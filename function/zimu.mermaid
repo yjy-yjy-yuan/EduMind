@@ -1,0 +1,38 @@
+graph TD
+    subgraph Input["输入层"]
+        A[视频音频流] --> B[语音识别]
+        B --> C[时间戳标记]
+    end
+
+    subgraph Processing["字幕处理层"]
+        D[文本分段]
+        E[时间轴对齐]
+        F[格式转换]
+        G[字幕优化]
+        
+        D --> E
+        E --> F
+        F --> G
+    end
+
+    subgraph Output["输出层"]
+        H[SRT文件]
+        I[WebVTT格式]
+        J[在线字幕]
+        
+        G --> H
+        G --> I
+        G --> J
+    end
+
+    subgraph Features["功能模块"]
+        K[字幕编辑器]
+        L[时间轴调整]
+        M[格式转换器]
+        N[字幕查找]
+        
+        H --> K
+        H --> L
+        H --> M
+        H --> N
+    end
