@@ -216,11 +216,6 @@ def handle_subtitle_tab():
 def handle_qa_tab():
     st.markdown("### 💡 智能问答")
     
-    # 检查是否有视频数据和转录文本
-    if not st.session_state.get("video_data") or not st.session_state.get("video_transcript"):
-        st.warning("请先上传并处理视频")
-        return
-    
     # 初始化聊天历史和输入内容
     if 'messages' not in st.session_state:
         st.session_state.messages = []
@@ -232,6 +227,20 @@ def handle_qa_tab():
     # 初始化输入框的key
     if 'qa_input_key' not in st.session_state:
         st.session_state.qa_input_key = 0
+
+    # 添加选择器，让用户选择是否基于视频内容进行问答
+    use_video_content = st.radio(
+        "选择问答模式",
+        ["基于视频内容的智能问答", "自由对话模式"],
+        index=0,  # 默认选择基于视频内容
+        help="基于视频内容：分析视频内容回答问题\n自由对话：可以询问任何问题"
+    )
+
+    if use_video_content == "基于视频内容的智能问答":
+        # 检查是否有视频数据和转录文本
+        if not st.session_state.get("video_data") or not st.session_state.get("video_transcript"):
+            st.warning("请先上传并处理视频")
+            return
     
     # 用户输入区域（固定高度）
     user_input = st.text_area(
@@ -244,7 +253,10 @@ def handle_qa_tab():
     # 创建两列布局用于按钮
     col1, col2 = st.columns([4, 1])
     with col1:
-        st.markdown("*提示：使用 '发送按钮' 进行解答*")
+        if use_video_content == "基于视频内容的智能问答":
+            st.markdown("*提示：系统将基于视频内容为您解答问题*")
+        else:
+            st.markdown("*提示：您可以询问任何问题*")
     with col2:
         send_button = st.button("发送", use_container_width=True)
 
@@ -283,17 +295,11 @@ def handle_qa_tab():
         with st.chat_message("user"):
             st.markdown(current_input)
 
-        # 使用RAG系统搜索相关字幕
-        similar_subtitles = st.session_state.rag_system.search_similar_subtitles(current_input)
-        
-        # 根据相关字幕的相关度决定是否使用RAG系统的回答
-        use_rag = False
-        if similar_subtitles:
-            # 检查最相关的字幕的相关度是否超过阈值
-            max_similarity = max(sub['similarity_score'] for sub in similar_subtitles)
-            use_rag = max_similarity > 0.5  # 调整相似度阈值为0.5
-
-        if use_rag:
+        # 根据用户选择决定使用哪种问答模式
+        if use_video_content == "基于视频内容的智能问答":
+            # 使用RAG系统搜索相关字幕
+            similar_subtitles = st.session_state.rag_system.search_similar_subtitles(current_input)
+            
             # 构建上下文
             context = "相关视频内容：\n"
             for sub in similar_subtitles:
@@ -311,19 +317,9 @@ def handle_qa_tab():
 1. 分条列点说明
 2. 使用markdown格式
 3. 在回答的末尾列出相关的视频时间点"""
-
         else:
-            # 直接使用DeepSeek API回答
-            prompt = f"""请回答用户的问题。注意：这是一个与视频内容无关的问题。
-
-用户问题：{current_input}
-
-请给出准确、详细的回答。
-回答时要：
-1. 以"这是一个与视频内容无关的问题，以下是我的回答："开头
-2. 分条列点说明
-3. 使用markdown格式
-4. 保持友好和专业的语气"""
+            # 自由对话模式：直接使用用户输入作为prompt
+            prompt = current_input
 
         # 获取AI回答
         with st.chat_message("assistant"):
