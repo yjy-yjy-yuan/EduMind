@@ -10,9 +10,11 @@ import requests
 from Process_video import process_video
 from download_video import download_and_play_video
 from note_system import NoteSystem, NoteImportance, NoteMood, NoteTemplate
+from rag_system import RAGSystem
 from openai import OpenAI
 import logging
 from datetime import datetime, timedelta
+import hashlib
 
 # 设置页面配置
 st.set_page_config(
@@ -84,97 +86,124 @@ def submit_chat():
 
 # 处理本地上传的视频
 def process_uploaded_video(uploaded_file, whisper_model_size, video_language):
-    """""" 
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
-        tmp_file.write(uploaded_file.getbuffer())
-        video_path = tmp_file.name
-        st.session_state.current_video = video_path
-        
-    with st.status("Processing video...", expanded=True) as status:
-        success = process_video(
-            video_path, 
-            status, 
-            uploaded_file.name, 
-            whisper_model=whisper_model_size,
-            to_simplified=video_language.startswith("中文")
-        )
-        if success:
-            st.session_state.processed_video = True
+    """处理上传的视频文件"""
+    if uploaded_file is not None:
+        try:
+            # 保存视频数据到session state
+            video_data = uploaded_file.getvalue()
+            st.session_state.video_data = video_data
+            
+            # 创建临时文件用于处理
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
+                tmp_file.write(video_data)
+                video_path = tmp_file.name
 
-# 处理视频链接
-def process_video_link(video_link, whisper_model_size, video_language):
-    try:
-        with st.spinner('正在下载视频...'):
-            video_path, video_name = download_and_play_video(video_link)
-            
-        if video_path and os.path.exists(video_path):
-            st.session_state.current_video = video_path
-            
-            with st.status("Processing video...", expanded=True) as status:
-                success = process_video(
-                    video_path, 
-                    status, 
-                    video_name, 
+            # 处理视频
+            with st.spinner('处理视频中...'):
+                process_video(
+                    video_path,
+                    original_filename=uploaded_file.name,
                     whisper_model=whisper_model_size,
-                    to_simplified=video_language.startswith("中文")
+                    st_session_state=st.session_state
                 )
-                if success:
-                    st.session_state.processed_video = True
-        else:
-            st.error("视频下载失败，请检查链接")
-            
-    except Exception as e:
-        st.error(f"处理视频时出错: {str(e)}")
+                
+            st.session_state.processed_video = True
+            return True
 
-# 处理视频上传和显示
+        except Exception as e:
+            st.error(f'处理视频时出错: {str(e)}')
+            return False
+        finally:
+            # 清理临时文件
+            if 'video_path' in locals():
+                try:
+                    os.unlink(video_path)
+                except:
+                    pass
+    return False
+
+def process_video_link(video_link, whisper_model_size, video_language):
+    """处理视频链接"""
+    if video_link:
+        try:
+            # 下载视频
+            with st.spinner('下载视频中...'):
+                video_path = download_and_play_video(video_link)
+                if not video_path:
+                    st.error('下载视频失败')
+                    return False
+                
+                # 读取视频数据
+                with open(video_path, 'rb') as f:
+                    video_data = f.read()
+                st.session_state.video_data = video_data
+
+            # 处理视频
+            with st.spinner('处理视频中...'):
+                process_video(
+                    video_path,
+                    whisper_model=whisper_model_size,
+                    st_session_state=st.session_state
+                )
+                
+            st.session_state.processed_video = True
+            return True
+
+        except Exception as e:
+            st.error(f'处理视频时出错: {str(e)}')
+            return False
+        finally:
+            # 清理临时文件
+            if 'video_path' in locals() and os.path.exists(video_path):
+                try:
+                    os.unlink(video_path)
+                except:
+                    pass
+    return False
+
 def handle_video_tab():
-    video_source = st.radio("选择视频来源", ["本地上传", "视频链接"])
-    video_language = st.radio(
-        "视频语言",
-        options=["中文 (简体/繁体)", "英文 (English)"]
+    """处理视频上传和显示标签页"""
+    st.header("📹 视频处理")
+    
+    # 初始化session state
+    if 'processed_video' not in st.session_state:
+        st.session_state.processed_video = False
+    if 'video_data' not in st.session_state:
+        st.session_state.video_data = None
+        
+    # 选择whisper模型大小
+    whisper_model_size = st.selectbox(
+        "选择Whisper模型大小",
+        ["tiny", "base", "small", "medium", "large"],
+        index=1
     )
     
-    with st.expander("高级设置", expanded=False):
-        if video_language.startswith("中文"):
-            base_model = st.selectbox(
-                "转录模型大小",
-                options=["tiny", "base", "small", "medium", "large", "turbo"],
-                index=1
-            )
-        else:
-            base_model = st.selectbox(
-                "转录模型大小",
-                options=["tiny", "base", "small", "medium"],
-                index=1
-            )
-        # 根据语言选择添加.en后缀
-        whisper_model_size = f"{base_model}.en" if video_language.startswith("英文") else base_model
-        
-    if video_source == "本地上传":
+    # 选择视频语言
+    video_language = st.selectbox(
+        "选择视频语言",
+        ["Chinese", "English", "Japanese", "Korean"],
+        index=0
+    )
+
+    # 创建两列布局
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # 处理本地视频上传
         uploaded_file = st.file_uploader("上传视频文件", type=["mp4", "mov", "avi"])
         if uploaded_file and not st.session_state.processed_video:
             process_uploaded_video(uploaded_file, whisper_model_size, video_language)
-    else:
+    
+    with col2:
+        # 处理视频链接
         video_link = st.text_input("输入视频链接")
         if st.button("处理视频", key="process_video") and video_link and not st.session_state.processed_video:
             process_video_link(video_link, whisper_model_size, video_language)
 
-    if st.session_state.current_video:
+    # 显示视频
+    if st.session_state.video_data is not None:
         with st.expander("📺 播放视频", expanded=True):
-            st.video(st.session_state.current_video)
-            st.markdown(""" 
-            <script>
-                const video = document.querySelector('video');
-                if (video) {
-                    video.addEventListener('timeupdate', function() {
-                        window.parent.postMessage({
-                            type: 'streamlit:setComponentValue',
-                            value: video.currentTime
-                        }, '*');
-                    });
-                }
-            </script>
-            """, unsafe_allow_html=True)
+            st.video(st.session_state.video_data)
 
 # 处理字幕显示
 def handle_subtitle_tab():
@@ -187,23 +216,35 @@ def handle_subtitle_tab():
 def handle_qa_tab():
     st.markdown("### 💡 智能问答")
     
-    # 初始化聊天历史
+    # 检查是否有视频数据和转录文本
+    if not st.session_state.get("video_data") or not st.session_state.get("video_transcript"):
+        st.warning("请先上传并处理视频")
+        return
+    
+    # 初始化聊天历史和输入内容
     if 'messages' not in st.session_state:
         st.session_state.messages = []
-
+    
+    # 初始化DeepSeek API
+    if 'deepseek_api' not in st.session_state:
+        st.session_state.deepseek_api = DeepSeekChatAPI()
+    
+    # 初始化输入框的key
+    if 'qa_input_key' not in st.session_state:
+        st.session_state.qa_input_key = 0
+    
     # 用户输入区域（固定高度）
     user_input = st.text_area(
         "在这里输入你的问题",
-        height=100,  # 固定高度
-        key="qa_input",
-        placeholder="请输入你的问题...\n按 Ctrl+Enter 快捷发送",
-        help="使用 Ctrl+Enter 快捷发送消息"
+        key=f"qa_input_{st.session_state.qa_input_key}",
+        height=100,
+        placeholder="请输入你的问题...",
     )
 
     # 创建两列布局用于按钮
     col1, col2 = st.columns([4, 1])
     with col1:
-        st.markdown("*提示：使用 Ctrl+Enter 快捷发送*")
+        st.markdown("*提示：使用 '发送按钮' 进行解答*")
     with col2:
         send_button = st.button("发送", use_container_width=True)
 
@@ -219,6 +260,11 @@ def handle_qa_tab():
         .stChatMessage:hover {
             background-color: #f0f0f0;
         }
+        .timestamp-link {
+            color: #0066cc;
+            text-decoration: underline;
+            cursor: pointer;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -226,47 +272,79 @@ def handle_qa_tab():
     if st.session_state.messages:
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-
-    # 检查是否按下了Ctrl+Enter
-    if user_input and ('\x11' in user_input or '\x0e' in user_input):  # Ctrl+Enter的一些可能的编码
-        user_input = user_input.replace('\x11', '').replace('\x0e', '')  # 清除控制字符
-        send_button = True
+                st.markdown(message["content"], unsafe_allow_html=True)
 
     # 当点击发送按钮且有输入内容时
     if send_button and user_input and user_input.strip():
+        current_input = user_input.strip()
+        
         # 添加用户消息
-        st.session_state.messages.append({"role": "user", "content": user_input})
+        st.session_state.messages.append({"role": "user", "content": current_input})
         with st.chat_message("user"):
-            st.markdown(user_input)
+            st.markdown(current_input)
 
-        # 生成回答
+        # 使用RAG系统搜索相关字幕
+        similar_subtitles = st.session_state.rag_system.search_similar_subtitles(current_input)
+        
+        # 根据相关字幕的相关度决定是否使用RAG系统的回答
+        use_rag = False
+        if similar_subtitles:
+            # 检查最相关的字幕的相关度是否超过阈值
+            max_similarity = max(sub['similarity_score'] for sub in similar_subtitles)
+            use_rag = max_similarity > 0.5  # 调整相似度阈值为0.5
+
+        if use_rag:
+            # 构建上下文
+            context = "相关视频内容：\n"
+            for sub in similar_subtitles:
+                context += f"- [{sub['start_time']} --> {sub['end_time']}] {sub['text']} (相关度: {sub['similarity_score']:.2f})\n"
+                
+            # 构建完整的prompt
+            prompt = f"""基于以下视频内容回答用户的问题。
+
+用户问题：{current_input}
+
+{context}
+
+请根据提供的视频内容，给出准确、详细的回答。
+回答时要：
+1. 分条列点说明
+2. 使用markdown格式
+3. 在回答的末尾列出相关的视频时间点"""
+
+        else:
+            # 直接使用DeepSeek API回答
+            prompt = f"""请回答用户的问题。注意：这是一个与视频内容无关的问题。
+
+用户问题：{current_input}
+
+请给出准确、详细的回答。
+回答时要：
+1. 以"这是一个与视频内容无关的问题，以下是我的回答："开头
+2. 分条列点说明
+3. 使用markdown格式
+4. 保持友好和专业的语气"""
+
+        # 获取AI回答
         with st.chat_message("assistant"):
             with st.spinner("思考中..."):
-                try:
-                    deepseek_chat = DeepSeekChatAPI()
-                    response = deepseek_chat.chat(user_input)
-                    st.session_state.messages.append({"role": "assistant", "content": response})
-                    st.markdown(response)
-                except Exception as e:
-                    st.error(f"生成回答时出错: {str(e)}")
-                    st.session_state.messages.pop()  # 移除最后一条用户消息
-        
-        st.rerun()
+                response = st.session_state.deepseek_api.chat(prompt)
+                st.markdown(response)
+                st.session_state.messages.append({"role": "assistant", "content": response})
 
-    # 添加清空聊天记录按钮（放在底部）
-    if st.session_state.messages and st.button("清空聊天记录", key="clear_chat"):
-        st.session_state.messages = []
+        # 通过更新key来清空输入框
+        st.session_state.qa_input_key += 1
         st.rerun()
-
+    
+    # 学习规划功能实现
 def handle_learning_plan():
     st.markdown("### 📚 学习规划")
     
-    # 添加视频信息提示
-    if not st.session_state.get("current_video"):
-        st.warning("请先上传或选择一个视频")
+    # 检查是否有视频数据和转录文本
+    if not st.session_state.get("video_data") or not st.session_state.get("video_transcript"):
+        st.warning("请先上传并处理视频")
         return
-        
+    
     # 初始化学习计划
     if "learning_plan" not in st.session_state:
         st.session_state.learning_plan = ""
@@ -299,19 +377,16 @@ def handle_learning_plan():
     if st.session_state.learning_plan:
         st.markdown(st.session_state.learning_plan)
 
+# 笔记系统功能实现
 def handle_notes():
     if 'note_system' not in st.session_state:
         st.session_state.note_system = NoteSystem()
         
     st.markdown("### 📝 笔记系统")
     
-    # 检查是否有视频
-    if not st.session_state.get("current_video"):
-        st.warning("请先上传或选择一个视频")
-        return
-    # 检查是否有视频
-    if not st.session_state.get("current_video"):
-        st.warning("请先上传或选择一个视频")
+    # 检查是否有视频数据和转录文本
+    if not st.session_state.get("video_data") or not st.session_state.get("video_transcript"):
+        st.warning("请先上传并处理视频")
         return
         
     # 添加笔记部分
@@ -473,6 +548,10 @@ def main():
         st.session_state.chat_input = ""
     if 'submit_chat' not in st.session_state:
         st.session_state.submit_chat = False
+    if 'rag_system' not in st.session_state:
+        st.session_state.rag_system = RAGSystem()
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
 
     # 创建三列布局
     col1, col2, col3 = st.columns([2, 3, 2])

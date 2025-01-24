@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 from video_tools import VideoTools
 import subprocess
@@ -163,7 +161,7 @@ def detect_first_voice_time(video_path: str) -> float:
         return 0
 
 # 处理视频主函数
-def process_video(video_path, status_container=None, original_filename=None, output_dir='../IVS/captions', whisper_model="base", to_simplified=True):
+def process_video(video_path, status_container=None, original_filename=None, output_dir='../IVS/captions', whisper_model="base", to_simplified=True, st_session_state=None):
     try:
         if original_filename is None:
             original_filename = os.path.basename(video_path)
@@ -258,6 +256,11 @@ def process_video(video_path, status_container=None, original_filename=None, out
         except Exception as e:
             if status_container:
                 status_container.error(f"保存元数据失败: {str(e)}")
+        
+        # 将字幕添加到RAG系统
+        if st_session_state and 'rag_system' in st_session_state:
+            # 使用TXT文件更新RAG系统
+            st_session_state.rag_system.add_subtitles_from_txt(base_filename, txt_filepath)
         
         # 更新会话状态中的字幕内容
         import streamlit as st
