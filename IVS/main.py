@@ -45,14 +45,79 @@ class DeepSeekChatAPI:
             api_key=self.api_key,
             base_url="https://api.deepseek.com"
         )
-        self.messages = []
-        
-    def chat(self, user_input, stream=True):
-        self.messages.append({"role": "user", "content": user_input})
+        # 分别存储两种模式的消息历史
+        self.video_qa_messages = []
+        self.free_chat_messages = []
+
+    def _judge_question_type(self, question: str) -> bool:
+        """判断是否需要分析整个视频内容"""
+        judge_prompt = f"""请判断以下问题是否需要分析整个视频内容来回答：
+
+问题：{question}
+
+判断标准：
+1. 如果问题涉及视频的整体内容、主题、总结等（如"视频讲了什么"、"视频的主要内容是什么"、"总结一下视频内容"等），返回"需要全文分析"
+2. 如果问题是具体的、针对特定内容的提问，返回"使用RAG检索"
+
+请只返回"需要全文分析"或"使用RAG检索"这两个短语之一。"""
+
         try:
             response = self.client.chat.completions.create(
                 model="deepseek-chat",
-                messages=self.messages,
+                messages=[{"role": "user", "content": judge_prompt}],
+                stream=False
+            )
+            result = response.choices[0].message.content.strip()
+            return result == "需要全文分析"
+        except Exception as e:
+            logging.error(f"Question type judgment error: {str(e)}")
+            return False
+
+    def chat(self, user_input, mode="free_chat", context=None, full_transcript=None, stream=True):
+        # 选择对应模式的消息历史
+        messages = self.video_qa_messages if mode == "video_qa" else self.free_chat_messages
+        
+        if mode == "video_qa":
+            # 判断是否需要分析整个视频内容
+            needs_full_analysis = self._judge_question_type(user_input)
+            
+            if needs_full_analysis and full_transcript:
+                # 使用完整字幕进行回答
+                full_prompt = f"""请基于以下完整的视频字幕回答用户的问题。
+
+用户问题：{user_input}
+
+完整视频字幕：
+{full_transcript}
+
+请给出全面、详细的回答。回答要求：
+1. 分条列点说明
+2. 使用markdown格式
+3. 突出重点内容
+4. 如果合适的话，可以对内容进行分类或总结"""
+                messages.append({"role": "user", "content": full_prompt})
+            else:
+                # 使用RAG检索结果回答
+                full_prompt = f"""基于以下视频内容回答用户的问题。
+
+用户问题：{user_input}
+
+{context}
+
+请根据提供的视频内容，给出准确、详细的回答。
+回答时要：
+1. 分条列点说明
+2. 使用markdown格式
+3. 在回答的末尾列出相关的视频时间点"""
+                messages.append({"role": "user", "content": full_prompt})
+        else:
+            # 自由对话模式：直接使用用户输入
+            messages.append({"role": "user", "content": user_input})
+        
+        try:
+            response = self.client.chat.completions.create(
+                model="deepseek-chat",
+                messages=messages,
                 stream=stream
             )
             
@@ -66,19 +131,20 @@ class DeepSeekChatAPI:
                         full_response += content
                         # 使用markdown方法更新内容
                         message_placeholder.markdown(full_response)
-                self.messages.append({"role": "assistant", "content": full_response})
+                messages.append({"role": "assistant", "content": full_response})
                 return full_response
             else:
                 # 非流式输出
                 result = response.choices[0].message.content
-                st.markdown(result)  # 使用markdown而不是write
-                self.messages.append({"role": "assistant", "content": result})
+                st.markdown(result)
+                messages.append({"role": "assistant", "content": result})
                 return result
                 
         except Exception as e:
-            logging.error(f"Chat API Error: {str(e)}")  # 使用logging记录错误
-            st.error("抱歉，暂时无法回答您的问题。")
-            return "抱歉，暂时无法回答您的问题。"
+            logging.error(f"Chat API Error: {str(e)}")
+            error_msg = "抱歉，暂时无法回答您的问题。"
+            st.error(error_msg)
+            return error_msg
 
 def submit_chat():
     if st.session_state.chat_input.strip():  # 确保输入不是空白
@@ -216,9 +282,11 @@ def handle_subtitle_tab():
 def handle_qa_tab():
     st.markdown("### 💡 智能问答")
     
-    # 初始化聊天历史和输入内容
-    if 'messages' not in st.session_state:
-        st.session_state.messages = []
+    # 初始化两种模式的聊天历史
+    if 'video_qa_messages' not in st.session_state:
+        st.session_state.video_qa_messages = []
+    if 'free_chat_messages' not in st.session_state:
+        st.session_state.free_chat_messages = []
     
     # 初始化DeepSeek API
     if 'deepseek_api' not in st.session_state:
@@ -235,6 +303,21 @@ def handle_qa_tab():
         index=0,  # 默认选择基于视频内容
         help="基于视频内容：分析视频内容回答问题\n自由对话：可以询问任何问题"
     )
+
+    # 根据当前模式选择对应的消息列表
+    current_messages = (st.session_state.video_qa_messages 
+                       if use_video_content == "基于视频内容的智能问答" 
+                       else st.session_state.free_chat_messages)
+
+    # 添加清除聊天记录按钮
+    col1, col2, col3 = st.columns([6, 2, 2])
+    with col2:
+        if st.button("清除聊天记录", use_container_width=True):
+            if use_video_content == "基于视频内容的智能问答":
+                st.session_state.video_qa_messages = []
+            else:
+                st.session_state.free_chat_messages = []
+            st.rerun()
 
     if use_video_content == "基于视频内容的智能问答":
         # 检查是否有视频数据和转录文本
@@ -280,18 +363,21 @@ def handle_qa_tab():
         </style>
     """, unsafe_allow_html=True)
 
-    # 显示聊天历史
-    if st.session_state.messages:
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"], unsafe_allow_html=True)
+    # 显示当前模式的聊天历史
+    if current_messages:
+        # 创建一个容器来显示聊天记录
+        chat_container = st.container()
+        with chat_container:
+            for message in current_messages:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"], unsafe_allow_html=True)
 
     # 当点击发送按钮且有输入内容时
     if send_button and user_input and user_input.strip():
         current_input = user_input.strip()
         
-        # 添加用户消息
-        st.session_state.messages.append({"role": "user", "content": current_input})
+        # 添加用户消息到当前模式的消息列表
+        current_messages.append({"role": "user", "content": current_input})
         with st.chat_message("user"):
             st.markdown(current_input)
 
@@ -304,29 +390,28 @@ def handle_qa_tab():
             context = "相关视频内容：\n"
             for sub in similar_subtitles:
                 context += f"- [{sub['start_time']} --> {sub['end_time']}] {sub['text']} (相关度: {sub['similarity_score']:.2f})\n"
-                
-            # 构建完整的prompt
-            prompt = f"""基于以下视频内容回答用户的问题。
-
-用户问题：{current_input}
-
-{context}
-
-请根据提供的视频内容，给出准确、详细的回答。
-回答时要：
-1. 分条列点说明
-2. 使用markdown格式
-3. 在回答的末尾列出相关的视频时间点"""
+            
+            # 获取AI回答（视频问答模式）
+            with st.chat_message("assistant"):
+                with st.spinner("思考中..."):
+                    response = st.session_state.deepseek_api.chat(
+                        user_input=current_input,
+                        mode="video_qa",
+                        context=context,
+                        full_transcript=st.session_state.video_transcript
+                    )
+                    st.markdown(response)
+                    current_messages.append({"role": "assistant", "content": response})
         else:
-            # 自由对话模式：直接使用用户输入作为prompt
-            prompt = current_input
-
-        # 获取AI回答
-        with st.chat_message("assistant"):
-            with st.spinner("思考中..."):
-                response = st.session_state.deepseek_api.chat(prompt)
-                st.markdown(response)
-                st.session_state.messages.append({"role": "assistant", "content": response})
+            # 自由对话模式：直接使用DeepSeek对话
+            with st.chat_message("assistant"):
+                with st.spinner("思考中..."):
+                    response = st.session_state.deepseek_api.chat(
+                        user_input=current_input,
+                        mode="free_chat"
+                    )
+                    st.markdown(response)
+                    current_messages.append({"role": "assistant", "content": response})
 
         # 通过更新key来清空输入框
         st.session_state.qa_input_key += 1
