@@ -1,3 +1,8 @@
+import warnings
+import torchvision
+torchvision.disable_beta_transforms_warning()
+warnings.filterwarnings('ignore', category=UserWarning)
+
 # main.py
 # 主要功能：视频处理、字幕显示、笔记系统、智能问答、学习规划
 # 引用了Process_video.py、download_video.py、note_system.py
@@ -194,10 +199,13 @@ def process_video_link(video_link, whisper_model_size, video_language):
         try:
             # 下载视频
             with st.spinner('下载视频中...'):
-                video_path = download_and_play_video(video_link)
-                if not video_path:
+                video_path_info = download_and_play_video(video_link)
+                if not video_path_info[0]:  # 检查 video_path
                     st.error('下载视频失败')
                     return False
+                
+                video_path = video_path_info[0]  # 获取实际的视频路径
+                st.success(f"视频已下载到: {video_path}")
                 
                 # 读取视频数据
                 with open(video_path, 'rb') as f:
@@ -236,6 +244,8 @@ def handle_video_tab():
         st.session_state.processed_video = False
     if 'video_data' not in st.session_state:
         st.session_state.video_data = None
+    if 'active_tab' not in st.session_state:
+        st.session_state.active_tab = "upload"  # 默认显示上传标签页
         
     # 选择whisper模型大小
     whisper_model_size = st.selectbox(
@@ -251,25 +261,43 @@ def handle_video_tab():
         index=0
     )
 
-    # 创建两列布局
-    col1, col2 = st.columns(2)
+    # 创建选项卡
+    tab1, tab2 = st.tabs(["📤 本地视频上传", "🔗 视频链接输入"])
     
-    with col1:
-        # 处理本地视频上传
-        uploaded_file = st.file_uploader("上传视频文件", type=["mp4", "mov", "avi"])
-        if uploaded_file and not st.session_state.processed_video:
-            process_uploaded_video(uploaded_file, whisper_model_size, video_language)
+    # 本地视频上传标签页
+    with tab1:
+        if not st.session_state.processed_video:
+            uploaded_file = st.file_uploader("选择视频文件", type=["mp4", "mov", "avi"])
+            if uploaded_file:
+                if st.button("处理本地视频"):
+                    process_uploaded_video(uploaded_file, whisper_model_size, video_language)
+        else:
+            st.info("已有视频正在处理中。如需处理新视频，请刷新页面。")
     
-    with col2:
-        # 处理视频链接
-        video_link = st.text_input("输入视频链接")
-        if st.button("处理视频", key="process_video") and video_link and not st.session_state.processed_video:
-            process_video_link(video_link, whisper_model_size, video_language)
+    # 视频链接输入标签页
+    with tab2:
+        if not st.session_state.processed_video:
+            video_link = st.text_input("输入视频链接（支持B站、YouTube等平台）", key="video_link_input")
+            # 始终显示按钮，但根据是否有输入来决定是否禁用
+            if st.button("处理在线视频", disabled=not bool(video_link), key="process_video_button"):
+                process_video_link(video_link, whisper_model_size, video_language)
+        else:
+            st.info("已有视频正在处理中。如需处理新视频，请刷新页面。")
 
-    # 显示视频
+    # 显示视频和处理状态
+    if st.session_state.processed_video:
+        st.success("✅ 视频已成功处理")
+        
     if st.session_state.video_data is not None:
         with st.expander("📺 播放视频", expanded=True):
             st.video(st.session_state.video_data)
+            
+    # 添加重置按钮
+    if st.session_state.processed_video:
+        if st.button("处理新视频"):
+            st.session_state.processed_video = False
+            st.session_state.video_data = None
+            st.experimental_rerun()
 
 # 处理字幕显示
 def handle_subtitle_tab():
