@@ -12,14 +12,16 @@ import tempfile
 import os
 import json
 import requests
+from openai import OpenAI
 from Process_video import process_video
 from download_video import download_and_play_video
 from note_system import NoteSystem, NoteImportance, NoteMood, NoteTemplate
 from rag_system import RAGSystem
-from openai import OpenAI
 import logging
 from datetime import datetime, timedelta
 import hashlib
+import time
+import random
 
 # 设置页面配置
 st.set_page_config(
@@ -39,20 +41,63 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# DeepSeek API配置
-API_KEY = "sk-ba656c564e2148009618ad3a2231c002"  # 建议使用环境变量
+# 通义千问 API配置
+API_KEY = "sk-178e130a121445659860893fdfae1e7d"  # 建议使用环境变量
 
-# DeepSeek对话API类
-class DeepSeekChatAPI:
+# 通义千问对话API类
+class QwenChatAPI:
     def __init__(self):
-        self.api_key = API_KEY
         self.client = OpenAI(
-            api_key=self.api_key,
-            base_url="https://api.deepseek.com"
+            api_key=API_KEY,
+            base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
         )
         # 分别存储两种模式的消息历史
-        self.video_qa_messages = []
-        self.free_chat_messages = []
+        self.video_qa_messages = [
+            {"role": "system", "content": "你是一个教育助手。你会为用户提供安全，有帮助，准确的回答。同时，你会拒绝一切涉及恐怖主义，种族歧视，黄色暴力等问题的回答。"}
+        ]
+        self.free_chat_messages = [
+            {"role": "system", "content": "你是一个教育助手。你会为用户提供安全，有帮助，准确的回答。同时，你会拒绝一切涉及恐怖主义，种族歧视，黄色暴力等问题的回答。"}
+        ]
+        # 添加请求计数器和最后请求时间
+        self.request_count = 0
+        self.last_request_time = 0
+        self.max_retries = 3
+        self.retry_delay = 1.5
+
+    def _wait_for_rate_limit(self):
+        """等待以符合速率限制"""
+        current_time = time.time()
+        time_diff = current_time - self.last_request_time
+        
+        # 如果距离上次请求不到1秒
+        if time_diff < 1:
+            # 添加一个随机延迟，避免所有请求同时发送
+            sleep_time = 1 - time_diff + random.uniform(0, 0.5)
+            time.sleep(sleep_time)
+        
+        self.last_request_time = time.time()
+
+    def _make_request(self, messages, retry_count=0):
+        """发送API请求，包含重试逻辑"""
+        try:
+            self._wait_for_rate_limit()
+            
+            stream_response = self.client.chat.completions.create(
+                model="qwen-turbo",
+                messages=messages,
+                temperature=0.3,
+                stream=True
+            )
+            return stream_response
+            
+        except Exception as e:
+            if "rate_limit_reached_error" in str(e) and retry_count < self.max_retries:
+                # 如果是速率限制错误且未超过最大重试次数
+                retry_sleep = self.retry_delay * (retry_count + 1)
+                time.sleep(retry_sleep)
+                return self._make_request(messages, retry_count + 1)
+            else:
+                raise e
 
     def _judge_question_type(self, question: str) -> bool:
         """判断是否需要分析整个视频内容"""
@@ -67,10 +112,12 @@ class DeepSeekChatAPI:
 请只返回"需要全文分析"或"使用RAG检索"这两个短语之一。"""
 
         try:
+            messages = [{"role": "user", "content": judge_prompt}]
+            self._wait_for_rate_limit()  # 添加速率限制等待
             response = self.client.chat.completions.create(
-                model="deepseek-chat",
-                messages=[{"role": "user", "content": judge_prompt}],
-                stream=False
+                model="qwen-turbo",
+                messages=messages,
+                temperature=0.3,
             )
             result = response.choices[0].message.content.strip()
             return result == "需要全文分析"
@@ -79,16 +126,18 @@ class DeepSeekChatAPI:
             return False
 
     def chat(self, user_input, mode="free_chat", context=None, full_transcript=None, stream=True):
+        """流式对话函数"""
         # 选择对应模式的消息历史
         messages = self.video_qa_messages if mode == "video_qa" else self.free_chat_messages
         
-        if mode == "video_qa":
-            # 判断是否需要分析整个视频内容
-            needs_full_analysis = self._judge_question_type(user_input)
-            
-            if needs_full_analysis and full_transcript:
-                # 使用完整字幕进行回答
-                full_prompt = f"""请基于以下完整的视频字幕回答用户的问题。
+        try:
+            if mode == "video_qa":
+                # 判断是否需要分析整个视频内容
+                needs_full_analysis = self._judge_question_type(user_input)
+                
+                if needs_full_analysis and full_transcript:
+                    # 使用完整字幕进行回答
+                    prompt = f"""请基于以下完整的视频字幕回答用户的问题。
 
 用户问题：{user_input}
 
@@ -98,58 +147,47 @@ class DeepSeekChatAPI:
 请给出全面、详细的回答。回答要求：
 1. 分条列点说明
 2. 使用markdown格式
-3. 突出重点内容
-4. 如果合适的话，可以对内容进行分类或总结"""
-                messages.append({"role": "user", "content": full_prompt})
-            else:
-                # 使用RAG检索结果回答
-                full_prompt = f"""基于以下视频内容回答用户的问题。
+3. 突出重点内容"""
+                else:
+                    # 使用相关字幕片段进行回答
+                    prompt = f"""请基于以下视频片段回答用户的问题。
 
 用户问题：{user_input}
 
 {context}
 
-请根据提供的视频内容，给出准确、详细的回答。
-回答时要：
+请给出准确、相关的回答。回答要求：
 1. 分条列点说明
 2. 使用markdown格式
-3. 在回答的末尾列出相关的视频时间点"""
-                messages.append({"role": "user", "content": full_prompt})
-        else:
-            # 自由对话模式：直接使用用户输入
-            messages.append({"role": "user", "content": user_input})
-        
-        try:
-            response = self.client.chat.completions.create(
-                model="deepseek-chat",
-                messages=messages,
-                stream=stream
-            )
-            
-            if stream:
-                # 流式输出
-                full_response = ""
-                message_placeholder = st.empty()
-                for chunk in response:
-                    if chunk.choices[0].delta.content is not None:
-                        content = chunk.choices[0].delta.content
-                        full_response += content
-                        # 使用markdown方法更新内容
-                        message_placeholder.markdown(full_response)
-                messages.append({"role": "assistant", "content": full_response})
-                return full_response
+3. 突出重点内容
+4. 如果提供的视频片段无法完全回答问题，请说明"""
             else:
-                # 非流式输出
-                result = response.choices[0].message.content
-                st.markdown(result)
-                messages.append({"role": "assistant", "content": result})
-                return result
-                
+                # 自由对话模式
+                prompt = user_input
+
+            # 添加用户消息
+            messages.append({"role": "user", "content": prompt})
+            
+            # 创建流式对话（使用重试机制）
+            stream_response = self._make_request(messages)
+            
+            # 用于收集完整的回答
+            full_response = ""
+            
+            # 逐个词语返回回答
+            for chunk in stream_response:
+                if chunk.choices[0].delta.content is not None:
+                    content = chunk.choices[0].delta.content
+                    full_response += content
+                    yield content
+            
+            # 添加助手回答到历史记录
+            messages.append({"role": "assistant", "content": full_response})
+            
         except Exception as e:
+            error_msg = f"对话生成出错: {str(e)}"
             logging.error(f"Chat API Error: {str(e)}")
-            error_msg = "抱歉，暂时无法回答您的问题。"
-            st.error(error_msg)
-            return error_msg
+            yield error_msg
 
 def submit_chat():
     if st.session_state.chat_input.strip():  # 确保输入不是空白
@@ -316,9 +354,9 @@ def handle_qa_tab():
     if 'free_chat_messages' not in st.session_state:
         st.session_state.free_chat_messages = []
     
-    # 初始化DeepSeek API
-    if 'deepseek_api' not in st.session_state:
-        st.session_state.deepseek_api = DeepSeekChatAPI()
+    # 初始化通义千问 API
+    if 'qwen_api' not in st.session_state:
+        st.session_state.qwen_api = QwenChatAPI()
     
     # 初始化输入框的key
     if 'qa_input_key' not in st.session_state:
@@ -421,25 +459,39 @@ def handle_qa_tab():
             
             # 获取AI回答（视频问答模式）
             with st.chat_message("assistant"):
-                with st.spinner("思考中..."):
-                    response = st.session_state.deepseek_api.chat(
-                        user_input=current_input,
-                        mode="video_qa",
-                        context=context,
-                        full_transcript=st.session_state.video_transcript
-                    )
-                    st.markdown(response)
-                    current_messages.append({"role": "assistant", "content": response})
+                message_placeholder = st.empty()
+                full_response = ""
+                
+                # 使用流式输出
+                for token in st.session_state.qwen_api.chat(
+                    user_input=current_input,
+                    mode="video_qa",
+                    context=context,
+                    full_transcript=st.session_state.video_transcript
+                ):
+                    full_response += token
+                    message_placeholder.markdown(full_response + "▌")
+                
+                # 显示最终回答
+                message_placeholder.markdown(full_response)
+                current_messages.append({"role": "assistant", "content": full_response})
         else:
-            # 自由对话模式：直接使用DeepSeek对话
+            # 自由对话模式：直接使用通义千问对话
             with st.chat_message("assistant"):
-                with st.spinner("思考中..."):
-                    response = st.session_state.deepseek_api.chat(
-                        user_input=current_input,
-                        mode="free_chat"
-                    )
-                    st.markdown(response)
-                    current_messages.append({"role": "assistant", "content": response})
+                message_placeholder = st.empty()
+                full_response = ""
+                
+                # 使用流式输出
+                for token in st.session_state.qwen_api.chat(
+                    user_input=current_input,
+                    mode="free_chat"
+                ):
+                    full_response += token
+                    message_placeholder.markdown(full_response + "▌")
+                
+                # 显示最终回答
+                message_placeholder.markdown(full_response)
+                current_messages.append({"role": "assistant", "content": full_response})
 
         # 通过更新key来清空输入框
         st.session_state.qa_input_key += 1

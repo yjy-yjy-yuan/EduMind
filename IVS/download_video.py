@@ -34,80 +34,107 @@ def progress_hook(d):
 # 使用 yt-dlp 下载视频并返回可播放的文件路径(主函数调用)
 def download_and_play_video(video_link, download_folder="../IVS/downloads"):
     try:
+        # 确保使用正确的路径分隔符并转换为绝对路径
+        download_folder = os.path.abspath(download_folder)
         os.makedirs(download_folder, exist_ok=True)
+        
+        # 通用的下载配置
+        common_opts = {
+            'format': 'bestvideo*+bestaudio/best',
+            'merge_output_format': 'mp4',
+            'outtmpl': os.path.join(download_folder, '%(title)s.%(ext)s'),
+            'progress_hooks': [lambda d: progress_hook(d)],
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,
+            'postprocessors': [{
+                'key': 'FFmpegVideoConvertor',
+                'preferedformat': 'mp4',
+            }]
+        }
+        
+        # 通用User-Agent
+        user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         
         # 区分不同平台的下载配置
         if "bilibili.com" in video_link or "b23.tv" in video_link or video_link.startswith('BV'):
-            # Bilibili 视频的下载配置
+            # Bilibili 特定配置
             ydl_opts = {
-                'format': 'bestvideo*+bestaudio/best',  # 下载最佳视频和音频质量
-                'merge_output_format': 'mp4',  # 强制合并为mp4
-                'outtmpl': os.path.join(download_folder, '%(title)s.%(ext)s'),
-                'progress_hooks': [lambda d: progress_hook(d)],
-                'quiet': True,
-                'no_warnings': True,
-                'extract_flat': False,
-                'postprocessors': [{
-                    'key': 'FFmpegVideoConvertor',
-                    'preferedformat': 'mp4',
-                }],
+                **common_opts,
                 'http_headers': {
                     'Referer': 'https://www.bilibili.com',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    'User-Agent': user_agent
                 }
             }
             
             # 处理 Bilibili 短链接
             if "b23.tv" in video_link:
                 import requests
-                headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                }
+                headers = {'User-Agent': user_agent}
                 response = requests.head(video_link, headers=headers, allow_redirects=True)
                 video_link = response.url
                 
             # 处理 BV 号格式
             if video_link.startswith('BV'):
                 video_link = f"https://www.bilibili.com/video/{video_link}"
-            
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(video_link, download=True)
-                video_title = info['title']
-                safe_title = get_safe_filename(video_title)
-                video_path = os.path.join(download_folder, f"{safe_title}.mp4")
-                
-                return video_path, safe_title
-                
         else:
-            # YouTube 等其他平台的默认配置
+            # YouTube 等其他平台的配置
             ydl_opts = {
-                'format': 'best[ext=mp4]/best',
-                'outtmpl': os.path.join(download_folder, '%(title)s.%(ext)s'),
-                'progress_hooks': [lambda d: progress_hook(d)],
-                'quiet': True,
+                **common_opts,
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',  # 优先选择mp4格式
+                'http_headers': {
+                    'User-Agent': user_agent,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-us,en;q=0.5',
+                    'Sec-Fetch-Mode': 'navigate',
+                },
+                'nocheckcertificate': True,
+                'ignoreerrors': False,
                 'no_warnings': True,
-                'extract_flat': False,
-                'postprocessors': [{
-                    'key': 'FFmpegVideoConvertor',
-                    'preferedformat': 'mp4'
-                }]
+                'extractor_args': {'youtube': {
+                    'player_client': ['android', 'web'],  # 尝试多个客户端
+                    'player_skip': ['webpage', 'config', 'js'],  # 跳过可能导致问题的检查
+                }},
+                'socket_timeout': 30,  # 增加超时时间
+                'retries': 10,  # 增加重试次数
+                'file_access_retries': 10,
+                'fragment_retries': 10,
+                'skip_unavailable_fragments': True,
+                'overwrites': True,
             }
+            
+            # 如果是YouTube链接，尝试规范化URL
+            if 'youtube.com' in video_link or 'youtu.be' in video_link:
+                try:
+                    # 处理短链接
+                    if 'youtu.be' in video_link:
+                        video_id = video_link.split('/')[-1].split('?')[0]
+                        video_link = f'https://www.youtube.com/watch?v={video_id}'
+                    # 清理URL参数
+                    if '&' in video_link:
+                        video_link = video_link.split('&')[0]
+                except Exception:
+                    pass  # 如果URL处理失败，使用原始URL
         
+        # 下载视频
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(video_link, download=True)
             video_title = info['title']
             safe_title = get_safe_filename(video_title)
             video_path = os.path.join(download_folder, f"{safe_title}.mp4")
             
-            return video_path, safe_title
+            # 确保文件存在
+            if not os.path.exists(video_path):
+                # 尝试查找实际下载的文件
+                potential_files = [f for f in os.listdir(download_folder) if f.startswith(safe_title)]
+                if potential_files:
+                    video_path = os.path.join(download_folder, potential_files[0])
             
-    except yt_dlp.utils.DownloadError as e:
-        error_str = str(e)
-        if "Requested format is not available" in error_str:
-            st.error(f"无法获取视频格式: {error_str}")
-        else:
-            st.error(f"视频下载失败: {error_str}")
-        return None, None
+            if os.path.exists(video_path):
+                return video_path, safe_title
+            else:
+                raise FileNotFoundError(f"无法找到下载的视频文件: {video_path}")
+                
     except Exception as e:
-        st.error(f"发生未知错误: {str(e)}")
+        st.error(f"下载视频时出错: {str(e)}")
         return None, None
