@@ -27,12 +27,6 @@ class NoteImportance(Enum):
     HIGH = "🌟"     # 非常重要
     CRITICAL = "🔥"  # 关键笔记
 
-class NoteMood(Enum):
-    HAPPY = "😊"     # 理解很好
-    NEUTRAL = "😐"   # 一般理解
-    CONFUSED = "😕"  # 有点困惑
-    DIFFICULT = "😫" # 很难理解
-
 class NoteTemplate(Enum):
     CONCEPT = "概念模板"
     QUESTION = "问题模板"
@@ -46,57 +40,54 @@ class Note:
         timestamp: float,
         timestamp_str: Optional[str] = None,
         importance: NoteImportance = NoteImportance.LOW,
-        mood: NoteMood = NoteMood.NEUTRAL,
         tags: Set[str] = None,
         template_type: Optional[NoteTemplate] = None,
-        related_notes: List[int] = None
+        related_notes: List[int] = None,
+        last_reviewed: Optional[datetime] = None
     ):
-        self.id = datetime.now().timestamp()
-        self.text = text.strip()
+        self.text = text
         self.timestamp = timestamp
-        self.timestamp_str = timestamp_str or str(timedelta(seconds=int(timestamp)))
+        self.timestamp_str = timestamp_str if timestamp_str else self._format_timestamp(timestamp)
         self.importance = importance
-        self.mood = mood
-        self.tags = tags or set()
+        self.tags = tags if tags else set()
         self.template_type = template_type
-        self.related_notes = related_notes or []
-        self.created_at = datetime.now()
-        self.last_reviewed = None
-        self.review_count = 0
+        self.related_notes = related_notes if related_notes else []
+        self.last_reviewed = last_reviewed
+
+    def _format_timestamp(self, timestamp: float) -> str:
+        """将时间戳格式化为字符串"""
+        total_seconds = int(timestamp)
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
     def to_dict(self) -> Dict:
+        """将笔记转换为字典格式"""
         return {
-            "id": self.id,
-            "text": self.text,
-            "timestamp": self.timestamp,
-            "timestamp_str": self.timestamp_str,
-            "importance": self.importance.name,
-            "mood": self.mood.name,
-            "tags": list(self.tags),
-            "template_type": self.template_type.name if self.template_type else None,
-            "related_notes": self.related_notes,
-            "created_at": self.created_at.isoformat(),
-            "last_reviewed": self.last_reviewed.isoformat() if self.last_reviewed else None,
-            "review_count": self.review_count
+            'text': self.text,
+            'timestamp': self.timestamp,
+            'timestamp_str': self.timestamp_str,
+            'importance': self.importance.name,
+            'tags': list(self.tags),
+            'template_type': self.template_type.name if self.template_type else None,
+            'related_notes': self.related_notes,
+            'last_reviewed': self.last_reviewed.isoformat() if self.last_reviewed else None
         }
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'Note':
-        note = cls(
-            text=data["text"],
-            timestamp=data["timestamp"],
-            timestamp_str=data["timestamp_str"],
-            importance=NoteImportance[data["importance"]],
-            mood=NoteMood[data["mood"]],
-            tags=set(data["tags"]),
-            template_type=NoteTemplate[data["template_type"]] if data["template_type"] else None,
-            related_notes=data["related_notes"]
+        """从字典创建笔记对象"""
+        return cls(
+            text=data['text'],
+            timestamp=data['timestamp'],
+            timestamp_str=data['timestamp_str'],
+            importance=NoteImportance[data['importance']],
+            tags=set(data['tags']),
+            template_type=NoteTemplate[data['template_type']] if data['template_type'] else None,
+            related_notes=data['related_notes'],
+            last_reviewed=datetime.fromisoformat(data['last_reviewed']) if data['last_reviewed'] else None
         )
-        note.id = data["id"]
-        note.created_at = datetime.fromisoformat(data["created_at"])
-        note.last_reviewed = datetime.fromisoformat(data["last_reviewed"]) if data["last_reviewed"] else None
-        note.review_count = data["review_count"]
-        return note
 
 class NoteSystem:
     def __init__(self):
@@ -114,7 +105,6 @@ class NoteSystem:
         timestamp: float,
         timestamp_str: Optional[str] = None,
         importance: NoteImportance = NoteImportance.LOW,
-        mood: NoteMood = NoteMood.NEUTRAL,
         tags: Set[str] = None,
         template_type: Optional[NoteTemplate] = None,
         related_notes: List[int] = None
@@ -128,7 +118,6 @@ class NoteSystem:
             timestamp=timestamp,
             timestamp_str=timestamp_str,
             importance=importance,
-            mood=mood,
             tags=tags,
             template_type=template_type,
             related_notes=related_notes
@@ -139,7 +128,6 @@ class NoteSystem:
 
     def get_notes(self, 
                  importance: Optional[NoteImportance] = None,
-                 mood: Optional[NoteMood] = None,
                  tags: Optional[Set[str]] = None,
                  template_type: Optional[NoteTemplate] = None) -> List[Note]:
         """获取笔记，支持多种过滤条件"""
@@ -147,8 +135,6 @@ class NoteSystem:
         
         if importance:
             filtered_notes = [n for n in filtered_notes if n.importance == importance]
-        if mood:
-            filtered_notes = [n for n in filtered_notes if n.mood == mood]
         if tags:
             filtered_notes = [n for n in filtered_notes if tags & n.tags]
         if template_type:
@@ -169,7 +155,6 @@ class NoteSystem:
         new_text: Optional[str] = None,
         new_timestamp: Optional[float] = None,
         new_importance: Optional[NoteImportance] = None,
-        new_mood: Optional[NoteMood] = None,
         new_tags: Optional[Set[str]] = None
     ) -> bool:
         """编辑笔记"""
@@ -181,11 +166,9 @@ class NoteSystem:
             note.text = new_text.strip()
         if new_timestamp is not None:
             note.timestamp = new_timestamp
-            note.timestamp_str = str(timedelta(seconds=int(new_timestamp)))
+            note.timestamp_str = note._format_timestamp(new_timestamp)
         if new_importance is not None:
             note.importance = new_importance
-        if new_mood is not None:
-            note.mood = new_mood
         if new_tags is not None:
             note.tags = new_tags
             
@@ -225,7 +208,6 @@ class NoteSystem:
             return False
             
         note.last_reviewed = datetime.now()
-        note.review_count += 1
         return True
 
     def get_notes_for_review(self, days_threshold: int = 7) -> List[Note]:
@@ -242,23 +224,17 @@ class NoteSystem:
             return {
                 'total_notes': 0,
                 'importance_distribution': {},
-                'mood_distribution': {},
                 'tags_distribution': {}
             }
         
         total_notes = len(self.notes)
         importance_dist = {}
-        mood_dist = {}
         tags_dist = {}
         
         for note in self.notes:
             # 统计重要性分布
             imp = note.importance.name
             importance_dist[imp] = importance_dist.get(imp, 0) + 1
-            
-            # 统计心情分布
-            mood = note.mood.name
-            mood_dist[mood] = mood_dist.get(mood, 0) + 1
             
             # 统计标签分布
             if note.tags:
@@ -268,7 +244,6 @@ class NoteSystem:
         return {
             'total_notes': total_notes,
             'importance_distribution': importance_dist,
-            'mood_distribution': mood_dist,
             'tags_distribution': tags_dist
         }
     
@@ -311,7 +286,6 @@ class NoteSystem:
                     for note in self.notes:
                         f.write(f"时间: [{note.timestamp_str}]\n")
                         f.write(f"重要性: {note.importance.value}\n")
-                        f.write(f"心情: {note.mood.value}\n")
                         if note.tags:
                             f.write(f"标签: {', '.join(note.tags)}\n")
                         if note.template_type:

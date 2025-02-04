@@ -8,7 +8,7 @@ import os
 from openai import OpenAI
 from Process_video import process_video
 from download_video import download_and_play_video
-from note_system import NoteSystem, Note, NoteImportance, NoteMood, NoteTemplate
+from note_system import NoteSystem, Note, NoteImportance, NoteTemplate
 from rag_system import RAGSystem
 import logging
 from datetime import datetime
@@ -574,6 +574,14 @@ def handle_notes():
         st.warning("请先上传并处理视频")
         return
         
+    # 笔记模板选择
+    template_type = st.selectbox(
+        "笔记模板",
+        options=[None] + [t for t in NoteTemplate],
+        format_func=lambda x: x.value if x else "不使用模板",
+        help="选择合适的模板来规范笔记格式"
+    )
+        
     # 笔记输入区域
     note_text = st.text_area(
         "在这里输入你的笔记",
@@ -603,19 +611,12 @@ def handle_notes():
     importance = st.selectbox(
         "重要性",
         options=[imp for imp in NoteImportance],
-        format_func=lambda x: f"{x.value} {x.name}"
-    )
-    
-    mood = st.selectbox(
-        "理解程度",
-        options=[m for m in NoteMood],
-        format_func=lambda x: f"{x.value} {x.name}"
-    )
-    
-    template_type = st.selectbox(
-        "笔记模板",
-        options=[None] + [t for t in NoteTemplate],
-        format_func=lambda x: x.value if x else "不使用模板"
+        format_func=lambda x: f"{x.value} {x.name}",
+        help="""笔记重要性等级说明：\n
+        💡 LOW - 普通笔记：一般性的知识点或想法
+    ⭐ MEDIUM - 重要笔记：需要重点关注的内容
+    🌟 HIGH - 非常重要：核心知识点或关键内容
+    🔥 CRITICAL - 关键笔记：必须掌握的知识点"""
     )
     
     tags = st.text_input("标签（用逗号分隔）", help="例如：概念,重点,待复习")
@@ -632,7 +633,6 @@ def handle_notes():
                     text=note_text,
                     timestamp=current_time,
                     importance=importance,
-                    mood=mood,
                     tags=set(tags.split(",")) if tags else set(),
                     template_type=template_type
                 )
@@ -663,19 +663,12 @@ def handle_notes():
                 options=[None] + list(NoteImportance),
                 format_func=lambda x: "全部" if x is None else f"{x.value} {x.name}"
             )
-        with col2:
-            filter_mood = st.selectbox(
-                "按理解程度筛选",
-                options=[None] + list(NoteMood),
-                format_func=lambda x: "全部" if x is None else f"{x.value} {x.name}"
-            )
         with col3:
             all_tags = {tag for note in st.session_state.note_system.notes for tag in note.tags}
             filter_tags = st.multiselect("按标签筛选", options=list(all_tags))
             
         notes = st.session_state.note_system.get_notes(
             importance=filter_importance,
-            mood=filter_mood,
             tags=set(filter_tags) if filter_tags else None
         )
         
@@ -686,7 +679,7 @@ def handle_notes():
                 with st.container():
                     col1, col2 = st.columns([4, 1])
                     with col1:
-                        st.markdown(f"**时间**: [{note.timestamp_str}] {note.importance.value} {note.mood.value}")
+                        st.markdown(f"**时间**: [{note.timestamp_str}] {note.importance.value}")
                         if note.tags:
                             st.markdown(f"**标签**: {', '.join(note.tags)}")
                         st.markdown(f"**内容**:\n{note.text}")
@@ -694,9 +687,6 @@ def handle_notes():
                         if st.button("删除", key=f"delete_{note.id}"):
                             st.session_state.note_system.delete_note(note.id)
                             st.rerun()
-                        if st.button("标记已复习", key=f"review_{note.id}"):
-                            st.session_state.note_system.mark_note_reviewed(note.id)
-                            st.success("已标记为已复习！")
                     st.markdown("---")
             
             # 添加笔记总结功能
@@ -727,16 +717,11 @@ def handle_notes():
                 col1, col2 = st.columns(2)
                 with col1:
                     st.metric("总笔记数", progress["total_notes"])
-                    st.metric("已复习比例", f"{progress['review_status']['reviewed']*100:.1f}%")
                 
                 with col2:
                     st.markdown("#### 重要性分布")
                     for imp, ratio in progress["importance_distribution"].items():
                         st.progress(ratio, text=f"{NoteImportance[imp].value} {ratio*100:.1f}%")
-                    
-                    st.markdown("#### 理解程度分布")
-                    for mood, ratio in progress["mood_distribution"].items():
-                        st.progress(ratio, text=f"{NoteMood[mood].value} {ratio*100:.1f}%")
                 
                 if progress["tags_distribution"]:
                     st.markdown("#### 标签统计")
