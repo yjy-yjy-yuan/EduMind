@@ -1,5 +1,18 @@
-# note_system.py
-# 实现了一个现代化的笔记系统，用于记录视频学习笔记
+"""
+1、实现功能
+    实现了一个现代化的视频学习笔记系统
+    支持笔记的增删改查
+    包含笔记重要性、心情标记
+    支持笔记模板和标签管理
+    实现了笔记之间的关联关系
+2、主要技术
+    使用枚举类（Enum）定义笔记属性
+    采用 emoji 进行心情和重要性标记
+    实现了完整的 CRUD 操作
+    使用 JSON 序列化支持数据持久化
+    采用类型注解确保代码类型安全
+    实现了笔记模板系统
+    支持多维度的笔记过滤和检索"""
 
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Union, Set
@@ -225,39 +238,43 @@ class NoteSystem:
 
     def get_learning_progress(self) -> Dict:
         """获取学习进度统计"""
-        total_notes = len(self.notes)
-        if not total_notes:
+        if not self.notes:
             return {
-                "total_notes": 0,
-                "importance_distribution": {},
-                "mood_distribution": {},
-                "review_status": {"reviewed": 0, "not_reviewed": 0},
-                "tags_distribution": {}
+                'total_notes': 0,
+                'importance_distribution': {},
+                'mood_distribution': {},
+                'tags_distribution': {}
             }
-
-        importance_dist = {imp: 0 for imp in NoteImportance}
-        mood_dist = {mood: 0 for mood in NoteMood}
+        
+        total_notes = len(self.notes)
+        importance_dist = {}
+        mood_dist = {}
         tags_dist = {}
-        reviewed = 0
-
+        
         for note in self.notes:
-            importance_dist[note.importance] += 1
-            mood_dist[note.mood] += 1
-            if note.last_reviewed:
-                reviewed += 1
-            for tag in note.tags:
-                tags_dist[tag] = tags_dist.get(tag, 0) + 1
-
+            # 统计重要性分布
+            imp = note.importance.name
+            importance_dist[imp] = importance_dist.get(imp, 0) + 1
+            
+            # 统计心情分布
+            mood = note.mood.name
+            mood_dist[mood] = mood_dist.get(mood, 0) + 1
+            
+            # 统计标签分布
+            if note.tags:
+                for tag in note.tags:
+                    tags_dist[tag] = tags_dist.get(tag, 0) + 1
+        
         return {
-            "total_notes": total_notes,
-            "importance_distribution": {k.name: v/total_notes for k, v in importance_dist.items()},
-            "mood_distribution": {k.name: v/total_notes for k, v in mood_dist.items()},
-            "review_status": {
-                "reviewed": reviewed/total_notes,
-                "not_reviewed": (total_notes-reviewed)/total_notes
-            },
-            "tags_distribution": {k: v/total_notes for k, v in tags_dist.items()}
+            'total_notes': total_notes,
+            'importance_distribution': importance_dist,
+            'mood_distribution': mood_dist,
+            'tags_distribution': tags_dist
         }
+    
+    def clear_all_notes(self):
+        """清空所有笔记"""
+        self.notes = []
 
     def save_notes(self, filepath: str) -> bool:
         """保存笔记到文件"""

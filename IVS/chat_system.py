@@ -1,5 +1,14 @@
-# chat_system.py
-# 实现了一个简单的聊天系统，用于与用户进行对话，并记录对话历史。
+"""
+1、实现了
+    智能聊天系统，用于与用户进行教育相关的对话
+    包含对话历史记录管理
+    集成了上下文感知能力
+2、主要技术：
+使用 OpenAI API（通义千问模型）进行对话生成
+采用异步流式处理技术（Generator）
+使用 typing 模块进行类型提示
+实现了上下文管理和历史记录维护
+"""
 
 from typing import List, Dict, Optional, Generator
 from openai import OpenAI

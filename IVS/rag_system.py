@@ -1,8 +1,20 @@
+"""
+1、实现功能
+    实现检索增强生成（RAG）系统
+    支持基于字幕的相似内容检索
+    高效的向量检索和相似度计算
+    支持 GPU 加速
+2、主要技术
+    使用 FAISS 进行高效向量检索
+    使用 SentenceTransformer 进行文本向量化
+    实现了余弦相似度计算
+    使用正则表达式处理时间戳
+    支持批量处理和增量更新
+"""
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Tuple
-import json
 import os
 import torch
 import re

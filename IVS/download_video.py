@@ -1,4 +1,13 @@
-# 下载视频：目前支持YouTube、bilibili
+"""
+1、实现功能：
+    支持从多个平台（YouTube、bilibili）下载视频，支持下载进度显示
+2、主要技术：
+    使用 yt-dlp 库进行视频下载
+    集成 Streamlit 进行进度展示
+    使用正则表达式处理文件名
+    实现了错误处理和重试机制
+    支持多平台适配（B站和YouTube的不同配置）
+"""
 
 import os
 import re

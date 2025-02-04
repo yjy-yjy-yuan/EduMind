@@ -2,24 +2,16 @@ import warnings
 import torchvision
 torchvision.disable_beta_transforms_warning()
 warnings.filterwarnings('ignore', category=UserWarning)
-
-# main.py
-# 主要功能：视频处理、字幕显示、笔记系统、智能问答、学习规划
-# 引用了Process_video.py、download_video.py、note_system.py
-
 import streamlit as st
 import tempfile
 import os
-import json
-import requests
 from openai import OpenAI
 from Process_video import process_video
 from download_video import download_and_play_video
-from note_system import NoteSystem, NoteImportance, NoteMood, NoteTemplate
+from note_system import NoteSystem, Note, NoteImportance, NoteMood, NoteTemplate
 from rag_system import RAGSystem
 import logging
-from datetime import datetime, timedelta
-import hashlib
+from datetime import datetime
 import time
 import random
 
@@ -335,16 +327,83 @@ def handle_video_tab():
         if st.button("处理新视频"):
             st.session_state.processed_video = False
             st.session_state.video_data = None
-            st.experimental_rerun()
+            st.rerun()
 
-# 处理字幕显示
+def merge_subtitle_segments(transcript):
+    """将字幕合并成有意义的段落，并添加标点符号"""
+    if not transcript:
+        return ""
+    
+    lines = transcript.strip().split('\n\n')
+    merged_paragraphs = []
+    current_paragraph = []
+    current_text = ""
+    start_time = ""
+    end_time = ""
+    
+    for line in lines:
+        if not line.strip():
+            continue
+            
+        # 提取时间戳和文本
+        try:
+            # 提取时间戳 [HH:MM:SS.sss --> HH:MM:SS.sss]
+            time_parts = line[1:line.find(']')].split(' --> ')
+            if not start_time:
+                start_time = time_parts[0]
+            end_time = time_parts[1]
+            
+            # 提取文本并添加标点
+            text = line[line.find(']') + 1:].strip()
+            if text:
+                if current_text:
+                    # 检查最后一个字符是否已经有标点
+                    if not current_text[-1] in '。，！？':
+                        current_text += '，'
+                current_text += text
+                
+                # 如果文本较长或以句号结尾，创建新段落
+                if len(current_text) > 50 or text[-1] in '。！？':
+                    if not current_text[-1] in '。，！？':
+                        current_text += '。'
+                    merged_paragraphs.append(
+                        f"[{start_time} --> {end_time}]\n{current_text}\n\n---\n\n"
+                    )
+                    current_text = ""
+                    start_time = ""
+                    end_time = ""
+        except Exception as e:
+            print(f"处理字幕行时出错: {str(e)}")
+            continue
+    
+    # 处理最后一个段落
+    if current_text:
+        if not current_text[-1] in '。，！？':
+            current_text += '。'
+        merged_paragraphs.append(
+            f"[{start_time} --> {end_time}]\n{current_text}\n\n---\n\n"
+        )
+    
+    return ''.join(merged_paragraphs)
+
 def handle_subtitle_tab():
     if st.session_state.video_transcript:
-        st.markdown(st.session_state.video_transcript)
+        # 添加CSS样式使字幕显示更美观
+        st.markdown("""
+            <style>
+            .stMarkdown p {
+                line-height: 1.8;
+                margin-bottom: 1.5em;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+        # 合并字幕段落
+        merged_transcript = merge_subtitle_segments(st.session_state.video_transcript)
+        st.markdown(merged_transcript)
     else:
         st.info("请先处理视频以生成字幕")
 
-# 处理智能问答
 def handle_qa_tab():
     st.markdown("### 💡 智能问答")
     
@@ -497,110 +556,103 @@ def handle_qa_tab():
         st.session_state.qa_input_key += 1
         st.rerun()
     
-    # 学习规划功能实现
-def handle_learning_plan():
-    st.markdown("### 📚 学习规划")
-    
-    # 检查是否有视频数据和转录文本
-    if not st.session_state.get("video_data") or not st.session_state.get("video_transcript"):
-        st.warning("请先上传并处理视频")
-        return
-    
-    # 初始化学习计划
-    if "learning_plan" not in st.session_state:
-        st.session_state.learning_plan = ""
-        
-    # 生成学习计划按钮
-    if st.button("生成学习计划", use_container_width=True):
-        with st.spinner("正在生成学习计划..."):
-            try:
-                deepseek_chat = DeepSeekChatAPI()
-                # 构建提示词
-                prompt = f"""请根据以下视频内容生成一个详细的学习计划：
-                视频标题：{st.session_state.current_video}
-                
-                请包含以下内容：
-                1. 学习目标
-                2. 关键知识点
-                3. 学习步骤
-                4. 练习建议
-                5. 时间安排
-                
-                请用markdown格式输出。
-                """
-                response = deepseek_chat.chat(prompt)
-                st.session_state.learning_plan = response
-                st.rerun()
-            except Exception as e:
-                st.error(f"生成学习计划时出错: {str(e)}")
-    
-    # 显示学习计划
-    if st.session_state.learning_plan:
-        st.markdown(st.session_state.learning_plan)
-
-# 笔记系统功能实现
+    # 笔记系统功能实现
 def handle_notes():
     if 'note_system' not in st.session_state:
         st.session_state.note_system = NoteSystem()
         
-    st.markdown("### 📝 笔记系统")
+    if 'note_input' not in st.session_state:
+        st.session_state.note_input = ""
+        
+    if 'note_input_key' not in st.session_state:
+        st.session_state.note_input_key = 0
+        
+    st.markdown("### 📒 笔记系统")
     
     # 检查是否有视频数据和转录文本
     if not st.session_state.get("video_data") or not st.session_state.get("video_transcript"):
         st.warning("请先上传并处理视频")
         return
         
-    # 添加笔记部分
-    with st.expander("✍️ 添加新笔记", expanded=True):
-        # 笔记模板选择
-        template_type = st.selectbox(
-            "选择笔记模板",
-            options=[None] + list(NoteTemplate),
-            format_func=lambda x: "不使用模板" if x is None else x.value
-        )
-        
-        # 如果选择了模板，显示模板内容
-        if template_type:
-            note_template = st.session_state.note_system.get_template(template_type)
-            note_text = st.text_area("笔记内容", value=note_template, height=200)
-        else:
-            note_text = st.text_area("笔记内容", height=150)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            importance = st.select_slider(
-                "重要性",
-                options=list(NoteImportance),
-                format_func=lambda x: f"{x.value} {x.name}",
-                value=NoteImportance.LOW
-            )
-        with col2:
-            mood = st.select_slider(
-                "理解程度",
-                options=list(NoteMood),
-                format_func=lambda x: f"{x.value} {x.name}",
-                value=NoteMood.NEUTRAL
-            )
-        
-        tags = st.text_input("标签（用逗号分隔）")
-        tags_set = {tag.strip() for tag in tags.split(",")} if tags else set()
-        
-        current_time = st.session_state.get('current_video_time', 0)
-        if st.button("保存笔记"):
-            if note_text.strip():
-                success = st.session_state.note_system.add_note(
+    # 笔记输入区域
+    note_text = st.text_area(
+        "在这里输入你的笔记",
+        height=150,
+        key=f"note_text_{st.session_state.note_input_key}",
+        help="""格式说明：\n
+1、标题：\n
+    输入 # + 空格 + 文本，创建一级标题\n
+    输入 ## + 空格 + 文本，创建二级标题\n
+    输入 ### + 空格 + 文本，创建三级标题
+
+2、文本样式：\n
+    在文本两端各加两个 * ，设置粗体(**文本**)\n
+    在文本两端各加一个 * ，设置斜体(*文本*)\n
+    在文本两端各加两个 ~ ，设置删除线(~~文本~~)
+
+3、列表：\n
+    输入 - + 空格 + 文本，创建无序列表\n
+    输入 1. + 空格 + 文本，创建有序列表
+
+4、引用：\n
+    输入 > + 空格 + 文本，创建单行引用\n
+    多行引用每行都需要添加 > + 空格"""
+    )
+    
+    # 笔记属性选择
+    importance = st.selectbox(
+        "重要性",
+        options=[imp for imp in NoteImportance],
+        format_func=lambda x: f"{x.value} {x.name}"
+    )
+    
+    mood = st.selectbox(
+        "理解程度",
+        options=[m for m in NoteMood],
+        format_func=lambda x: f"{x.value} {x.name}"
+    )
+    
+    template_type = st.selectbox(
+        "笔记模板",
+        options=[None] + [t for t in NoteTemplate],
+        format_func=lambda x: x.value if x else "不使用模板"
+    )
+    
+    tags = st.text_input("标签（用逗号分隔）", help="例如：概念,重点,待复习")
+    
+    # 创建两列布局
+    col1, col2 = st.columns([1, 1])
+    
+    current_time = st.session_state.get('current_video_time', 0)
+    with col1:
+        if st.button("保存笔记", key="save_note_button"):
+            if note_text.strip():  # 确保笔记内容不为空
+                # 直接调用add_note方法
+                st.session_state.note_system.add_note(
                     text=note_text,
                     timestamp=current_time,
                     importance=importance,
                     mood=mood,
-                    tags=tags_set,
+                    tags=set(tags.split(",")) if tags else set(),
                     template_type=template_type
                 )
-                if success:
-                    st.success("笔记已保存！")
-                else:
-                    st.error("保存笔记失败！")
-                    
+                st.success("笔记保存成功！")
+                # 通过更新key来清空输入框
+                st.session_state.note_input_key += 1
+                st.rerun()
+            else:
+                st.warning("笔记内容不能为空")
+    
+    with col2:
+        if st.button("清空笔记", key="clear_note_button"):
+            if st.session_state.note_system.notes:  # 如果有笔记
+                if st.warning("确定要清空所有笔记吗？此操作不可恢复！", icon="⚠️"):
+                    st.session_state.note_system.clear_all_notes()
+                    st.success("已清空所有笔记！")
+                    st.rerun()
+            else:
+                st.info("当前没有保存的笔记。")
+            
     # 显示笔记列表
     with st.expander("📖 查看笔记", expanded=True):
         # 筛选选项
@@ -650,15 +702,22 @@ def handle_notes():
             # 添加笔记总结功能
             if st.button("生成笔记总结", key="summarize_notes"):
                 with st.spinner("正在生成笔记总结..."):
-                    deepseek_chat = DeepSeekChatAPI()
+                    qwen_chat = QwenChatAPI()
                     notes_text = "\n".join([
                         f"时间 {note.timestamp_str} {note.importance.value}: {note.text}" 
                         for note in notes
                     ])
                     
-                    summary = deepseek_chat.chat(f"请总结这些笔记内容：\n{notes_text}")
-                    st.markdown("### 笔记总结")
-                    st.markdown(summary)
+                    # 创建一个markdown容器
+                    st.markdown("### 📝 笔记总结")
+                    summary_container = st.empty()
+                    summary = ""
+                    
+                    # 处理流式响应
+                    for chunk in qwen_chat.chat(f"请总结这些笔记内容：\n{notes_text}", stream=True):
+                        if chunk:
+                            summary += chunk
+                            summary_container.markdown(summary)
             
             # 显示学习进度
             if st.button("查看学习进度"):
@@ -713,6 +772,8 @@ def main():
         st.session_state.rag_system = RAGSystem()
     if 'messages' not in st.session_state:
         st.session_state.messages = []
+    if 'qwen_api' not in st.session_state:
+        st.session_state.qwen_api = QwenChatAPI()
 
     # 创建三列布局
     col1, col2, col3 = st.columns([2, 3, 2])
@@ -729,7 +790,7 @@ def main():
         with tab2:
             handle_qa_tab()
         with tab3:
-            handle_learning_plan()
+            st.info("请先上传并处理视频")
     
     # 右侧列：笔记系统
     with col3:

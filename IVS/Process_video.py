@@ -1,3 +1,18 @@
+"""
+1、实现功能：
+    视频处理的主要流程控制
+    视频音频提取和转录
+    字幕生成和格式化
+    支持简繁体中文转换
+    精确检测视频第一个有声音的时间点
+2、主要技术：
+    使用 Whisper 进行语音识别
+    使用 FFmpeg 进行音视频处理
+    使用 OpenCC 进行中文简繁转换
+    支持 SRT 和 TXT 格式的字幕生成
+    实现了精确的音频检测算法
+"""
+
 import streamlit as st
 from video_tools import VideoTools
 import subprocess
@@ -5,7 +20,6 @@ from opencc import OpenCC
 import os
 import json
 from datetime import datetime
-import whisper
 
 # 创建带时间戳的字幕段落
 def create_paragraphs_combined(transcript, first_voice_time: float, to_simplified=True):
