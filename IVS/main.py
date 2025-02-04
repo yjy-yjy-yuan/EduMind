@@ -38,6 +38,7 @@ API_KEY = "sk-178e130a121445659860893fdfae1e7d"  # 建议使用环境变量
 
 # 笔记模板名称映射
 NOTE_TEMPLATE_NAMES = {
+    "无模板": "无模板",
     NoteTemplate.CONCEPT.value: "概念笔记",
     NoteTemplate.QUESTION.value: "问题笔记",
     NoteTemplate.SUMMARY.value: "总结笔记",
@@ -400,7 +401,7 @@ def handle_subtitle_tab():
         html_content = """
         <style>
         .subtitle-container {
-            height: 300px;
+            height: 400px;
             overflow-y: auto;
             padding: 20px;
             font-family: sans-serif;
@@ -471,7 +472,7 @@ def handle_subtitle_tab():
             """
         
         # 使用st.components.html显示内容
-        st.components.v1.html(html_content, height=350)
+        st.components.v1.html(html_content, height=450)
 
 def handle_qa_tab():
     st.markdown("### 💡 智能问答")
@@ -664,58 +665,82 @@ def handle_notes():
             except Exception as e:
                 continue
 
-        # 笔记模板选择
-        st.markdown("### 笔记模板")
-        selected_template = st.selectbox(
-            "选择笔记模板",
-            options=[template.value for template in NoteTemplate],
-            format_func=lambda x: NOTE_TEMPLATE_NAMES.get(x, x),
-            key="note_template"
-        )
-
-        # 添加时间点选择器
-        st.markdown("### 时间点列表")
-        if timestamps:
-            selected_index = st.selectbox(
-                "选择时间点",
-                options=range(len(timestamps)),
-                format_func=lambda i: timestamps[i][0],
-                key="note_timestamp"
+        # 创建两列布局用于笔记模板和时间点列表
+        template_col, timestamp_col = st.columns(2)
+        
+        with template_col:
+            # 笔记模板选择
+            st.markdown("### 笔记模板")
+            selected_template = st.selectbox(
+                "选择笔记模板",
+                options=["无模板"] + [template.value for template in NoteTemplate],
+                format_func=lambda x: NOTE_TEMPLATE_NAMES.get(x, x),
+                key="note_template"
             )
             
-            if selected_index is not None:
-                selected_time = timestamps[selected_index]
-                st.session_state.current_video_time = selected_time[1]
-                st.session_state.current_video_end_time = selected_time[2]
+            # 当模板改变时，更新笔记输入
+            if selected_template and selected_template != "无模板":
+                template_type = NoteTemplate(selected_template)
+                template_content = st.session_state.note_system.get_template(template_type)
+                if "last_template" not in st.session_state or st.session_state.last_template != selected_template:
+                    st.session_state.note_input = template_content
+                    st.session_state.note_input_key += 1  # 强制更新文本区域
+                    st.session_state.last_template = selected_template
+            elif selected_template == "无模板":
+                if "last_template" not in st.session_state or st.session_state.last_template != selected_template:
+                    st.session_state.note_input = ""
+                    st.session_state.note_input_key += 1
+                    st.session_state.last_template = selected_template
+        
+        with timestamp_col:
+            # 添加时间点选择器
+            st.markdown("### 时间点列表")
+            if timestamps:
+                selected_index = st.selectbox(
+                    "选择时间点",
+                    options=range(len(timestamps)),
+                    format_func=lambda i: timestamps[i][0],
+                    key="note_timestamp"
+                )
+                
+                if selected_index is not None:
+                    selected_time = timestamps[selected_index]
+                    st.session_state.current_video_time = selected_time[1]
+                    st.session_state.current_video_end_time = selected_time[2]
         
         # 笔记输入区域
         st.markdown("### 添加笔记")
-        note_text = st.text_area("笔记内容", key="note_text", height=100)
+        note_text = st.text_area("笔记内容", 
+                               value=st.session_state.note_input,
+                               key=f"note_text_{st.session_state.note_input_key}",
+                               height=100)
         
-        # 笔记属性选择
-        importance = st.selectbox(
-            "重要性",
-            options=[imp for imp in NoteImportance],
-            format_func=lambda x: f"{x.value} {x.name}",
-            help="""笔记重要性等级说明：\n
-            LOW - 普通笔记：一般性的知识点或想法
-        MEDIUM - 重要笔记：需要重点关注的内容
-        HIGH - 非常重要：核心知识点或关键内容
-        CRITICAL - 关键笔记：必须掌握的知识点"""
-        )
+        # 创建两列布局用于重要性和标签
+        col1, col2 = st.columns(2)
         
-        tags = st.text_input("标签（用逗号分隔）", help="例如：概念,重点,待复习")
+        with col1:
+            importance = st.selectbox(
+                "重要性",
+                options=[imp for imp in NoteImportance],
+                format_func=lambda x: f"{x.value} {x.name}",
+                help="""笔记重要性等级说明：
+                LOW - 普通笔记：一般性的知识点或想法
+                MEDIUM - 重要笔记：需要重点关注的内容
+                HIGH - 非常重要：核心知识点或关键内容
+                CRITICAL - 关键笔记：必须掌握的知识点"""
+            )
+        
+        with col2:
+            tags = st.text_input("标签（用逗号分隔）", help="例如：概念,重点,待复习")
         
         # 创建两列布局
         col1, col2 = st.columns([1, 1])
         
-        current_time = st.session_state.get('current_video_time', 0)
         with col1:
             if st.button("保存笔记"):
-                current_time = st.session_state.get('current_video_time', 0)
-                current_end_time = st.session_state.get('current_video_end_time', current_time)
+                current_time = st.session_state.current_video_time if hasattr(st.session_state, 'current_video_time') else 0
+                current_end_time = st.session_state.current_video_end_time if hasattr(st.session_state, 'current_video_end_time') else None
                 
-                # 添加笔记
                 st.session_state.note_system.add_note(
                     text=note_text,
                     timestamp=current_time,
