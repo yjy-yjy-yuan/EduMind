@@ -36,6 +36,14 @@ logging.basicConfig(
 # 通义千问 API配置
 API_KEY = "sk-178e130a121445659860893fdfae1e7d"  # 建议使用环境变量
 
+# 笔记模板名称映射
+NOTE_TEMPLATE_NAMES = {
+    NoteTemplate.CONCEPT.value: "概念笔记",
+    NoteTemplate.QUESTION.value: "问题笔记",
+    NoteTemplate.SUMMARY.value: "总结笔记",
+    NoteTemplate.REVIEW.value: "复习笔记"
+}
+
 # 通义千问对话API类
 class QwenChatAPI:
     def __init__(self):
@@ -392,10 +400,13 @@ def handle_subtitle_tab():
         html_content = """
         <style>
         .subtitle-container {
-            height: 600px;
+            height: 300px;
             overflow-y: auto;
             padding: 20px;
             font-family: sans-serif;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
         }
         .subtitle-segment {
             margin-bottom: 20px;
@@ -424,9 +435,6 @@ def handle_subtitle_tab():
         
         # 获取合并后的字幕段落
         merged_transcript = merge_subtitle_segments(st.session_state.video_transcript)
-        
-        # 从合并后的段落中提取时间戳和文本
-        timestamps = []
         paragraphs = []
         
         for paragraph in merged_transcript.split('---\n\n'):
@@ -435,70 +443,35 @@ def handle_subtitle_tab():
             try:
                 # 提取时间戳 [HH:MM:SS.sss --> HH:MM:SS.sss]
                 time_str = paragraph[paragraph.find('[')+1:paragraph.find(']')]
-                start_time = time_str.split(' --> ')[0]
-                # 保存完整的时间戳和对应的时间信息
-                h, m, s = map(float, start_time.split(':'))
-                start_seconds = h * 3600 + m * 60 + s
-                h, m, s = map(float, time_str.split(' --> ')[1].split(':'))
-                end_seconds = h * 3600 + m * 60 + s
-                
-                # 保存时间戳和文本
                 text_part = paragraph[paragraph.find(']')+1:].strip()
-                timestamps.append((f"[{time_str}]", start_seconds, end_seconds))
                 paragraphs.append((time_str, text_part))
             except Exception as e:
                 continue
+                
+        # 为每个段落添加HTML内容
+        selected_index = st.session_state.get('note_timestamp', None)
+        for i, (time_str, text) in enumerate(paragraphs):
+            segment_class = "selected-timestamp" if i == selected_index else "subtitle-segment"
+            html_content += f"""
+            <div id="segment_{i}" class="{segment_class}">
+                [{time_str}]<br>{text}
+            </div>
+            """
         
-        if timestamps:
-            # 保存当前选择的时间戳
-            if 'selected_timestamp' not in st.session_state:
-                st.session_state.selected_timestamp = timestamps[0][1]
-            
-            # 创建两列布局
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                st.markdown("### 时间点列表")
-                # 添加时间戳选择器
-                selected_index = st.selectbox(
-                    "选择时间点",
-                    options=range(len(timestamps)),
-                    format_func=lambda i: timestamps[i][0],
-                    key="subtitle_timestamp"
-                )
-                
-                if selected_index is not None:
-                    selected_time = timestamps[selected_index]
-                    st.session_state.current_video_time = selected_time[1]
-                    st.session_state.current_video_end_time = selected_time[2]
-            
-            with col2:
-                st.markdown("### 字幕内容")
-                
-                # 为每个段落添加HTML内容
-                for i, (time_str, text) in enumerate(paragraphs):
-                    segment_class = "selected-timestamp" if i == selected_index else "subtitle-segment"
-                    html_content += f"""
-                    <div id="segment_{i}" class="{segment_class}">
-                        [{time_str}]<br>{text}
-                    </div>
-                    """
-                
-                html_content += "</div>"
-                
-                # 添加自动滚动脚本
-                html_content += f"""
-                <script>
-                    setTimeout(function() {{
-                        scrollToSegment('segment_{selected_index}');
-                    }}, 100);
-                </script>
-                """
-                
-                # 使用st.components.html显示内容
-                st.components.v1.html(html_content, height=650)
-    else:
-        st.info("请先处理视频以生成字幕")
+        html_content += "</div>"
+        
+        # 添加自动滚动脚本
+        if selected_index is not None:
+            html_content += f"""
+            <script>
+                setTimeout(function() {{
+                    scrollToSegment('segment_{selected_index}');
+                }}, 100);
+            </script>
+            """
+        
+        # 使用st.components.html显示内容
+        st.components.v1.html(html_content, height=350)
 
 def handle_qa_tab():
     st.markdown("### 💡 智能问答")
@@ -654,6 +627,7 @@ def handle_qa_tab():
     
     # 笔记系统功能实现
 def handle_notes():
+    # 初始化笔记系统
     if 'note_system' not in st.session_state:
         st.session_state.note_system = NoteSystem()
         
@@ -662,168 +636,183 @@ def handle_notes():
         
     if 'note_input_key' not in st.session_state:
         st.session_state.note_input_key = 0
-        
-    st.markdown("### 📒 笔记系统")
-    
+
     # 检查是否有视频数据和转录文本
     if not st.session_state.get("video_data") or not st.session_state.get("video_transcript"):
         st.warning("请先上传并处理视频")
         return
+
+    if st.session_state.video_transcript:
+        # 获取合并后的字幕段落用于时间点选择
+        merged_transcript = merge_subtitle_segments(st.session_state.video_transcript)
+        timestamps = []
         
-    # 笔记模板选择
-    template_type = st.selectbox(
-        "笔记模板",
-        options=[None] + [t for t in NoteTemplate],
-        format_func=lambda x: x.value if x else "不使用模板",
-        help="选择合适的模板来规范笔记格式"
-    )
+        for paragraph in merged_transcript.split('---\n\n'):
+            if not paragraph.strip():
+                continue
+            try:
+                # 提取时间戳 [HH:MM:SS.sss --> HH:MM:SS.sss]
+                time_str = paragraph[paragraph.find('[')+1:paragraph.find(']')]
+                start_time = time_str.split(' --> ')[0]
+                # 保存完整的时间戳和对应的时间信息
+                h, m, s = map(float, start_time.split(':'))
+                start_seconds = h * 3600 + m * 60 + s
+                h, m, s = map(float, time_str.split(' --> ')[1].split(':'))
+                end_seconds = h * 3600 + m * 60 + s
+                
+                timestamps.append((f"[{time_str}]", start_seconds, end_seconds))
+            except Exception as e:
+                continue
+
+        # 笔记模板选择
+        st.markdown("### 笔记模板")
+        selected_template = st.selectbox(
+            "选择笔记模板",
+            options=[template.value for template in NoteTemplate],
+            format_func=lambda x: NOTE_TEMPLATE_NAMES.get(x, x),
+            key="note_template"
+        )
+
+        # 添加时间点选择器
+        st.markdown("### 时间点列表")
+        if timestamps:
+            selected_index = st.selectbox(
+                "选择时间点",
+                options=range(len(timestamps)),
+                format_func=lambda i: timestamps[i][0],
+                key="note_timestamp"
+            )
+            
+            if selected_index is not None:
+                selected_time = timestamps[selected_index]
+                st.session_state.current_video_time = selected_time[1]
+                st.session_state.current_video_end_time = selected_time[2]
         
-    # 笔记输入区域
-    note_text = st.text_area(
-        "在这里输入你的笔记",
-        height=150,
-        key=f"note_text_{st.session_state.note_input_key}",
-        help="""格式说明：\n
-1、标题：\n
-    输入 # + 空格 + 文本，创建一级标题\n
-    输入 ## + 空格 + 文本，创建二级标题\n
-    输入 ### + 空格 + 文本，创建三级标题
-
-2、文本样式：\n
-    在文本两端各加两个 * ，设置粗体(**文本**)\n
-    在文本两端各加一个 * ，设置斜体(*文本*)\n
-    在文本两端各加两个 ~ ，设置删除线(~~文本~~)
-
-3、列表：\n
-    输入 - + 空格 + 文本，创建无序列表\n
-    输入 1. + 空格 + 文本，创建有序列表
-
-4、引用：\n
-    输入 > + 空格 + 文本，创建单行引用\n
-    多行引用每行都需要添加 > + 空格"""
-    )
-    
-    # 笔记属性选择
-    importance = st.selectbox(
-        "重要性",
-        options=[imp for imp in NoteImportance],
-        format_func=lambda x: f"{x.value} {x.name}",
-        help="""笔记重要性等级说明：\n
-        💡 LOW - 普通笔记：一般性的知识点或想法
-    ⭐ MEDIUM - 重要笔记：需要重点关注的内容
-    🌟 HIGH - 非常重要：核心知识点或关键内容
-    🔥 CRITICAL - 关键笔记：必须掌握的知识点"""
-    )
-    
-    tags = st.text_input("标签（用逗号分隔）", help="例如：概念,重点,待复习")
-    
-    # 创建两列布局
-    col1, col2 = st.columns([1, 1])
-    
-    current_time = st.session_state.get('current_video_time', 0)
-    with col1:
-        if st.button("保存笔记"):
-            current_time = st.session_state.get('current_video_time', 0)
-            current_end_time = st.session_state.get('current_video_end_time', current_time)
-            
-            # 添加笔记
-            st.session_state.note_system.add_note(
-                text=note_text,
-                timestamp=current_time,
-                end_timestamp=current_end_time,
-                importance=importance,
-                tags=set(tags.split(",")) if tags else set(),
-                template_type=template_type
-            )
-            st.success("笔记保存成功！")
-            # 通过更新key来清空输入框
-            st.session_state.note_input_key += 1
-            st.rerun()
-    
-    with col2:
-        if st.button("清空笔记"):
-            if st.session_state.note_system.notes:  # 如果有笔记
-                if st.warning("确定要清空所有笔记吗？此操作不可恢复！", icon="⚠️"):
-                    st.session_state.note_system.clear_all_notes()
-                    st.success("已清空所有笔记！")
-                    st.rerun()
-            else:
-                st.info("当前没有保存的笔记。")
-            
-    # 显示笔记列表
-    with st.expander("📖 查看笔记", expanded=True):
-        # 筛选选项
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            filter_importance = st.selectbox(
-                "按重要性筛选",
-                options=[None] + list(NoteImportance),
-                format_func=lambda x: "全部" if x is None else f"{x.value} {x.name}"
-            )
-        with col3:
-            all_tags = {tag for note in st.session_state.note_system.notes for tag in note.tags}
-            filter_tags = st.multiselect("按标签筛选", options=list(all_tags))
-            
-        notes = st.session_state.note_system.get_notes(
-            importance=filter_importance,
-            tags=set(filter_tags) if filter_tags else None
+        # 笔记输入区域
+        st.markdown("### 添加笔记")
+        note_text = st.text_area("笔记内容", key="note_text", height=100)
+        
+        # 笔记属性选择
+        importance = st.selectbox(
+            "重要性",
+            options=[imp for imp in NoteImportance],
+            format_func=lambda x: f"{x.value} {x.name}",
+            help="""笔记重要性等级说明：\n
+            LOW - 普通笔记：一般性的知识点或想法
+        MEDIUM - 重要笔记：需要重点关注的内容
+        HIGH - 非常重要：核心知识点或关键内容
+        CRITICAL - 关键笔记：必须掌握的知识点"""
         )
         
-        if not notes:
-            st.info("还没有添加任何笔记")
-        else:
-            for note in notes:
-                with st.container():
-                    col1, col2 = st.columns([4, 1])
+        tags = st.text_input("标签（用逗号分隔）", help="例如：概念,重点,待复习")
+        
+        # 创建两列布局
+        col1, col2 = st.columns([1, 1])
+        
+        current_time = st.session_state.get('current_video_time', 0)
+        with col1:
+            if st.button("保存笔记"):
+                current_time = st.session_state.get('current_video_time', 0)
+                current_end_time = st.session_state.get('current_video_end_time', current_time)
+                
+                # 添加笔记
+                st.session_state.note_system.add_note(
+                    text=note_text,
+                    timestamp=current_time,
+                    end_timestamp=current_end_time,
+                    importance=importance,
+                    tags=set(tags.split(",")) if tags else set(),
+                    template_type=selected_template
+                )
+                st.success("笔记保存成功！")
+                # 通过更新key来清空输入框
+                st.session_state.note_input_key += 1
+                st.rerun()
+        
+        with col2:
+            if st.button("清空笔记"):
+                if st.session_state.note_system.notes:  # 如果有笔记
+                    if st.warning("确定要清空所有笔记吗？此操作不可恢复！", icon="⚠️"):
+                        st.session_state.note_system.clear_all_notes()
+                        st.success("已清空所有笔记！")
+                        st.rerun()
+                else:
+                    st.info("当前没有保存的笔记。")
+            
+        # 显示笔记列表
+        with st.expander("📖 查看笔记", expanded=True):
+            # 筛选选项
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                filter_importance = st.selectbox(
+                    "按重要性筛选",
+                    options=[None] + list(NoteImportance),
+                    format_func=lambda x: "全部" if x is None else f"{x.value} {x.name}"
+                )
+            with col3:
+                all_tags = {tag for note in st.session_state.note_system.notes for tag in note.tags}
+                filter_tags = st.multiselect("按标签筛选", options=list(all_tags))
+                
+            notes = st.session_state.note_system.get_notes(
+                importance=filter_importance,
+                tags=set(filter_tags) if filter_tags else None
+            )
+            
+            if not notes:
+                st.info("还没有添加任何笔记")
+            else:
+                for note in notes:
+                    with st.container():
+                        col1, col2 = st.columns([4, 1])
+                        with col1:
+                            st.markdown(f"**时间**: [{note.timestamp_str}] {note.importance.value}")
+                            if note.tags:
+                                st.markdown(f"**标签**: {', '.join(note.tags)}")
+                            st.markdown(f"**内容**:\n{note.text}")
+                        with col2:
+                            if st.button("删除", key=f"delete_{note.id}"):
+                                st.session_state.note_system.delete_note(note.id)
+                                st.rerun()
+                        st.markdown("---")
+                
+                # 添加笔记总结功能
+                if st.button("生成笔记总结", key="summarize_notes"):
+                    with st.spinner("正在生成笔记总结..."):
+                        qwen_chat = QwenChatAPI()
+                        notes_text = "\n".join([
+                            f"时间 {note.timestamp_str} {note.importance.value}: {note.text}" 
+                            for note in notes
+                        ])
+                        
+                        # 创建一个markdown容器
+                        st.markdown("### 📝 笔记总结")
+                        summary_container = st.empty()
+                        summary = ""
+                        
+                        # 处理流式响应
+                        for chunk in qwen_chat.chat(f"请总结这些笔记内容：\n{notes_text}", stream=True):
+                            if chunk:
+                                summary += chunk
+                                summary_container.markdown(summary)
+            
+                # 显示学习进度
+                if st.button("查看学习进度"):
+                    progress = st.session_state.note_system.get_learning_progress()
+                    st.markdown("### 📊 学习进度统计")
+                    
+                    col1, col2 = st.columns(2)
                     with col1:
-                        st.markdown(f"**时间**: [{note.timestamp_str}] {note.importance.value}")
-                        if note.tags:
-                            st.markdown(f"**标签**: {', '.join(note.tags)}")
-                        st.markdown(f"**内容**:\n{note.text}")
+                        st.metric("总笔记数", progress["total_notes"])
+                    
                     with col2:
-                        if st.button("删除", key=f"delete_{note.id}"):
-                            st.session_state.note_system.delete_note(note.id)
-                            st.rerun()
-                    st.markdown("---")
-            
-            # 添加笔记总结功能
-            if st.button("生成笔记总结", key="summarize_notes"):
-                with st.spinner("正在生成笔记总结..."):
-                    qwen_chat = QwenChatAPI()
-                    notes_text = "\n".join([
-                        f"时间 {note.timestamp_str} {note.importance.value}: {note.text}" 
-                        for note in notes
-                    ])
+                        st.markdown("#### 重要性分布")
+                        for imp, ratio in progress["importance_distribution"].items():
+                            st.progress(ratio, text=f"{NoteImportance[imp].value} {ratio*100:.1f}%")
                     
-                    # 创建一个markdown容器
-                    st.markdown("### 📝 笔记总结")
-                    summary_container = st.empty()
-                    summary = ""
-                    
-                    # 处理流式响应
-                    for chunk in qwen_chat.chat(f"请总结这些笔记内容：\n{notes_text}", stream=True):
-                        if chunk:
-                            summary += chunk
-                            summary_container.markdown(summary)
-            
-            # 显示学习进度
-            if st.button("查看学习进度"):
-                progress = st.session_state.note_system.get_learning_progress()
-                st.markdown("### 📊 学习进度统计")
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("总笔记数", progress["total_notes"])
-                
-                with col2:
-                    st.markdown("#### 重要性分布")
-                    for imp, ratio in progress["importance_distribution"].items():
-                        st.progress(ratio, text=f"{NoteImportance[imp].value} {ratio*100:.1f}%")
-                
-                if progress["tags_distribution"]:
-                    st.markdown("#### 标签统计")
-                    for tag, ratio in progress["tags_distribution"].items():
-                        st.progress(ratio, text=f"{tag}: {ratio*100:.1f}%")
+                    if progress["tags_distribution"]:
+                        st.markdown("#### 标签统计")
+                        for tag, ratio in progress["tags_distribution"].items():
+                            st.progress(ratio, text=f"{tag}: {ratio*100:.1f}%")
 
 # 主函数
 def main():
