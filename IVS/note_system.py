@@ -20,6 +20,7 @@ import json
 import os
 import emoji
 from enum import Enum
+import time
 
 class NoteImportance(Enum):
     LOW = "💡"      # 普通笔记
@@ -34,59 +35,68 @@ class NoteTemplate(Enum):
     REVIEW = "复习模板"
 
 class Note:
-    def __init__(
-        self,
-        text: str,
-        timestamp: float,
-        timestamp_str: Optional[str] = None,
-        importance: NoteImportance = NoteImportance.LOW,
-        tags: Set[str] = None,
-        template_type: Optional[NoteTemplate] = None,
-        related_notes: List[int] = None,
-        last_reviewed: Optional[datetime] = None
-    ):
+    def __init__(self, text: str, timestamp: float, importance: NoteImportance = NoteImportance.LOW,
+                 tags: Set[str] = None, template_type: Optional[NoteTemplate] = None,
+                 note_id: Optional[float] = None, timestamp_str: Optional[str] = None,
+                 end_timestamp: Optional[float] = None):
         self.text = text
         self.timestamp = timestamp
-        self.timestamp_str = timestamp_str if timestamp_str else self._format_timestamp(timestamp)
+        self.end_timestamp = end_timestamp
         self.importance = importance
-        self.tags = tags if tags else set()
+        self.tags = tags if tags is not None else set()
         self.template_type = template_type
-        self.related_notes = related_notes if related_notes else []
-        self.last_reviewed = last_reviewed
+        self.id = note_id if note_id is not None else time.time()
+        self.timestamp_str = timestamp_str if timestamp_str else self._format_timestamp(timestamp)
 
     def _format_timestamp(self, timestamp: float) -> str:
         """将时间戳格式化为字符串"""
+        # 计算开始时间
         total_seconds = int(timestamp)
         hours = total_seconds // 3600
         minutes = (total_seconds % 3600) // 60
         seconds = total_seconds % 60
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        milliseconds = int((timestamp - total_seconds) * 1000)
+        start_time = f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+        
+        # 使用传入的结束时间
+        end_time = ""
+        if self.end_timestamp is not None:
+            end_seconds = int(self.end_timestamp)
+            end_hours = end_seconds // 3600
+            end_minutes = (end_seconds % 3600) // 60
+            end_secs = end_seconds % 60
+            end_time = f"{end_hours:02d}:{end_minutes:02d}:{end_secs:02d}.{milliseconds:03d}"
+        else:
+            # 如果没有结束时间，使用开始时间
+            end_time = start_time
+        
+        return f"[{start_time} --> {end_time}]"
 
     def to_dict(self) -> Dict:
         """将笔记转换为字典格式"""
         return {
             'text': self.text,
             'timestamp': self.timestamp,
-            'timestamp_str': self.timestamp_str,
-            'importance': self.importance.name,
+            'end_timestamp': self.end_timestamp,
+            'importance': self.importance.value,
             'tags': list(self.tags),
-            'template_type': self.template_type.name if self.template_type else None,
-            'related_notes': self.related_notes,
-            'last_reviewed': self.last_reviewed.isoformat() if self.last_reviewed else None
+            'template_type': self.template_type.value if self.template_type else None,
+            'id': self.id,
+            'timestamp_str': self.timestamp_str
         }
 
     @classmethod
     def from_dict(cls, data: Dict) -> 'Note':
-        """从字典创建笔记对象"""
+        """从字典创建笔记"""
         return cls(
             text=data['text'],
             timestamp=data['timestamp'],
-            timestamp_str=data['timestamp_str'],
-            importance=NoteImportance[data['importance']],
+            end_timestamp=data.get('end_timestamp'),
+            importance=NoteImportance(data['importance']),
             tags=set(data['tags']),
-            template_type=NoteTemplate[data['template_type']] if data['template_type'] else None,
-            related_notes=data['related_notes'],
-            last_reviewed=datetime.fromisoformat(data['last_reviewed']) if data['last_reviewed'] else None
+            template_type=NoteTemplate(data['template_type']) if data.get('template_type') else None,
+            note_id=data['id'],
+            timestamp_str=data.get('timestamp_str')
         )
 
 class NoteSystem:
@@ -103,11 +113,10 @@ class NoteSystem:
         self,
         text: str,
         timestamp: float,
-        timestamp_str: Optional[str] = None,
+        end_timestamp: Optional[float] = None,
         importance: NoteImportance = NoteImportance.LOW,
         tags: Set[str] = None,
-        template_type: Optional[NoteTemplate] = None,
-        related_notes: List[int] = None
+        template_type: Optional[NoteTemplate] = None
     ) -> bool:
         """添加新笔记"""
         if not text.strip():
@@ -116,11 +125,10 @@ class NoteSystem:
         note = Note(
             text=text,
             timestamp=timestamp,
-            timestamp_str=timestamp_str,
+            end_timestamp=end_timestamp,
             importance=importance,
             tags=tags,
-            template_type=template_type,
-            related_notes=related_notes
+            template_type=template_type
         )
         self.notes.append(note)
         self.notes.sort(key=lambda x: x.timestamp)
@@ -154,6 +162,7 @@ class NoteSystem:
         note_id: int,
         new_text: Optional[str] = None,
         new_timestamp: Optional[float] = None,
+        new_end_timestamp: Optional[float] = None,
         new_importance: Optional[NoteImportance] = None,
         new_tags: Optional[Set[str]] = None
     ) -> bool:
@@ -167,6 +176,9 @@ class NoteSystem:
         if new_timestamp is not None:
             note.timestamp = new_timestamp
             note.timestamp_str = note._format_timestamp(new_timestamp)
+        if new_end_timestamp is not None:
+            note.end_timestamp = new_end_timestamp
+            note.timestamp_str = note._format_timestamp(note.timestamp)
         if new_importance is not None:
             note.importance = new_importance
         if new_tags is not None:

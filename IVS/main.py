@@ -388,19 +388,115 @@ def merge_subtitle_segments(transcript):
 
 def handle_subtitle_tab():
     if st.session_state.video_transcript:
-        # 添加CSS样式使字幕显示更美观
-        st.markdown("""
-            <style>
-            .stMarkdown p {
-                line-height: 1.8;
-                margin-bottom: 1.5em;
+        # 创建HTML内容
+        html_content = """
+        <style>
+        .subtitle-container {
+            height: 600px;
+            overflow-y: auto;
+            padding: 20px;
+            font-family: sans-serif;
+        }
+        .subtitle-segment {
+            margin-bottom: 20px;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .selected-timestamp {
+            background-color: #f0f2f6;
+            border-left: 4px solid #ff4b4b;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        </style>
+        
+        <script>
+        function scrollToSegment(id) {
+            const element = document.getElementById(id);
+            if (element) {
+                element.scrollIntoView({behavior: 'smooth', block: 'center'});
             }
-            </style>
-            """, unsafe_allow_html=True)
-            
-        # 合并字幕段落
+        }
+        </script>
+        
+        <div class="subtitle-container" id="subtitle-container">
+        """
+        
+        # 获取合并后的字幕段落
         merged_transcript = merge_subtitle_segments(st.session_state.video_transcript)
-        st.markdown(merged_transcript)
+        
+        # 从合并后的段落中提取时间戳和文本
+        timestamps = []
+        paragraphs = []
+        
+        for paragraph in merged_transcript.split('---\n\n'):
+            if not paragraph.strip():
+                continue
+            try:
+                # 提取时间戳 [HH:MM:SS.sss --> HH:MM:SS.sss]
+                time_str = paragraph[paragraph.find('[')+1:paragraph.find(']')]
+                start_time = time_str.split(' --> ')[0]
+                # 保存完整的时间戳和对应的时间信息
+                h, m, s = map(float, start_time.split(':'))
+                start_seconds = h * 3600 + m * 60 + s
+                h, m, s = map(float, time_str.split(' --> ')[1].split(':'))
+                end_seconds = h * 3600 + m * 60 + s
+                
+                # 保存时间戳和文本
+                text_part = paragraph[paragraph.find(']')+1:].strip()
+                timestamps.append((f"[{time_str}]", start_seconds, end_seconds))
+                paragraphs.append((time_str, text_part))
+            except Exception as e:
+                continue
+        
+        if timestamps:
+            # 保存当前选择的时间戳
+            if 'selected_timestamp' not in st.session_state:
+                st.session_state.selected_timestamp = timestamps[0][1]
+            
+            # 创建两列布局
+            col1, col2 = st.columns([1, 2])
+            
+            with col1:
+                st.markdown("### 时间点列表")
+                # 添加时间戳选择器
+                selected_index = st.selectbox(
+                    "选择时间点",
+                    options=range(len(timestamps)),
+                    format_func=lambda i: timestamps[i][0],
+                    key="subtitle_timestamp"
+                )
+                
+                if selected_index is not None:
+                    selected_time = timestamps[selected_index]
+                    st.session_state.current_video_time = selected_time[1]
+                    st.session_state.current_video_end_time = selected_time[2]
+            
+            with col2:
+                st.markdown("### 字幕内容")
+                
+                # 为每个段落添加HTML内容
+                for i, (time_str, text) in enumerate(paragraphs):
+                    segment_class = "selected-timestamp" if i == selected_index else "subtitle-segment"
+                    html_content += f"""
+                    <div id="segment_{i}" class="{segment_class}">
+                        [{time_str}]<br>{text}
+                    </div>
+                    """
+                
+                html_content += "</div>"
+                
+                # 添加自动滚动脚本
+                html_content += f"""
+                <script>
+                    setTimeout(function() {{
+                        scrollToSegment('segment_{selected_index}');
+                    }}, 100);
+                </script>
+                """
+                
+                # 使用st.components.html显示内容
+                st.components.v1.html(html_content, height=650)
     else:
         st.info("请先处理视频以生成字幕")
 
@@ -626,25 +722,26 @@ def handle_notes():
     
     current_time = st.session_state.get('current_video_time', 0)
     with col1:
-        if st.button("保存笔记", key="save_note_button"):
-            if note_text.strip():  # 确保笔记内容不为空
-                # 直接调用add_note方法
-                st.session_state.note_system.add_note(
-                    text=note_text,
-                    timestamp=current_time,
-                    importance=importance,
-                    tags=set(tags.split(",")) if tags else set(),
-                    template_type=template_type
-                )
-                st.success("笔记保存成功！")
-                # 通过更新key来清空输入框
-                st.session_state.note_input_key += 1
-                st.rerun()
-            else:
-                st.warning("笔记内容不能为空")
+        if st.button("保存笔记"):
+            current_time = st.session_state.get('current_video_time', 0)
+            current_end_time = st.session_state.get('current_video_end_time', current_time)
+            
+            # 添加笔记
+            st.session_state.note_system.add_note(
+                text=note_text,
+                timestamp=current_time,
+                end_timestamp=current_end_time,
+                importance=importance,
+                tags=set(tags.split(",")) if tags else set(),
+                template_type=template_type
+            )
+            st.success("笔记保存成功！")
+            # 通过更新key来清空输入框
+            st.session_state.note_input_key += 1
+            st.rerun()
     
     with col2:
-        if st.button("清空笔记", key="clear_note_button"):
+        if st.button("清空笔记"):
             if st.session_state.note_system.notes:  # 如果有笔记
                 if st.warning("确定要清空所有笔记吗？此操作不可恢复！", icon="⚠️"):
                     st.session_state.note_system.clear_all_notes()
