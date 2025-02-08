@@ -1,38 +1,101 @@
-## AI-EdVision - 智能教育视频分析与个性化辅导系统
+# AI-EdVision - 智能教育视频分析与个性化辅导系统
 
-### 1. 下载依赖包
+## 1. 项目介绍
+AI-EdVision 是一个基于人工智能的教育视频分析与个性化辅导系统。
 
-### 2. 本项目最好可以是配有GPU的机器，否则可能会出现内存不足的情况：安装CUDA、cuDNN、pytorch等进行加速
+## 2. 环境要求
+- Python = 3.10（推荐使用 Python 3.10）
+- CUDA = 11.8（如果使用 GPU）
+- cuDNN 对应版本
+- 显存建议 >= 8GB（使用 GPU 时）
+- 内存建议 >= 16GB
 
-### 3. 需要的python版本为： Python > 3.9，最好是python3.10
+## 3. 环境配置
 
-```shell
-pip install -r requirements.txt
+### 3.1 基础环境要求
+- Python 3.10
+- CUDA 11.8 及以上（如果使用 GPU）
+- cuDNN（与 CUDA 版本匹配）
+
+### 3.2 创建、激活虚拟环境
+```bash
+# 创建名为 ai_vision 的虚拟环境
+conda create -n ai_vision python=3.10
+# 激活环境
+conda activate ai_vision
 ```
 
-### 4. 运行程序，实现功能
-- 首先切换到IVS目录下，在运行下列命令即可
-```shell
-streamlit run ../main.py
+### 3.3 安装 PyTorch 和 FAISS
+```bash
+# 1. 安装 PyTorch（使用 CUDA 11.8）
+pip install torch==2.0.0+cu118 torchvision==0.15.1+cu118 torchaudio==2.0.1+cu118 --index-url https://download.pytorch.org/whl/cu118
+
+# 2. 安装 FAISS-GPU
+conda install -c conda-forge faiss-gpu=1.8.0
 ```
 
-### 5. 需要本地安装并配置完成ffmpeg，参考：https://blog.csdn.net/qq_45956730/article/details/125272407?spm=1001.2014.3001.5506
+### 3.4 运行'..\AI-EdVision\download.py'安装其他依赖
+```bash
+# 切换到download.py所在目录
+# 运行下载脚本
+python download.py
+```
 
-### 6. 核心组件分析:
+# 7. 下载 spacy 中文语言模型
+```bash
+python -m spacy download zh_core_web_sm
+```
 
-- 视频处理模块
-main.py作为主控制器
-Process_video.py负责核心视频处理功能
-video_tools.py提供底层工具支持
-download_video.py处理视频下载
+### 3.5 验证安装(在虚拟环境中运行)
+```python
+import torch
+print(f"PyTorch version: {torch.__version__}")
+print(f"CUDA available: {torch.cuda.is_available()}")
+print(f"CUDA version: {torch.version.cuda}")
 
-- LLM智能交互模块
-chat_system.py实现基础对话功能
-question_generator.py生成学习问题
-learning_path.py生成个性化学习路径
+# 验证 transformers 安装
+from transformers import AutoTokenizer
+print("Transformers 测试成功")
 
-- 笔记系统模块
-note_system.py实现带时间戳的笔记功能
+# 验证 spacy 安装
+import spacy
+nlp = spacy.load("zh_core_web_sm")
+print("Spacy 测试成功")
+```
 
+## 4. 运行程序
+```bash
+# 切换到 IVS 目录
+cd IVS
 
+# 启动应用
+streamlit run main.py
+```
 
+## 5. 常见问题
+
+### 5.1 依赖安装失败
+如果在安装依赖时遇到问题，可以尝试以下方法：
+1. 确保已经正确安装 CUDA 和 cuDNN
+2. 使用国内镜像源：
+```bash
+pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+```
+3. 单独安装失败的包，查看具体错误信息
+
+### 5.2 运行时 GPU 内存不足
+1. 可以尝试减小批处理大小
+2. 关闭其他占用 GPU 的程序
+3. 如果仍然不足，考虑使用更大显存的 GPU
+
+### 5.3 CUDA 相关错误
+确保 CUDA 版本与 PyTorch 版本匹配，当前配置使用的是：
+- CUDA 11.8
+- PyTorch 2.0.0
+- cuDNN 对应版本
+
+## 6. 注意事项
+1. 所有依赖版本都是经过测试的，请不要随意更改版本号
+2. 建议使用 GPU 运行，CPU 运行可能会很慢
+3. 首次运行时会下载一些模型文件，请确保网络通畅
+4. 如遇到问题，请查看错误信息并对照常见问题解决

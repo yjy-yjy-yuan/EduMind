@@ -2,6 +2,7 @@ import warnings
 import torchvision
 torchvision.disable_beta_transforms_warning()
 warnings.filterwarnings('ignore', category=UserWarning)
+
 import streamlit as st
 import tempfile
 import os
@@ -10,6 +11,7 @@ from Process_video import process_video
 from download_video import download_and_play_video
 from note_system import NoteSystem, Note, NoteImportance, NoteTemplate
 from rag_system import RAGSystem
+from learning_path import KnowledgeGraph, LearningPathPlanner, LearningProgressTracker
 import logging
 from datetime import datetime
 import time
@@ -17,7 +19,7 @@ import random
 
 # 设置页面配置
 st.set_page_config(
-    page_title="智能教育视频分析系统",
+    page_title="AI-EdVision  视频分析系统",
     page_icon="🎓",
     layout="wide"
 )
@@ -394,6 +396,31 @@ def merge_subtitle_segments(transcript):
         )
     
     return ''.join(merged_paragraphs)
+
+def parse_timestamp(time_str):
+    """将时间字符串转换为秒数"""
+    try:
+        # 处理 HH:MM:SS.mmm 格式
+        if '.' in time_str:
+            main_time, ms = time_str.split('.')
+            hours, minutes, seconds = map(int, main_time.split(':'))
+            return hours * 3600 + minutes * 60 + seconds + float(f"0.{ms}")
+        # 处理 HH:MM:SS 格式
+        else:
+            hours, minutes, seconds = map(int, time_str.split(':'))
+            return hours * 3600 + minutes * 60 + seconds
+    except Exception as e:
+        raise ValueError(f"无法解析时间戳: {time_str}")
+
+def format_timestamp(seconds):
+    """将秒数转换为时:分:秒格式"""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    seconds = int(seconds % 60)
+    if hours > 0:
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    else:
+        return f"{minutes:02d}:{seconds:02d}"
 
 def handle_subtitle_tab():
     if st.session_state.video_transcript:
@@ -839,6 +866,141 @@ def handle_notes():
                         for tag, ratio in progress["tags_distribution"].items():
                             st.progress(ratio, text=f"{tag}: {ratio*100:.1f}%")
 
+def handle_learning_path_tab():
+    """处理学习规划标签页"""
+    if not st.session_state.get('processed_video', False):
+        st.info("请先上传并处理视频")
+        return
+
+    if 'knowledge_graph' not in st.session_state:
+        st.session_state.knowledge_graph = KnowledgeGraph()
+    if 'path_planner' not in st.session_state:
+        st.session_state.path_planner = LearningPathPlanner(st.session_state.knowledge_graph)
+    if 'progress_tracker' not in st.session_state:
+        st.session_state.progress_tracker = LearningProgressTracker(st.session_state.knowledge_graph)
+
+    # 从视频中提取知识点
+    if st.session_state.video_transcript and not st.session_state.knowledge_graph.nodes:
+        with st.spinner("正在从视频中提取知识点..."):
+            # 处理字幕内容
+            transcript_text = st.session_state.video_transcript
+            if isinstance(transcript_text, str):
+                # 将字幕文本按段落分割
+                paragraphs = [p.strip() for p in transcript_text.split('\n\n') if p.strip()]
+                success_count = 0
+                error_count = 0
+                
+                for i, paragraph in enumerate(paragraphs):
+                    # 提取时间戳和内容
+                    try:
+                        # 假设格式为 "[时间戳] 内容"
+                        time_str = paragraph[1:paragraph.index(']')]
+                        content = paragraph[paragraph.index(']')+1:].strip()
+                        
+                        # 解析时间戳
+                        if ' --> ' in time_str:
+                            start_time = parse_timestamp(time_str.split(' --> ')[0])
+                        else:
+                            start_time = parse_timestamp(time_str)
+                        
+                        if content:
+                            node_id = f"node_{i}"
+                            # 添加到知识图谱
+                            st.session_state.knowledge_graph.add_node(
+                                node_id,
+                                content,
+                                "current_video",  # 当前视频
+                                start_time
+                            )
+                            success_count += 1
+                    except Exception as e:
+                        error_count += 1
+                        continue
+                
+                if success_count > 0:
+                    st.success(f"成功提取 {success_count} 个知识点")
+                    if error_count > 0:
+                        st.warning(f"处理过程中有 {error_count} 个段落解析失败")
+                else:
+                    st.error("未能成功提取任何知识点")
+                    return
+            else:
+                st.warning("未能识别字幕格式")
+                return
+
+    # 显示知识图谱信息
+    st.subheader("📚 知识图谱概览")
+    if st.session_state.knowledge_graph.nodes:
+        stats = st.session_state.knowledge_graph.get_graph_statistics()
+        
+        # 显示基本统计信息
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("总实体数", stats['total_nodes'])
+        with col2:
+            st.metric("概念数量", stats['concept_count'])
+        with col3:
+            st.metric("技术术语数", stats['tech_term_count'])
+        
+        # 显示实体类型分布
+        st.subheader("实体类型分布")
+        for entity_type, count in stats['entity_types'].items():
+            percentage = count / stats['total_nodes'] * 100
+            st.progress(percentage / 100, text=f"{entity_type}: {count} ({percentage:.1f}%)")
+        
+        # 显示关系类型分布
+        st.subheader("关系类型分布")
+        if stats['relationship_count'] > 0:
+            for rel_type, count in stats['relationship_types'].items():
+                percentage = count / stats['relationship_count'] * 100
+                st.progress(percentage / 100, text=f"{rel_type}: {count} ({percentage:.1f}%)")
+        else:
+            st.info("暂无关系数据")
+        
+        # 用户输入
+        st.subheader("🎯 学习目标设置")
+        user_background = st.text_area(
+            "请描述您的学习背景和已掌握的知识：",
+            help="例如：我已经掌握了Python基础语法"
+        )
+        target_topics = st.text_area(
+            "请输入您想学习的主题（每行一个）：",
+            help="例如：\npandas数据处理\n数据可视化"
+        )
+
+        if st.button("生成学习路径", type="primary"):
+            if user_background and target_topics:
+                with st.spinner("正在生成个性化学习路径..."):
+                    topics = [t.strip() for t in target_topics.split('\n') if t.strip()]
+                    path = st.session_state.path_planner.generate_learning_path(
+                        user_background,
+                        topics
+                    )
+                    
+                    if path:
+                        st.success("学习路径生成成功！")
+                        st.subheader("📍 推荐学习路径")
+                        
+                        # 显示学习路径
+                        for i, node_id in enumerate(path, 1):
+                            node = st.session_state.knowledge_graph.nodes.get(node_id)
+                            if node:
+                                with st.expander(f"步骤 {i}: {node.content[:50]}..."):
+                                    st.write(f"**完整内容：** {node.content}")
+                                    st.write(f"**视频位置：** {format_timestamp(node.timestamp)}")
+                                    if node.prerequisites:
+                                        st.write("**前置知识：**")
+                                        for prereq_id in node.prerequisites:
+                                            prereq = st.session_state.knowledge_graph.nodes.get(prereq_id)
+                                            if prereq:
+                                                st.write(f"- {prereq.content[:100]}...")
+                    else:
+                        st.warning("未能找到合适的学习路径，请尝试调整学习目标或提供更多背景信息。")
+            else:
+                st.warning("请填写学习背景和目标主题")
+    else:
+        st.warning("未能从视频中提取到知识点，请确保视频已正确处理")
+
 # 主函数
 def main():
     st.title("智能教育视频分析系统")
@@ -886,7 +1048,7 @@ def main():
         with tab2:
             handle_qa_tab()
         with tab3:
-            st.info("请先上传并处理视频")
+            handle_learning_path_tab()
     
     # 右侧列：笔记系统
     with col3:

@@ -331,37 +331,39 @@ class VideoTools:
 
     # 转录视频
     def transcribe_video(self, video_path: str) -> Optional[Dict]:
-        """转录视频的音频内容"""
-        try:
-            print(f"Starting transcription with Whisper model on {self.device}")
-            
-            # 使用Whisper模型进行转录
-            result = self.whisper_model.transcribe(
-                video_path,
-                **self.transcribe_options
-            )
-            
-            if not result or not isinstance(result, dict):
-                print("Transcription failed: Invalid result format")
-                return None
-            
-            # 验证结果格式
-            if 'text' not in result or 'segments' not in result:
-                print("Transcription failed: Missing required fields")
-                return None
-            
-            # 处理每个片段的文本
-            for segment in result['segments']:
-                if 'text' in segment:
-                    # 如果需要，转换为简体中文
-                    try:
-                        segment['text'] = self.cc.convert(segment['text'].strip())
-                    except Exception as e:
-                        print(f"Error converting text: {e}")
-                        segment['text'] = segment['text'].strip()
-            
-            return result
-            
-        except Exception as e:
-            print(f"Transcription error: {e}")
+        """使用 Whisper 进行语音识别"""
+        # 检查是否可以使用 GPU
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"使用设备: {device}")
+        
+        # 加载 Whisper 模型
+        print(f"正在加载 Whisper 模型到 {device}...")
+        model = whisper.load_model("base", device=device)
+        
+        # 提取音频
+        audio = self.extract_audio(video_path)
+        
+        # 使用 Whisper 进行转录
+        print(f"开始使用 {device} 进行转录...")
+        result = model.transcribe(audio, **self.transcribe_options)
+        
+        if not result or not isinstance(result, dict):
+            print("Transcription failed: Invalid result format")
             return None
+        
+        # 验证结果格式
+        if 'text' not in result or 'segments' not in result:
+            print("Transcription failed: Missing required fields")
+            return None
+        
+        # 处理每个片段的文本
+        for segment in result['segments']:
+            if 'text' in segment:
+                # 如果需要，转换为简体中文
+                try:
+                    segment['text'] = self.cc.convert(segment['text'].strip())
+                except Exception as e:
+                    print(f"Error converting text: {e}")
+                    segment['text'] = segment['text'].strip()
+        
+        return result
