@@ -424,6 +424,26 @@ def format_timestamp(seconds):
 
 def handle_subtitle_tab():
     if st.session_state.video_transcript:
+        # 创建process_captions目录
+        process_captions_dir = os.path.join('../IVS/captions/process_captions')
+        os.makedirs(process_captions_dir, exist_ok=True)
+        
+        # 获取当前视频文件名
+        if 'current_video_name' in st.session_state:
+            base_filename = os.path.splitext(st.session_state.current_video_name)[0]
+            processed_filepath = os.path.join(process_captions_dir, f"{base_filename}_processed.txt")
+            
+            # 获取合并后的字幕段落
+            merged_transcript = merge_subtitle_segments(st.session_state.video_transcript)
+            
+            # 保存处理后的字幕文件
+            try:
+                with open(processed_filepath, 'w', encoding='utf-8') as f:
+                    f.write(merged_transcript)
+                st.success(f"已保存处理后的字幕文件到: {processed_filepath}")
+            except Exception as e:
+                st.error(f"保存字幕文件失败: {str(e)}")
+
         # 创建HTML内容
         html_content = """
         <style>
@@ -873,7 +893,12 @@ def handle_learning_path_tab():
         return
 
     if 'knowledge_graph' not in st.session_state:
-        st.session_state.knowledge_graph = KnowledgeGraph()
+        # 获取视频标题
+        video_title = None
+        if 'current_video_name' in st.session_state:
+            # 从文件名中提取标题（去除扩展名）
+            video_title = os.path.splitext(st.session_state.current_video_name)[0]
+        st.session_state.knowledge_graph = KnowledgeGraph(video_title=video_title)
     if 'path_planner' not in st.session_state:
         st.session_state.path_planner = LearningPathPlanner(st.session_state.knowledge_graph)
     if 'progress_tracker' not in st.session_state:
@@ -887,43 +912,106 @@ def handle_learning_path_tab():
             if isinstance(transcript_text, str):
                 # 将字幕文本按段落分割
                 paragraphs = [p.strip() for p in transcript_text.split('\n\n') if p.strip()]
+                
+                # 创建进度条
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
                 success_count = 0
                 error_count = 0
+                total_paragraphs = len(paragraphs)
+                
+                # 合并相邻的段落以获得更好的上下文
+                merged_paragraphs = []
+                current_paragraph = []
+                current_start_time = None
                 
                 for i, paragraph in enumerate(paragraphs):
-                    # 提取时间戳和内容
                     try:
-                        # 假设格式为 "[时间戳] 内容"
+                        status_text.text(f"正在处理段落 {i+1}/{total_paragraphs}")
+                        progress_bar.progress((i + 1) / total_paragraphs)
+                        
+                        # 提取时间戳和内容
+                        if '[' not in paragraph or ']' not in paragraph:
+                            continue
+                            
                         time_str = paragraph[1:paragraph.index(']')]
                         content = paragraph[paragraph.index(']')+1:].strip()
                         
+                        if not content:  # 跳过空内容
+                            continue
+                            
                         # 解析时间戳
-                        if ' --> ' in time_str:
-                            start_time = parse_timestamp(time_str.split(' --> ')[0])
-                        else:
-                            start_time = parse_timestamp(time_str)
+                        try:
+                            if ' --> ' in time_str:
+                                start_time = parse_timestamp(time_str.split(' --> ')[0])
+                            else:
+                                start_time = parse_timestamp(time_str)
+                        except ValueError:
+                            start_time = i * 10  # 使用索引作为近似时间戳
                         
-                        if content:
-                            node_id = f"node_{i}"
-                            # 添加到知识图谱
-                            st.session_state.knowledge_graph.add_node(
-                                node_id,
-                                content,
-                                "current_video",  # 当前视频
-                                start_time
-                            )
-                            success_count += 1
+                        if not current_paragraph:
+                            current_paragraph = [content]
+                            current_start_time = start_time
+                        else:
+                            # 如果时间间隔小于10秒，则合并段落
+                            if start_time - current_start_time < 10:
+                                current_paragraph.append(content)
+                            else:
+                                # 保存当前段落并开始新段落
+                                merged_content = ' '.join(current_paragraph)
+                                if len(merged_content.strip()) > 10:  # 只处理长度超过10个字符的段落
+                                    merged_paragraphs.append((current_start_time, merged_content))
+                                current_paragraph = [content]
+                                current_start_time = start_time
                     except Exception as e:
                         error_count += 1
                         continue
                 
-                if success_count > 0:
-                    st.success(f"成功提取 {success_count} 个知识点")
-                    if error_count > 0:
-                        st.warning(f"处理过程中有 {error_count} 个段落解析失败")
-                else:
-                    st.error("未能成功提取任何知识点")
-                    return
+                # 添加最后一个段落
+                if current_paragraph:
+                    merged_content = ' '.join(current_paragraph)
+                    if len(merged_content.strip()) > 10:
+                        merged_paragraphs.append((current_start_time, merged_content))
+                
+                # 更新进度条显示
+                status_text.text("正在创建知识图谱节点...")
+                progress_bar.progress(0)
+                
+                # 处理合并后的段落
+                total_merged = len(merged_paragraphs)
+                for i, (start_time, content) in enumerate(merged_paragraphs):
+                    try:
+                        progress_bar.progress((i + 1) / total_merged)
+                        status_text.text(f"正在处理知识点 {i+1}/{total_merged}")
+                        
+                        node_id = f"node_{i}"
+                        # 添加到知识图谱
+                        node = st.session_state.knowledge_graph.add_node(
+                            node_id,
+                            content,
+                            "current_video",  # 当前视频
+                            start_time
+                        )
+                        if node:  # 只有当成功创建节点时才增加计数
+                            success_count += 1
+                        else:
+                            error_count += 1
+                    except Exception as e:
+                        error_count += 1
+                        self.logger.error(f"处理节点失败: {str(e)}")
+                        continue
+                
+                # 显示最终统计信息
+                stats = st.session_state.knowledge_graph.get_graph_statistics()
+                print(f"\n知识图谱处理完成！")
+                print(f"✓ 节点：{stats.get('total_nodes', 0)}")
+                total_entities = sum(len(entities) for entities in stats.get('entity_types', {}).values())
+                print(f"✓ 实体：{total_entities}")
+                print(f"✓ 关系：{stats.get('relationship_count', 0)}")
+                
+                # 显示处理结果
+                status_text.text(f"处理完成！成功创建 {success_count} 个知识点，失败 {error_count} 个")
             else:
                 st.warning("未能识别字幕格式")
                 return
@@ -936,24 +1024,34 @@ def handle_learning_path_tab():
         # 显示基本统计信息
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("总实体数", stats['total_nodes'])
+            st.metric("总节点数", stats.get('total_nodes', 0))
         with col2:
-            st.metric("概念数量", stats['concept_count'])
+            concept_entities = stats.get('entity_types', {}).get('CONCEPT', [])
+            st.metric("概念数量", len(concept_entities) if concept_entities else 0)
         with col3:
-            st.metric("技术术语数", stats['tech_term_count'])
+            tech_entities = stats.get('entity_types', {}).get('TECH', [])
+            st.metric("技术术语数", len(tech_entities) if tech_entities else 0)
         
         # 显示实体类型分布
         st.subheader("实体类型分布")
-        for entity_type, count in stats['entity_types'].items():
-            percentage = count / stats['total_nodes'] * 100
-            st.progress(percentage / 100, text=f"{entity_type}: {count} ({percentage:.1f}%)")
+        total_entities = sum(len(entities) for entities in stats.get('entity_types', {}).values())
+        if total_entities > 0:
+            for entity_type, entities in stats.get('entity_types', {}).items():
+                count = len(entities)
+                if count > 0:
+                    percentage = count / total_entities
+                    st.progress(percentage, text=f"{entity_type}: {count} ({percentage*100:.1f}%)")
+        else:
+            st.info("暂无实体数据")
         
         # 显示关系类型分布
         st.subheader("关系类型分布")
-        if stats['relationship_count'] > 0:
-            for rel_type, count in stats['relationship_types'].items():
-                percentage = count / stats['relationship_count'] * 100
-                st.progress(percentage / 100, text=f"{rel_type}: {count} ({percentage:.1f}%)")
+        total_relations = stats.get('relationship_count', 0)
+        if total_relations > 0:
+            for rel_type, count in stats.get('relationship_types', {}).items():
+                if count > 0:
+                    percentage = count / total_relations
+                    st.progress(percentage, text=f"{rel_type}: {count} ({percentage*100:.1f}%)")
         else:
             st.info("暂无关系数据")
         

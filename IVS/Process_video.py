@@ -179,8 +179,15 @@ def process_video(video_path, status_container=None, original_filename=None, out
     try:
         if original_filename is None:
             original_filename = os.path.basename(video_path)
+            
+        # 保存当前处理的视频文件名到session_state
+        if st_session_state is not None:
+            st_session_state.current_video_name = original_filename
         
-        output_dir = os.path.abspath(output_dir)
+        # 修正输出目录的路径
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        output_dir = os.path.normpath(os.path.join(current_dir, output_dir))
+        
         os.makedirs(output_dir, exist_ok=True)
         
         base_filename = os.path.splitext(original_filename)[0]
@@ -249,13 +256,13 @@ def process_video(video_path, status_container=None, original_filename=None, out
             if status_container:
                 status_container.error(f"保存文本文件失败: {str(e)}")
         
-        # 保存为SRT文件
+        # 保存SRT格式字幕文件
         try:
             save_as_srt(result['segments'], srt_filepath, first_voice_time, to_simplified)
         except Exception as e:
             if status_container:
                 status_container.error(f"保存SRT文件失败: {str(e)}")
-        
+
         # 保存元数据
         try:
             metadata = {
