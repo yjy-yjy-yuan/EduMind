@@ -31,7 +31,7 @@ conda activate ai_vision
 pip install torch==2.0.0+cu118 torchvision==0.15.1+cu118 torchaudio==2.0.1+cu118 --index-url https://download.pytorch.org/whl/cu118
 
 # 2. 安装 FAISS-GPU
-conda install -c conda-forge faiss-gpu=1.8.0
+conda install -c conda-forge faiss-gpu=1.8.0 -y
 ```
 
 ### 3.4 运行'..\AI-EdVision\download.py'安装其他依赖
@@ -39,11 +39,13 @@ conda install -c conda-forge faiss-gpu=1.8.0
 # 切换到download.py所在目录
 # 运行下载脚本
 python download.py
+
+conda install spacy-pkuseg -y
 ```
 
 # 7. 下载 spacy 中文语言模型
 ```bash
-python -m spacy download zh_core_web_sm
+python -m spacy download zh_core_web_sm 
 ```
 
 ### 3.5 验证安装(在虚拟环境中运行)

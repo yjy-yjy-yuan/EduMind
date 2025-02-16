@@ -78,6 +78,7 @@ class KnowledgeGraph:
         self.neo4j_graph = None
         self.max_retries = 3
         self.retry_delay = 2  # 重试延迟（秒）
+        self.connection_failed = False  # 添加标志来追踪连接状态
         
         for attempt in range(self.max_retries):
             try:
@@ -95,11 +96,12 @@ class KnowledgeGraph:
                     self.logger.error(f"创建Neo4j约束失败: {str(e)}")
             except Exception as e:
                 self.logger.error(f"Neo4j连接尝试 {attempt + 1}/{self.max_retries} 失败: {str(e)}")
-                if attempt < self.max_retries - 1:  # 如果不是最后一次尝试
+                if attempt == self.max_retries - 1:  # 如果是最后一次尝试
+                    self.connection_failed = True  # 标记连接失败
+                    self.logger.error("Neo4j连接失败，已达到最大重试次数")
+                else:
                     import time
                     time.sleep(self.retry_delay)  # 等待一段时间后重试
-                else:
-                    self.logger.error("Neo4j连接失败，已达到最大重试次数")
                     
     def setup_logger(self, video_title=None):
         """设置日志记录器"""
@@ -295,6 +297,10 @@ class KnowledgeGraph:
 
     def add_node(self, node_id: str, content: str, source_video: str, timestamp: float) -> Optional[KnowledgeNode]:
         """添加知识点节点到图谱中"""
+        if self.connection_failed:
+            self.logger.error("由于之前的连接失败，跳过节点添加")
+            return
+            
         try:
             # 检查参数有效性
             if not content or not content.strip():
