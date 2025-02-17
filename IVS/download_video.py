@@ -13,6 +13,8 @@ import os
 import re
 import yt_dlp
 import streamlit as st
+from pathlib import Path
+import time
 
 #清理文件名，移除特殊字符
 def sanitize_filename(filename):
@@ -39,7 +41,7 @@ def progress_hook(d):
             st.text(status_msg)
         except Exception:
             pass   
-        
+
 # 使用 yt-dlp 下载视频并返回可播放的文件路径(主函数调用)
 def download_and_play_video(video_link, download_folder="../IVS/downloads"):
     try:
@@ -59,7 +61,13 @@ def download_and_play_video(video_link, download_folder="../IVS/downloads"):
             'postprocessors': [{
                 'key': 'FFmpegVideoConvertor',
                 'preferedformat': 'mp4',
-            }]
+            }],
+            # 添加重试和超时设置
+            'retries': 10,  # 增加重试次数
+            'fragment_retries': 10,
+            'retry_sleep': lambda n: 5 * (n + 1),  # 重试间隔时间递增
+            'socket_timeout': 60,  # 增加超时时间
+            'extractor_retries': 10,
         }
         
         # 通用User-Agent
@@ -72,16 +80,40 @@ def download_and_play_video(video_link, download_folder="../IVS/downloads"):
                 **common_opts,
                 'http_headers': {
                     'Referer': 'https://www.bilibili.com',
-                    'User-Agent': user_agent
-                }
+                    'User-Agent': user_agent,
+                    'Accept': '*/*',
+                    'Accept-Language': 'zh-CN,zh;q=0.9',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                },
+                'source_address': '0.0.0.0',  # 强制使用本地 IP
+                'nocheckcertificate': True,  # 忽略 SSL 证书验证
+                'geo_verification_proxy': '',  # 清除地理位置验证代理
             }
             
             # 处理 Bilibili 短链接
             if "b23.tv" in video_link:
-                import requests
-                headers = {'User-Agent': user_agent}
-                response = requests.head(video_link, headers=headers, allow_redirects=True)
-                video_link = response.url
+                try:
+                    import requests
+                    from urllib3.util.retry import Retry
+                    from requests.adapters import HTTPAdapter
+
+                    # 创建带有重试机制的会话
+                    session = requests.Session()
+                    retries = Retry(total=5,
+                                backoff_factor=1,
+                                status_forcelist=[500, 502, 503, 504])
+                    session.mount('http://', HTTPAdapter(max_retries=retries))
+                    session.mount('https://', HTTPAdapter(max_retries=retries))
+                    
+                    headers = {
+                        'User-Agent': user_agent,
+                        'Accept': '*/*',
+                        'Accept-Language': 'zh-CN,zh;q=0.9',
+                    }
+                    response = session.head(video_link, headers=headers, allow_redirects=True, verify=False)
+                    video_link = response.url
+                except Exception:
+                    st.warning(f"处理短链接时出错，尝试直接使用原始链接")
                 
             # 处理 BV 号格式
             if video_link.startswith('BV'):
@@ -95,21 +127,29 @@ def download_and_play_video(video_link, download_folder="../IVS/downloads"):
                     'User-Agent': user_agent,
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                     'Accept-Language': 'en-us,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate, br',
                     'Sec-Fetch-Mode': 'navigate',
                 },
                 'nocheckcertificate': True,
                 'ignoreerrors': False,
                 'no_warnings': True,
-                'extractor_args': {'youtube': {
-                    'player_client': ['android', 'web'],  # 尝试多个客户端
-                    'player_skip': ['webpage', 'config', 'js'],  # 跳过可能导致问题的检查
-                }},
-                'socket_timeout': 30,  # 增加超时时间
-                'retries': 10,  # 增加重试次数
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web'],  # 尝试多个客户端
+                        'player_skip': ['webpage', 'config', 'js'],  # 跳过可能导致问题的检查
+                        'skip_webpage': True,  # 跳过网页下载
+                        'compat_opts': ['no-youtube-unavailable-videos'],
+                    }
+                },
+                'socket_timeout': 30,
+                'retries': 10,
                 'file_access_retries': 10,
                 'fragment_retries': 10,
                 'skip_unavailable_fragments': True,
                 'overwrites': True,
+                'source_address': '0.0.0.0',  # 强制使用本地 IP
+                'geo_bypass': True,  # 绕过地理限制
+                'geo_bypass_country': 'US',  # 使用美国 IP
             }
             
             # 如果是YouTube链接，尝试规范化URL

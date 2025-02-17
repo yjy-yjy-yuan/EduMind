@@ -1,0 +1,171 @@
+2025-02-17 22:21:24,670 - KnowledgeGraph - INFO - 成功加载中文NLP模型
+2025-02-17 22:21:24,769 - KnowledgeGraph - INFO - Neo4j数据库连接成功！
+2025-02-17 22:21:24,771 - KnowledgeGraph - DEBUG - 创建Neo4j唯一性约束成功
+2025-02-17 22:21:24,815 - KnowledgeGraph - DEBUG - 处理节点: 大家好啊 像个视频发出之后 很多朋友在问怎么用那个 DeepSecq的那个API 把它接入到微信上 ...
+2025-02-17 22:21:24,815 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：62
+2025-02-17 22:21:24,831 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:21:24,842 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：大家好啊 像个视频发出之后 很多朋友在问怎么用那个 DeepSecq的那个API 把它接入到微信上 然后做一个微信聊天小住手
+2025-02-17 22:21:24,842 - KnowledgeGraph - DEBUG - 发现关系：好 -nsubj-> 大家
+2025-02-17 22:21:24,843 - KnowledgeGraph - DEBUG - 发现关系：发出 -nsubj-> 视频
+2025-02-17 22:21:24,843 - KnowledgeGraph - DEBUG - 发现关系：问 -nsubj-> 朋友
+2025-02-17 22:21:24,843 - KnowledgeGraph - DEBUG - 发现关系：用 -dobj-> Deep
+2025-02-17 22:21:24,843 - KnowledgeGraph - DEBUG - 发现关系：问 -dobj-> API
+2025-02-17 22:21:24,843 - KnowledgeGraph - DEBUG - 发现关系：做 -dobj-> 住手
+2025-02-17 22:21:24,986 - KnowledgeGraph - INFO - 已处理 1/110 个知识点 | 实体: 0 | 关系: 6
+2025-02-17 22:21:24,987 - KnowledgeGraph - DEBUG - 处理节点: 然后这里我就做了一下 嗯 还是给大家出一个小小的教程吧 然后首先我们还是打开那个 DeepSecq....
+2025-02-17 22:21:24,987 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：57
+2025-02-17 22:21:24,998 - KnowledgeGraph - DEBUG - 识别到技术术语: DeepSecq
+2025-02-17 22:21:24,998 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:21:25,009 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：然后这里我就做了一下 嗯 还是给大家出一个小小的教程吧 然后首先我们还是打开那个 DeepSecq.com这个官网
+2025-02-17 22:21:25,009 - KnowledgeGraph - DEBUG - 发现关系：做 -nsubj-> 我
+2025-02-17 22:21:25,009 - KnowledgeGraph - DEBUG - 发现关系：出 -dobj-> 教程
+2025-02-17 22:21:25,009 - KnowledgeGraph - DEBUG - 发现关系：打开 -nsubj-> 我们
+2025-02-17 22:21:25,009 - KnowledgeGraph - DEBUG - 发现关系：打开 -dobj-> 官网
+2025-02-17 22:21:25,082 - KnowledgeGraph - DEBUG - 处理节点: 官网之后还是看到那个API的开放平台 我们点进去 点进去之后呢 有一个那个APIKIMS 我们点进去...
+2025-02-17 22:21:25,083 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：60
+2025-02-17 22:21:25,136 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:21:25,146 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：官网之后还是看到那个API的开放平台 我们点进去 点进去之后呢 有一个那个APIKIMS 我们点进去之后创建这个APIK
+2025-02-17 22:21:25,146 - KnowledgeGraph - DEBUG - 发现关系：有 -nsubj-> 我们
+2025-02-17 22:21:25,146 - KnowledgeGraph - DEBUG - 发现关系：创建 -nsubj-> 我们
+2025-02-17 22:21:25,146 - KnowledgeGraph - DEBUG - 发现关系：创建 -dobj-> APIK
+2025-02-17 22:21:25,203 - KnowledgeGraph - DEBUG - 处理节点: 创建之后我就随便举个例子吧 我就啊好就他了 然后创建这个KIM之后我复制 复制之后...
+2025-02-17 22:21:25,203 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：41
+2025-02-17 22:21:25,213 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:21:25,222 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：创建之后我就随便举个例子吧 我就啊好就他了 然后创建这个KIM之后我复制 复制之后
+2025-02-17 22:21:25,223 - KnowledgeGraph - DEBUG - 发现关系：举 -nsubj-> 我
+2025-02-17 22:21:25,223 - KnowledgeGraph - DEBUG - 发现关系：举 -dobj-> 例子
+2025-02-17 22:21:25,223 - KnowledgeGraph - DEBUG - 发现关系：好 -nsubj-> 我
+2025-02-17 22:21:25,224 - KnowledgeGraph - DEBUG - 发现关系：创建 -dobj-> KIM
+2025-02-17 22:21:25,224 - KnowledgeGraph - DEBUG - 发现关系：复制 -nsubj-> 我
+2025-02-17 22:21:25,296 - KnowledgeGraph - DEBUG - 处理节点: 你就只能复制一次啊 就是因为你如果插掉的话 后面的话这就不可以三复制了 然后那我这边删掉 因为我这边...
+2025-02-17 22:21:25,296 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：58
+2025-02-17 22:21:25,310 - KnowledgeGraph - DEBUG - 发现实体：三 (类型: CARDINAL)
+2025-02-17 22:21:25,310 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:21:25,321 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：你就只能复制一次啊 就是因为你如果插掉的话 后面的话这就不可以三复制了 然后那我这边删掉 因为我这边不用这个嘛 然后
+2025-02-17 22:21:25,321 - KnowledgeGraph - DEBUG - 发现关系：复制 -nsubj-> 你
+2025-02-17 22:21:25,321 - KnowledgeGraph - DEBUG - 发现关系：插掉 -nsubj-> 你
+2025-02-17 22:21:25,321 - KnowledgeGraph - DEBUG - 发现关系：删掉 -nsubj-> 这边
+2025-02-17 22:21:25,321 - KnowledgeGraph - DEBUG - 发现关系：不用 -dobj-> 这个
+2025-02-17 22:21:25,393 - KnowledgeGraph - INFO - 已处理 5/110 个知识点 | 实体: 2 | 关系: 22
+2025-02-17 22:21:25,395 - KnowledgeGraph - DEBUG - 处理节点: 然后打开Wesco的 我这边代码已经写了 然后这个boat.py 我们把它复制到这 我们就可以使用了...
+2025-02-17 22:21:25,395 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：50
+2025-02-17 22:21:25,405 - KnowledgeGraph - DEBUG - 识别到技术术语: 然后这个boat.py
+2025-02-17 22:21:25,405 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:21:25,415 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：然后打开Wesco的 我这边代码已经写了 然后这个boat.py 我们把它复制到这 我们就可以使用了
+2025-02-17 22:21:25,415 - KnowledgeGraph - DEBUG - 发现关系：打开 -dobj-> Wesco
+2025-02-17 22:21:25,415 - KnowledgeGraph - DEBUG - 发现关系：写 -nsubj-> 代码
+2025-02-17 22:21:25,415 - KnowledgeGraph - DEBUG - 发现关系：写 -dobj-> boat
+2025-02-17 22:21:25,415 - KnowledgeGraph - DEBUG - 发现关系：复制 -nsubj-> 我们
+2025-02-17 22:21:25,415 - KnowledgeGraph - DEBUG - 发现关系：使用 -nsubj-> 我们
+2025-02-17 22:21:25,485 - KnowledgeGraph - DEBUG - 处理节点: 然后 我们来运行一下 到时候我会把这个代码 还是放在那个 Get a Hub的这个平台上 因为前几天...
+2025-02-17 22:21:25,485 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：69
+2025-02-17 22:21:25,497 - KnowledgeGraph - DEBUG - 发现实体：前几天 (类型: DATE)
+2025-02-17 22:21:25,497 - KnowledgeGraph - DEBUG - 识别到技术术语: Get
+2025-02-17 22:21:25,498 - KnowledgeGraph - DEBUG - 总共识别到 2 个唯一实体
+2025-02-17 22:21:25,508 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：然后 我们来运行一下 到时候我会把这个代码 还是放在那个 Get a Hub的这个平台上 因为前几天有点忙 所以说我想把它整理了之后发上去
+2025-02-17 22:21:25,509 - KnowledgeGraph - DEBUG - 发现关系：运行 -nsubj-> 我们
+2025-02-17 22:21:25,509 - KnowledgeGraph - DEBUG - 发现关系：放在 -nsubj-> 我
+2025-02-17 22:21:25,509 - KnowledgeGraph - DEBUG - 发现关系：Get -dobj-> 平台
+2025-02-17 22:21:25,509 - KnowledgeGraph - DEBUG - 发现关系：想 -nsubj-> 我
+2025-02-17 22:21:25,509 - KnowledgeGraph - DEBUG - 发现共现关系：前几天 -相关-> Get
+2025-02-17 22:21:25,581 - KnowledgeGraph - DEBUG - 处理节点: 嗯 然后这边点那个qr 然后微信扫码 登陆上去就可以了...
+2025-02-17 22:21:25,581 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：27
+2025-02-17 22:21:25,587 - KnowledgeGraph - DEBUG - 发现实体：qr (类型: PERSON)
+2025-02-17 22:21:25,587 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:21:25,593 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：嗯 然后这边点那个qr 然后微信扫码 登陆上去就可以了
+2025-02-17 22:21:25,593 - KnowledgeGraph - DEBUG - 发现关系：可以 -nsubj-> 扫码
+2025-02-17 22:21:25,623 - KnowledgeGraph - DEBUG - 处理节点: 好了登陆成功 登陆成功之后呢 他会跳转到另一个网页上 这个网页呢 就是在监视我那个 聊天然后他回复...
+2025-02-17 22:21:25,623 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：49
+2025-02-17 22:21:25,632 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:21:25,641 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：好了登陆成功 登陆成功之后呢 他会跳转到另一个网页上 这个网页呢 就是在监视我那个 聊天然后他回复
+2025-02-17 22:21:25,641 - KnowledgeGraph - DEBUG - 发现关系：登陆 -dobj-> 成功
+2025-02-17 22:21:25,641 - KnowledgeGraph - DEBUG - 发现关系：跳转 -nsubj-> 他
+2025-02-17 22:21:25,641 - KnowledgeGraph - DEBUG - 发现关系：监视 -dobj-> 聊天
+2025-02-17 22:21:25,641 - KnowledgeGraph - DEBUG - 发现关系：回复 -nsubj-> 他
+2025-02-17 22:21:25,708 - KnowledgeGraph - DEBUG - 处理节点: 然后现在就是 就是我自己跟自己聊天 然后就是你现在回我好 然后他就可以 给你做一个 这种聊天的回复 ...
+2025-02-17 22:21:25,708 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：57
+2025-02-17 22:21:25,718 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:21:25,727 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：然后现在就是 就是我自己跟自己聊天 然后就是你现在回我好 然后他就可以 给你做一个 这种聊天的回复 当然我这个其实
+2025-02-17 22:21:25,727 - KnowledgeGraph - DEBUG - 发现关系：聊天 -nsubj-> 自己
+2025-02-17 22:21:25,727 - KnowledgeGraph - DEBUG - 发现关系：回 -nsubj-> 你
+2025-02-17 22:21:25,727 - KnowledgeGraph - DEBUG - 发现关系：回 -dobj-> 我
+2025-02-17 22:21:25,727 - KnowledgeGraph - DEBUG - 发现关系：做 -nsubj-> 他
+2025-02-17 22:21:25,727 - KnowledgeGraph - DEBUG - 发现关系：做 -dobj-> 回复
+2025-02-17 22:21:25,784 - KnowledgeGraph - INFO - 已处理 10/110 个知识点 | 实体: 6 | 关系: 42
+2025-02-17 22:21:25,786 - KnowledgeGraph - DEBUG - 处理节点: 他做的不是很智能 因为我觉得 这个看着就是啥啥的 那么我们应该 怎么做呢...
+2025-02-17 22:21:25,786 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：36
+2025-02-17 22:21:25,794 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:21:25,802 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：他做的不是很智能 因为我觉得 这个看着就是啥啥的 那么我们应该 怎么做呢
+2025-02-17 22:21:25,802 - KnowledgeGraph - DEBUG - 发现关系：做 -nsubj-> 他
+2025-02-17 22:21:25,802 - KnowledgeGraph - DEBUG - 发现关系：觉得 -nsubj-> 我
+2025-02-17 22:21:25,802 - KnowledgeGraph - DEBUG - 发现关系：做 -nsubj-> 我们
+2025-02-17 22:21:25,840 - KnowledgeGraph - DEBUG - 处理节点: 到时候可以去调一调 或者我给他一些prote 然后去做一些设定 那么这一个后面就是可以看 大家自己去...
+2025-02-17 22:21:25,841 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：55
+2025-02-17 22:21:25,850 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:21:25,860 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：到时候可以去调一调 或者我给他一些prote 然后去做一些设定 那么这一个后面就是可以看 大家自己去做一些优惶
+2025-02-17 22:21:25,860 - KnowledgeGraph - DEBUG - 发现关系：给 -nsubj-> 我
+2025-02-17 22:21:25,860 - KnowledgeGraph - DEBUG - 发现关系：给 -dobj-> 他
+2025-02-17 22:21:25,860 - KnowledgeGraph - DEBUG - 发现关系：给 -dobj-> prote
+2025-02-17 22:21:25,860 - KnowledgeGraph - DEBUG - 发现关系：做 -dobj-> 设定
+2025-02-17 22:21:25,860 - KnowledgeGraph - DEBUG - 发现关系：看 -nsubj-> 后面
+2025-02-17 22:21:25,860 - KnowledgeGraph - DEBUG - 发现关系：做 -nsubj-> 自己
+2025-02-17 22:21:25,860 - KnowledgeGraph - DEBUG - 发现关系：做 -dobj-> 优惶
+2025-02-17 22:21:25,945 - KnowledgeGraph - DEBUG - 处理节点: 好吧 那我这边会把代码 能放在那个 get up上 然后我把它整理一下 然后前面的两个代码 我也会把...
+2025-02-17 22:21:25,945 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：54
+2025-02-17 22:21:25,955 - KnowledgeGraph - DEBUG - 发现实体：两 (类型: CARDINAL)
+2025-02-17 22:21:25,955 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:21:25,964 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：好吧 那我这边会把代码 能放在那个 get up上 然后我把它整理一下 然后前面的两个代码 我也会把它整理到
+2025-02-17 22:21:25,964 - KnowledgeGraph - DEBUG - 发现关系：放在 -nsubj-> 这边
+2025-02-17 22:21:25,964 - KnowledgeGraph - DEBUG - 发现关系：放在 -dobj-> get
+2025-02-17 22:21:25,965 - KnowledgeGraph - DEBUG - 发现关系：整理 -nsubj-> 我
+2025-02-17 22:21:25,965 - KnowledgeGraph - DEBUG - 发现关系：整理 -dobj-> 代码
+2025-02-17 22:21:25,965 - KnowledgeGraph - DEBUG - 发现关系：整理 -nsubj-> 我
+2025-02-17 22:21:26,019 - KnowledgeGraph - DEBUG - 处理节点: get up上 然后我给大家讲一下 那么这个到时候需求文档 这个不是配 这个就是那个配置的这个 我们...
+2025-02-17 22:21:26,019 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：60
+2025-02-17 22:21:26,028 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:21:26,037 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：get up上 然后我给大家讲一下 那么这个到时候需求文档 这个不是配 这个就是那个配置的这个 我们就按照这个配置就行了
+2025-02-17 22:21:26,039 - KnowledgeGraph - DEBUG - 发现关系：讲 -nsubj-> 我
+2025-02-17 22:21:26,039 - KnowledgeGraph - DEBUG - 发现关系：配 -nsubj-> 这个
+2025-02-17 22:21:26,039 - KnowledgeGraph - DEBUG - 发现关系：配 -dobj-> 这个
+2025-02-17 22:21:26,039 - KnowledgeGraph - DEBUG - 发现关系：行 -nsubj-> 我们
+2025-02-17 22:21:26,093 - KnowledgeGraph - DEBUG - 处理节点: 其他的都不需要管 然后还有一个基础的那个 拍3.9吧 拍3.9 好...
+2025-02-17 22:21:26,093 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：33
+2025-02-17 22:21:26,101 - KnowledgeGraph - DEBUG - 发现实体：3 (类型: CARDINAL)
+2025-02-17 22:21:26,101 - KnowledgeGraph - DEBUG - 发现实体：9 (类型: CARDINAL)
+2025-02-17 22:21:26,101 - KnowledgeGraph - DEBUG - 发现实体：3 (类型: CARDINAL)
+2025-02-17 22:21:26,101 - KnowledgeGraph - DEBUG - 发现实体：9 (类型: CARDINAL)
+2025-02-17 22:21:26,101 - KnowledgeGraph - DEBUG - 总共识别到 2 个唯一实体
+2025-02-17 22:21:26,109 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：其他的都不需要管 然后还有一个基础的那个 拍3.9吧 拍3.9 好
+2025-02-17 22:21:26,109 - KnowledgeGraph - DEBUG - 发现关系：管 -nsubj-> 其他
+2025-02-17 22:21:26,109 - KnowledgeGraph - DEBUG - 发现共现关系：3 -相关-> 9
+2025-02-17 22:21:26,152 - KnowledgeGraph - INFO - 已处理 15/110 个知识点 | 实体: 9 | 关系: 63

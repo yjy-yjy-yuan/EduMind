@@ -1,0 +1,310 @@
+2025-02-17 21:52:57,401 - KnowledgeGraph - INFO - 成功加载中文NLP模型
+2025-02-17 21:52:57,502 - KnowledgeGraph - INFO - Neo4j数据库连接成功！
+2025-02-17 21:52:57,533 - KnowledgeGraph - DEBUG - 创建Neo4j唯一性约束成功
+2025-02-17 21:52:57,586 - KnowledgeGraph - DEBUG - 处理节点: 如果有人问你,操作系统是干什么的 你要怎么简洁的回答呢? 今天上午我在百度Credit.AI开发者大...
+2025-02-17 21:52:57,588 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：93
+2025-02-17 21:52:57,626 - KnowledgeGraph - DEBUG - 发现实体：今天上午 (类型: TIME)
+2025-02-17 21:52:57,627 - KnowledgeGraph - DEBUG - 发现实体：百度 (类型: ORG)
+2025-02-17 21:52:57,627 - KnowledgeGraph - DEBUG - 发现实体：AI开发者大会 (类型: ORG)
+2025-02-17 21:52:57,629 - KnowledgeGraph - DEBUG - 识别到概念: 操作系统是干什么的
+2025-02-17 21:52:57,631 - KnowledgeGraph - DEBUG - 总共识别到 4 个唯一实体
+2025-02-17 21:52:57,643 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：如果有人问你,操作系统是干什么的 你要怎么简洁的回答呢? 今天上午我在百度Credit.AI开发者大会上就听到一个 挺有意思的关键词 屏蔽底下的这种复杂性 屏蔽底层的复杂性更是啥意思呢?
+2025-02-17 21:52:57,645 - KnowledgeGraph - DEBUG - 发现关系：问 -dobj-> 你
+2025-02-17 21:52:57,645 - KnowledgeGraph - DEBUG - 发现关系：干什么 -nsubj-> 系统
+2025-02-17 21:52:57,645 - KnowledgeGraph - DEBUG - 发现关系：回答 -nsubj-> 你
+2025-02-17 21:52:57,645 - KnowledgeGraph - DEBUG - 发现关系：听到 -nsubj-> 我
+2025-02-17 21:52:57,645 - KnowledgeGraph - DEBUG - 发现关系：意思 -nsubj-> 复杂性
+2025-02-17 21:52:57,645 - KnowledgeGraph - DEBUG - 发现关系：听到 -dobj-> 意思
+2025-02-17 21:52:57,645 - KnowledgeGraph - DEBUG - 发现共现关系：今天上午 -相关-> 百度
+2025-02-17 21:52:57,645 - KnowledgeGraph - DEBUG - 发现共现关系：今天上午 -相关-> AI开发者大会
+2025-02-17 21:52:57,645 - KnowledgeGraph - DEBUG - 发现共现关系：今天上午 -相关-> 操作系统是干什么的
+2025-02-17 21:52:57,645 - KnowledgeGraph - DEBUG - 发现共现关系：百度 -相关-> AI开发者大会
+2025-02-17 21:52:57,645 - KnowledgeGraph - DEBUG - 发现共现关系：百度 -相关-> 操作系统是干什么的
+2025-02-17 21:52:57,645 - KnowledgeGraph - DEBUG - 发现共现关系：AI开发者大会 -相关-> 操作系统是干什么的
+2025-02-17 21:52:58,477 - KnowledgeGraph - INFO - 已处理 1/110 个知识点 | 实体: 4 | 关系: 12
+2025-02-17 21:52:58,478 - KnowledgeGraph - DEBUG - 处理节点: 比如你在玩手机刷视频 本质上是你在控制手机里的各种精密电子元件 让它慢照一定规律协作 把画面呈现给你...
+2025-02-17 21:52:58,479 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：78
+2025-02-17 21:52:58,492 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 21:52:58,504 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：比如你在玩手机刷视频 本质上是你在控制手机里的各种精密电子元件 让它慢照一定规律协作 把画面呈现给你 但实际上你并不需要关心屏幕 芯片这些元期间是怎么运作的
+2025-02-17 21:52:58,505 - KnowledgeGraph - DEBUG - 发现关系：控制 -nsubj-> 你
+2025-02-17 21:52:58,505 - KnowledgeGraph - DEBUG - 发现关系：控制 -nsubj-> 你
+2025-02-17 21:52:58,505 - KnowledgeGraph - DEBUG - 发现关系：控制 -dobj-> 元件
+2025-02-17 21:52:58,505 - KnowledgeGraph - DEBUG - 发现关系：让 -dobj-> 它
+2025-02-17 21:52:58,505 - KnowledgeGraph - DEBUG - 发现关系：呈现 -dobj-> 你
+2025-02-17 21:52:58,505 - KnowledgeGraph - DEBUG - 发现关系：关心 -nsubj-> 你
+2025-02-17 21:52:58,505 - KnowledgeGraph - DEBUG - 发现关系：芯片 -nsubj-> 屏幕
+2025-02-17 21:52:58,505 - KnowledgeGraph - DEBUG - 发现关系：运作 -nsubj-> 期间
+2025-02-17 21:52:58,721 - KnowledgeGraph - DEBUG - 处理节点: 说那有个操作系统在调读他们 帮你屏蔽了底层硬件的复杂性 对于开发软件的程序原来说 屏蔽底层的复杂性更...
+2025-02-17 21:52:58,721 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：89
+2025-02-17 21:52:58,733 - KnowledgeGraph - DEBUG - 识别到概念: 说那有个操作系统在调读他们
+2025-02-17 21:52:58,734 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 21:52:58,746 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：说那有个操作系统在调读他们 帮你屏蔽了底层硬件的复杂性 对于开发软件的程序原来说 屏蔽底层的复杂性更为重要 我们开发应用的时候 如果要直接跟硬件打交道 当内存条硬盘CPU相互协作
+2025-02-17 21:52:58,746 - KnowledgeGraph - DEBUG - 发现关系：有 -dobj-> 系统
+2025-02-17 21:52:58,746 - KnowledgeGraph - DEBUG - 发现关系：帮 -nsubj-> 他们
+2025-02-17 21:52:58,746 - KnowledgeGraph - DEBUG - 发现关系：帮 -dobj-> 你
+2025-02-17 21:52:58,746 - KnowledgeGraph - DEBUG - 发现关系：说 -nsubj-> 程序
+2025-02-17 21:52:58,746 - KnowledgeGraph - DEBUG - 发现关系：重要 -nsubj-> 复杂性
+2025-02-17 21:52:58,746 - KnowledgeGraph - DEBUG - 发现关系：重要 -dobj-> 应用
+2025-02-17 21:52:58,746 - KnowledgeGraph - DEBUG - 发现关系：打交道 -dobj-> CPU
+2025-02-17 21:52:58,901 - KnowledgeGraph - DEBUG - 处理节点: 安排每个进程在什么时候运行 那这伙就没法干了 所以操作系统会帮他们屏蔽底层这些复杂的事儿 开发者通常...
+2025-02-17 21:52:58,901 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：82
+2025-02-17 21:52:58,913 - KnowledgeGraph - DEBUG - 识别到概念: 所以操作系统会帮他们屏蔽底层这些复杂的事儿
+2025-02-17 21:52:58,913 - KnowledgeGraph - DEBUG - 识别到概念: 开发者通常只需要跟操作系统的接口打交道就可以了
+2025-02-17 21:52:58,914 - KnowledgeGraph - DEBUG - 总共识别到 2 个唯一实体
+2025-02-17 21:52:58,925 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：安排每个进程在什么时候运行 那这伙就没法干了 所以操作系统会帮他们屏蔽底层这些复杂的事儿 开发者通常只需要跟操作系统的接口打交道就可以了 所以这软件越来越旁大和复杂
+2025-02-17 21:52:58,925 - KnowledgeGraph - DEBUG - 发现关系：运行 -nsubj-> 进程
+2025-02-17 21:52:58,926 - KnowledgeGraph - DEBUG - 发现关系：帮 -nsubj-> 系统
+2025-02-17 21:52:58,926 - KnowledgeGraph - DEBUG - 发现关系：需要 -nsubj-> 开发者
+2025-02-17 21:52:58,926 - KnowledgeGraph - DEBUG - 发现关系：帮 -dobj-> 打交道
+2025-02-17 21:52:58,926 - KnowledgeGraph - DEBUG - 发现关系：旁大 -nsubj-> 软件
+2025-02-17 21:52:58,926 - KnowledgeGraph - DEBUG - 发现共现关系：所以操作系统会帮他们屏蔽底层这些复杂的事儿 -相关-> 开发者通常只需要跟操作系统的接口打交道就可以了
+2025-02-17 21:52:59,062 - KnowledgeGraph - DEBUG - 处理节点: 操作系统这个屏蔽复杂性的任务 就变得越来越坚聚 这点我们操作系统的代码航述就可以看出来 对早的微软道...
+2025-02-17 21:52:59,062 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：83
+2025-02-17 21:52:59,073 - KnowledgeGraph - DEBUG - 发现实体：微软 (类型: ORG)
+2025-02-17 21:52:59,073 - KnowledgeGraph - DEBUG - 发现实体：4万 (类型: CARDINAL)
+2025-02-17 21:52:59,073 - KnowledgeGraph - DEBUG - 发现实体：Windows (类型: PRODUCT)
+2025-02-17 21:52:59,074 - KnowledgeGraph - DEBUG - 识别到概念: 操作系统这个屏蔽复杂性的任务
+2025-02-17 21:52:59,074 - KnowledgeGraph - DEBUG - 识别到概念: 这点我们操作系统的代码航述就可以看出来
+2025-02-17 21:52:59,074 - KnowledgeGraph - DEBUG - 识别到概念: 对早的微软道子系统只有
+2025-02-17 21:52:59,074 - KnowledgeGraph - DEBUG - 总共识别到 6 个唯一实体
+2025-02-17 21:52:59,085 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：操作系统这个屏蔽复杂性的任务 就变得越来越坚聚 这点我们操作系统的代码航述就可以看出来 对早的微软道子系统只有4万航代码 道路Windows XP就有4000万航代码
+2025-02-17 21:52:59,085 - KnowledgeGraph - DEBUG - 发现关系：复杂性 -nsubj-> 屏蔽
+2025-02-17 21:52:59,085 - KnowledgeGraph - DEBUG - 发现关系：变得 -nsubj-> 任务
+2025-02-17 21:52:59,085 - KnowledgeGraph - DEBUG - 发现关系：看 -nsubj-> 航述
+2025-02-17 21:52:59,085 - KnowledgeGraph - DEBUG - 发现关系：码 -nsubj-> 系统
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现关系：码 -dobj-> 道路
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现关系：有 -nsubj-> XP
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现关系：有 -dobj-> 航代
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：微软 -相关-> 4万
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：微软 -相关-> Windows
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：微软 -相关-> 操作系统这个屏蔽复杂性的任务
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：微软 -相关-> 这点我们操作系统的代码航述就可以看出来
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：微软 -相关-> 对早的微软道子系统只有
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：4万 -相关-> Windows
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：4万 -相关-> 操作系统这个屏蔽复杂性的任务
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：4万 -相关-> 这点我们操作系统的代码航述就可以看出来
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：4万 -相关-> 对早的微软道子系统只有
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：Windows -相关-> 操作系统这个屏蔽复杂性的任务
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：Windows -相关-> 这点我们操作系统的代码航述就可以看出来
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：Windows -相关-> 对早的微软道子系统只有
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：操作系统这个屏蔽复杂性的任务 -相关-> 这点我们操作系统的代码航述就可以看出来
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：操作系统这个屏蔽复杂性的任务 -相关-> 对早的微软道子系统只有
+2025-02-17 21:52:59,086 - KnowledgeGraph - DEBUG - 发现共现关系：这点我们操作系统的代码航述就可以看出来 -相关-> 对早的微软道子系统只有
+2025-02-17 21:52:59,491 - KnowledgeGraph - INFO - 已处理 5/110 个知识点 | 实体: 13 | 关系: 55
+2025-02-17 21:52:59,493 - KnowledgeGraph - DEBUG - 处理节点: 当一台机器不能俩做需求 诶 计算集群就出现了 人们会把一堆机器连在一起 通过调读形成一个整体 就像一...
+2025-02-17 21:52:59,493 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：79
+2025-02-17 21:52:59,505 - KnowledgeGraph - DEBUG - 发现实体：一 (类型: CARDINAL)
+2025-02-17 21:52:59,506 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 21:52:59,518 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：当一台机器不能俩做需求 诶 计算集群就出现了 人们会把一堆机器连在一起 通过调读形成一个整体 就像一台机器 可以解决一些很庞大的问题 并且可以弹性分配计算资源
+2025-02-17 21:52:59,518 - KnowledgeGraph - DEBUG - 发现关系：做 -nsubj-> 机器
+2025-02-17 21:52:59,518 - KnowledgeGraph - DEBUG - 发现关系：做 -dobj-> 诶
+2025-02-17 21:52:59,518 - KnowledgeGraph - DEBUG - 发现关系：出现 -nsubj-> 集群
+2025-02-17 21:52:59,519 - KnowledgeGraph - DEBUG - 发现关系：形成 -nsubj-> 人们
+2025-02-17 21:52:59,519 - KnowledgeGraph - DEBUG - 发现关系：形成 -dobj-> 整体
+2025-02-17 21:52:59,519 - KnowledgeGraph - DEBUG - 发现关系：解决 -nsubj-> 机器
+2025-02-17 21:52:59,519 - KnowledgeGraph - DEBUG - 发现关系：解决 -dobj-> 问题
+2025-02-17 21:52:59,519 - KnowledgeGraph - DEBUG - 发现关系：计算 -dobj-> 资源
+2025-02-17 21:52:59,709 - KnowledgeGraph - DEBUG - 处理节点: 也就是所谓的云计算 但是让成千上万台机器高效的写作 本身就是一件非常复杂的事儿 于是就出现了分布式...
+2025-02-17 21:52:59,709 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：49
+2025-02-17 21:52:59,719 - KnowledgeGraph - DEBUG - 发现实体：成千上万 (类型: CARDINAL)
+2025-02-17 21:52:59,719 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 21:52:59,726 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：也就是所谓的云计算 但是让成千上万台机器高效的写作 本身就是一件非常复杂的事儿 于是就出现了分布式
+2025-02-17 21:52:59,726 - KnowledgeGraph - DEBUG - 发现关系：让 -nsubj-> 云计算
+2025-02-17 21:52:59,726 - KnowledgeGraph - DEBUG - 发现关系：让 -dobj-> 机器
+2025-02-17 21:52:59,727 - KnowledgeGraph - DEBUG - 发现关系：让 -dobj-> 写作
+2025-02-17 21:52:59,727 - KnowledgeGraph - DEBUG - 发现关系：让 -dobj-> 本身
+2025-02-17 21:52:59,813 - KnowledgeGraph - DEBUG - 处理节点: 屏蔽掉背后的复杂型 到今天的大模型时代 事情就变得更复杂了 你在对付框底跟大模型轻松的对话 背后也是...
+2025-02-17 21:52:59,814 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：72
+2025-02-17 21:52:59,825 - KnowledgeGraph - DEBUG - 发现实体：今天 (类型: DATE)
+2025-02-17 21:52:59,825 - KnowledgeGraph - DEBUG - 发现实体：成千上万 (类型: CARDINAL)
+2025-02-17 21:52:59,825 - KnowledgeGraph - DEBUG - 发现实体：台机PU服务器 (类型: ORG)
+2025-02-17 21:52:59,828 - KnowledgeGraph - DEBUG - 识别到概念: 到今天的大模型时代
+2025-02-17 21:52:59,828 - KnowledgeGraph - DEBUG - 识别到概念: 你在对付框底跟大模型轻松的对话
+2025-02-17 21:52:59,828 - KnowledgeGraph - DEBUG - 总共识别到 5 个唯一实体
+2025-02-17 21:52:59,838 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：屏蔽掉背后的复杂型 到今天的大模型时代 事情就变得更复杂了 你在对付框底跟大模型轻松的对话 背后也是成千上万台机PU服务器 组成的集群赞燃稍经费
+2025-02-17 21:52:59,838 - KnowledgeGraph - DEBUG - 发现关系：掉 -nsubj-> 屏蔽
+2025-02-17 21:52:59,838 - KnowledgeGraph - DEBUG - 发现关系：变得 -nsubj-> 复杂型
+2025-02-17 21:52:59,838 - KnowledgeGraph - DEBUG - 发现关系：对付 -nsubj-> 你
+2025-02-17 21:52:59,838 - KnowledgeGraph - DEBUG - 发现关系：对付 -dobj-> 框底
+2025-02-17 21:52:59,839 - KnowledgeGraph - DEBUG - 发现关系：组成 -nsubj-> 服务器
+2025-02-17 21:52:59,839 - KnowledgeGraph - DEBUG - 发现共现关系：今天 -相关-> 成千上万
+2025-02-17 21:52:59,839 - KnowledgeGraph - DEBUG - 发现共现关系：今天 -相关-> 台机PU服务器
+2025-02-17 21:52:59,839 - KnowledgeGraph - DEBUG - 发现共现关系：今天 -相关-> 到今天的大模型时代
+2025-02-17 21:52:59,839 - KnowledgeGraph - DEBUG - 发现共现关系：今天 -相关-> 你在对付框底跟大模型轻松的对话
+2025-02-17 21:52:59,839 - KnowledgeGraph - DEBUG - 发现共现关系：成千上万 -相关-> 台机PU服务器
+2025-02-17 21:52:59,839 - KnowledgeGraph - DEBUG - 发现共现关系：成千上万 -相关-> 到今天的大模型时代
+2025-02-17 21:52:59,839 - KnowledgeGraph - DEBUG - 发现共现关系：成千上万 -相关-> 你在对付框底跟大模型轻松的对话
+2025-02-17 21:52:59,839 - KnowledgeGraph - DEBUG - 发现共现关系：台机PU服务器 -相关-> 到今天的大模型时代
+2025-02-17 21:52:59,839 - KnowledgeGraph - DEBUG - 发现共现关系：台机PU服务器 -相关-> 你在对付框底跟大模型轻松的对话
+2025-02-17 21:52:59,839 - KnowledgeGraph - DEBUG - 发现共现关系：到今天的大模型时代 -相关-> 你在对付框底跟大模型轻松的对话
+2025-02-17 21:53:00,087 - KnowledgeGraph - DEBUG - 处理节点: 奔跑的计算 因为计算量非常的大 所以这些服务器 必须以极高的效率来通信和写作 就像是一台机器 这时候...
+2025-02-17 21:53:00,087 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：91
+2025-02-17 21:53:00,099 - KnowledgeGraph - DEBUG - 识别到概念: 计算操作系统来指挥调读他们
+2025-02-17 21:53:00,100 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 21:53:00,113 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：奔跑的计算 因为计算量非常的大 所以这些服务器 必须以极高的效率来通信和写作 就像是一台机器 这时候同样需要一个智能 计算操作系统来指挥调读他们 往上面的使用者来屏蔽掉硬件层的复杂型
+2025-02-17 21:53:00,113 - KnowledgeGraph - DEBUG - 发现关系：大 -nsubj-> 计算量
+2025-02-17 21:53:00,113 - KnowledgeGraph - DEBUG - 发现关系：像 -nsubj-> 服务器
+2025-02-17 21:53:00,113 - KnowledgeGraph - DEBUG - 发现关系：像 -nsubj-> 写作
+2025-02-17 21:53:00,113 - KnowledgeGraph - DEBUG - 发现关系：需要 -nsubj-> 机器
+2025-02-17 21:53:00,113 - KnowledgeGraph - DEBUG - 发现关系：计算 -nsubj-> 智能
+2025-02-17 21:53:00,114 - KnowledgeGraph - DEBUG - 发现关系：计算 -dobj-> 系统
+2025-02-17 21:53:00,114 - KnowledgeGraph - DEBUG - 发现关系：调读 -dobj-> 使用者
+2025-02-17 21:53:00,234 - KnowledgeGraph - DEBUG - 处理节点: 这个操作系统既要高效充分的令 所有服务器的计算能力 比如不能让一部分服务器类似 另一部分还这么贵于 ...
+2025-02-17 21:53:00,235 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：85
+2025-02-17 21:53:00,247 - KnowledgeGraph - DEBUG - 识别到概念: 这个操作系统既要高效充分的令
+2025-02-17 21:53:00,247 - KnowledgeGraph - DEBUG - 识别到概念: 总之让大模型开发者
+2025-02-17 21:53:00,247 - KnowledgeGraph - DEBUG - 总共识别到 2 个唯一实体
+2025-02-17 21:53:00,259 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：这个操作系统既要高效充分的令 所有服务器的计算能力 比如不能让一部分服务器类似 另一部分还这么贵于 同时也要考虑不同的芯片的肩容性单的 总之让大模型开发者 用管底层的事情
+2025-02-17 21:53:00,259 - KnowledgeGraph - DEBUG - 发现关系：令 -nsubj-> 系统
+2025-02-17 21:53:00,260 - KnowledgeGraph - DEBUG - 发现关系：令 -dobj-> 能力
+2025-02-17 21:53:00,260 - KnowledgeGraph - DEBUG - 发现关系：让 -dobj-> 服务器
+2025-02-17 21:53:00,260 - KnowledgeGraph - DEBUG - 发现关系：肩容 -dobj-> 性单
+2025-02-17 21:53:00,260 - KnowledgeGraph - DEBUG - 发现关系：考虑 -dobj-> 总之
+2025-02-17 21:53:00,260 - KnowledgeGraph - DEBUG - 发现关系：让 -dobj-> 开发者
+2025-02-17 21:53:00,260 - KnowledgeGraph - DEBUG - 发现共现关系：这个操作系统既要高效充分的令 -相关-> 总之让大模型开发者
+2025-02-17 21:53:00,400 - KnowledgeGraph - INFO - 已处理 10/110 个知识点 | 实体: 23 | 关系: 96
+2025-02-17 21:53:00,401 - KnowledgeGraph - DEBUG - 处理节点: 屏蔽掉这些复杂型 百度智能源 这次就发布了一个叫万元的 智能计算操作系统 这个操作系统是跑在云机算里...
+2025-02-17 21:53:00,402 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：85
+2025-02-17 21:53:00,415 - KnowledgeGraph - DEBUG - 发现实体：成千上万 (类型: CARDINAL)
+2025-02-17 21:53:00,415 - KnowledgeGraph - DEBUG - 发现实体：一 (类型: CARDINAL)
+2025-02-17 21:53:00,415 - KnowledgeGraph - DEBUG - 识别到概念: 这个操作系统是跑在云机算里的
+2025-02-17 21:53:00,415 - KnowledgeGraph - DEBUG - 识别到概念: 这个操作系统是跑在云机算里的
+2025-02-17 21:53:00,415 - KnowledgeGraph - DEBUG - 总共识别到 3 个唯一实体
+2025-02-17 21:53:00,429 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：屏蔽掉这些复杂型 百度智能源 这次就发布了一个叫万元的 智能计算操作系统 这个操作系统是跑在云机算里的 可以让成千上万台智能计算服务器 高效的写作 似乎在就像一台机器那样
+2025-02-17 21:53:00,429 - KnowledgeGraph - DEBUG - 发现关系：掉 -nsubj-> 屏蔽
+2025-02-17 21:53:00,429 - KnowledgeGraph - DEBUG - 发现关系：掉 -dobj-> 百度
+2025-02-17 21:53:00,429 - KnowledgeGraph - DEBUG - 发现关系：发布 -nsubj-> 能源
+2025-02-17 21:53:00,430 - KnowledgeGraph - DEBUG - 发现关系：叫 -dobj-> 万元
+2025-02-17 21:53:00,430 - KnowledgeGraph - DEBUG - 发现关系：计算 -nsubj-> 智能
+2025-02-17 21:53:00,430 - KnowledgeGraph - DEBUG - 发现关系：计算 -dobj-> 系统
+2025-02-17 21:53:00,430 - KnowledgeGraph - DEBUG - 发现关系：跑 -nsubj-> 系统
+2025-02-17 21:53:00,430 - KnowledgeGraph - DEBUG - 发现关系：算 -nsubj-> 云机
+2025-02-17 21:53:00,430 - KnowledgeGraph - DEBUG - 发现关系：让 -dobj-> 智能
+2025-02-17 21:53:00,430 - KnowledgeGraph - DEBUG - 发现关系：计算 -dobj-> 服务器
+2025-02-17 21:53:00,430 - KnowledgeGraph - DEBUG - 发现关系：让 -dobj-> 写作
+2025-02-17 21:53:00,430 - KnowledgeGraph - DEBUG - 发现共现关系：成千上万 -相关-> 一
+2025-02-17 21:53:00,430 - KnowledgeGraph - DEBUG - 发现共现关系：成千上万 -相关-> 这个操作系统是跑在云机算里的
+2025-02-17 21:53:00,430 - KnowledgeGraph - DEBUG - 发现共现关系：一 -相关-> 这个操作系统是跑在云机算里的
+2025-02-17 21:53:00,672 - KnowledgeGraph - DEBUG - 处理节点: 而且即使这些服务器用的是不同的芯片 也不是问题 除了系统内核 可以屏蔽掉底层硬件的复杂型 它在工具层...
+2025-02-17 21:53:00,672 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：89
+2025-02-17 21:53:00,686 - KnowledgeGraph - DEBUG - 识别到概念: 除了系统内核
+2025-02-17 21:53:00,687 - KnowledgeGraph - DEBUG - 识别到概念: 大模型精条定制过程中的一些复杂型
+2025-02-17 21:53:00,687 - KnowledgeGraph - DEBUG - 总共识别到 2 个唯一实体
+2025-02-17 21:53:00,699 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：而且即使这些服务器用的是不同的芯片 也不是问题 除了系统内核 可以屏蔽掉底层硬件的复杂型 它在工具层面还可以解决掉一些 大模型精条定制过程中的一些复杂型 比如一个教育行业的看法者
+2025-02-17 21:53:00,700 - KnowledgeGraph - DEBUG - 发现关系：用 -nsubj-> 服务器
+2025-02-17 21:53:00,700 - KnowledgeGraph - DEBUG - 发现关系：芯片 -nsubj-> 用
+2025-02-17 21:53:00,700 - KnowledgeGraph - DEBUG - 发现关系：问题 -nsubj-> 芯片
+2025-02-17 21:53:00,700 - KnowledgeGraph - DEBUG - 发现关系：屏蔽 -nsubj-> 内核
+2025-02-17 21:53:00,700 - KnowledgeGraph - DEBUG - 发现关系：硬件 -nsubj-> 底层
+2025-02-17 21:53:00,700 - KnowledgeGraph - DEBUG - 发现关系：屏蔽 -dobj-> 复杂型
+2025-02-17 21:53:00,700 - KnowledgeGraph - DEBUG - 发现关系：解决 -nsubj-> 它
+2025-02-17 21:53:00,700 - KnowledgeGraph - DEBUG - 发现关系：解决 -dobj-> 看法者
+2025-02-17 21:53:00,700 - KnowledgeGraph - DEBUG - 发现共现关系：除了系统内核 -相关-> 大模型精条定制过程中的一些复杂型
+2025-02-17 21:53:00,854 - KnowledgeGraph - DEBUG - 处理节点: 要精条一个大模型 把行业数据训练进去 让它变成一个能批准作业的AI老师 在没有工具的情况下 这个事儿...
+2025-02-17 21:53:00,854 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：80
+2025-02-17 21:53:00,865 - KnowledgeGraph - DEBUG - 发现实体：AI (类型: PERSON)
+2025-02-17 21:53:00,866 - KnowledgeGraph - DEBUG - 识别到概念: 但是有了操作系统里的工具
+2025-02-17 21:53:00,866 - KnowledgeGraph - DEBUG - 总共识别到 2 个唯一实体
+2025-02-17 21:53:00,880 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：要精条一个大模型 把行业数据训练进去 让它变成一个能批准作业的AI老师 在没有工具的情况下 这个事儿就非常的复杂 设计到的工总非常的多 但是有了操作系统里的工具
+2025-02-17 21:53:00,881 - KnowledgeGraph - DEBUG - 发现关系：训练 -nsubj-> 模型
+2025-02-17 21:53:00,881 - KnowledgeGraph - DEBUG - 发现关系：让 -dobj-> 它
+2025-02-17 21:53:00,881 - KnowledgeGraph - DEBUG - 发现关系：复杂 -nsubj-> 老师
+2025-02-17 21:53:00,881 - KnowledgeGraph - DEBUG - 发现关系：没有 -dobj-> 工具
+2025-02-17 21:53:00,881 - KnowledgeGraph - DEBUG - 发现关系：复杂 -nsubj-> 事儿
+2025-02-17 21:53:00,881 - KnowledgeGraph - DEBUG - 发现关系：复杂 -dobj-> 设计
+2025-02-17 21:53:00,881 - KnowledgeGraph - DEBUG - 发现关系：多 -nsubj-> 工总
+2025-02-17 21:53:00,881 - KnowledgeGraph - DEBUG - 发现关系：有 -dobj-> 工具
+2025-02-17 21:53:00,881 - KnowledgeGraph - DEBUG - 发现共现关系：AI -相关-> 但是有了操作系统里的工具
+2025-02-17 21:53:01,041 - KnowledgeGraph - DEBUG - 处理节点: 就可以屏蔽掉这些复杂型 数据直接往里丢就可以 再用开发缓解 只能接受操作系统 也可以屏蔽掉边往的复杂...
+2025-02-17 21:53:01,042 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：77
+2025-02-17 21:53:01,054 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 21:53:01,067 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：就可以屏蔽掉这些复杂型 数据直接往里丢就可以 再用开发缓解 只能接受操作系统 也可以屏蔽掉边往的复杂型 比如连红就在大会现场 也是开发了一个有乐园规划住手
+2025-02-17 21:53:01,067 - KnowledgeGraph - DEBUG - 发现关系：丢 -nsubj-> 数据
+2025-02-17 21:53:01,067 - KnowledgeGraph - DEBUG - 发现关系：接受 -dobj-> 系统
+2025-02-17 21:53:01,067 - KnowledgeGraph - DEBUG - 发现关系：屏蔽 -dobj-> 复杂型
+2025-02-17 21:53:01,067 - KnowledgeGraph - DEBUG - 发现关系：开发 -nsubj-> 连红
+2025-02-17 21:53:01,067 - KnowledgeGraph - DEBUG - 发现关系：有 -dobj-> 乐园
+2025-02-17 21:53:01,166 - KnowledgeGraph - DEBUG - 处理节点: 直接点点数标 用中文数一些描述就可以做出来 一行代码都不用写 全都交给大模型的生产 在这次开发者大会...
+2025-02-17 21:53:01,167 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：72
+2025-02-17 21:53:01,179 - KnowledgeGraph - DEBUG - 发现实体：通用 (类型: ORG)
+2025-02-17 21:53:01,179 - KnowledgeGraph - DEBUG - 识别到概念: 全都交给大模型的生产
+2025-02-17 21:53:01,179 - KnowledgeGraph - DEBUG - 总共识别到 2 个唯一实体
+2025-02-17 21:53:01,191 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：直接点点数标 用中文数一些描述就可以做出来 一行代码都不用写 全都交给大模型的生产 在这次开发者大会现场 连红幼蚁字说 未来 自然也将成为通用的
+2025-02-17 21:53:01,191 - KnowledgeGraph - DEBUG - 发现关系：做 -nsubj-> 描述
+2025-02-17 21:53:01,191 - KnowledgeGraph - DEBUG - 发现关系：写 -nsubj-> 代码
+2025-02-17 21:53:01,191 - KnowledgeGraph - DEBUG - 发现关系：交给 -dobj-> 生产
+2025-02-17 21:53:01,191 - KnowledgeGraph - DEBUG - 发现关系：成为 -nsubj-> 自然
+2025-02-17 21:53:01,191 - KnowledgeGraph - DEBUG - 发现共现关系：通用 -相关-> 全都交给大模型的生产
+2025-02-17 21:53:01,316 - KnowledgeGraph - INFO - 已处理 15/110 个知识点 | 实体: 32 | 关系: 138
+2025-02-17 21:53:01,317 - KnowledgeGraph - DEBUG - 处理节点: 变成级的 你只要会说话 就可以成为你开发者 如果真想它说的那么简单 那么前所未有的简单背后 必然藏着...
+2025-02-17 21:53:01,317 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：78
+2025-02-17 21:53:01,331 - KnowledgeGraph - DEBUG - 识别到概念: 在这个大模型一发之变的时代
+2025-02-17 21:53:01,331 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 21:53:01,344 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：变成级的 你只要会说话 就可以成为你开发者 如果真想它说的那么简单 那么前所未有的简单背后 必然藏着前所未有的复杂 这也是为什么 在这个大模型一发之变的时代
+2025-02-17 21:53:01,344 - KnowledgeGraph - DEBUG - 发现关系：说话 -nsubj-> 你
+2025-02-17 21:53:01,344 - KnowledgeGraph - DEBUG - 发现关系：藏 -nsubj-> 开发者
+2025-02-17 21:53:01,344 - KnowledgeGraph - DEBUG - 发现关系：说 -nsubj-> 它
+2025-02-17 21:53:01,344 - KnowledgeGraph - DEBUG - 发现关系：想 -dobj-> 背后
+2025-02-17 21:53:01,344 - KnowledgeGraph - DEBUG - 发现关系：藏 -dobj-> 复杂
+2025-02-17 21:53:01,345 - KnowledgeGraph - DEBUG - 发现关系：时代 -nsubj-> 这
+2025-02-17 21:53:01,465 - KnowledgeGraph - DEBUG - 处理节点: 我们又以此需要用一个 行的草作系统 来屏蔽这些复杂型的 好的 本期视频就到这里 我这里 op主整理了...
+2025-02-17 21:53:01,466 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：76
+2025-02-17 21:53:01,478 - KnowledgeGraph - DEBUG - 识别到概念: op主整理了全套操作系统学
+2025-02-17 21:53:01,478 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 21:53:01,488 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：我们又以此需要用一个 行的草作系统 来屏蔽这些复杂型的 好的 本期视频就到这里 我这里 op主整理了全套操作系统学 这些对于学习计算机的同学 帮助非常大
+2025-02-17 21:53:01,489 - KnowledgeGraph - DEBUG - 发现关系：到 -nsubj-> 我们
+2025-02-17 21:53:01,490 - KnowledgeGraph - DEBUG - 发现关系：屏蔽 -dobj-> 复杂型
+2025-02-17 21:53:01,490 - KnowledgeGraph - DEBUG - 发现关系：需要 -dobj-> 本期
+2025-02-17 21:53:01,490 - KnowledgeGraph - DEBUG - 发现关系：到 -nsubj-> 视频
+2025-02-17 21:53:01,490 - KnowledgeGraph - DEBUG - 发现关系：到 -dobj-> 这里
+2025-02-17 21:53:01,490 - KnowledgeGraph - DEBUG - 发现关系：整理 -nsubj-> 这里
+2025-02-17 21:53:01,490 - KnowledgeGraph - DEBUG - 发现关系：整理 -dobj-> 系统
+2025-02-17 21:53:01,490 - KnowledgeGraph - DEBUG - 发现关系：学 -dobj-> 同学
+2025-02-17 21:53:01,627 - KnowledgeGraph - DEBUG - 处理节点: 又代码 视频 笔记且十分系统 有需要的饱子 可以无常 是 不过记得帮我一件三零...
+2025-02-17 21:53:01,627 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：39
+2025-02-17 21:53:01,635 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 21:53:01,642 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：又代码 视频 笔记且十分系统 有需要的饱子 可以无常 是 不过记得帮我一件三零
+2025-02-17 21:53:01,643 - KnowledgeGraph - DEBUG - 发现关系：代码 -dobj-> 记且
+2025-02-17 21:53:01,643 - KnowledgeGraph - DEBUG - 发现关系：有 -dobj-> 需要
+2025-02-17 21:53:01,643 - KnowledgeGraph - DEBUG - 发现关系：帮 -dobj-> 我
+2025-02-17 21:53:01,643 - KnowledgeGraph - DEBUG - 发现关系：帮 -dobj-> 三零
+2025-02-17 21:55:58,323 - KnowledgeGraph - INFO - 开始分析节点间的内容关系...
+2025-02-17 21:55:58,824 - KnowledgeGraph - INFO - 完成内容关系分析，共处理 18 个节点
+2025-02-17 21:56:31,764 - KnowledgeGraph - INFO - 开始分析节点间的内容关系...
+2025-02-17 21:56:31,905 - KnowledgeGraph - INFO - 完成内容关系分析，共处理 18 个节点

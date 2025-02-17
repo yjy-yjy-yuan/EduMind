@@ -1,0 +1,327 @@
+2025-02-17 22:11:54,361 - KnowledgeGraph - INFO - 成功加载中文NLP模型
+2025-02-17 22:11:54,476 - KnowledgeGraph - INFO - Neo4j数据库连接成功！
+2025-02-17 22:11:54,478 - KnowledgeGraph - DEBUG - 创建Neo4j唯一性约束成功
+2025-02-17 22:11:54,556 - KnowledgeGraph - DEBUG - 处理节点: 好,所以我们来运行我们带马回车 他自己把微信钓出来了 然后找到我的好友 A给他拖出来 然后我们让他给...
+2025-02-17 22:11:54,557 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：56
+2025-02-17 22:11:54,577 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:54,590 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：好,所以我们来运行我们带马回车 他自己把微信钓出来了 然后找到我的好友 A给他拖出来 然后我们让他给我们发销消息
+2025-02-17 22:11:54,591 - KnowledgeGraph - DEBUG - 发现关系：运行 -nsubj-> 我们
+2025-02-17 22:11:54,591 - KnowledgeGraph - DEBUG - 发现关系：运行 -dobj-> 回车
+2025-02-17 22:11:54,591 - KnowledgeGraph - DEBUG - 发现关系：钓 -nsubj-> 自己
+2025-02-17 22:11:54,591 - KnowledgeGraph - DEBUG - 发现关系：找到 -dobj-> A
+2025-02-17 22:11:54,591 - KnowledgeGraph - DEBUG - 发现关系：让 -nsubj-> 我们
+2025-02-17 22:11:54,591 - KnowledgeGraph - DEBUG - 发现关系：让 -dobj-> 他
+2025-02-17 22:11:54,591 - KnowledgeGraph - DEBUG - 发现关系：发销 -dobj-> 消息
+2025-02-17 22:11:54,885 - KnowledgeGraph - INFO - 已处理 1/110 个知识点 | 实体: 0 | 关系: 7
+2025-02-17 22:11:54,886 - KnowledgeGraph - DEBUG - 处理节点: OK,你以为他要新消息 你是谁 然后他就会自动回复 怕过去了 这个项目我已经开完了...
+2025-02-17 22:11:54,886 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：41
+2025-02-17 22:11:54,899 - KnowledgeGraph - DEBUG - 识别到技术术语: OK
+2025-02-17 22:11:54,899 - KnowledgeGraph - DEBUG - 识别到技术术语: OK
+2025-02-17 22:11:54,899 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:11:54,909 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：OK,你以为他要新消息 你是谁 然后他就会自动回复 怕过去了 这个项目我已经开完了
+2025-02-17 22:11:54,909 - KnowledgeGraph - DEBUG - 发现关系：以为 -nsubj-> 你
+2025-02-17 22:11:54,909 - KnowledgeGraph - DEBUG - 发现关系：要 -nsubj-> 他
+2025-02-17 22:11:54,909 - KnowledgeGraph - DEBUG - 发现关系：要 -dobj-> 消息
+2025-02-17 22:11:54,909 - KnowledgeGraph - DEBUG - 发现关系：谁 -nsubj-> 你
+2025-02-17 22:11:54,909 - KnowledgeGraph - DEBUG - 发现关系：回复 -nsubj-> 他
+2025-02-17 22:11:54,909 - KnowledgeGraph - DEBUG - 发现关系：怕 -dobj-> 项目
+2025-02-17 22:11:54,910 - KnowledgeGraph - DEBUG - 发现关系：开完 -nsubj-> 我
+2025-02-17 22:11:55,030 - KnowledgeGraph - DEBUG - 处理节点: 然后第一次我就放在简介里面了 我们现在第一步 本第一步是我DBC 然后我们要在欧南网上部署 安装欧南...
+2025-02-17 22:11:55,031 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：56
+2025-02-17 22:11:55,043 - KnowledgeGraph - DEBUG - 发现实体：第一 (类型: ORDINAL)
+2025-02-17 22:11:55,043 - KnowledgeGraph - DEBUG - 发现实体：第一 (类型: ORDINAL)
+2025-02-17 22:11:55,043 - KnowledgeGraph - DEBUG - 发现实体：第一 (类型: ORDINAL)
+2025-02-17 22:11:55,043 - KnowledgeGraph - DEBUG - 发现实体：两 (类型: CARDINAL)
+2025-02-17 22:11:55,043 - KnowledgeGraph - DEBUG - 总共识别到 2 个唯一实体
+2025-02-17 22:11:55,053 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：然后第一次我就放在简介里面了 我们现在第一步 本第一步是我DBC 然后我们要在欧南网上部署 安装欧南网有两种方式
+2025-02-17 22:11:55,054 - KnowledgeGraph - DEBUG - 发现关系：放在 -nsubj-> 我
+2025-02-17 22:11:55,054 - KnowledgeGraph - DEBUG - 发现关系：放在 -dobj-> 里面
+2025-02-17 22:11:55,054 - KnowledgeGraph - DEBUG - 发现关系：部署 -nsubj-> 我们
+2025-02-17 22:11:55,054 - KnowledgeGraph - DEBUG - 发现关系：要 -nsubj-> 我们
+2025-02-17 22:11:55,054 - KnowledgeGraph - DEBUG - 发现关系：安装 -dobj-> 欧南网
+2025-02-17 22:11:55,055 - KnowledgeGraph - DEBUG - 发现关系：有 -dobj-> 方式
+2025-02-17 22:11:55,055 - KnowledgeGraph - DEBUG - 发现共现关系：第一 -相关-> 两
+2025-02-17 22:11:55,241 - KnowledgeGraph - DEBUG - 处理节点: 现在第一种 要在官网安装 我们先打开了官网 然后官网地址 我也放在简介当中了 然后我们点击当路的 可...
+2025-02-17 22:11:55,242 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：61
+2025-02-17 22:11:55,253 - KnowledgeGraph - DEBUG - 发现实体：第一 (类型: ORDINAL)
+2025-02-17 22:11:55,255 - KnowledgeGraph - DEBUG - 发现实体：三 (类型: CARDINAL)
+2025-02-17 22:11:55,255 - KnowledgeGraph - DEBUG - 总共识别到 2 个唯一实体
+2025-02-17 22:11:55,266 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：现在第一种 要在官网安装 我们先打开了官网 然后官网地址 我也放在简介当中了 然后我们点击当路的 可以看到上面有三种平台吗
+2025-02-17 22:11:55,266 - KnowledgeGraph - DEBUG - 发现关系：安装 -dobj-> 我们
+2025-02-17 22:11:55,266 - KnowledgeGraph - DEBUG - 发现关系：打开 -dobj-> 官网
+2025-02-17 22:11:55,266 - KnowledgeGraph - DEBUG - 发现关系：放 -nsubj-> 我
+2025-02-17 22:11:55,266 - KnowledgeGraph - DEBUG - 发现关系：点击 -nsubj-> 我们
+2025-02-17 22:11:55,266 - KnowledgeGraph - DEBUG - 发现关系：有 -dobj-> 平台
+2025-02-17 22:11:55,267 - KnowledgeGraph - DEBUG - 发现共现关系：第一 -相关-> 三
+2025-02-17 22:11:55,368 - KnowledgeGraph - DEBUG - 处理节点: 温斗斯林郁格斯和麦克 我就是直接当路了 弗洛温斗斯了 然后非常慢 我就不下载了 来看第二种 我们要带...
+2025-02-17 22:11:55,368 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：57
+2025-02-17 22:11:55,382 - KnowledgeGraph - DEBUG - 发现实体：温斗斯 (类型: PERSON)
+2025-02-17 22:11:55,383 - KnowledgeGraph - DEBUG - 发现实体：麦克 (类型: PERSON)
+2025-02-17 22:11:55,383 - KnowledgeGraph - DEBUG - 发现实体：第二 (类型: ORDINAL)
+2025-02-17 22:11:55,383 - KnowledgeGraph - DEBUG - 总共识别到 3 个唯一实体
+2025-02-17 22:11:55,393 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：温斗斯林郁格斯和麦克 我就是直接当路了 弗洛温斗斯了 然后非常慢 我就不下载了 来看第二种 我们要带来百度网看安装
+2025-02-17 22:11:55,394 - KnowledgeGraph - DEBUG - 发现关系：当路 -nsubj-> 我
+2025-02-17 22:11:55,394 - KnowledgeGraph - DEBUG - 发现关系：当路 -dobj-> 弗洛温斗斯
+2025-02-17 22:11:55,394 - KnowledgeGraph - DEBUG - 发现关系：下载 -nsubj-> 我
+2025-02-17 22:11:55,394 - KnowledgeGraph - DEBUG - 发现关系：带来 -nsubj-> 我们
+2025-02-17 22:11:55,394 - KnowledgeGraph - DEBUG - 发现关系：带来 -dobj-> 百度网
+2025-02-17 22:11:55,394 - KnowledgeGraph - DEBUG - 发现关系：带来 -dobj-> 安装
+2025-02-17 22:11:55,394 - KnowledgeGraph - DEBUG - 发现共现关系：温斗斯 -相关-> 麦克
+2025-02-17 22:11:55,394 - KnowledgeGraph - DEBUG - 发现共现关系：温斗斯 -相关-> 第二
+2025-02-17 22:11:55,394 - KnowledgeGraph - DEBUG - 发现共现关系：麦克 -相关-> 第二
+2025-02-17 22:11:55,517 - KnowledgeGraph - INFO - 已处理 5/110 个知识点 | 实体: 8 | 关系: 36
+2025-02-17 22:11:55,518 - KnowledgeGraph - DEBUG - 处理节点: 然后点进来 然后自己又蹦过来 然后下载安装就行了 我这里已经下点好了 我们直接点进来双击运行...
+2025-02-17 22:11:55,518 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：46
+2025-02-17 22:11:55,529 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:55,539 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：然后点进来 然后自己又蹦过来 然后下载安装就行了 我这里已经下点好了 我们直接点进来双击运行
+2025-02-17 22:11:55,539 - KnowledgeGraph - DEBUG - 发现关系：蹦 -nsubj-> 自己
+2025-02-17 22:11:55,540 - KnowledgeGraph - DEBUG - 发现关系：好 -nsubj-> 这里
+2025-02-17 22:11:55,540 - KnowledgeGraph - DEBUG - 发现关系：点 -nsubj-> 我们
+2025-02-17 22:11:55,597 - KnowledgeGraph - DEBUG - 处理节点: 然后点击Stold开始安装 然后他安装非常简单 直接等他结束我自己消失就行了 然后再说一点 他这个末...
+2025-02-17 22:11:55,597 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：56
+2025-02-17 22:11:55,609 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:55,619 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：然后点击Stold开始安装 然后他安装非常简单 直接等他结束我自己消失就行了 然后再说一点 他这个末日安装的C盘
+2025-02-17 22:11:55,619 - KnowledgeGraph - DEBUG - 发现关系：点击 -dobj-> Stold
+2025-02-17 22:11:55,619 - KnowledgeGraph - DEBUG - 发现关系：安装 -nsubj-> 他
+2025-02-17 22:11:55,619 - KnowledgeGraph - DEBUG - 发现关系：结束 -nsubj-> 他
+2025-02-17 22:11:55,619 - KnowledgeGraph - DEBUG - 发现关系：行 -nsubj-> 自己
+2025-02-17 22:11:55,620 - KnowledgeGraph - DEBUG - 发现关系：再说 -dobj-> C盘
+2025-02-17 22:11:55,700 - KnowledgeGraph - DEBUG - 处理节点: 而且不能改 所以要确定你C盘有足过来的空间 最好有30个机 OK安装10点比较长 我这里直接剪一刀...
+2025-02-17 22:11:55,701 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：49
+2025-02-17 22:11:55,712 - KnowledgeGraph - DEBUG - 发现实体：30 (类型: CARDINAL)
+2025-02-17 22:11:55,712 - KnowledgeGraph - DEBUG - 发现实体：10点 (类型: CARDINAL)
+2025-02-17 22:11:55,713 - KnowledgeGraph - DEBUG - 总共识别到 2 个唯一实体
+2025-02-17 22:11:55,723 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：而且不能改 所以要确定你C盘有足过来的空间 最好有30个机 OK安装10点比较长 我这里直接剪一刀
+2025-02-17 22:11:55,723 - KnowledgeGraph - DEBUG - 发现关系：有 -nsubj-> C盘
+2025-02-17 22:11:55,723 - KnowledgeGraph - DEBUG - 发现关系：过来 -nsubj-> 足
+2025-02-17 22:11:55,723 - KnowledgeGraph - DEBUG - 发现关系：有 -nsubj-> 空间
+2025-02-17 22:11:55,723 - KnowledgeGraph - DEBUG - 发现关系：安装 -nsubj-> 机
+2025-02-17 22:11:55,723 - KnowledgeGraph - DEBUG - 发现关系：剪 -nsubj-> 这里
+2025-02-17 22:11:55,723 - KnowledgeGraph - DEBUG - 发现共现关系：30 -相关-> 10点
+2025-02-17 22:11:55,817 - KnowledgeGraph - DEBUG - 处理节点: 好的 这里已经安装好了 他先是正在运行 然后我们打开命令行 右键菜单 选择打开命令行...
+2025-02-17 22:11:55,817 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：42
+2025-02-17 22:11:55,827 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:55,834 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：好的 这里已经安装好了 他先是正在运行 然后我们打开命令行 右键菜单 选择打开命令行
+2025-02-17 22:11:55,834 - KnowledgeGraph - DEBUG - 发现关系：安装 -nsubj-> 这里
+2025-02-17 22:11:55,834 - KnowledgeGraph - DEBUG - 发现关系：运行 -nsubj-> 他
+2025-02-17 22:11:55,834 - KnowledgeGraph - DEBUG - 发现关系：打开 -nsubj-> 我们
+2025-02-17 22:11:55,835 - KnowledgeGraph - DEBUG - 发现关系：打开 -dobj-> 命令行
+2025-02-17 22:11:55,889 - KnowledgeGraph - DEBUG - 处理节点: 然后进来 然后我们输入Olam 然后Gangv 回车 这就会显示我们的版本 如果你也成功显示版本...
+2025-02-17 22:11:55,891 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：48
+2025-02-17 22:11:55,899 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:55,909 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：然后进来 然后我们输入Olam 然后Gangv 回车 这就会显示我们的版本 如果你也成功显示版本
+2025-02-17 22:11:55,909 - KnowledgeGraph - DEBUG - 发现关系：显示 -nsubj-> 回车
+2025-02-17 22:11:55,910 - KnowledgeGraph - DEBUG - 发现关系：显示 -nsubj-> 版本
+2025-02-17 22:11:55,910 - KnowledgeGraph - DEBUG - 发现关系：显示 -nsubj-> 你
+2025-02-17 22:11:55,955 - KnowledgeGraph - INFO - 已处理 10/110 个知识点 | 实体: 10 | 关系: 57
+2025-02-17 22:11:55,957 - KnowledgeGraph - DEBUG - 处理节点: 然后说明你安装成功了 已经下一步了 然后我们就要在Olam上 部署DPC客 我们现在打开Olam的官...
+2025-02-17 22:11:55,957 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：76
+2025-02-17 22:11:55,969 - KnowledgeGraph - DEBUG - 发现实体：第一 (类型: ORDINAL)
+2025-02-17 22:11:55,969 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:11:55,981 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：然后说明你安装成功了 已经下一步了 然后我们就要在Olam上 部署DPC客 我们现在打开Olam的官网 左上讲摩托停进去 第一个就是我们的DPC客停进去
+2025-02-17 22:11:55,981 - KnowledgeGraph - DEBUG - 发现关系：安装 -nsubj-> 你
+2025-02-17 22:11:55,981 - KnowledgeGraph - DEBUG - 发现关系：部署 -nsubj-> 我们
+2025-02-17 22:11:55,981 - KnowledgeGraph - DEBUG - 发现关系：部署 -dobj-> DPC
+2025-02-17 22:11:55,981 - KnowledgeGraph - DEBUG - 发现关系：部署 -dobj-> 客
+2025-02-17 22:11:55,981 - KnowledgeGraph - DEBUG - 发现关系：打开 -nsubj-> 我们
+2025-02-17 22:11:55,982 - KnowledgeGraph - DEBUG - 发现关系：打开 -dobj-> 官网
+2025-02-17 22:11:55,982 - KnowledgeGraph - DEBUG - 发现关系：讲 -dobj-> 摩托停
+2025-02-17 22:11:55,982 - KnowledgeGraph - DEBUG - 发现关系：客停 -nsubj-> DPC
+2025-02-17 22:11:56,075 - KnowledgeGraph - DEBUG - 处理节点: 然后这个菜单 里面有很多的摩托 然后根据自己的配置选择 我就选择最普通的1.5B 然后把命令复制下来...
+2025-02-17 22:11:56,076 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：50
+2025-02-17 22:11:56,086 - KnowledgeGraph - DEBUG - 发现实体：1.5 (类型: CARDINAL)
+2025-02-17 22:11:56,086 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:11:56,094 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：然后这个菜单 里面有很多的摩托 然后根据自己的配置选择 我就选择最普通的1.5B 然后把命令复制下来
+2025-02-17 22:11:56,094 - KnowledgeGraph - DEBUG - 发现关系：有 -dobj-> 摩托
+2025-02-17 22:11:56,095 - KnowledgeGraph - DEBUG - 发现关系：选择 -nsubj-> 我
+2025-02-17 22:11:56,095 - KnowledgeGraph - DEBUG - 发现关系：选择 -dobj-> B
+2025-02-17 22:11:56,146 - KnowledgeGraph - DEBUG - 处理节点: 接着打开命令行 专题 回车运行 这就开始下载了 可以看到前面他下载速度很快 但是到后面的100招的时...
+2025-02-17 22:11:56,146 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：51
+2025-02-17 22:11:56,154 - KnowledgeGraph - DEBUG - 发现实体：100 (类型: CARDINAL)
+2025-02-17 22:11:56,155 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:11:56,164 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：接着打开命令行 专题 回车运行 这就开始下载了 可以看到前面他下载速度很快 但是到后面的100招的时候
+2025-02-17 22:11:56,164 - KnowledgeGraph - DEBUG - 发现关系：下载 -nsubj-> 运行
+2025-02-17 22:11:56,164 - KnowledgeGraph - DEBUG - 发现关系：很快 -nsubj-> 速度
+2025-02-17 22:11:56,164 - KnowledgeGraph - DEBUG - 发现关系：到 -dobj-> 后面
+2025-02-17 22:11:56,219 - KnowledgeGraph - DEBUG - 处理节点: 速度就可以变慢 所以这里我就先剪一刀 好 这样我们DPC客 居然在本地部署完了...
+2025-02-17 22:11:56,219 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：39
+2025-02-17 22:11:56,229 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:56,238 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：速度就可以变慢 所以这里我就先剪一刀 好 这样我们DPC客 居然在本地部署完了
+2025-02-17 22:11:56,238 - KnowledgeGraph - DEBUG - 发现关系：变慢 -nsubj-> 速度
+2025-02-17 22:11:56,238 - KnowledgeGraph - DEBUG - 发现关系：剪 -nsubj-> 我
+2025-02-17 22:11:56,238 - KnowledgeGraph - DEBUG - 发现关系：部署 -nsubj-> 客
+2025-02-17 22:11:56,284 - KnowledgeGraph - DEBUG - 处理节点: 然后我们可以在这里 跟他进行对话 DPC客部署完成后 就可以进行下一步配置拍摄环境 我们先打开项目录...
+2025-02-17 22:11:56,285 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：69
+2025-02-17 22:11:56,296 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:56,308 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：然后我们可以在这里 跟他进行对话 DPC客部署完成后 就可以进行下一步配置拍摄环境 我们先打开项目录 这部主要是下载一下 程序需要的拍摄包
+2025-02-17 22:11:56,308 - KnowledgeGraph - DEBUG - 发现关系：进行 -nsubj-> 我们
+2025-02-17 22:11:56,308 - KnowledgeGraph - DEBUG - 发现关系：进行 -dobj-> 部署
+2025-02-17 22:11:56,308 - KnowledgeGraph - DEBUG - 发现关系：进行 -dobj-> 环境
+2025-02-17 22:11:56,308 - KnowledgeGraph - DEBUG - 发现关系：打开 -nsubj-> 我们
+2025-02-17 22:11:56,308 - KnowledgeGraph - DEBUG - 发现关系：打开 -dobj-> 项目
+2025-02-17 22:11:56,308 - KnowledgeGraph - DEBUG - 发现关系：录 -dobj-> 这部
+2025-02-17 22:11:56,308 - KnowledgeGraph - DEBUG - 发现关系：需要 -nsubj-> 程序
+2025-02-17 22:11:56,308 - KnowledgeGraph - DEBUG - 发现关系：下载 -dobj-> 需要
+2025-02-17 22:11:56,390 - KnowledgeGraph - INFO - 已处理 15/110 个知识点 | 实体: 13 | 关系: 82
+2025-02-17 22:11:56,391 - KnowledgeGraph - DEBUG - 处理节点: 如果你的电脑里没有安装拍摄的话 可以去拍摄官网上下载一个 好 我们打开榴软器 跟换家配合员案 把它换...
+2025-02-17 22:11:56,391 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：72
+2025-02-17 22:11:56,404 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:56,417 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：如果你的电脑里没有安装拍摄的话 可以去拍摄官网上下载一个 好 我们打开榴软器 跟换家配合员案 把它换成国内的 现在速度更快 我们在钻铁进行命令行
+2025-02-17 22:11:56,417 - KnowledgeGraph - DEBUG - 发现关系：拍摄 -dobj-> 官网
+2025-02-17 22:11:56,417 - KnowledgeGraph - DEBUG - 发现关系：打开 -nsubj-> 我们
+2025-02-17 22:11:56,417 - KnowledgeGraph - DEBUG - 发现关系：打开 -dobj-> 榴软器
+2025-02-17 22:11:56,417 - KnowledgeGraph - DEBUG - 发现关系：配合 -dobj-> 员案
+2025-02-17 22:11:56,417 - KnowledgeGraph - DEBUG - 发现关系：快 -nsubj-> 速度
+2025-02-17 22:11:56,417 - KnowledgeGraph - DEBUG - 发现关系：进行 -nsubj-> 我们
+2025-02-17 22:11:56,418 - KnowledgeGraph - DEBUG - 发现关系：进行 -dobj-> 命令行
+2025-02-17 22:11:56,506 - KnowledgeGraph - DEBUG - 处理节点: 回车 好 这已经更快完成了 现在我们安装奥法内包 把这个命令复制一下 钻铁进行命令行 回车 这个包就...
+2025-02-17 22:11:56,506 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：53
+2025-02-17 22:11:56,516 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:56,526 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：回车 好 这已经更快完成了 现在我们安装奥法内包 把这个命令复制一下 钻铁进行命令行 回车 这个包就和我们
+2025-02-17 22:11:56,526 - KnowledgeGraph - DEBUG - 发现关系：好 -nsubj-> 回车
+2025-02-17 22:11:56,526 - KnowledgeGraph - DEBUG - 发现关系：完成 -nsubj-> 这
+2025-02-17 22:11:56,526 - KnowledgeGraph - DEBUG - 发现关系：安装 -nsubj-> 我们
+2025-02-17 22:11:56,526 - KnowledgeGraph - DEBUG - 发现关系：安装 -dobj-> 内包
+2025-02-17 22:11:56,526 - KnowledgeGraph - DEBUG - 发现关系：复制 -dobj-> 钻铁
+2025-02-17 22:11:56,526 - KnowledgeGraph - DEBUG - 发现关系：进行 -dobj-> 包
+2025-02-17 22:11:56,623 - KnowledgeGraph - DEBUG - 处理节点: 调用DPC客的一些接口有关 好 这里我已经安装过了 这个速度很快 然后我们来安装微信 outable...
+2025-02-17 22:11:56,623 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：50
+2025-02-17 22:11:56,634 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:56,644 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：调用DPC客的一些接口有关 好 这里我已经安装过了 这个速度很快 然后我们来安装微信 outable
+2025-02-17 22:11:56,644 - KnowledgeGraph - DEBUG - 发现关系：调用 -dobj-> DPC客
+2025-02-17 22:11:56,644 - KnowledgeGraph - DEBUG - 发现关系：安装 -nsubj-> 接口
+2025-02-17 22:11:56,644 - KnowledgeGraph - DEBUG - 发现关系：安装 -nsubj-> 我
+2025-02-17 22:11:56,645 - KnowledgeGraph - DEBUG - 发现关系：很快 -nsubj-> 速度
+2025-02-17 22:11:56,645 - KnowledgeGraph - DEBUG - 发现关系：安装 -nsubj-> 我们
+2025-02-17 22:11:56,645 - KnowledgeGraph - DEBUG - 发现关系：安装 -dobj-> 微信
+2025-02-17 22:11:56,727 - KnowledgeGraph - DEBUG - 处理节点: 这个包和对微信的一些操作有关 我也是安装过了 OK 那么这一步也完成了 接着我们在打开项目幕录...
+2025-02-17 22:11:56,728 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：47
+2025-02-17 22:11:56,739 - KnowledgeGraph - DEBUG - 识别到技术术语: OK
+2025-02-17 22:11:56,739 - KnowledgeGraph - DEBUG - 识别到技术术语: OK
+2025-02-17 22:11:56,739 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:11:56,750 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：这个包和对微信的一些操作有关 我也是安装过了 OK 那么这一步也完成了 接着我们在打开项目幕录
+2025-02-17 22:11:56,751 - KnowledgeGraph - DEBUG - 发现关系：安装 -dobj-> OK
+2025-02-17 22:11:56,751 - KnowledgeGraph - DEBUG - 发现关系：打开 -nsubj-> 我们
+2025-02-17 22:11:56,751 - KnowledgeGraph - DEBUG - 发现关系：打开 -dobj-> 项目
+2025-02-17 22:11:56,792 - KnowledgeGraph - DEBUG - 处理节点: 接下来我们就要修改一下 内部4RTXT这个文件 然后把这个账三理四 替换成你需要 自动回消息的微信好...
+2025-02-17 22:11:56,792 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：63
+2025-02-17 22:11:56,803 - KnowledgeGraph - DEBUG - 发现实体：三理四 (类型: CARDINAL)
+2025-02-17 22:11:56,803 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:11:56,816 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：接下来我们就要修改一下 内部4RTXT这个文件 然后把这个账三理四 替换成你需要 自动回消息的微信好友 如果有很多个就要付了些
+2025-02-17 22:11:56,816 - KnowledgeGraph - DEBUG - 发现关系：修改 -nsubj-> 我们
+2025-02-17 22:11:56,816 - KnowledgeGraph - DEBUG - 发现关系：修改 -dobj-> 文件
+2025-02-17 22:11:56,816 - KnowledgeGraph - DEBUG - 发现关系：需要 -nsubj-> 你
+2025-02-17 22:11:56,816 - KnowledgeGraph - DEBUG - 发现关系：回 -dobj-> 消息
+2025-02-17 22:11:56,816 - KnowledgeGraph - DEBUG - 发现关系：有 -nsubj-> 好友
+2025-02-17 22:11:56,816 - KnowledgeGraph - DEBUG - 发现关系：付 -nsubj-> 很多
+2025-02-17 22:11:56,900 - KnowledgeGraph - INFO - 已处理 20/110 个知识点 | 实体: 15 | 关系: 110
+2025-02-17 22:11:56,901 - KnowledgeGraph - DEBUG - 处理节点: 我这里就用四针了 好 我们还需要对AI点P外 这个文件接下来更大 先打开...
+2025-02-17 22:11:56,902 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：36
+2025-02-17 22:11:56,911 - KnowledgeGraph - DEBUG - 发现实体：四针 (类型: CARDINAL)
+2025-02-17 22:11:56,911 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:11:56,919 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：我这里就用四针了 好 我们还需要对AI点P外 这个文件接下来更大 先打开
+2025-02-17 22:11:56,919 - KnowledgeGraph - DEBUG - 发现关系：用 -nsubj-> 这里
+2025-02-17 22:11:56,919 - KnowledgeGraph - DEBUG - 发现关系：大 -nsubj-> 我们
+2025-02-17 22:11:56,960 - KnowledgeGraph - DEBUG - 处理节点: 可以看到它这个第五行 有个my mode 我要替换成 你不属于DPC个版本 比如我是1.5 我又被它...
+2025-02-17 22:11:56,960 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：65
+2025-02-17 22:11:56,973 - KnowledgeGraph - DEBUG - 发现实体：第五 (类型: ORDINAL)
+2025-02-17 22:11:56,973 - KnowledgeGraph - DEBUG - 发现实体：1.5 (类型: CARDINAL)
+2025-02-17 22:11:56,973 - KnowledgeGraph - DEBUG - 总共识别到 3 个唯一实体
+2025-02-17 22:11:56,984 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：可以看到它这个第五行 有个my mode 我要替换成 你不属于DPC个版本 比如我是1.5 我又被它形成这样 如果你是别的版本的话
+2025-02-17 22:11:56,984 - KnowledgeGraph - DEBUG - 发现关系：属于 -nsubj-> 我
+2025-02-17 22:11:56,984 - KnowledgeGraph - DEBUG - 发现关系：属于 -nsubj-> 你
+2025-02-17 22:11:56,984 - KnowledgeGraph - DEBUG - 发现关系：属于 -dobj-> 版本
+2025-02-17 22:11:56,984 - KnowledgeGraph - DEBUG - 发现关系：1.5 -nsubj-> 我
+2025-02-17 22:11:56,984 - KnowledgeGraph - DEBUG - 发现关系：形成 -nsubj-> 我
+2025-02-17 22:11:56,984 - KnowledgeGraph - DEBUG - 发现关系：形成 -nsubj-> 它
+2025-02-17 22:11:56,984 - KnowledgeGraph - DEBUG - 发现关系：版本 -nsubj-> 你
+2025-02-17 22:11:56,984 - KnowledgeGraph - DEBUG - 发现共现关系：第五 -相关-> 1.5
+2025-02-17 22:11:56,985 - KnowledgeGraph - DEBUG - 发现共现关系：第五 -相关-> 5
+2025-02-17 22:11:56,985 - KnowledgeGraph - DEBUG - 发现共现关系：1.5 -相关-> 5
+2025-02-17 22:11:57,108 - KnowledgeGraph - DEBUG - 处理节点: 你就把1.5B 换成你所不属的版本 上去OK了 好 最后我们安装射不下 夹右键 选择命令行...
+2025-02-17 22:11:57,108 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：45
+2025-02-17 22:11:57,117 - KnowledgeGraph - DEBUG - 发现实体：1.5 (类型: CARDINAL)
+2025-02-17 22:11:57,118 - KnowledgeGraph - DEBUG - 总共识别到 1 个唯一实体
+2025-02-17 22:11:57,127 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：你就把1.5B 换成你所不属的版本 上去OK了 好 最后我们安装射不下 夹右键 选择命令行
+2025-02-17 22:11:57,127 - KnowledgeGraph - DEBUG - 发现关系：换成 -nsubj-> 你
+2025-02-17 22:11:57,127 - KnowledgeGraph - DEBUG - 发现关系：属 -nsubj-> 你
+2025-02-17 22:11:57,127 - KnowledgeGraph - DEBUG - 发现关系：OK -nsubj-> 版本
+2025-02-17 22:11:57,127 - KnowledgeGraph - DEBUG - 发现关系：安装 -nsubj-> 我们
+2025-02-17 22:11:57,127 - KnowledgeGraph - DEBUG - 发现关系：安装 -dobj-> 射
+2025-02-17 22:11:57,127 - KnowledgeGraph - DEBUG - 发现关系：夹 -dobj-> 右键
+2025-02-17 22:11:57,127 - KnowledgeGraph - DEBUG - 发现关系：选择 -dobj-> 命令行
+2025-02-17 22:11:57,216 - KnowledgeGraph - DEBUG - 处理节点: 然后进来输入拍战 AVP点P外 运行我们的程序回车 它就会自动把微信调出来 然后选择命的好友...
+2025-02-17 22:11:57,216 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：46
+2025-02-17 22:11:57,227 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:57,237 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：然后进来输入拍战 AVP点P外 运行我们的程序回车 它就会自动把微信调出来 然后选择命的好友
+2025-02-17 22:11:57,237 - KnowledgeGraph - DEBUG - 发现关系：运行 -nsubj-> P外
+2025-02-17 22:11:57,237 - KnowledgeGraph - DEBUG - 发现关系：输入 -dobj-> 回车
+2025-02-17 22:11:57,237 - KnowledgeGraph - DEBUG - 发现关系：调 -nsubj-> 它
+2025-02-17 22:11:57,237 - KnowledgeGraph - DEBUG - 发现关系：选择 -dobj-> 命
+2025-02-17 22:11:57,313 - KnowledgeGraph - DEBUG - 处理节点: 它会自动它拉出来 然后这里我让它给我们发调消息...
+2025-02-17 22:11:57,313 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：23
+2025-02-17 22:11:57,322 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:57,328 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：它会自动它拉出来 然后这里我让它给我们发调消息
+2025-02-17 22:11:57,330 - KnowledgeGraph - DEBUG - 发现关系：拉 -nsubj-> 它
+2025-02-17 22:11:57,330 - KnowledgeGraph - DEBUG - 发现关系：拉 -nsubj-> 它
+2025-02-17 22:11:57,330 - KnowledgeGraph - DEBUG - 发现关系：让 -nsubj-> 我
+2025-02-17 22:11:57,330 - KnowledgeGraph - DEBUG - 发现关系：让 -dobj-> 它
+2025-02-17 22:11:57,330 - KnowledgeGraph - DEBUG - 发现关系：让 -dobj-> 消息
+2025-02-17 22:11:57,401 - KnowledgeGraph - INFO - 已处理 25/110 个知识点 | 实体: 20 | 关系: 138
+2025-02-17 22:11:57,402 - KnowledgeGraph - DEBUG - 处理节点: 哎 收到消息 自动回复...
+2025-02-17 22:11:57,402 - KnowledgeGraph - DEBUG - 
+正在从文本中提取实体，文本长度：11
+2025-02-17 22:11:57,409 - KnowledgeGraph - DEBUG - 总共识别到 0 个唯一实体
+2025-02-17 22:11:57,415 - KnowledgeGraph - DEBUG - 
+分析文本的依存关系：哎 收到消息 自动回复
+2025-02-17 22:11:57,415 - KnowledgeGraph - DEBUG - 发现关系：收到 -dobj-> 消息

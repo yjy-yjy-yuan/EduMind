@@ -226,12 +226,8 @@ def process_uploaded_video(uploaded_file, whisper_model_size, video_language):
             st.error(f'处理视频时出错: {str(e)}')
             return False
         finally:
-            # 清理临时文件
-            if 'video_path' in locals():
-                try:
-                    os.unlink(video_path)
-                except:
-                    pass
+            # 保留视频文件，不再删除
+            pass
     return False
 
 def process_video_link(video_link, whisper_model_size, video_language):
@@ -268,12 +264,8 @@ def process_video_link(video_link, whisper_model_size, video_language):
             st.error(f'处理视频时出错: {str(e)}')
             return False
         finally:
-            # 清理临时文件
-            if 'video_path' in locals() and os.path.exists(video_path):
-                try:
-                    os.unlink(video_path)
-                except:
-                    pass
+            # 保留视频文件，不再删除
+            pass
     return False
 
 def handle_video_tab():
