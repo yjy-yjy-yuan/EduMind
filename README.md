@@ -101,3 +101,34 @@ pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 2. 建议使用 GPU 运行，CPU 运行可能会很慢
 3. 首次运行时会下载一些模型文件，请确保网络通畅
 4. 如遇到问题，请查看错误信息并对照常见问题解决
+
+## 7. 项目结构说明
+
+```
+AI-EdVision/
+├── IVS/                    # 智能视频分析系统核心目录
+│   ├── main.py            # 主程序入口
+│   ├── Process_video.py   # 视频处理模块
+│   ├── chat_system.py     # 聊天系统模块
+│   ├── download_video.py  # 视频下载模块
+│   ├── learning_path.py   # 学习路径生成模块
+│   ├── note_system.py     # 笔记系统模块
+│   ├── rag_system.py      # RAG检索增强生成系统
+│   ├── video_tools.py     # 视频工具模块
+│   ├── captions/          # 字幕文件目录
+│   └── downloads/         # 下载文件存储目录
+│
+├── LLM/                    # 大语言模型接口目录
+│   ├── baidu_api/         # 百度文心API接口
+│   ├── deepseek/          # DeepSeek API接口
+│   ├── tongyi_api/        # 通义千问API接口
+│   └── zhipu_api/         # 智谱API接口
+│
+├── database/              # 数据库相关模块
+│   ├── drive_connect.py           # 云盘连接模块
+│   ├── pymysql_connect.py         # MySQL数据库连接模块
+│   └── query_knowledge_graph.py   # 知识图谱查询模块
+│
+├── ffmpeg/                # ffmpeg工具目录
+├── download.py            # 依赖下载脚本
+└── requirements.txt       # 项目依赖文件
