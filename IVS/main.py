@@ -226,8 +226,12 @@ def process_uploaded_video(uploaded_file, whisper_model_size, video_language):
             st.error(f'处理视频时出错: {str(e)}')
             return False
         finally:
-            # 保留视频文件，不再删除
-            pass
+            # 清理临时文件
+            if 'video_path' in locals():
+                try:
+                    os.unlink(video_path)
+                except:
+                    pass
     return False
 
 def process_video_link(video_link, whisper_model_size, video_language):
@@ -264,8 +268,12 @@ def process_video_link(video_link, whisper_model_size, video_language):
             st.error(f'处理视频时出错: {str(e)}')
             return False
         finally:
-            # 保留视频文件，不再删除
-            pass
+            # 清理临时文件
+            if 'video_path' in locals() and os.path.exists(video_path):
+                try:
+                    os.unlink(video_path)
+                except:
+                    pass
     return False
 
 def handle_video_tab():
@@ -280,19 +288,54 @@ def handle_video_tab():
     if 'active_tab' not in st.session_state:
         st.session_state.active_tab = "upload"  # 默认显示上传标签页
         
-    # 选择whisper模型大小
-    whisper_model_size = st.selectbox(
-        "选择Whisper模型大小",
-        ["tiny", "base", "small", "medium", "large"],
-        index=1
-    )
+    # 创建两列布局用于语言和模型选择
+    col1, col2 = st.columns(2)
     
-    # 选择视频语言
-    video_language = st.selectbox(
-        "选择视频语言",
-        ["Chinese", "English", "Japanese", "Korean"],
-        index=0
-    )
+    # 在左列选择视频语言
+    with col1:
+        video_language = st.selectbox(
+            "选择视频语言",
+            ["Other", "English"],
+            index=0,
+            help="""
+            🌏 选择Other：
+            - 适用于包含非英语内容的视频（如中文、日语等）
+            - 系统将使用多语言模型进行处理
+            
+            🎯 选择English：
+            - 适用于主要是英语内容的视频
+            - 系统将使用英语专用模型，可获得更好的识别效果
+            """
+        )
+    
+    # 在右列根据语言选择显示对应的模型选项
+    with col2:
+        if video_language == "English":
+            whisper_model_size = st.selectbox(
+                "Whisper模型大小",
+                ["tiny.en", "base.en", "small.en", "medium.en"],
+                index=1,  # 默认选择 base.en
+                help="""
+                🤖 模型大小说明：
+                - tiny.en：最快速但准确度较低
+                - base.en：平衡速度和准确度（推荐）
+                - small.en：准确度较高但速度较慢
+                - medium.en：最高准确度但速度最慢
+                """
+            )
+        else:  # Other
+            whisper_model_size = st.selectbox(
+                "Whisper模型大小",
+                ["tiny", "base", "small", "medium", "large", "turbo"],
+                index=5,  # 默认选择 turbo
+                help="""
+                🤖 模型大小说明：
+                - tiny/base：速度快但准确度较低
+                - small/medium：平衡速度和准确度
+                - large：最高准确度但速度较慢
+                - turbo：OpenAI最新模型，速度快且准确度高（推荐）
+                """
+            )
 
     # 创建选项卡
     tab1, tab2 = st.tabs(["📤 本地视频上传", "🔗 视频链接输入"])
