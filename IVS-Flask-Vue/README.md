@@ -33,6 +33,11 @@ IVS-Flask-Vue/
 
 ## 开发环境要求
 
+### 配置内存数据库 Redis
+- 访问 https://github.com/microsoftarchive/redis/releases 
+- 下载最新的 Redis-x64-xxx.msi 安装包，双击安装包进行安装
+- 安装时选择"Add the Redis installation folder to the PATH environment variable"
+
 ### 后端
 - Python 3.10
 - Flask 2.0+
@@ -46,6 +51,15 @@ IVS-Flask-Vue/
 - 其他依赖见 package.json(看下就好，不用太在意)
 
 ## 安装和运行
+
+### 启动 Redis
+```bash
+# 终端中进行
+redis-server
+
+# 另一个终端中，检查一下Redis服务是否正在运行
+redis-cli ping  #结果返回 PONG 即运行成功
+```
 
 ### 后端
 ```bash
@@ -72,20 +86,18 @@ npm run serve
 
 ### 启动项目
 ```bash
-# 1. 启动 Redis 服务
-redis-server.exe
 
-# 2. 确保 Redis 服务正在运行
-redis-cli ping
-
-# 3. 启动Celery Worker  
+# 1. 启动Celery Worker  
+conda activate ivs
 cd IVS-Flask-Vue/backend
 celery -A app.celery_app worker --loglevel=info -P solo
 
-# 4. 启动 Flask 后端 
+# 2. 启动 Flask 后端 
+conda activate ivs
+cd IVS-Flask-Vue/backend
 python run.py
 
-# 5. 启动前端开发服务器  
+# 3. 启动前端开发服务器(在Powershell中)  
 cd E:/infomation/graduation/test/IVS-Flask-Vue/frontend
 npm run dev
 ```
