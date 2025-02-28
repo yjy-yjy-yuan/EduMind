@@ -34,7 +34,7 @@ IVS-Flask-Vue/
 ## 开发环境要求
 
 ### 后端
-- Python 3.8+
+- Python 3.10
 - Flask 2.0+
 - 其他依赖见 requirements.txt
 
@@ -47,11 +47,18 @@ IVS-Flask-Vue/
 
 ### 后端
 ```bash
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+cd IVS-Flask-Vue/backend
+conda create -n ivs python=3.10 -y
+conda activate ivs
+# 1. 安装 PyTorch（使用 CUDA 11.8）
+conda install pytorch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 pytorch-cuda=11.8 -c pytorch -c nvidia
+
+# 2. 安装 FAISS-GPU
+conda install -c conda-forge faiss-gpu=1.8.0 -y
+
+# 3. 安装其它依赖
 pip install -r requirements.txt
-python run.py
+
 ```
 
 ### 前端
@@ -59,4 +66,24 @@ python run.py
 cd frontend
 npm install
 npm run serve
+```
+
+### 启动项目
+```bash
+# 1. 启动 Redis 服务
+redis-server.exe
+
+# 2. 确保 Redis 服务正在运行
+redis-cli ping
+
+# 3. 启动Celery Worker  
+cd IVS-Flask-Vue/backend
+celery -A app.celery_app worker --loglevel=info -P solo
+
+# 4. 启动 Flask 后端 
+python run.py
+
+# 5. 启动前端开发服务器  
+cd E:/infomation/graduation/test/IVS-Flask-Vue/frontend
+npm run dev
 ```
