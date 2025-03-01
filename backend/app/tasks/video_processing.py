@@ -94,6 +94,9 @@ def extract_video_info(video):
 
 def generate_preview(video_path):
     """生成视频预览图"""
+    import os  # 确保os模块导入
+    import cv2
+    import numpy as np
     try:
         # 创建预览图目录
         preview_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'previews')
@@ -182,6 +185,7 @@ def process_subtitles(video, whisper_model="base", to_simplified=True):
 
 def create_placeholder_preview(video):
     """为占位文件创建默认预览图"""
+    import os  # 确保os模块导入
     try:
         # 确保预览图目录存在
         preview_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'previews')
@@ -215,26 +219,41 @@ def create_placeholder_preview(video):
         logger.error(f"创建占位文件预览图出错: {str(e)}")
         return False
 
-@celery.task(bind=True, max_retries=3, retry_backoff=True, retry_backoff_max=240, retry_jitter=True)
+@celery.task(name='app.tasks.process_video', bind=True, max_retries=3, retry_backoff=True, retry_backoff_max=240, retry_jitter=True)
 def process_video(self, video_id, language='zh', model='large'):
     """处理视频任务"""
+    import os  # 确保os模块导入
     try:
         # 导入faiss相关模块
         import sys
         import importlib
         
+        # 记录Python版本和环境信息
+        python_version = sys.version
+        logger.info(f"🐍 Python版本: {python_version}")
+        
         # 尝试导入faiss模块
         try:
             import faiss
             logger.info("🔍 FAISS模块已成功加载")
-        except ImportError:
-            logger.warning("⚠️ 未找到FAISS模块，QA功能将受限")
+        except ImportError as e:
+            logger.warning(f"⚠️ 未找到FAISS模块，QA功能将受限: {str(e)}")
+            
+            # 尝试查找可能的faiss安装位置
+            try:
+                for path in sys.path:
+                    if 'site-packages' in path or 'dist-packages' in path:
+                        import os
+                        packages = os.listdir(path)
+                        faiss_related = [p for p in packages if 'faiss' in p.lower()]
+                        if faiss_related:
+                            logger.info(f"💡 发现可能的FAISS相关包: {faiss_related}")
+            except Exception as e:
+                logger.error(f"❌ 查找FAISS包时出错: {str(e)}")
         
         # 设置任务ID
         task_id = self.request.id
         logger.info(f"🎬 开始处理视频 | ID: {video_id} | 语言: {language} | 模型: {model} | 任务ID: {task_id}")
-        
-        logger.warning(f'🎬 开始处理视频 | ID: {video_id} | 语言: {language} | 模型: {model}')
         
         # 获取视频信息
         video = Video.query.get(video_id)
@@ -434,7 +453,6 @@ def process_video(self, video_id, language='zh', model='large'):
                 cmd_str = ' '.join(whisper_cmd)
                 logger.info(f"🚀 启动AI转录引擎 | 模型: {model} | 语言: {language} | CUDA加速: {'已启用' if cuda_available else '未启用'}")
                 logger.info(f"📝 处理文件: {os.path.basename(video.filepath)}")
-                logger.debug(f"完整命令: {cmd_str}")  # 将完整命令移到debug级别
                 
                 # 更新进度
                 video.process_progress = 60.0
@@ -499,8 +517,6 @@ def process_video(self, video_id, language='zh', model='large'):
                     # 不要因为字幕失败而使整个处理失败，继续处理
                 else:
                     logger.info(f"✅ 转录完成 | 状态: 成功")
-                    stdout_output = process.stdout.read()
-                    logger.debug(f"转录输出: {stdout_output}")  # 详细输出移到debug级别
                     
                 # 检查生成的字幕文件是否存在
                 expected_srt = os.path.join(subtitle_dir, f"{base_filename}.srt")
