@@ -531,12 +531,21 @@ def process_video_route(video_id):
                 'message': f'视频状态不正确: {video.status.name}'
             }), 400
         
+        # 获取请求数据
+        data = request.get_json() or {}
+        language = data.get('language', 'Other')
+        model = data.get('model', 'turbo')
+        
+        # 根据语言选择设置whisper参数
+        whisper_language = 'en' if language == 'English' else 'zh'
+        whisper_model = model
+        
         # 更新视频状态
         video.status = VideoStatus.PENDING
         db.session.commit()
         
         # 启动异步任务处理视频
-        task = process_video.delay(video.id)
+        task = process_video.delay(video.id, whisper_language, whisper_model)
         
         # 更新视频的任务ID
         video.task_id = task.id
@@ -653,13 +662,22 @@ def process_video_route_new(video_id):
                 "status": video.status.value
             }), 400
             
+        # 获取请求数据
+        data = request.get_json() or {}
+        language = data.get('language', 'Other')
+        model = data.get('model', 'turbo')
+        
+        # 根据语言选择设置whisper参数
+        whisper_language = 'en' if language == 'English' else 'zh'
+        whisper_model = model
+            
         # 更新状态为处理中
         video.status = VideoStatus.PENDING
         db.session.commit()
         
         # 启动异步处理任务
         from ..tasks.video_processing import process_video
-        process_video.delay(video_id)
+        process_video.delay(video_id, whisper_language, whisper_model)
         
         return jsonify({"message": "视频处理已开始"}), 200
         

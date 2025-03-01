@@ -423,18 +423,125 @@ const refreshList = async () => {
 // 处理视频
 const handleProcess = async (video) => {
   try {
-    await processVideo(video.id)
-    ElMessage({
-      message: '视频正在处理，请稍候...',
-      type: 'info',
-      duration: 5000
-    })
-    
-    // 启动轮询检查处理状态
-    startPollingProcessStatus(video.id)
+    // 创建对话框内容
+    const dialogHtml = `
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; font-weight: bold;">视频语言：</label>
+        <select id="language-select" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #dcdfe6;">
+          <option value="English">English</option>
+          <option value="Other" selected>Other</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px; font-weight: bold;">转录模型大小：</label>
+        <select id="model-select" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #dcdfe6;">
+          <option value="tiny">tiny</option>
+          <option value="base">base</option>
+          <option value="small">small</option>
+          <option value="medium">medium</option>
+          <option value="large">large</option>
+          <option value="turbo" selected>turbo</option>
+        </select>
+      </div>
+    `;
+
+    // 显示对话框
+    ElMessageBox.confirm(dialogHtml, '处理视频', {
+      dangerouslyUseHTMLString: true,
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      customClass: 'video-process-dialog',
+      beforeClose: (action, instance, done) => {
+        if (action === 'confirm') {
+          instance.confirmButtonLoading = true;
+          setTimeout(() => {
+            instance.confirmButtonLoading = false;
+            done();
+          }, 300);
+        } else {
+          done();
+        }
+      },
+      callback: async (action) => {
+        if (action === 'confirm') {
+          // 获取用户选择的语言和模型
+          const languageSelect = document.getElementById('language-select');
+          const modelSelect = document.getElementById('model-select');
+          
+          if (languageSelect && modelSelect) {
+            const language = languageSelect.value;
+            const model = modelSelect.value;
+            
+            // 调用处理视频API
+            await processVideo(video.id, language, model);
+            
+            ElMessage({
+              message: '视频正在处理，请稍候...',
+              type: 'info',
+              duration: 5000
+            });
+            
+            // 启动轮询检查处理状态
+            startPollingProcessStatus(video.id);
+          }
+        }
+      }
+    });
+
+    // 添加事件监听器以更新模型选项
+    setTimeout(() => {
+      const languageSelect = document.getElementById('language-select');
+      const modelSelect = document.getElementById('model-select');
+      
+      if (languageSelect && modelSelect) {
+        languageSelect.addEventListener('change', () => {
+          const language = languageSelect.value;
+          
+          // 清空现有选项
+          modelSelect.innerHTML = '';
+          
+          // 根据语言添加相应的模型选项
+          if (language === 'English') {
+            // 英语语言选项
+            const models = [
+              { value: 'tiny.en', text: 'tiny.en' },
+              { value: 'base.en', text: 'base.en', selected: true },
+              { value: 'small.en', text: 'small.en' },
+              { value: 'medium.en', text: 'medium.en' }
+            ];
+            
+            models.forEach(model => {
+              const option = document.createElement('option');
+              option.value = model.value;
+              option.textContent = model.text;
+              if (model.selected) option.selected = true;
+              modelSelect.appendChild(option);
+            });
+          } else {
+            // 其他语言选项
+            const models = [
+              { value: 'tiny', text: 'tiny' },
+              { value: 'base', text: 'base' },
+              { value: 'small', text: 'small' },
+              { value: 'medium', text: 'medium' },
+              { value: 'large', text: 'large' },
+              { value: 'turbo', text: 'turbo', selected: true }
+            ];
+            
+            models.forEach(model => {
+              const option = document.createElement('option');
+              option.value = model.value;
+              option.textContent = model.text;
+              if (model.selected) option.selected = true;
+              modelSelect.appendChild(option);
+            });
+          }
+        });
+      }
+    }, 100);
   } catch (error) {
-    console.error('处理视频失败:', error)
-    ElMessage.error(error.response?.error || '处理视频失败')
+    console.error('处理视频失败:', error);
+    ElMessage.error(error.response?.error || '处理视频失败');
   }
 }
 

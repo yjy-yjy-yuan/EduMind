@@ -216,10 +216,10 @@ def create_placeholder_preview(video):
         return False
 
 @celery.task(name='app.tasks.process_video')
-def process_video(video_id):
+def process_video(video_id, language='zh', model='base'):
     """处理视频任务"""
     try:
-        logger.warning(f'开始处理视频: {video_id}')
+        logger.warning(f'开始处理视频: {video_id}, 语言: {language}, 模型: {model}')
         
         # 获取视频信息
         video = Video.query.get(video_id)
@@ -351,8 +351,8 @@ def process_video(video_id):
                 whisper_cmd = [
                     "whisper", 
                     video.filepath,
-                    "--model", "base",
-                    "--language", "zh",
+                    "--model", model,
+                    "--language", language,
                     "--output_dir", subtitle_dir,
                     "--output_format", "all"  # 使用all生成所有格式，包括srt和txt
                 ]

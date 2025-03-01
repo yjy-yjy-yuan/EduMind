@@ -104,10 +104,14 @@ export function getVideoList() {
 }
 
 // 开始处理视频
-export function processVideo(videoId) {
+export function processVideo(videoId, language = 'Other', model = 'turbo') {
   return request({
     url: `/api/videos/${videoId}/process`,
-    method: 'post'
+    method: 'post',
+    data: {
+      language,
+      model
+    }
   })
 }
 
