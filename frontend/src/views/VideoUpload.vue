@@ -425,30 +425,80 @@ const handleProcess = async (video) => {
   try {
     // 创建对话框内容
     const dialogHtml = `
-      <div style="margin-bottom: 15px;">
-        <label style="display: block; margin-bottom: 5px; font-weight: bold;">视频语言：</label>
-        <select id="language-select" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #dcdfe6;">
-          <option value="English">English</option>
-          <option value="Other" selected>Other</option>
-        </select>
-      </div>
-      <div style="margin-bottom: 15px;">
-        <label style="display: block; margin-bottom: 5px; font-weight: bold;">转录模型大小：</label>
-        <select id="model-select" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #dcdfe6;">
-          <option value="tiny">tiny</option>
-          <option value="base">base</option>
-          <option value="small">small</option>
-          <option value="medium">medium</option>
-          <option value="large">large</option>
-          <option value="turbo" selected>turbo</option>
-        </select>
+      <div style="font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;">
+        <div style="margin-bottom: 20px; border-bottom: 1px solid #ebeef5; padding-bottom: 15px;">
+          <div style="display: flex; align-items: center; margin-bottom: 10px;">
+            <i class="el-icon-video-camera" style="color: #409EFF; font-size: 18px; margin-right: 8px;"></i>
+            <span style="font-size: 16px; font-weight: 600; color: #303133;">视频转录设置</span>
+          </div>
+          <p style="margin: 5px 0 0; font-size: 13px; color: #909399;">请选择视频语言和转录模型大小，以获得最佳转录效果</p>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #606266; font-size: 14px;">
+            <i class="el-icon-s-flag" style="margin-right: 5px;"></i>视频语言：
+          </label>
+          <div class="language-selector" style="display: flex; width: 100%; margin-bottom: 5px;">
+            <div class="language-option" data-value="English" style="flex: 1; text-align: center; padding: 10px; border: 1px solid #dcdfe6; border-radius: 4px 0 0 4px; cursor: pointer; background-color: #f5f7fa; color: #606266; transition: all 0.3s;">
+              <div style="font-weight: 500; margin-bottom: 3px;">English</div>
+              <div style="font-size: 12px; color: #909399;">英语</div>
+            </div>
+            <div class="language-option selected" data-value="Other" style="flex: 1; text-align: center; padding: 10px; border: 1px solid #409EFF; border-radius: 0 4px 4px 0; cursor: pointer; background-color: #ecf5ff; color: #409EFF; transition: all 0.3s;">
+              <div style="font-weight: 500; margin-bottom: 3px;">Other</div>
+              <div style="font-size: 12px; color: #409EFF;">其他语言</div>
+            </div>
+          </div>
+          <input type="hidden" id="language-select" value="Other">
+          <div style="font-size: 12px; color: #909399; margin-top: 5px;">
+            <i class="el-icon-info-circle" style="margin-right: 3px;"></i>选择与视频主要语言相符的选项
+          </div>
+        </div>
+        
+        <div style="margin-bottom: 10px;">
+          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #606266; font-size: 14px;">
+            <i class="el-icon-s-operation" style="margin-right: 5px;"></i>转录模型大小：
+          </label>
+          <div id="model-options-container">
+            <div class="model-size-slider" style="margin-bottom: 15px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span style="font-size: 12px; color: #909399;">更快速</span>
+                <span style="font-size: 12px; color: #909399;">更准确</span>
+              </div>
+              <div style="position: relative; height: 60px; background: linear-gradient(to right, #67C23A, #E6A23C, #F56C6C); border-radius: 4px; overflow: hidden;">
+                <div id="model-options" style="display: flex; height: 100%; position: relative;">
+                  <!-- 模型选项将在这里动态生成 -->
+                </div>
+              </div>
+            </div>
+            <div id="model-description" style="background-color: #f5f7fa; border-radius: 4px; padding: 12px; margin-top: 5px; border-left: 3px solid #409EFF;">
+              <div style="font-weight: 500; color: #303133; margin-bottom: 5px;">turbo 模型 (推荐)</div>
+              <div style="font-size: 13px; color: #606266;">
+                <p style="margin: 0 0 5px;">• 处理速度：<span style="color: #67C23A; font-weight: 500;">极快</span></p>
+                <p style="margin: 0 0 5px;">• 准确度：<span style="color: #409EFF; font-weight: 500;">良好</span></p>
+                <p style="margin: 0;">• 适用场景：<span style="color: #606266;">一般视频转录，对速度要求高</span></p>
+              </div>
+            </div>
+          </div>
+          <input type="hidden" id="model-select" value="turbo">
+          <div style="font-size: 12px; color: #909399; margin-top: 10px; display: flex; align-items: center;">
+            <i class="el-icon-info-circle" style="margin-right: 3px;"></i>
+            <span>从左到右：模型越大，转录准确度越高，但处理时间也越长</span>
+          </div>
+        </div>
+        
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ebeef5; font-size: 13px; color: #606266;">
+          <div style="display: flex; align-items: center;">
+            <i class="el-icon-warning-outline" style="color: #e6a23c; margin-right: 5px;"></i>
+            <span>选择后将开始处理视频，请耐心等待</span>
+          </div>
+        </div>
       </div>
     `;
 
     // 显示对话框
     ElMessageBox.confirm(dialogHtml, '处理视频', {
       dangerouslyUseHTMLString: true,
-      confirmButtonText: '确认',
+      confirmButtonText: '开始处理',
       cancelButtonText: '取消',
       customClass: 'video-process-dialog',
       beforeClose: (action, instance, done) => {
@@ -488,56 +538,266 @@ const handleProcess = async (video) => {
       }
     });
 
-    // 添加事件监听器以更新模型选项
+    // 添加事件监听器
     setTimeout(() => {
-      const languageSelect = document.getElementById('language-select');
-      const modelSelect = document.getElementById('model-select');
+      // 语言选择事件监听
+      const languageOptions = document.querySelectorAll('.language-option');
+      const languageInput = document.getElementById('language-select');
       
-      if (languageSelect && modelSelect) {
-        languageSelect.addEventListener('change', () => {
-          const language = languageSelect.value;
+      languageOptions.forEach(option => {
+        option.addEventListener('click', () => {
+          // 移除所有选中状态
+          languageOptions.forEach(opt => {
+            opt.classList.remove('selected');
+            opt.style.backgroundColor = '#f5f7fa';
+            opt.style.borderColor = '#dcdfe6';
+            opt.style.color = '#606266';
+            const subText = opt.querySelector('div:nth-child(2)');
+            if (subText) subText.style.color = '#909399';
+          });
           
+          // 添加选中状态
+          option.classList.add('selected');
+          option.style.backgroundColor = '#ecf5ff';
+          option.style.borderColor = '#409EFF';
+          option.style.color = '#409EFF';
+          const subText = option.querySelector('div:nth-child(2)');
+          if (subText) subText.style.color = '#409EFF';
+          
+          // 更新隐藏输入值
+          const value = option.getAttribute('data-value');
+          languageInput.value = value;
+          
+          // 更新模型选项
+          updateModelOptions(value);
+        });
+      });
+      
+      // 更新模型选项函数
+      function updateModelOptions(language) {
+        const modelOptionsContainer = document.getElementById('model-options');
+        const modelDescriptionContainer = document.getElementById('model-description');
+        const modelInput = document.getElementById('model-select');
+        
+        if (modelOptionsContainer && modelDescriptionContainer) {
           // 清空现有选项
-          modelSelect.innerHTML = '';
+          modelOptionsContainer.innerHTML = '';
+          
+          let models = [];
           
           // 根据语言添加相应的模型选项
           if (language === 'English') {
             // 英语语言选项
-            const models = [
-              { value: 'tiny.en', text: 'tiny.en' },
-              { value: 'base.en', text: 'base.en', selected: true },
-              { value: 'small.en', text: 'small.en' },
-              { value: 'medium.en', text: 'medium.en' }
+            models = [
+              { 
+                value: 'tiny.en', 
+                text: 'tiny.en', 
+                desc: '最小',
+                color: '#67C23A',
+                speed: '极快',
+                accuracy: '一般',
+                useCase: '简单内容，对速度要求高',
+                speedColor: '#67C23A',
+                accuracyColor: '#E6A23C'
+              },
+              { 
+                value: 'base.en', 
+                text: 'base.en', 
+                desc: '基础',
+                color: '#85CF4E',
+                speed: '很快',
+                accuracy: '良好',
+                useCase: '一般内容，速度和准确度平衡',
+                speedColor: '#85CF4E',
+                accuracyColor: '#E6A23C'
+              },
+              { 
+                value: 'small.en', 
+                text: 'small.en', 
+                desc: '小型',
+                selected: true,
+                color: '#E6A23C',
+                speed: '中等',
+                accuracy: '很好',
+                useCase: '复杂内容，对准确度要求较高',
+                speedColor: '#E6A23C',
+                accuracyColor: '#409EFF'
+              },
+              { 
+                value: 'medium.en', 
+                text: 'medium.en', 
+                desc: '中型',
+                color: '#F56C6C',
+                speed: '较慢',
+                accuracy: '极高',
+                useCase: '专业内容，对准确度要求高',
+                speedColor: '#F56C6C',
+                accuracyColor: '#409EFF'
+              }
             ];
-            
-            models.forEach(model => {
-              const option = document.createElement('option');
-              option.value = model.value;
-              option.textContent = model.text;
-              if (model.selected) option.selected = true;
-              modelSelect.appendChild(option);
-            });
           } else {
             // 其他语言选项
-            const models = [
-              { value: 'tiny', text: 'tiny' },
-              { value: 'base', text: 'base' },
-              { value: 'small', text: 'small' },
-              { value: 'medium', text: 'medium' },
-              { value: 'large', text: 'large' },
-              { value: 'turbo', text: 'turbo', selected: true }
+            models = [
+              { 
+                value: 'tiny', 
+                text: 'tiny', 
+                desc: '最小',
+                color: '#67C23A',
+                speed: '极快',
+                accuracy: '一般',
+                useCase: '简单内容，对速度要求高',
+                speedColor: '#67C23A',
+                accuracyColor: '#E6A23C'
+              },
+              { 
+                value: 'base', 
+                text: 'base', 
+                desc: '基础',
+                color: '#85CF4E',
+                speed: '很快',
+                accuracy: '良好',
+                useCase: '一般内容，速度和准确度平衡',
+                speedColor: '#85CF4E',
+                accuracyColor: '#E6A23C'
+              },
+              { 
+                value: 'small', 
+                text: 'small', 
+                desc: '小型',
+                color: '#9FD072',
+                speed: '快',
+                accuracy: '良好',
+                useCase: '一般内容，速度和准确度平衡',
+                speedColor: '#9FD072',
+                accuracyColor: '#E6A23C'
+              },
+              { 
+                value: 'medium', 
+                text: 'medium', 
+                desc: '中型',
+                color: '#E6A23C',
+                speed: '中等',
+                accuracy: '很好',
+                useCase: '复杂内容，对准确度要求较高',
+                speedColor: '#E6A23C',
+                accuracyColor: '#409EFF'
+              },
+              { 
+                value: 'large', 
+                text: 'large', 
+                desc: '大型',
+                color: '#F56C6C',
+                speed: '较慢',
+                accuracy: '极高',
+                useCase: '专业内容，对准确度要求高',
+                speedColor: '#F56C6C',
+                accuracyColor: '#409EFF'
+              },
+              { 
+                value: 'turbo', 
+                text: 'turbo', 
+                desc: '极速',
+                selected: true,
+                color: '#67C23A',
+                speed: '极快',
+                accuracy: '良好',
+                useCase: '一般视频转录，对速度要求高',
+                speedColor: '#67C23A',
+                accuracyColor: '#409EFF'
+              }
             ];
-            
-            models.forEach(model => {
-              const option = document.createElement('option');
-              option.value = model.value;
-              option.textContent = model.text;
-              if (model.selected) option.selected = true;
-              modelSelect.appendChild(option);
-            });
           }
-        });
+          
+          // 设置默认选中的模型
+          let selectedModel = models.find(m => m.selected) || models[models.length - 1];
+          modelInput.value = selectedModel.value;
+          
+          // 更新模型描述
+          updateModelDescription(selectedModel);
+          
+          // 创建模型选项
+          models.forEach((model, index) => {
+            const width = 100 / models.length;
+            
+            const option = document.createElement('div');
+            option.className = 'model-option';
+            option.setAttribute('data-value', model.value);
+            option.setAttribute('data-index', index);
+            option.style.width = `${width}%`;
+            option.style.height = '100%';
+            option.style.display = 'flex';
+            option.style.flexDirection = 'column';
+            option.style.justifyContent = 'center';
+            option.style.alignItems = 'center';
+            option.style.cursor = 'pointer';
+            option.style.position = 'relative';
+            option.style.zIndex = '1';
+            option.style.transition = 'all 0.3s';
+            option.style.color = 'white';
+            option.style.textShadow = '0 1px 2px rgba(0,0,0,0.2)';
+            
+            // 设置选中状态
+            if (model.selected) {
+              option.classList.add('selected');
+              option.style.transform = 'scale(1.05)';
+              option.style.zIndex = '2';
+              option.style.boxShadow = '0 0 10px rgba(0,0,0,0.2)';
+            }
+            
+            option.innerHTML = `
+              <div style="font-weight: 600; font-size: 14px;">${model.text}</div>
+              <div style="font-size: 12px;">${model.desc}</div>
+            `;
+            
+            // 添加点击事件
+            option.addEventListener('click', () => {
+              // 移除所有选中状态
+              document.querySelectorAll('.model-option').forEach(opt => {
+                opt.classList.remove('selected');
+                opt.style.transform = '';
+                opt.style.zIndex = '1';
+                opt.style.boxShadow = '';
+              });
+              
+              // 添加选中状态
+              option.classList.add('selected');
+              option.style.transform = 'scale(1.05)';
+              option.style.zIndex = '2';
+              option.style.boxShadow = '0 0 10px rgba(0,0,0,0.2)';
+              
+              // 更新隐藏输入值
+              modelInput.value = model.value;
+              
+              // 更新模型描述
+              updateModelDescription(model);
+            });
+            
+            modelOptionsContainer.appendChild(option);
+          });
+        }
       }
+      
+      // 更新模型描述函数
+      function updateModelDescription(model) {
+        const modelDescriptionContainer = document.getElementById('model-description');
+        
+        if (modelDescriptionContainer && model) {
+          modelDescriptionContainer.innerHTML = `
+            <div style="font-weight: 500; color: #303133; margin-bottom: 5px;">${model.text} 模型 ${model.selected ? '(推荐)' : ''}</div>
+            <div style="font-size: 13px; color: #606266;">
+              <p style="margin: 0 0 5px;">• 处理速度：<span style="color: ${model.speedColor}; font-weight: 500;">${model.speed}</span></p>
+              <p style="margin: 0 0 5px;">• 准确度：<span style="color: ${model.accuracyColor}; font-weight: 500;">${model.accuracy}</span></p>
+              <p style="margin: 0;">• 适用场景：<span style="color: #606266;">${model.useCase}</span></p>
+            </div>
+          `;
+          
+          // 更新边框颜色
+          modelDescriptionContainer.style.borderLeftColor = model.color;
+        }
+      }
+      
+      // 初始化模型选项
+      updateModelOptions(languageInput.value);
     }, 100);
   } catch (error) {
     console.error('处理视频失败:', error);
