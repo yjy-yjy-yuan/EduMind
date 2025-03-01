@@ -1,25 +1,50 @@
 import os
-import faiss
+try:
+    import faiss
+    FAISS_AVAILABLE = True
+    print("成功初始化GPU资源")
+except ImportError:
+    FAISS_AVAILABLE = False
+    import logging
+    logging.warning("警告: 未找到faiss模块，QA功能将受限")
+    print("警告: 未找到faiss模块，QA功能将受限")
+
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+    import logging
+    logging.warning("警告: 未找到sentence_transformers模块，QA功能将受限")
+    print("警告: 未找到sentence_transformers模块，QA功能将受限")
+
 import numpy as np
-from sentence_transformers import SentenceTransformer
-from openai import OpenAI
 import re
 from typing import List, Dict, Tuple
 
 class QASystem:
     def __init__(self, model_name="all-MiniLM-L6-v2"):
         # 初始化向量模型
+        if not SENTENCE_TRANSFORMERS_AVAILABLE:
+            raise ImportError("sentence_transformers模块不可用")
         self.model = SentenceTransformer(model_name)
         # 初始化 FAISS 资源
-        try:
-            self.res = faiss.StandardGpuResources()
-            # 设置临时内存限制为 256MB
-            self.res.setTempMemory(256 * 1024 * 1024)
-            self.use_gpu = True
-            print("成功初始化GPU资源")
-        except Exception as e:
-            print(f"GPU资源初始化失败，将使用CPU: {str(e)}")
-            self.use_gpu = False
+        self.use_gpu = False
+        
+        # 如果FAISS可用，尝试使用GPU
+        if FAISS_AVAILABLE:
+            try:
+                # 检查是否有GPU资源
+                res = faiss.StandardGpuResources()
+                self.use_gpu = True
+                self.res = res
+                print("FAISS GPU资源初始化成功")
+            except Exception as e:
+                print(f"FAISS GPU初始化失败: {e}")
+                self.use_gpu = False
+        else:
+            print("FAISS模块不可用，将使用备用方式")
+            
         # 存储向量
         self.vectors = None
         # 初始化FAISS索引
@@ -31,6 +56,10 @@ class QASystem:
         
     def _create_index(self, dimension):
         """创建 FAISS 索引"""
+        if not FAISS_AVAILABLE:
+            print("FAISS模块不可用，无法创建索引")
+            return None
+            
         try:
             # 先清理之前的索引
             if self.index is not None:
@@ -108,11 +137,13 @@ class QASystem:
         # 创建索引
         dimension = vectors.shape[1]
         self.index = self._create_index(dimension)
-        if self.index is None:
+        if self.index is None and FAISS_AVAILABLE:
+            print("无法创建索引")
             raise RuntimeError("无法创建索引")
             
         # 添加向量到索引
-        self.index.add(vectors)
+        if FAISS_AVAILABLE and self.index:
+            self.index.add(vectors)
         
         # 保存文本和时间戳
         self.texts = texts
@@ -123,7 +154,7 @@ class QASystem:
         
     def search_similar_segments(self, query: str, top_k: int = 3) -> List[Dict]:
         """搜索与查询最相似的片段"""
-        if not self.index or not self.texts:
+        if not self.texts:
             raise ValueError("知识库未初始化")
             
         # 将查询转换为向量
@@ -131,16 +162,26 @@ class QASystem:
         query_vector = query_vector.astype('float32')
         
         # 搜索最相似的片段
-        distances, indices = self.index.search(query_vector, top_k)
-        
-        # 返回结果
         results = []
-        for i, idx in enumerate(indices[0]):
-            if idx < len(self.texts):
+        
+        if FAISS_AVAILABLE and self.index:
+            # 使用FAISS搜索
+            distances, indices = self.index.search(query_vector, top_k)
+            
+            for i, idx in enumerate(indices[0]):
+                if idx < len(self.texts):
+                    results.append({
+                        'text': self.texts[idx],
+                        'timestamp': self.timestamps[idx],
+                        'score': float(distances[0][i])
+                    })
+        else:
+            # 备用方案：返回前几个文档
+            for i, text in enumerate(self.texts[:top_k]):
                 results.append({
-                    'text': self.texts[idx],
-                    'timestamp': self.timestamps[idx],
-                    'score': float(distances[0][i])
+                    'text': text,
+                    'timestamp': self.timestamps[i],
+                    'score': 0.0  # 无法计算相似度分数
                 })
                 
         return results

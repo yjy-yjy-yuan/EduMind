@@ -453,8 +453,14 @@ def get_video_preview_file(video_id):
 @bp.route('/list', methods=['GET'])
 def get_video_list():
     try:
-        videos = Video.query.order_by(Video.upload_time.desc()).all()
+        # 添加性能日志
+        start_time = time.time()
+        current_app.logger.info("🔍 开始获取视频列表")
+        
+        # 限制返回最近100条记录以提高性能
+        videos = Video.query.order_by(Video.upload_time.desc()).limit(100).all()
         result = []
+        
         for video in videos:
             try:
                 # 安全获取状态值
@@ -483,12 +489,15 @@ def get_video_list():
                 # 跳过有问题的记录，继续处理其他记录
                 continue
         
+        elapsed_time = time.time() - start_time
+        current_app.logger.info(f"✅ 获取视频列表完成 | 耗时: {elapsed_time:.2f}秒 | 记录数: {len(result)}")
+        
         return jsonify({
             'message': '获取成功',
             'videos': result
         })
     except Exception as e:
-        current_app.logger.error(f'获取视频列表失败: {str(e)}')
+        current_app.logger.error(f'❌ 获取视频列表失败: {str(e)}')
         return jsonify({'error': '获取视频列表失败'}), 500
 
 @bp.route('/<int:video_id>/status', methods=['GET'])
@@ -500,7 +509,10 @@ def get_video_status(video_id):
         current_app.logger.info(f"获取视频状态成功: 视频ID={video_id}, 状态={status}")
         return jsonify({
             'id': video.id,
-            'status': status
+            'status': status,
+            'progress': video.process_progress,
+            'current_step': video.current_step,
+            'task_id': video.task_id
         })
     except Exception as e:
         current_app.logger.error(f"获取视频状态失败: {str(e)}")

@@ -34,6 +34,11 @@ class Video(db.Model):
     upload_time = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # 进度信息
+    process_progress = db.Column(db.Float, default=0.0)  # 处理进度（0-100）
+    current_step = db.Column(db.String(255), nullable=True)  # 当前处理步骤
+    task_id = db.Column(db.String(255), nullable=True)  # Celery任务ID
+    
     # 视频属性
     duration = db.Column(db.Float, nullable=True)      # 视频时长（秒）
     fps = db.Column(db.Float, nullable=True)          # 帧率
@@ -59,6 +64,9 @@ class Video(db.Model):
             'error_message': self.error_message,
             'upload_time': self.upload_time.isoformat() if self.upload_time else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'process_progress': self.process_progress,
+            'current_step': self.current_step,
+            'task_id': self.task_id,
             'duration': self.duration,
             'fps': self.fps,
             'width': self.width,

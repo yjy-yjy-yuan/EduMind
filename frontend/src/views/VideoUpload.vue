@@ -37,6 +37,9 @@
               :status="uploadStatus"
               :stroke-width="15"
             />
+            <div v-if="uploadStepInfo" class="processing-step">
+              当前步骤: {{ uploadStepInfo }}
+            </div>
           </div>
         </el-form-item>
 
@@ -168,6 +171,7 @@ const formData = ref({
 
 const uploadProgress = ref(0)
 const uploadStatus = ref('')
+const uploadStepInfo = ref('')
 const urlUploading = ref(false)
 const loading = ref(false)
 const videoList = ref([])
@@ -344,8 +348,17 @@ const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
     console.log(`正在检查视频${videoId}的状态，第${attempts+1}次尝试`)
     const response = await getVideoStatus(videoId)
     const status = response.status
+    const progress = response.progress || 0
+    const currentStep = response.current_step || ''
     
-    console.log(`视频${videoId}状态: ${status}, 尝试次数: ${attempts+1}`)
+    console.log(`视频${videoId}状态: ${status}, 进度: ${progress}%, 步骤: ${currentStep}, 尝试次数: ${attempts+1}`)
+    
+    // 更新UI显示进度
+    if (status === 'processing') {
+      uploadStatus.value = 'processing'
+      uploadProgress.value = Math.round(progress)
+      uploadStepInfo.value = currentStep || '处理中...'
+    }
     
     // 如果视频下载完成或失败，停止轮询
     if (status === 'uploaded') {
@@ -356,6 +369,8 @@ const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
       
       console.log(`视频${videoId}下载完成，停止轮询`)
       uploadStatus.value = 'success'
+      uploadProgress.value = 100
+      uploadStepInfo.value = '下载完成'
       ElMessage({
         message: 'YouTube视频下载成功',
         type: 'success',
@@ -365,17 +380,37 @@ const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
       // 清空输入框并刷新列表
       formData.value.videoUrl = ''
       refreshList()
+    } else if (status === 'completed') {
+      if (pollingTimers.value[videoId]) {
+        clearInterval(pollingTimers.value[videoId])
+        delete pollingTimers.value[videoId]
+      }
+      
+      console.log(`视频${videoId}处理完成，停止轮询`)
+      uploadStatus.value = 'success'
+      uploadProgress.value = 100
+      uploadStepInfo.value = '处理完成'
+      ElMessage({
+        message: '视频处理成功',
+        type: 'success',
+        duration: 3000
+      })
+      
+      // 刷新列表
+      refreshList()
     } else if (status === 'failed') {
       if (pollingTimers.value[videoId]) {
         clearInterval(pollingTimers.value[videoId])
         delete pollingTimers.value[videoId]
       }
       
-      console.log(`视频${videoId}下载失败，停止轮询`)
+      console.log(`视频${videoId}处理失败，停止轮询`)
       uploadStatus.value = 'exception'
-      ElMessage.error('视频下载失败')
+      uploadProgress.value = 0
+      uploadStepInfo.value = currentStep || '处理失败'
+      ElMessage.error('视频处理失败')
     } else {
-      console.log(`视频${videoId}仍在下载中，状态: ${status}，继续轮询`)
+      console.log(`视频${videoId}仍在处理中，状态: ${status}，继续轮询`)
     }
     
     // 达到最大尝试次数，停止轮询
@@ -386,9 +421,9 @@ const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
       }
       
       console.log(`视频${videoId}轮询达到最大次数，停止轮询`)
-      // 不显示错误，因为视频可能仍在下载中
+      // 不显示错误，因为视频可能仍在处理中
       ElMessage({
-        message: '视频可能仍在下载中，请稍后刷新列表查看',
+        message: '视频可能仍在处理中，请稍后刷新列表查看',
         type: 'info',
         duration: 5000
       })
@@ -832,71 +867,75 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
   try {
     console.log(`正在检查视频${videoId}的处理状态，第${attempts+1}次尝试`)
     
-    // 使用getVideoList代替getVideo，因为getVideoList更稳定
-    const response = await getVideoList()
-    
-    if (!response || !response.videos) {
-      console.log(`获取视频列表失败，继续轮询`)
-      return
-    }
-    
-    // 在列表中查找指定ID的视频
-    const video = response.videos.find(v => v.id === videoId)
-    
-    if (!video) {
-      console.log(`在列表中未找到视频${videoId}，继续轮询`)
-      return
-    }
-    
-    const status = video.status
-    console.log(`视频${videoId}处理状态: ${status}, 尝试次数: ${attempts+1}`)
-    
-    // 如果视频处理完成或失败，停止轮询
-    if (status === 'completed') {
-      if (processingTimers.value[videoId]) {
-        clearInterval(processingTimers.value[videoId])
-        delete processingTimers.value[videoId]
+    // 获取视频状态
+    const statusResponse = await getVideoStatus(videoId)
+    if (statusResponse) {
+      const status = statusResponse.status
+      const progress = statusResponse.progress || 0
+      const currentStep = statusResponse.current_step || ''
+      
+      console.log(`视频${videoId}处理状态: ${status}, 进度: ${progress}%, 步骤: ${currentStep}, 尝试次数: ${attempts+1}`)
+      
+      // 更新UI显示进度
+      if (status === 'processing') {
+        uploadStatus.value = 'processing'
+        uploadProgress.value = Math.round(progress)
+        uploadStepInfo.value = currentStep || '处理中...'
       }
       
-      console.log(`视频${videoId}处理完成，停止轮询`)
-      ElMessage({
-        message: '视频处理完成',
-        type: 'success',
-        duration: 3000
-      })
-      
-      // 刷新列表
-      refreshList()
-    } else if (status === 'failed') {
-      if (processingTimers.value[videoId]) {
-        clearInterval(processingTimers.value[videoId])
-        delete processingTimers.value[videoId]
+      // 如果视频处理完成或失败，停止轮询
+      if (status === 'completed') {
+        if (processingTimers.value[videoId]) {
+          clearInterval(processingTimers.value[videoId])
+          delete processingTimers.value[videoId]
+        }
+        
+        console.log(`视频${videoId}处理完成，停止轮询`)
+        uploadStatus.value = 'success'
+        uploadProgress.value = 100
+        uploadStepInfo.value = '处理完成'
+        ElMessage({
+          message: '视频处理完成',
+          type: 'success',
+          duration: 3000
+        })
+        
+        // 刷新列表
+        refreshList()
+      } else if (status === 'failed') {
+        if (processingTimers.value[videoId]) {
+          clearInterval(processingTimers.value[videoId])
+          delete processingTimers.value[videoId]
+        }
+        
+        console.log(`视频${videoId}处理失败，停止轮询`)
+        uploadStatus.value = 'exception'
+        uploadProgress.value = 0
+        uploadStepInfo.value = currentStep || '处理失败'
+        ElMessage.error('视频处理失败')
+        
+        // 刷新列表
+        refreshList()
+      } else if (status === 'processing') {
+        console.log(`视频${videoId}仍在处理中，继续轮询`)
+      } else {
+        console.log(`视频${videoId}状态: ${status}，继续轮询`)
       }
       
-      console.log(`视频${videoId}处理失败，停止轮询`)
-      ElMessage.error('视频处理失败')
-      
-      // 刷新列表
-      refreshList()
-    } else if (status === 'processing') {
-      console.log(`视频${videoId}仍在处理中，继续轮询`)
-    } else {
-      console.log(`视频${videoId}状态: ${status}，继续轮询`)
-    }
-    
-    // 达到最大尝试次数，停止轮询
-    if (attempts >= maxAttempts) {
-      if (processingTimers.value[videoId]) {
-        clearInterval(processingTimers.value[videoId])
-        delete processingTimers.value[videoId]
+      // 达到最大尝试次数，停止轮询
+      if (attempts >= maxAttempts) {
+        if (processingTimers.value[videoId]) {
+          clearInterval(processingTimers.value[videoId])
+          delete processingTimers.value[videoId]
+        }
+        
+        console.log(`视频${videoId}处理轮询达到最大次数，停止轮询`)
+        ElMessage({
+          message: '视频可能仍在处理中，请稍后刷新列表查看',
+          type: 'info',
+          duration: 5000
+        })
       }
-      
-      console.log(`视频${videoId}处理轮询达到最大次数，停止轮询`)
-      ElMessage({
-        message: '视频可能仍在处理中，请稍后刷新列表查看',
-        type: 'info',
-        duration: 5000
-      })
     }
   } catch (error) {
     console.error('轮询视频处理状态失败:', error)
@@ -1057,7 +1096,7 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
-.upload-card {
+.upload-card, .video-list-card {
   margin-bottom: 20px;
 }
 
@@ -1068,22 +1107,50 @@ onUnmounted(() => {
 }
 
 .progress-container {
-  margin-top: 20px;
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+  border: 1px solid #ebeef5;
 }
 
-.el-upload {
-  width: 100%;
+.video-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
-.el-upload-dragger {
-  width: 100%;
+.video-actions .el-button {
+  margin-left: 10px;
 }
 
-:deep(.el-upload__tip) {
-  margin-top: 8px;
+.video-process-dialog .el-message-box__content {
+  max-height: 500px;
+  overflow-y: auto;
 }
 
-.video-list-card {
-  margin-top: 20px;
+.language-option {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.language-option:hover {
+  transform: translateY(-2px);
+}
+
+.model-option.selected {
+  transform: scale(1.05);
+  z-index: 2;
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
+
+.processing-step {
+  font-size: 13px;
+  color: #409EFF;
+  font-weight: 500;
+  margin-top: 5px;
+  padding: 5px 10px;
+  background-color: #ecf5ff;
+  border-radius: 4px;
+  border-left: 3px solid #409EFF;
 }
 </style>

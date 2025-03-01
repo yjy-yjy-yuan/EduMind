@@ -215,10 +215,25 @@ def create_placeholder_preview(video):
         logger.error(f"创建占位文件预览图出错: {str(e)}")
         return False
 
-@celery.task(name='app.tasks.process_video', bind=True, max_retries=3)
-def process_video(self, video_id, language='zh', model='base'):
+@celery.task(bind=True, max_retries=3, retry_backoff=True, retry_backoff_max=240, retry_jitter=True)
+def process_video(self, video_id, language='zh', model='large'):
     """处理视频任务"""
     try:
+        # 导入faiss相关模块
+        import sys
+        import importlib
+        
+        # 尝试导入faiss模块
+        try:
+            import faiss
+            logger.info("🔍 FAISS模块已成功加载")
+        except ImportError:
+            logger.warning("⚠️ 未找到FAISS模块，QA功能将受限")
+        
+        # 设置任务ID
+        task_id = self.request.id
+        logger.info(f"🎬 开始处理视频 | ID: {video_id} | 语言: {language} | 模型: {model} | 任务ID: {task_id}")
+        
         logger.warning(f'🎬 开始处理视频 | ID: {video_id} | 语言: {language} | 模型: {model}')
         
         # 获取视频信息
@@ -227,8 +242,11 @@ def process_video(self, video_id, language='zh', model='base'):
             logger.error(f'❌ 视频不存在 | ID: {video_id}')
             return {'status': 'failed', 'message': '视频不存在'}
         
-        # 更新视频状态
+        # 更新视频状态和进度
         video.status = VideoStatus.PROCESSING
+        video.process_progress = 0.0
+        video.current_step = "初始化处理"
+        video.task_id = self.request.id
         db.session.commit()
         
         # 检查文件是否为占位文件（文本文件）
@@ -249,6 +267,10 @@ def process_video(self, video_id, language='zh', model='base'):
         # 如果是占位文件，创建一个默认预览图
         if is_placeholder:
             logger.warning(f'为占位文件创建默认预览图')
+            video.process_progress = 20.0
+            video.current_step = "处理占位文件"
+            db.session.commit()
+            
             if create_placeholder_preview(video):
                 # 更新视频状态
                 video.status = VideoStatus.COMPLETED
@@ -258,16 +280,25 @@ def process_video(self, video_id, language='zh', model='base'):
                 video.width = 640
                 video.height = 360
                 video.frame_count = 0
+                video.process_progress = 100.0
+                video.current_step = "完成"
                 db.session.commit()
                 
                 return {'status': 'success', 'message': '已创建占位文件预览图'}
             else:
                 video.status = VideoStatus.FAILED
+                video.process_progress = 0.0
+                video.current_step = "处理失败"
                 db.session.commit()
                 return {'status': 'failed', 'message': '创建占位文件预览图失败'}
         
         # 生成预览图
         try:
+            # 更新进度
+            video.process_progress = 10.0
+            video.current_step = "生成预览图"
+            db.session.commit()
+            
             # 确保预览图目录存在
             preview_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'previews')
             os.makedirs(preview_dir, exist_ok=True)
@@ -281,6 +312,8 @@ def process_video(self, video_id, language='zh', model='base'):
             if not cap.isOpened():
                 logger.error(f"无法打开视频文件: {video.filepath}")
                 video.status = VideoStatus.FAILED
+                video.process_progress = 0.0
+                video.current_step = "无法打开视频文件"
                 db.session.commit()
                 return {'status': 'failed', 'message': '无法打开视频文件'}
             
@@ -290,6 +323,8 @@ def process_video(self, video_id, language='zh', model='base'):
                 logger.error(f"无法读取视频帧: {video.filepath}")
                 cap.release()
                 video.status = VideoStatus.FAILED
+                video.process_progress = 0.0
+                video.current_step = "无法读取视频帧"
                 db.session.commit()
                 return {'status': 'failed', 'message': '无法读取视频帧'}
             
@@ -300,14 +335,23 @@ def process_video(self, video_id, language='zh', model='base'):
             # 更新视频记录
             video.preview_filename = preview_filename
             video.preview_filepath = preview_path
+            video.process_progress = 20.0
+            db.session.commit()
         except Exception as e:
             logger.error(f"生成预览图失败: {str(e)}")
             video.status = VideoStatus.FAILED
+            video.process_progress = 0.0
+            video.current_step = f"生成预览图失败: {str(e)}"
             db.session.commit()
             return {'status': 'failed', 'message': f'生成预览图失败: {str(e)}'}
         
         # 提取视频信息
         try:
+            # 更新进度
+            video.process_progress = 30.0
+            video.current_step = "提取视频信息"
+            db.session.commit()
+            
             # 获取视频信息
             video_info = generate_video_info(video.filepath)
             
@@ -318,20 +362,31 @@ def process_video(self, video_id, language='zh', model='base'):
                 video.fps = video_info['fps']
                 video.frame_count = video_info['frame_count']
                 video.duration = video_info['duration']
+                video.process_progress = 40.0
+                db.session.commit()
             else:
                 logger.error(f"获取视频信息失败: {video.filepath}")
                 video.status = VideoStatus.FAILED
+                video.process_progress = 0.0
+                video.current_step = "获取视频信息失败"
                 db.session.commit()
                 return {'status': 'failed', 'message': '获取视频信息失败'}
         except Exception as e:
             logger.error(f"提取视频信息失败: {str(e)}")
             video.status = VideoStatus.FAILED
+            video.process_progress = 0.0
+            video.current_step = f"提取视频信息失败: {str(e)}"
             db.session.commit()
             return {'status': 'failed', 'message': f'提取视频信息失败: {str(e)}'}
         
         # 处理字幕
         try:
             logger.info(f"🎙️ 准备转录视频 | 文件: {os.path.basename(video.filepath)}")
+            
+            # 更新进度
+            video.process_progress = 50.0
+            video.current_step = "准备转录视频"
+            db.session.commit()
             
             # 检查是否是占位文件，如果是则跳过字幕处理
             if not is_placeholder:
@@ -358,7 +413,7 @@ def process_video(self, video_id, language='zh', model='base'):
                 
                 # 调用whisper命令行工具进行转录
                 whisper_cmd = [
-                    "whisper", 
+                    "python", "-m", "whisper", 
                     video.filepath,
                     "--model", model,
                     "--language", language,
@@ -381,14 +436,71 @@ def process_video(self, video_id, language='zh', model='base'):
                 logger.info(f"📝 处理文件: {os.path.basename(video.filepath)}")
                 logger.debug(f"完整命令: {cmd_str}")  # 将完整命令移到debug级别
                 
-                result = subprocess.run(whisper_cmd, capture_output=True, text=True)
+                # 更新进度
+                video.process_progress = 60.0
+                video.current_step = "运行AI转录引擎"
+                db.session.commit()
                 
-                if result.returncode != 0:
-                    logger.error(f"❌ 转录失败: {result.stderr}")
+                # 启动子进程并实时监控输出
+                process = subprocess.Popen(
+                    whisper_cmd, 
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    bufsize=1,
+                    universal_newlines=True
+                )
+                
+                # 监控进度
+                for line in iter(process.stderr.readline, ''):
+                    # 解析进度信息
+                    if "%" in line:
+                        try:
+                            # 尝试从输出中提取进度百分比
+                            progress_parts = line.split('%')
+                            if len(progress_parts) > 1:
+                                progress_text = progress_parts[0].strip().split(' ')[-1]
+                                progress_value = float(progress_text)
+                                # 将whisper的进度(0-100)映射到整体进度的60%-90%
+                                overall_progress = 60.0 + (progress_value * 0.3)
+                                video.process_progress = min(90.0, overall_progress)
+                                video.current_step = f"转录中: {progress_value:.1f}%"
+                                db.session.commit()
+                                logger.debug(f"转录进度: {progress_value:.1f}%")
+                        except Exception as e:
+                            logger.debug(f"解析进度失败: {str(e)}, 行: {line}")
+                    
+                    # 检查是否包含处理步骤信息
+                    step_indicators = {
+                        "Detecting language": "检测语言",
+                        "Transcribing": "转录音频",
+                        "Loading model": "加载模型",
+                        "Processing": "处理音频"
+                    }
+                    
+                    for indicator, step_name in step_indicators.items():
+                        if indicator in line:
+                            video.current_step = step_name
+                            db.session.commit()
+                            logger.debug(f"当前步骤: {step_name}")
+                
+                # 等待进程完成
+                process.wait()
+                result = process.returncode
+                
+                # 更新进度
+                video.process_progress = 90.0
+                video.current_step = "转录完成，处理结果"
+                db.session.commit()
+                
+                if result != 0:
+                    stderr_output = process.stderr.read()
+                    logger.error(f"❌ 转录失败: {stderr_output}")
                     # 不要因为字幕失败而使整个处理失败，继续处理
                 else:
                     logger.info(f"✅ 转录完成 | 状态: 成功")
-                    logger.debug(f"转录输出: {result.stdout}")  # 详细输出移到debug级别
+                    stdout_output = process.stdout.read()
+                    logger.debug(f"转录输出: {stdout_output}")  # 详细输出移到debug级别
                     
                 # 检查生成的字幕文件是否存在
                 expected_srt = os.path.join(subtitle_dir, f"{base_filename}.srt")
@@ -409,14 +521,20 @@ def process_video(self, video_id, language='zh', model='base'):
                 db.session.commit()
             else:
                 logger.info(f"📝 占位文件，跳过字幕处理 | 文件: {os.path.basename(video.filepath)}")
+                video.process_progress = 90.0
+                db.session.commit()
                 
         except Exception as e:
             logger.error(f"❌ 处理字幕失败 | 错误: {str(e)}")
             # 不要因为字幕失败而使整个处理失败，继续处理
+            video.current_step = f"字幕处理出错，但继续完成其他步骤"
+            db.session.commit()
         
         # 更新视频状态
         video.status = VideoStatus.COMPLETED
         video.processed = True
+        video.process_progress = 100.0
+        video.current_step = "处理完成"
         db.session.commit()
         
         logger.info(f"✅ 视频处理完成 | ID: {video_id}")
@@ -430,6 +548,8 @@ def process_video(self, video_id, language='zh', model='base'):
             video = Video.query.get(video_id)
             if video:
                 video.status = VideoStatus.FAILED
+                video.process_progress = 0.0
+                video.current_step = f"处理失败: {str(e)}"
                 db.session.commit()
         except Exception as e2:
             logger.error(f"更新视频状态失败: {str(e2)}")

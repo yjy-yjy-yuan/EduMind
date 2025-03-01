@@ -50,6 +50,7 @@ IVS-Flask-Vue/
 
 - 其他依赖见 package.json(看下就好，不用太在意)
 
+
 ## 安装和运行
 
 ### 启动 Redis
@@ -67,7 +68,7 @@ cd IVS-Flask-Vue/backend
 conda create -n ivs python=3.10 -y
 conda activate ivs
 # 1. 安装 PyTorch（使用 CUDA 11.8）
-conda install pytorch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 pytorch-cuda=11.8 -c pytorch -c nvidia
+pip install torch==2.0.0 torchvision==0.15.1 torchaudio==2.0.1 --index-url https://download.pytorch.org/whl/cu118
 
 # 2. 安装 FAISS-GPU
 conda install -c conda-forge faiss-gpu=1.8.0 -y
@@ -77,9 +78,34 @@ pip install -r requirements.txt
 
 ```
 
+## 环境配置注意事项
+
+### 依赖版本兼容性
+在安装依赖时，请注意以下版本兼容性问题：
+
+1. **numpy版本**：必须使用1.23.5版本，更高版本可能导致与其他库的兼容性问题
+   ```bash
+   conda install numpy=1.23.5 -y
+   ```
+
+2. **scikit-learn版本**：推荐使用1.2.2版本以确保与numpy 1.23.5兼容
+   ```bash
+   conda install scikit-learn=1.2.2 -y
+   ```
+
+3. **FAISS模块**：如果安装FAISS失败，系统会自动降级使用备用搜索方法，但功能会受限
+
+### 常见问题解决
+如果遇到"numpy._core.multiarray failed to import"错误，请尝试以下步骤：
+1. 卸载当前numpy：`conda remove numpy -y`
+2. 安装指定版本：`conda install numpy=1.23.5 -y`
+3. 安装scikit-learn：`conda install scikit-learn=1.2.2 -y`
+
+
 ### 前端
 ```bash
 cd frontend
+npm install @vitejs/plugin-vue --save-dev
 npm install
 npm run serve
 ```
@@ -90,7 +116,7 @@ npm run serve
 # 1. 启动Celery Worker  
 conda activate ivs
 cd IVS-Flask-Vue/backend
-celery -A app.celery_app worker --loglevel=info -P solo
+python -m celery -A app.celery_app worker --loglevel=info -P solo
 
 # 2. 启动 Flask 后端 
 conda activate ivs
