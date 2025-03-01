@@ -215,16 +215,16 @@ def create_placeholder_preview(video):
         logger.error(f"创建占位文件预览图出错: {str(e)}")
         return False
 
-@celery.task(name='app.tasks.process_video')
-def process_video(video_id, language='zh', model='base'):
+@celery.task(name='app.tasks.process_video', bind=True, max_retries=3)
+def process_video(self, video_id, language='zh', model='base'):
     """处理视频任务"""
     try:
-        logger.warning(f'开始处理视频: {video_id}, 语言: {language}, 模型: {model}')
+        logger.warning(f'🎬 开始处理视频 | ID: {video_id} | 语言: {language} | 模型: {model}')
         
         # 获取视频信息
         video = Video.query.get(video_id)
         if not video:
-            logger.error(f'视频不存在: {video_id}')
+            logger.error(f'❌ 视频不存在 | ID: {video_id}')
             return {'status': 'failed', 'message': '视频不存在'}
         
         # 更新视频状态
@@ -331,10 +331,22 @@ def process_video(video_id, language='zh', model='base'):
         
         # 处理字幕
         try:
-            logger.info(f"开始处理视频字幕: {video_id}")
+            logger.info(f"🎙️ 准备转录视频 | 文件: {os.path.basename(video.filepath)}")
             
             # 检查是否是占位文件，如果是则跳过字幕处理
             if not is_placeholder:
+                # 检测CUDA是否可用
+                cuda_available = False
+                try:
+                    # 尝试执行一个简单的命令来检测CUDA是否可用
+                    check_cmd = ["python", "-c", "import torch; print(torch.cuda.is_available())"]
+                    result = subprocess.run(check_cmd, capture_output=True, text=True)
+                    cuda_available = "True" in result.stdout
+                    logger.info(f"CUDA检测结果: {result.stdout.strip()}")
+                except Exception as e:
+                    logger.warning(f"CUDA检测失败: {str(e)}")
+                    cuda_available = False
+                
                 # 创建字幕输出目录
                 subtitle_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'subtitles')
                 os.makedirs(subtitle_dir, exist_ok=True)
@@ -344,9 +356,6 @@ def process_video(video_id, language='zh', model='base'):
                 srt_filepath = os.path.join(subtitle_dir, f"{base_filename}.srt")
                 txt_filepath = os.path.join(subtitle_dir, f"{base_filename}.txt")
                 
-                # 使用whisper模型转录视频
-                logger.info(f"开始转录视频: {video.filepath}")
-                
                 # 调用whisper命令行工具进行转录
                 whisper_cmd = [
                     "whisper", 
@@ -354,40 +363,55 @@ def process_video(video_id, language='zh', model='base'):
                     "--model", model,
                     "--language", language,
                     "--output_dir", subtitle_dir,
-                    "--output_format", "all"  # 使用all生成所有格式，包括srt和txt
+                    "--output_format", "all",  # 使用all生成所有格式，包括srt和txt
                 ]
                 
-                logger.info(f"执行命令: {' '.join(whisper_cmd)}")
+                # 只有在CUDA可用时才添加CUDA设备参数
+                if cuda_available:
+                    whisper_cmd.extend(["--device", "cuda"])
+                else:
+                    # 如果CUDA不可用，但模型较大，给出警告
+                    large_models = ["large", "medium"]
+                    if model in large_models:
+                        logger.warning(f"⚠️ 注意: 正在使用较大的模型({model})但CUDA未启用，处理可能会很慢")
+                
+                # 格式化日志输出，使其更友好
+                cmd_str = ' '.join(whisper_cmd)
+                logger.info(f"🚀 启动AI转录引擎 | 模型: {model} | 语言: {language} | CUDA加速: {'已启用' if cuda_available else '未启用'}")
+                logger.info(f"📝 处理文件: {os.path.basename(video.filepath)}")
+                logger.debug(f"完整命令: {cmd_str}")  # 将完整命令移到debug级别
+                
                 result = subprocess.run(whisper_cmd, capture_output=True, text=True)
                 
                 if result.returncode != 0:
-                    logger.error(f"转录失败: {result.stderr}")
+                    logger.error(f"❌ 转录失败: {result.stderr}")
                     # 不要因为字幕失败而使整个处理失败，继续处理
                 else:
-                    logger.info(f"转录成功: {result.stdout}")
-                    # 更新视频记录 - 注意whisper生成的文件名可能与视频文件名不同
-                    # 检查生成的字幕文件是否存在
-                    expected_srt = os.path.join(subtitle_dir, f"{base_filename}.srt")
-                    if os.path.exists(expected_srt):
-                        video.subtitle_filepath = expected_srt
-                        logger.info(f"找到字幕文件: {expected_srt}")
-                    else:
-                        # 尝试查找任何生成的srt文件
-                        srt_files = [f for f in os.listdir(subtitle_dir) if f.endswith('.srt')]
-                        if srt_files:
-                            newest_srt = max([os.path.join(subtitle_dir, f) for f in srt_files], 
-                                           key=os.path.getctime)
-                            video.subtitle_filepath = newest_srt
-                            logger.info(f"使用最新生成的字幕文件: {newest_srt}")
-                        else:
-                            logger.warning(f"未找到生成的字幕文件")
+                    logger.info(f"✅ 转录完成 | 状态: 成功")
+                    logger.debug(f"转录输出: {result.stdout}")  # 详细输出移到debug级别
                     
-                    db.session.commit()
+                # 检查生成的字幕文件是否存在
+                expected_srt = os.path.join(subtitle_dir, f"{base_filename}.srt")
+                if os.path.exists(expected_srt):
+                    video.subtitle_filepath = expected_srt
+                    logger.info(f"📄 字幕文件已生成 | 文件: {os.path.basename(expected_srt)}")
+                else:
+                    # 尝试查找任何生成的srt文件
+                    srt_files = [f for f in os.listdir(subtitle_dir) if f.endswith('.srt')]
+                    if srt_files:
+                        newest_srt = max([os.path.join(subtitle_dir, f) for f in srt_files], 
+                                       key=os.path.getctime)
+                        video.subtitle_filepath = newest_srt
+                        logger.info(f"📄 字幕文件已生成 | 文件: {os.path.basename(newest_srt)}")
+                    else:
+                        logger.warning(f"⚠️ 未找到生成的字幕文件")
+                    
+                db.session.commit()
             else:
-                logger.info(f"占位文件，跳过字幕处理: {video.filepath}")
+                logger.info(f"📝 占位文件，跳过字幕处理 | 文件: {os.path.basename(video.filepath)}")
                 
         except Exception as e:
-            logger.error(f"处理字幕失败: {str(e)}")
+            logger.error(f"❌ 处理字幕失败 | 错误: {str(e)}")
             # 不要因为字幕失败而使整个处理失败，继续处理
         
         # 更新视频状态
@@ -395,10 +419,11 @@ def process_video(video_id, language='zh', model='base'):
         video.processed = True
         db.session.commit()
         
+        logger.info(f"✅ 视频处理完成 | ID: {video_id}")
         return {'status': 'success', 'message': '视频处理成功'}
         
     except Exception as e:
-        logger.error(f"处理视频失败: {str(e)}")
+        logger.error(f"❌ 处理视频失败 | 错误: {str(e)}")
         
         # 更新视频状态
         try:
@@ -408,6 +433,21 @@ def process_video(video_id, language='zh', model='base'):
                 db.session.commit()
         except Exception as e2:
             logger.error(f"更新视频状态失败: {str(e2)}")
+        
+        # 尝试重试任务
+        try:
+            # 如果是超时或特定错误，尝试重试
+            retry = False
+            if "timed out" in str(e).lower() or "memory" in str(e).lower() or "cuda" in str(e).lower():
+                retry = True
+            
+            if retry and self.request.retries < self.max_retries:
+                logger.warning(f"⚠️ 任务失败，准备重试 | 尝试: {self.request.retries + 1}/{self.max_retries} | ID: {video_id}")
+                # 指数退避策略：每次重试等待时间翻倍
+                countdown = 60 * (2 ** self.request.retries)  # 60秒, 120秒, 240秒
+                raise self.retry(exc=e, countdown=countdown)
+        except self.MaxRetriesExceededError:
+            logger.error(f"❌ 达到最大重试次数，任务失败 | ID: {video_id}")
         
         return {'status': 'failed', 'message': f'处理视频失败: {str(e)}'}
 
