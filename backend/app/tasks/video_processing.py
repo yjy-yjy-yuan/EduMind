@@ -407,20 +407,26 @@ def process_video(self, video_id, language='zh', model='large'):
             video.current_step = "准备转录视频"
             db.session.commit()
             
+            # 检测CUDA是否可用
+            cuda_available = False
+            try:
+                # 尝试执行一个简单的命令来检测CUDA是否可用
+                check_cmd = ["python", "-c", "import torch; print(torch.cuda.is_available())"]
+                result = subprocess.run(check_cmd, capture_output=True, text=True)
+                cuda_available = "True" in result.stdout
+                logger.info(f"CUDA检测结果: {cuda_available}")
+                
+                # 如果CUDA可用，尝试预热GPU
+                if cuda_available:
+                    logger.info("🔥 预热GPU以提高处理速度...")
+                    warm_cmd = ["python", "-c", "import torch; torch.cuda.init(); torch.cuda.empty_cache(); print('GPU预热完成')"]
+                    subprocess.run(warm_cmd, capture_output=True, text=True)
+            except Exception as e:
+                logger.warning(f"CUDA检测失败: {str(e)}")
+                cuda_available = False
+            
             # 检查是否是占位文件，如果是则跳过字幕处理
             if not is_placeholder:
-                # 检测CUDA是否可用
-                cuda_available = False
-                try:
-                    # 尝试执行一个简单的命令来检测CUDA是否可用
-                    check_cmd = ["python", "-c", "import torch; print(torch.cuda.is_available())"]
-                    result = subprocess.run(check_cmd, capture_output=True, text=True)
-                    cuda_available = "True" in result.stdout
-                    logger.info(f"CUDA检测结果: {result.stdout.strip()}")
-                except Exception as e:
-                    logger.warning(f"CUDA检测失败: {str(e)}")
-                    cuda_available = False
-                
                 # 创建字幕输出目录
                 subtitle_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'subtitles')
                 os.makedirs(subtitle_dir, exist_ok=True)
@@ -430,24 +436,99 @@ def process_video(self, video_id, language='zh', model='large'):
                 srt_filepath = os.path.join(subtitle_dir, f"{base_filename}.srt")
                 txt_filepath = os.path.join(subtitle_dir, f"{base_filename}.txt")
                 
+                # 预处理视频，提取音频以加快处理速度
+                try:
+                    logger.info("🔊 提取音频以加快处理速度...")
+                    audio_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'audio_temp')
+                    os.makedirs(audio_dir, exist_ok=True)
+                    audio_path = os.path.join(audio_dir, f"{base_filename}.wav")
+                    
+                    # 使用ffmpeg提取音频（单声道，16kHz采样率，优化为语音识别）
+                    ffmpeg_cmd = [
+                        "ffmpeg", "-y", "-i", video.filepath, 
+                        "-vn", "-acodec", "pcm_s16le", 
+                        "-ar", "16000", "-ac", "1", 
+                        audio_path
+                    ]
+                    
+                    # 执行ffmpeg命令
+                    subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+                    
+                    if os.path.exists(audio_path):
+                        logger.info(f"✅ 音频提取成功 | 文件: {os.path.basename(audio_path)}")
+                        # 使用提取的音频文件替代原视频文件进行转录
+                        input_file = audio_path
+                    else:
+                        logger.warning("⚠️ 音频提取失败，将使用原视频文件")
+                        input_file = video.filepath
+                except Exception as e:
+                    logger.warning(f"⚠️ 音频提取过程中出错: {str(e)}，将使用原视频文件")
+                    input_file = video.filepath
+                
                 # 调用whisper命令行工具进行转录
                 whisper_cmd = [
                     "python", "-m", "whisper", 
-                    video.filepath,
+                    input_file,  # 使用提取的音频文件或原视频文件
                     "--model", model,
                     "--language", language,
                     "--output_dir", subtitle_dir,
                     "--output_format", "all",  # 使用all生成所有格式，包括srt和txt
                 ]
                 
+                # 根据模型大小调整参数
+                model_size_map = {
+                    "tiny": {"beam_size": 2, "best_of": 2, "patience": 1.0},
+                    "base": {"beam_size": 2, "best_of": 2, "patience": 1.0},
+                    "small": {"beam_size": 3, "best_of": 3, "patience": 1.0},
+                    "medium": {"beam_size": 3, "best_of": 3, "patience": 1.0},
+                    "large": {"beam_size": 3, "best_of": 3, "patience": 1.0},
+                    "turbo": {"beam_size": 1, "best_of": 1, "patience": 0.8},  # turbo模型更快，使用更小的参数
+                }
+                
+                # 获取当前模型的参数配置
+                model_base = model.split('.')[0] if '.' in model else model  # 处理如small.en这样的模型名
+                model_params = model_size_map.get(model_base, {"beam_size": 3, "best_of": 3, "patience": 1.0})
+                
                 # 只有在CUDA可用时才添加CUDA设备参数
                 if cuda_available:
                     whisper_cmd.extend(["--device", "cuda"])
+                    # 添加FP16加速参数
+                    whisper_cmd.extend(["--fp16", "True"])
+                    # 增加线程数，提高CPU部分的处理速度
+                    whisper_cmd.extend(["--threads", "8"])
+                    # 添加beam_size参数，在保证质量的情况下提高速度
+                    whisper_cmd.extend(["--beam_size", str(model_params["beam_size"])])
+                    # 添加best_of参数，减少候选数量，加快处理速度
+                    whisper_cmd.extend(["--best_of", str(model_params["best_of"])])
+                    # 添加patience参数，优化beam search效率
+                    whisper_cmd.extend(["--patience", str(model_params["patience"])])
+                    # 添加length_penalty参数，优化长文本处理
+                    whisper_cmd.extend(["--length_penalty", "0.8"])
+                    # 添加temperature参数，使用较低的温度提高准确性和速度
+                    whisper_cmd.extend(["--temperature", "0.0"])
+                    # 添加no_speech_threshold参数，更好地处理静音段
+                    whisper_cmd.extend(["--no_speech_threshold", "0.6"])
+                    
+                    # 如果是大模型，给出性能提示
+                    large_models = ["large", "medium"]
+                    if model_base in large_models:
+                        logger.info(f"⚠️ 注意: 正在使用较大的模型({model})，即使有CUDA加速，处理也可能需要较长时间")
                 else:
                     # 如果CUDA不可用，但模型较大，给出警告
                     large_models = ["large", "medium"]
-                    if model in large_models:
+                    if model_base in large_models:
                         logger.warning(f"⚠️ 注意: 正在使用较大的模型({model})但CUDA未启用，处理可能会很慢")
+                    # 即使没有CUDA，也增加线程数提高CPU处理速度
+                    whisper_cmd.extend(["--threads", "8"])
+                    # 对于CPU处理，使用更小的beam_size和best_of以加快速度
+                    whisper_cmd.extend(["--beam_size", "1"])
+                    whisper_cmd.extend(["--best_of", "1"])
+                    # 添加patience参数，优化beam search效率
+                    whisper_cmd.extend(["--patience", "0.8"])
+                    # 添加temperature参数，使用较低的温度提高准确性和速度
+                    whisper_cmd.extend(["--temperature", "0.0"])
+                    # 添加no_speech_threshold参数，更好地处理静音段
+                    whisper_cmd.extend(["--no_speech_threshold", "0.6"])
                 
                 # 格式化日志输出，使其更友好
                 cmd_str = ' '.join(whisper_cmd)
@@ -533,18 +614,23 @@ def process_video(self, video_id, language='zh', model='large'):
                         logger.info(f"📄 字幕文件已生成 | 文件: {os.path.basename(newest_srt)}")
                     else:
                         logger.warning(f"⚠️ 未找到生成的字幕文件")
+                
+                # 清理临时音频文件
+                try:
+                    if 'audio_path' in locals() and os.path.exists(audio_path):
+                        os.remove(audio_path)
+                        logger.info(f"🧹 已清理临时音频文件: {os.path.basename(audio_path)}")
+                except Exception as e:
+                    logger.warning(f"⚠️ 清理临时文件失败: {str(e)}")
                     
                 db.session.commit()
             else:
                 logger.info(f"📝 占位文件，跳过字幕处理 | 文件: {os.path.basename(video.filepath)}")
                 video.process_progress = 90.0
                 db.session.commit()
-                
         except Exception as e:
-            logger.error(f"❌ 处理字幕失败 | 错误: {str(e)}")
+            logger.error(f"❌ 字幕处理失败: {str(e)}")
             # 不要因为字幕失败而使整个处理失败，继续处理
-            video.current_step = f"字幕处理出错，但继续完成其他步骤"
-            db.session.commit()
         
         # 更新视频状态
         video.status = VideoStatus.COMPLETED
