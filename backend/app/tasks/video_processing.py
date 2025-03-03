@@ -14,10 +14,15 @@ import time
 import logging
 import subprocess
 import numpy as np
+import whisper
+import torch
 from datetime import datetime
 from flask import current_app
 from ..extensions import db, celery
 from ..models.video import Video, VideoStatus
+from pydub import AudioSegment
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -150,37 +155,294 @@ def generate_preview(video_path):
         logger.error(f"生成预览图失败: {str(e)}")
         return None
 
-def process_subtitles(video, whisper_model="base", to_simplified=True):
-    """处理视频字幕"""
+def warm_up_gpu():
+    """预热GPU，提高首次转录速度"""
     try:
-        # 创建字幕输出目录
+        if torch.cuda.is_available():
+            # 执行一些小型矩阵运算来预热 GPU
+            x = torch.randn(100, 100).cuda()
+            torch.matmul(x, x)
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+            logger.info("GPU预热完成")
+    except Exception as e:
+        logger.warning(f"GPU预热失败: {str(e)}")
+
+def process_long_audio(audio_path, chunk_duration=600):
+    """处理长音频文件，将其分成小块并行处理"""
+    try:
+        audio = AudioSegment.from_wav(audio_path)
+        total_duration = len(audio)
+        chunks = []
+        
+        # 如果音频小于10分钟，直接返回原文件
+        if total_duration <= chunk_duration * 1000:
+            return [audio_path]
+            
+        # 分割音频
+        for i in range(0, total_duration, chunk_duration * 1000):
+            chunk = audio[i:i + chunk_duration * 1000]
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+                chunk.export(temp_file.name, format='wav')
+                chunks.append(temp_file.name)
+        
+        return chunks
+    except Exception as e:
+        logger.error(f"音频分块失败: {str(e)}")
+        return [audio_path]
+
+def get_whisper_params(model_name, language='zh'):
+    """获取针对不同模型优化的转录参数"""
+    # 语言代码映射
+    language_map = {
+        'zh': 'Chinese',
+        'ja': 'Japanese',
+        'ko': 'Korean',
+        'en': 'English',
+        'fr': 'French',
+        'de': 'German',
+        'es': 'Spanish',
+        'ru': 'Russian',
+        'it': 'Italian',
+        'pt': 'Portuguese',
+        'nl': 'Dutch',
+        'pl': 'Polish',
+        'tr': 'Turkish',
+        'ar': 'Arabic',
+        'hi': 'Hindi',
+        'th': 'Thai',
+        'vi': 'Vietnamese'
+    }
+    
+    # 获取完整的语言名称，如果不在映射表中，则使用原始代码
+    target_language = language_map.get(language.lower(), language)
+    
+    # 基础参数配置
+    base_params = {
+        'language': target_language,
+        'task': 'transcribe',
+        'temperature': 0.0,  # 使用确定性输出
+        'no_speech_threshold': 0.6,
+        'condition_on_previous_text': True,
+        'fp16': True,  # 使用半精度加速
+        'verbose': False
+    }
+    
+    # 为不同语言设置初始提示
+    prompts = {
+        'Chinese': '这是一个教育视频。',
+        'Japanese': 'これは教育ビデオです。',
+        'Korean': '이것은 교육 비디오입니다。',
+        'English': 'This is an educational video.',
+    }
+    base_params['initial_prompt'] = prompts.get(target_language, '')
+    
+    # 根据模型大小优化参数
+    if model_name in ['tiny', 'tiny.en', 'base', 'base.en', 'turbo']:
+        base_params.update({
+            'beam_size': 1,
+            'best_of': 1,
+            'patience': 1,
+            'compression_ratio_threshold': 2.4,
+            'logprob_threshold': -1.0,
+            'no_speech_threshold': 0.6
+        })
+    elif model_name in ['small', 'small.en']:
+        base_params.update({
+            'beam_size': 2,
+            'best_of': 2,
+            'patience': 1,
+            'compression_ratio_threshold': 2.4,
+            'logprob_threshold': -1.0
+        })
+    else:  # medium, large
+        base_params.update({
+            'beam_size': 5,
+            'best_of': 5,
+            'patience': 1,
+            'compression_ratio_threshold': 2.4,
+            'logprob_threshold': -1.0
+        })
+    
+    return base_params
+
+def transcribe_audio(audio_path, model_name="base", language="zh"):
+    """使用Whisper API转录音频"""
+    try:
+        # 设置设备
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        print(f"使用设备: {device}")
+        
+        # 加载模型
+        print(f"正在加载 Whisper 模型到 {device}...")
+        model = whisper.load_model(model_name, device=device)
+        
+        # 获取优化的参数
+        params = get_whisper_params(model_name, language)
+        
+        # 设置torch线程数和内存配置
+        torch.set_num_threads(8)
+        if torch.cuda.is_available():
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cudnn.deterministic = False  # 关闭确定性模式以提高性能
+            torch.cuda.empty_cache()  # 清理GPU缓存
+        
+        # 转录音频
+        print(f"开始使用 {device} 进行转录...")
+        result = model.transcribe(audio_path, **params)
+        
+        if not result or not isinstance(result, dict):
+            print("转录失败: 无效的结果格式")
+            return None
+        
+        # 验证结果格式
+        if 'text' not in result or 'segments' not in result:
+            print("转录失败: 缺少必要字段")
+            return None
+        
+        return result
+    except Exception as e:
+        logger.error(f"音频转录失败: {str(e)}")
+        return None
+
+def merge_transcriptions(chunks_results):
+    """合并多个转录结果"""
+    merged_result = {
+        'text': '',
+        'segments': []
+    }
+    
+    time_offset = 0
+    for result in chunks_results:
+        if not result:
+            continue
+            
+        merged_result['text'] += result['text'] + '\n'
+        
+        # 调整时间戳
+        for segment in result['segments']:
+            segment['start'] += time_offset
+            segment['end'] += time_offset
+            merged_result['segments'].append(segment)
+        
+        # 更新时间偏移
+        if result['segments']:
+            time_offset = result['segments'][-1]['end']
+    
+    return merged_result
+
+def process_video(self, video_id, language='zh', model='large'):
+    """处理视频任务"""
+    try:
+        # 设置任务ID
+        task_id = self.request.id
+        logger.info(f"🎬 开始处理视频 | ID: {video_id} | 语言: {language} | 模型: {model} | 任务ID: {task_id}")
+        
+        # 获取视频记录
+        video = Video.query.get(video_id)
+        if not video:
+            raise Exception(f"视频记录不存在: {video_id}")
+            
+        # 更新视频状态
+        video.status = VideoStatus.PROCESSING
+        video.task_id = task_id
+        db.session.commit()
+        
+        # 预热GPU
+        warm_up_gpu()
+        
+        # 提取音频
+        audio_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'audio')
+        os.makedirs(audio_dir, exist_ok=True)
+        audio_path = os.path.join(audio_dir, f"{os.path.splitext(video.filename)[0]}.wav")
+        
+        logger.info(f"📝 开始从视频提取音频 | 视频: {video.filename}")
+        
+        # 使用优化的ffmpeg参数提取音频
+        ffmpeg_cmd = [
+            "ffmpeg", "-y", "-i", video.filepath,
+            "-vn",  # 不处理视频
+            "-acodec", "pcm_s16le",  # 强制使用PCM 16-bit编码
+            "-ar", "16000",  # 采样率16kHz
+            "-ac", "1",  # 单声道
+            "-threads", "8",  # 使用8个线程
+            "-benchmark",  # 启用基准测试模式
+            audio_path
+        ]
+        
+        subprocess.run(ffmpeg_cmd, check=True)
+        logger.info(f"✅ 音频提取成功 | 音频文件: {os.path.basename(audio_path)}")
+        
+        # 处理长音频
+        audio_chunks = process_long_audio(audio_path)
+        
+        # 显示CUDA状态
+        cuda_status = "已启用" if torch.cuda.is_available() else "未启用"
+        logger.info(f"🚀 开始音频转录 | 模型: {model} | 语言: {language} | CUDA加速: {cuda_status}")
+        
+        # 并行处理音频块
+        chunks_results = []
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = []
+            for chunk_path in audio_chunks:
+                future = executor.submit(transcribe_audio, chunk_path, model, language)
+                futures.append(future)
+            
+            # 收集结果
+            for future in futures:
+                result = future.result()
+                if result:
+                    chunks_results.append(result)
+        
+        # 合并转录结果
+        if len(chunks_results) > 1:
+            result = merge_transcriptions(chunks_results)
+        else:
+            result = chunks_results[0] if chunks_results else None
+            
+        if not result:
+            raise Exception("转录失败")
+            
+        # 清理临时文件
+        for chunk_path in audio_chunks:
+            if chunk_path != audio_path:
+                try:
+                    os.remove(chunk_path)
+                except:
+                    pass
+        
+        # 保存字幕文件
         subtitle_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'subtitles')
         os.makedirs(subtitle_dir, exist_ok=True)
         
-        # 设置输出文件路径
         base_filename = os.path.splitext(video.filename)[0]
         srt_filepath = os.path.join(subtitle_dir, f"{base_filename}.srt")
-        txt_filepath = os.path.join(subtitle_dir, f"{base_filename}.txt")
         
-        # 初始化视频工具
-        video_tools = VideoTools(whisper_model=whisper_model)
-        
-        # 转录视频
-        result = video_tools.transcribe_video(video.filepath)
-        if not result:
-            raise Exception("视频转录失败")
-            
-        # 保存字幕文件
-        video_tools.save_subtitles(result, txt_filepath, srt_filepath, to_simplified)
+        # 生成SRT格式字幕
+        with open(srt_filepath, 'w', encoding='utf-8') as f:
+            for i, segment in enumerate(result['segments'], 1):
+                start = format_timestamp(segment['start'])
+                end = format_timestamp(segment['end'])
+                text = segment['text'].strip()
+                
+                f.write(f"{i}\n")
+                f.write(f"{start} --> {end}\n")
+                f.write(f"{text}\n\n")
         
         # 更新视频记录
         video.subtitle_filepath = srt_filepath
+        video.status = VideoStatus.COMPLETED
         db.session.commit()
         
+        logger.info(f"✅ 视频处理完成 | ID: {video_id}")
         return True
         
     except Exception as e:
-        logger.error(f"处理字幕失败: {str(e)}")
+        logger.error(f"❌ 视频处理失败: {str(e)}")
+        if video:
+            video.status = VideoStatus.FAILED
+            video.error_message = str(e)
+            db.session.commit()
         return False
 
 def create_placeholder_preview(video):
@@ -218,38 +480,6 @@ def create_placeholder_preview(video):
     except Exception as e:
         logger.error(f"创建占位文件预览图出错: {str(e)}")
         return False
-
-def get_whisper_params(model_name):
-    """获取针对不同模型优化的转录参数"""
-    base_params = {
-        'language': 'zh',
-        'temperature': 0.0,  # 使用确定性输出
-        'no_speech_threshold': 0.6,  # 更好地处理静音段
-        'condition_on_previous_text': True,  # 利用上下文提高准确性
-        'fp16': True  # 使用半精度加速
-    }
-    
-    # 根据模型大小调整参数
-    if model_name in ['tiny', 'tiny.en', 'base', 'base.en', 'turbo']:
-        base_params.update({
-            'beam_size': 1,
-            'best_of': 1,
-            'patience': 1.0
-        })
-    elif model_name in ['small', 'small.en']:
-        base_params.update({
-            'beam_size': 2,
-            'best_of': 2,
-            'patience': 1.5
-        })
-    else:  # medium, large
-        base_params.update({
-            'beam_size': 3,
-            'best_of': 3,
-            'patience': 2.0
-        })
-    
-    return base_params
 
 @celery.task(name='app.tasks.process_video', bind=True, max_retries=3, retry_backoff=True, retry_backoff_max=240, retry_jitter=True)
 def process_video(self, video_id, language='zh', model='large'):

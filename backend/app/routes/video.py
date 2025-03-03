@@ -28,6 +28,14 @@ ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv', 'webm'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def secure_filename_with_chinese(filename):
+    """安全的文件名处理，保留中文字符"""
+    # 替换不安全的字符为下划线，但保留中文字符
+    filename = re.sub(r'[<>:"/\\|?*]', '_', filename)
+    # 移除前后的点和空格
+    filename = filename.strip('. ')
+    return filename
+
 bp = Blueprint('video', __name__, url_prefix='/api/videos')  # 移除url_prefix，让app注册时处理
 
 @bp.before_request
@@ -76,14 +84,22 @@ def upload_video():
         if not os.path.exists(upload_folder):
             os.makedirs(upload_folder)
 
-        # 生成安全的文件名并保存文件
-        filename = secure_filename(file.filename)
+        # 获取原始文件名和扩展名
+        original_filename = file.filename
+        name, ext = os.path.splitext(original_filename)
+        
+        # 使用自定义函数处理文件名，保留中文字符
+        cleaned_name = secure_filename_with_chinese(name)
+        
+        # 添加local-前缀
+        title = f"local-{cleaned_name}"
+        filename = f"{title}{ext}"
         file_path = os.path.join(upload_folder, filename)
         
         # 如果文件已存在，添加时间戳
         if os.path.exists(file_path):
-            name, ext = os.path.splitext(filename)
-            filename = f"{name}_{int(datetime.now().timestamp())}{ext}"
+            title = f"{title}_{int(datetime.now().timestamp())}"
+            filename = f"{title}{ext}"
             file_path = os.path.join(upload_folder, filename)
         
         current_app.logger.info(f'保存文件: {file_path}')
@@ -93,8 +109,8 @@ def upload_video():
         video = Video(
             filename=filename,
             filepath=file_path,
-            title=os.path.splitext(filename)[0],  # 使用文件名作为标题
-            status=VideoStatus.UPLOADED  # 修改初始状态
+            title=title,  # 使用带有local-前缀的标题
+            status=VideoStatus.UPLOADED
         )
         
         # 检查是否存在对应的字幕文件
@@ -182,11 +198,11 @@ def upload_video_url():
             if bv_match:
                 video_id = bv_match.group(0)
                 current_app.logger.info(f'提取到BV号: {video_id}')
-                title = f'bilibili-{video_id}'
+                title = f'bilibili-{video_id}'  # 临时标题
             elif av_match:
                 video_id = av_match.group(0)
                 current_app.logger.info(f'提取到av号: {video_id}')
-                title = f'bilibili-{video_id}'
+                title = f'bilibili-{video_id}'  # 临时标题
             else:
                 current_app.logger.error(f'无法从URL中提取视频ID: {video_url}')
                 return jsonify({'error': '无效的B站视频链接'}), 400
@@ -204,7 +220,7 @@ def upload_video_url():
                 return jsonify({'error': '无效的YouTube视频链接'}), 400
                 
             current_app.logger.info(f'提取到YouTube视频ID: {video_id}')
-            title = f'youtube-{video_id}'
+            title = f'youtube-{video_id}'  # 临时标题
         elif is_mooc:
             # 提取慕课视频ID
             mooc_url = video_url
@@ -245,7 +261,7 @@ def upload_video_url():
         
         # 创建临时视频记录，状态为DOWNLOADING
         temp_video = Video(
-            title=title,
+            title=title,  # 使用临时标题
             url=video_url,
             status=VideoStatus.DOWNLOADING
         )
@@ -268,7 +284,7 @@ def upload_video_url():
             # 通用的下载配置
             common_opts = {
                 'merge_output_format': 'mp4',
-                'outtmpl': os.path.join(download_folder, f'{title}.%(ext)s'),
+                'outtmpl': os.path.join(download_folder, '%(title)s.%(ext)s'),  # 使用视频原标题
                 'quiet': True,
                 'no_warnings': True,
             }
@@ -316,7 +332,7 @@ def upload_video_url():
                 # 使用自定义方法下载慕课视频
                 success, message = download_mooc_video(
                     video_url, 
-                    os.path.join(download_folder, f'{title}.mp4'), 
+                    os.path.join(download_folder, f"{title}.mp4"), 
                     course_id, 
                     tid, 
                     detail_id, 
@@ -338,33 +354,43 @@ def upload_video_url():
                         current_app.logger.info(f'YouTube视频下载可能需要较长时间，已设置更长的超时时间')
                         ydl.params['socket_timeout'] = 180  # 设置更长的超时时间，3分钟
                     
-                    info = ydl.extract_info(video_url, download=True)
-                    video_title = info.get('title', title)
-                    filename = f"{title}.mp4"
-                    filepath = os.path.join(download_folder, filename)
-            
-            # 确保文件存在
-            if not os.path.exists(filepath):
-                # 尝试查找实际下载的文件
-                potential_files = [f for f in os.listdir(download_folder) if f.startswith(title)]
-                if potential_files:
-                    filename = potential_files[0]
-                    filepath = os.path.join(download_folder, filename)
-            
-            if not os.path.exists(filepath):
-                current_app.logger.error(f'无法找到下载的视频文件: {filepath}')
-                # 更新临时视频记录状态为失败
-                temp_video.status = VideoStatus.FAILED
-                temp_video.error_message = "无法找到下载的视频文件"
-                db.session.commit()
-                raise FileNotFoundError(f"无法找到下载的视频文件")
-            
-            current_app.logger.info(f'视频下载成功: {filepath}')
+                    try:
+                        # 先获取视频信息
+                        info = ydl.extract_info(video_url, download=False)
+                        video_title = info.get('title', '未知标题')
+                        # 清理标题中的特殊字符，但保留中文字符
+                        video_title = secure_filename_with_chinese(video_title)
+                        # 根据来源添加前缀
+                        prefix = 'bilibili-' if is_bilibili else 'youtube-'
+                        title = f"{prefix}{video_title}"
+                        
+                        # 更新下载配置中的输出模板
+                        ydl_opts['outtmpl'] = os.path.join(download_folder, f'{title}.%(ext)s')
+                        
+                        # 使用新的配置下载视频
+                        with yt_dlp.YoutubeDL(ydl_opts) as ydl2:
+                            ydl2.download([video_url])
+                        
+                        # 设置文件路径
+                        filename = f"{title}.mp4"
+                        filepath = os.path.join(download_folder, filename)
+                        
+                        # 检查文件是否存在
+                        if not os.path.exists(filepath):
+                            current_app.logger.error(f'下载的视频文件不存在: {filepath}')
+                            raise FileNotFoundError(f"下载的视频文件不存在: {filepath}")
+                        
+                        current_app.logger.info(f'视频下载成功: {filepath}')
+                        
+                    except Exception as e:
+                        current_app.logger.error(f'下载视频时出错: {str(e)}')
+                        raise
             
             # 更新临时视频记录
             temp_video.filename = filename
             temp_video.filepath = filepath
-            temp_video.status = VideoStatus.UPLOADED  # 修改为UPLOADED状态，不自动处理
+            temp_video.title = title
+            temp_video.status = VideoStatus.UPLOADED
             db.session.commit()
             current_app.logger.info(f'视频记录更新成功: {temp_video.id}, 状态: {temp_video.status}')
             
@@ -376,8 +402,14 @@ def upload_video_url():
             
         except Exception as e:
             current_app.logger.error(f"下载视频失败: {str(e)}")
-            import traceback
             current_app.logger.error(f"详细错误信息: {traceback.format_exc()}")
+            
+            # 更新视频状态为失败
+            if temp_video:
+                temp_video.status = VideoStatus.FAILED
+                temp_video.error_message = str(e)
+                db.session.commit()
+            
             return jsonify({'error': f'下载视频失败: {str(e)}'}), 500
         
     except Exception as e:
