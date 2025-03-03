@@ -1,4 +1,11 @@
 import os
+import traceback
+from flask import Blueprint, request, jsonify, current_app, send_file, make_response, Response
+from ..models.video import Video
+
+bp = Blueprint('video', __name__, url_prefix='/api/videos')
+
+import os
 import re
 import json
 import uuid
@@ -9,7 +16,7 @@ import subprocess
 import traceback
 import requests
 from datetime import datetime
-from flask import Blueprint, request, jsonify, current_app, send_from_directory, send_file, make_response
+from flask import Blueprint, request, jsonify, current_app, send_from_directory, send_file, make_response, Response
 from werkzeug.utils import secure_filename
 import yt_dlp
 from ..models.video import Video, VideoStatus
@@ -48,7 +55,6 @@ def upload_video():
     if request.method == 'OPTIONS':
         response = make_response()
         response.status_code = 200
-        # 不再手动添加CORS头，由全局after_request处理
         return response
         
     try:
@@ -90,6 +96,19 @@ def upload_video():
             title=os.path.splitext(filename)[0],  # 使用文件名作为标题
             status=VideoStatus.UPLOADED  # 修改初始状态
         )
+        
+        # 检查是否存在对应的字幕文件
+        subtitle_path = None
+        possible_subtitle_files = [
+            os.path.join(current_app.config['SUBTITLE_FOLDER'], f"{filename}.srt"),
+            os.path.join(current_app.config['SUBTITLE_FOLDER'], f"{os.path.splitext(filename)[0]}.srt")
+        ]
+        
+        for path in possible_subtitle_files:
+            if os.path.exists(path):
+                subtitle_path = os.path.basename(path)
+                break
+        
         db.session.add(video)
         db.session.commit()
         
@@ -429,13 +448,39 @@ def get_status(task_id):
 
 @bp.route('/<int:video_id>', methods=['GET'])
 def get_video(video_id):
-    video = Video.query.get_or_404(video_id)
-    return jsonify({
-        'id': video.id,
-        'title': video.title,
-        'status': video.status.value,
-        'created_at': video.created_at.isoformat()
-    })
+    try:
+        video = Video.query.get_or_404(video_id)
+        
+        # 检查是否存在字幕文件
+        subtitle_path = None
+        possible_subtitle_files = [
+            os.path.join(current_app.config['SUBTITLE_FOLDER'], f"{video.filename}.srt"),
+            os.path.join(current_app.config['SUBTITLE_FOLDER'], f"{os.path.splitext(video.filename)[0]}.srt")
+        ]
+        
+        for path in possible_subtitle_files:
+            if os.path.exists(path):
+                subtitle_path = os.path.basename(path)
+                break
+        
+        return jsonify({
+            'id': video.id,
+            'title': video.title,
+            'filename': video.filename,
+            'status': video.status.value,
+            'upload_time': video.upload_time.isoformat() if video.upload_time else None,
+            'duration': video.duration,
+            'fps': video.fps,
+            'width': video.width,
+            'height': video.height,
+            'frame_count': video.frame_count,
+            'preview_filename': video.preview_filename,
+            'error_message': video.error_message,
+            'subtitle_filepath': subtitle_path
+        })
+    except Exception as e:
+        current_app.logger.error(f"获取视频信息失败: {str(e)}")
+        return jsonify({'error': f'获取视频信息失败: {str(e)}'}), 500
 
 @bp.route('/<int:video_id>/preview', methods=['GET'])
 def get_video_preview_file(video_id):
@@ -527,7 +572,6 @@ def process_video_route(video_id):
     if request.method == 'OPTIONS':
         response = make_response()
         response.status_code = 200
-        # 不再手动添加CORS头，由全局after_request处理
         return response
     
     try:
@@ -576,22 +620,15 @@ def process_video_route(video_id):
             'message': f'处理视频失败: {str(e)}'
         }), 500
 
-@bp.route('/<int:video_id>/preview', methods=['GET'])
-def get_video_preview(video_id):
-    """获取视频预览图"""
-    try:
-        video = Video.query.get_or_404(video_id)
-        if not video.preview_filepath or not os.path.exists(video.preview_filepath):
-            return jsonify({'error': '预览图不存在'}), 404
-            
-        return send_file(video.preview_filepath, mimetype='image/jpeg')
-    except Exception as e:
-        current_app.logger.error(f"获取视频预览图失败: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@bp.route('/<int:video_id>/delete', methods=['DELETE'])
+@bp.route('/<int:video_id>/delete', methods=['DELETE', 'OPTIONS'])
 def delete_video(video_id):
     """删除视频"""
+    # 处理 OPTIONS 请求
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Methods', 'DELETE')
+        return response
+        
     try:
         video = Video.query.get_or_404(video_id)
         
@@ -612,163 +649,167 @@ def delete_video(video_id):
         current_app.logger.error(f"删除视频失败: {str(e)}")
         return jsonify({'error': '删除视频失败'}), 500
 
-@bp.route('/list', methods=['GET'])
-def get_video_list_new():
-    """获取视频列表"""
-    try:
-        videos = Video.query.order_by(Video.upload_time.desc()).all()
-        return jsonify([video.to_dict() for video in videos])
-    except Exception as e:
-        current_app.logger.error(f"获取视频列表失败: {str(e)}")
-        return jsonify({"error": "获取视频列表失败"}), 500
-
-@bp.route('/upload', methods=['POST'])
-def upload_video_new():
-    """上传视频文件"""
-    try:
-        # 检查是否有文件被上传
-        if 'file' not in request.files:
-            return jsonify({"error": "没有文件被上传"}), 400
-            
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({"error": "没有选择文件"}), 400
-            
-        # 确保文件名安全
-        filename = secure_filename(file.filename)
-        
-        # 确保上传目录存在
-        upload_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'uploads')
-        os.makedirs(upload_dir, exist_ok=True)
-        
-        # 保存文件
-        filepath = os.path.join(upload_dir, filename)
-        file.save(filepath)
-        
-        # 创建视频记录
-        video = Video(
-            filename=filename,
-            filepath=filepath,
-            status=VideoStatus.UPLOADED,
-            upload_time=datetime.utcnow()
-        )
-        db.session.add(video)
-        db.session.commit()
-        
-        return jsonify(video.to_dict()), 200
-        
-    except Exception as e:
-        current_app.logger.error(f"上传视频失败: {str(e)}")
-        return jsonify({"error": "上传视频失败"}), 500
-
-@bp.route('/<int:video_id>/process', methods=['POST'])
-def process_video_route_new(video_id):
-    """处理视频"""
-    try:
-        video = Video.query.get_or_404(video_id)
-        
-        # 只有UPLOADED状态的视频可以处理
-        if video.status not in [VideoStatus.UPLOADED, VideoStatus.PENDING, VideoStatus.FAILED, VideoStatus.COMPLETED, VideoStatus.READY]:
-            return jsonify({
-                "error": "视频状态不正确",
-                "status": video.status.value
-            }), 400
-            
-        # 获取请求数据
-        data = request.get_json() or {}
-        language = data.get('language', 'Other')
-        model = data.get('model', 'turbo')
-        
-        # 根据语言选择设置whisper参数
-        whisper_language = 'en' if language == 'English' else 'zh'
-        whisper_model = model
-            
-        # 更新状态为处理中
-        video.status = VideoStatus.PENDING
-        db.session.commit()
-        
-        # 启动异步处理任务
-        from ..tasks.video_processing import process_video
-        process_video.delay(video_id, whisper_language, whisper_model)
-        
-        return jsonify({"message": "视频处理已开始"}), 200
-        
-    except Exception as e:
-        current_app.logger.error(f"处理视频失败: {str(e)}")
-        return jsonify({"error": "处理视频失败"}), 500
-
-@bp.route('/<int:video_id>/preview', methods=['GET'])
-def get_preview(video_id):
-    """获取视频预览图"""
-    try:
-        video = Video.query.get_or_404(video_id)
-        
-        if not video.preview_filepath or not os.path.exists(video.preview_filepath):
-            return jsonify({"error": "预览图不存在"}), 404
-            
-        return send_file(video.preview_filepath, mimetype='image/jpeg')
-        
-    except Exception as e:
-        current_app.logger.error(f"获取预览图失败: {str(e)}")
-        return jsonify({"error": "获取预览图失败"}), 500
-
-@bp.route('/<int:video_id>', methods=['DELETE'])
-def delete_video_new(video_id):
-    """删除视频"""
-    try:
-        video = Video.query.get_or_404(video_id)
-        
-        # 删除文件
-        if video.filepath and os.path.exists(video.filepath):
-            os.remove(video.filepath)
-        if video.preview_filepath and os.path.exists(video.preview_filepath):
-            os.remove(video.preview_filepath)
-            
-        # 删除数据库记录
-        db.session.delete(video)
-        db.session.commit()
-        
-        return jsonify({"message": "视频已删除"}), 200
-        
-    except Exception as e:
-        current_app.logger.error(f"删除视频失败: {str(e)}")
-        return jsonify({"error": "删除视频失败"}), 500
-
-@bp.route('/<int:video_id>/stream', methods=['GET'])
-def stream_video(video_id):
+@bp.route('/<int:video_id>/stream', methods=['GET', 'OPTIONS'])
+def get_video_stream(video_id):
     """流式传输视频"""
+    current_app.logger.info(f'收到视频流请求: video_id={video_id}')
+    current_app.logger.info(f'请求头: {dict(request.headers)}')
+    
     try:
         video = Video.query.get_or_404(video_id)
-        return send_file(video.filepath,
-                        mimetype='video/mp4',
-                        as_attachment=False)
+        current_app.logger.info(f'找到视频记录: {video.filename}')
+        
+        # 检查文件是否存在
+        if not os.path.exists(video.filepath):
+            current_app.logger.error(f'视频文件不存在: {video.filepath}')
+            return jsonify({'error': '视频文件不存在'}), 404
+        
+        # 获取文件大小
+        file_size = os.path.getsize(video.filepath)
+        current_app.logger.info(f'视频文件大小: {file_size} 字节')
+        
+        # 获取Range头
+        range_header = request.headers.get('Range')
+        current_app.logger.info(f'Range头: {range_header}')
+        
+        # 设置基础响应头
+        headers = {
+            'Accept-Ranges': 'bytes',
+            'Content-Type': 'video/mp4',
+            'Access-Control-Allow-Origin': request.headers.get('Origin', '*'),
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Range',
+            'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+        }
+        
+        if range_header:
+            try:
+                # 解析Range头
+                bytes_range = range_header.replace('bytes=', '').split('-')
+                start = int(bytes_range[0]) if bytes_range[0] else 0
+                end = int(bytes_range[1]) if bytes_range[1] else file_size - 1
+                
+                if start >= file_size:
+                    current_app.logger.error(f'请求的范围无效: start={start}, file_size={file_size}')
+                    return jsonify({'error': '请求的范围无效'}), 416
+                
+                # 确保end不超过文件大小
+                end = min(end, file_size - 1)
+                chunk_size = end - start + 1
+                
+                current_app.logger.info(f'处理范围请求: bytes {start}-{end}/{file_size}')
+                
+                headers['Content-Range'] = f'bytes {start}-{end}/{file_size}'
+                headers['Content-Length'] = str(chunk_size)
+                
+                def generate():
+                    with open(video.filepath, 'rb') as f:
+                        f.seek(start)
+                        remaining = chunk_size
+                        buffer_size = min(8192, remaining)  # 8KB chunks
+                        
+                        while remaining:
+                            if remaining < buffer_size:
+                                buffer_size = remaining
+                            data = f.read(buffer_size)
+                            if not data:
+                                break
+                            remaining -= len(data)
+                            yield data
+                
+                return Response(
+                    generate(),
+                    206,
+                    headers=headers,
+                    direct_passthrough=True
+                )
+                
+            except (IndexError, ValueError) as e:
+                current_app.logger.error(f'解析Range头失败: {str(e)}')
+                return jsonify({'error': '无效的Range头'}), 400
+        
+        # 如果没有Range头，返回整个文件
+        current_app.logger.info('返回完整文件')
+        return send_file(
+            video.filepath,
+            mimetype='video/mp4',
+            as_attachment=False,
+            conditional=True,
+            etag=True,
+            last_modified=True
+        )
+        
     except Exception as e:
-        current_app.logger.error(f"流式传输视频失败: {str(e)}")
+        current_app.logger.error(f"视频流传输失败: {str(e)}")
+        current_app.logger.error(traceback.format_exc())
         return jsonify({
-            'status': 'error',
+            'error': '视频流传输失败',
             'message': str(e)
         }), 500
 
 @bp.route('/<int:video_id>/subtitle', methods=['GET'])
 def get_subtitle(video_id):
-    """获取字幕文件"""
     try:
+        # 获取请求的格式参数
+        format_type = request.args.get('format', 'srt')
+        current_app.logger.info(f'请求的字幕格式: {format_type}')
+        
+        # 获取视频信息
         video = Video.query.get_or_404(video_id)
-        if not video.subtitle_filepath or not os.path.exists(video.subtitle_filepath):
-            return jsonify({
-                'status': 'error',
-                'message': '字幕文件不存在'
-            }), 404
+        current_app.logger.info(f'获取视频信息: ID={video.id}, 文件名={video.filename}')
+        
+        # 处理文件名
+        filename = os.path.splitext(video.filename)[0]
+        current_app.logger.info(f'处理后的文件名: {filename}')
+        
+        # 构建可能的字幕文件路径
+        possible_subtitle_files = [
+            os.path.join(current_app.config['SUBTITLE_FOLDER'], f"{video.filename}.srt"),
+            os.path.join(current_app.config['SUBTITLE_FOLDER'], f"{filename}.srt")
+        ]
+        current_app.logger.info(f'可能的字幕文件路径: {possible_subtitle_files}')
+        
+        # 检查字幕文件夹是否存在
+        subtitle_folder = current_app.config['SUBTITLE_FOLDER']
+        current_app.logger.info(f'字幕文件夹路径: {subtitle_folder}')
+        
+        subtitle_path = None
+        for path in possible_subtitle_files:
+            current_app.logger.info(f'检查文件: {path}')
+            if os.path.exists(path):
+                subtitle_path = path
+                current_app.logger.info(f'找到字幕文件: {path}')
+                break
+        
+        if not subtitle_path:
+            return jsonify({'error': '字幕文件不存在'}), 404
             
-        return send_file(video.subtitle_filepath,
-                        mimetype='text/plain',
-                        as_attachment=False)
+        current_app.logger.info(f'读取字幕文件: {subtitle_path}')
+        with open(subtitle_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        # 如果请求VTT格式，转换SRT为VTT
+        if format_type.lower() == 'vtt':
+            current_app.logger.info('转换为VTT格式')
+            vtt_content = 'WEBVTT\n\n' + content.replace(',', '.')
+            response = make_response(vtt_content)
+            response.headers['Content-Type'] = 'text/vtt; charset=utf-8'
+        else:
+            current_app.logger.info('返回SRT格式')
+            response = make_response(content)
+            response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+            
+        # 如果是下载请求，添加Content-Disposition头
+        if request.args.get('download') == 'true':
+            response.headers['Content-Disposition'] = f'attachment; filename={filename}.{format_type}'
+        
+        return response
+        
     except Exception as e:
-        current_app.logger.error(f"获取字幕文件失败: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
+        current_app.logger.error(f"获取字幕失败: {str(e)}")
+        return jsonify({'error': f'获取字幕失败: {str(e)}'}), 500
 
 @bp.route('/<int:video_id>', methods=['GET'])
 def get_video_detail(video_id):

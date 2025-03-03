@@ -55,7 +55,7 @@ export default createStore({
     async getVideoDetails({ commit }, videoId) {
       try {
         commit('setLoading', true)
-        const { data } = await videoApi.getVideoDetails(videoId)
+        const { data } = await videoApi.getVideo(videoId)
         commit('setCurrentVideo', data)
         return data
       } catch (error) {

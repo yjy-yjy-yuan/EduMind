@@ -293,10 +293,17 @@ const handlePlay = () => {
 onMounted(async () => {
   const videoId = route.params.id
   try {
+    loading.value = true
     await store.dispatch('getVideoDetails', videoId)
-    await store.dispatch('getSubtitles', videoId)
+    
+    // 如果视频已处理完成，加载字幕
+    if (currentVideo.value?.status === 'completed') {
+      await store.dispatch('getSubtitles', videoId)
+    }
   } catch (error) {
-    ElMessage.error('加载视频信息失败')
+    ElMessage.error('加载视频信息失败：' + error.message)
+  } finally {
+    loading.value = false
   }
 })
 </script>

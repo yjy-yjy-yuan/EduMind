@@ -219,38 +219,42 @@ def create_placeholder_preview(video):
         logger.error(f"创建占位文件预览图出错: {str(e)}")
         return False
 
+def get_whisper_params(model_name):
+    """获取针对不同模型优化的转录参数"""
+    base_params = {
+        'language': 'zh',
+        'temperature': 0.0,  # 使用确定性输出
+        'no_speech_threshold': 0.6,  # 更好地处理静音段
+        'condition_on_previous_text': True,  # 利用上下文提高准确性
+        'fp16': True  # 使用半精度加速
+    }
+    
+    # 根据模型大小调整参数
+    if model_name in ['tiny', 'tiny.en', 'base', 'base.en', 'turbo']:
+        base_params.update({
+            'beam_size': 1,
+            'best_of': 1,
+            'patience': 1.0
+        })
+    elif model_name in ['small', 'small.en']:
+        base_params.update({
+            'beam_size': 2,
+            'best_of': 2,
+            'patience': 1.5
+        })
+    else:  # medium, large
+        base_params.update({
+            'beam_size': 3,
+            'best_of': 3,
+            'patience': 2.0
+        })
+    
+    return base_params
+
 @celery.task(name='app.tasks.process_video', bind=True, max_retries=3, retry_backoff=True, retry_backoff_max=240, retry_jitter=True)
 def process_video(self, video_id, language='zh', model='large'):
     """处理视频任务"""
-    import os  # 确保os模块导入
     try:
-        # 导入faiss相关模块
-        import sys
-        import importlib
-        
-        # 记录Python版本和环境信息
-        python_version = sys.version
-        logger.info(f"🐍 Python版本: {python_version}")
-        
-        # 尝试导入faiss模块
-        try:
-            import faiss
-            logger.info("🔍 FAISS模块已成功加载")
-        except ImportError as e:
-            logger.warning(f"⚠️ 未找到FAISS模块，QA功能将受限: {str(e)}")
-            
-            # 尝试查找可能的faiss安装位置
-            try:
-                for path in sys.path:
-                    if 'site-packages' in path or 'dist-packages' in path:
-                        import os
-                        packages = os.listdir(path)
-                        faiss_related = [p for p in packages if 'faiss' in p.lower()]
-                        if faiss_related:
-                            logger.info(f"💡 发现可能的FAISS相关包: {faiss_related}")
-            except Exception as e:
-                logger.error(f"❌ 查找FAISS包时出错: {str(e)}")
-        
         # 设置任务ID
         task_id = self.request.id
         logger.info(f"🎬 开始处理视频 | ID: {video_id} | 语言: {language} | 模型: {model} | 任务ID: {task_id}")
@@ -448,11 +452,13 @@ def process_video(self, video_id, language='zh', model='large'):
                         "ffmpeg", "-y", "-i", video.filepath, 
                         "-vn", "-acodec", "pcm_s16le", 
                         "-ar", "16000", "-ac", "1", 
+                        "-threads", "8",  # 使用8个线程
+                        "-benchmark",  # 启用基准测试模式
                         audio_path
                     ]
                     
                     # 执行ffmpeg命令
-                    subprocess.run(ffmpeg_cmd, capture_output=True, text=True)
+                    subprocess.run(ffmpeg_cmd, check=True)
                     
                     if os.path.exists(audio_path):
                         logger.info(f"✅ 音频提取成功 | 文件: {os.path.basename(audio_path)}")

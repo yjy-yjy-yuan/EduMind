@@ -122,8 +122,15 @@
             {{ formatDate(scope.row.upload_time) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150">
+        <el-table-column label="操作" width="200">
           <template #default="scope">
+            <el-button 
+              :icon="VideoPlay"
+              circle
+              @click="handlePlay(scope.row)"
+              :disabled="!['completed'].includes(scope.row.status)"
+              title="播放视频"
+            />
             <el-button 
               :icon="VideoCamera"
               circle
@@ -148,9 +155,11 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { 
   UploadFilled, 
   VideoCamera,
+  VideoPlay,
   Delete, 
   Refresh 
 } from '@element-plus/icons-vue'
@@ -159,7 +168,7 @@ import {
   uploadVideoUrl, 
   getVideoList, 
   processVideo,
-  getVideoPreviewImage,
+  getVideoPreview,
   deleteVideo,
   getVideoStatus,
   getVideo
@@ -1066,7 +1075,8 @@ const formatDuration = (seconds) => {
 // 获取预览图URL
 const getPreviewUrl = (video) => {
   if (!video.preview_filename) return ''
-  return `http://localhost:5000/api/videos/${video.id}/preview`
+  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+  return `${baseURL}/api/videos/${video.id}/preview`
 }
 
 // 处理表格多选事件
@@ -1074,6 +1084,17 @@ const handleSelectionChange = (selection) => {
   selectedVideos.value = selection
   console.log('选中的视频:', selectedVideos.value)
 }
+
+// 播放视频
+const handlePlay = (video) => {
+  if (video.status !== 'completed') {
+    ElMessage.warning('该视频尚未处理完成，无法播放')
+    return
+  }
+  router.push(`/player/${video.id}`)
+}
+
+const router = useRouter()
 
 onMounted(() => {
   refreshList()

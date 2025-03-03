@@ -1,5 +1,8 @@
 <template>
   <div id="app">
+    <!-- 导航菜单 -->
+    <Navigation />
+
     <!-- 全局加载状态 -->
     <el-loading
       v-if="$store.state.loading"
@@ -18,14 +21,14 @@
     ></el-alert>
 
     <!-- 路由视图 -->
-    <router-view></router-view>
+    <div class="main-content">
+      <router-view></router-view>
+    </div>
   </div>
 </template>
 
-<script>
-export default {
-  name: 'App'
-}
+<script setup>
+import Navigation from './components/Navigation.vue'
 </script>
 
 <style>
@@ -35,6 +38,10 @@ export default {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #2c3e50;
+}
+
+.main-content {
+  padding: 0 20px;
 }
 
 .global-error {
