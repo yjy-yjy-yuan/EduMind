@@ -69,8 +69,55 @@
           </div>
         </div>
       </div>
-      <div class="qa-section">
-        <h3>智能问答</h3>
+      <div 
+        v-if="isQaExpanded" 
+        class="qa-section qa-expanded"
+        ref="qaDialog"
+        :style="{ left: dialogPosition.x + 'px', top: dialogPosition.y + 'px' }"
+        @mousedown="startDrag"
+      >
+        <div class="qa-header" @mousedown.stop="startDrag">
+          <h3>智能问答</h3>
+          <el-button 
+            type="text" 
+            @click="toggleQaExpansion"
+            :icon="Close"
+          >
+            收起
+          </el-button>
+        </div>
+        <div class="qa-content">
+          <div class="qa-input">
+            <el-input v-model="question" placeholder="请输入问题" type="textarea" />
+            <el-button type="primary" @click="askQuestion" :loading="isAsking">提问</el-button>
+          </div>
+          <div class="qa-history">
+            <ul>
+              <li v-for="(item, index) in qaHistory" :key="index" class="qa-item">
+                <div class="question">
+                  <el-icon class="qa-icon"><QuestionFilled /></el-icon>
+                  <span class="qa-text">{{ item.question }}</span>
+                </div>
+                <div class="answer">
+                  <el-icon class="qa-icon"><ChatLineSquare /></el-icon>
+                  <span class="qa-text">{{ item.answer }}</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div v-else class="qa-section">
+        <div class="qa-header">
+          <h3>智能问答</h3>
+          <el-button 
+            type="text" 
+            @click="toggleQaExpansion"
+            :icon="FullScreen"
+          >
+            展开
+          </el-button>
+        </div>
         <div class="qa-content">
           <div class="qa-input">
             <el-input v-model="question" placeholder="请输入问题" type="textarea" />
@@ -132,7 +179,7 @@
 import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Loading, Warning, QuestionFilled, ChatLineSquare } from '@element-plus/icons-vue'
+import { Loading, Warning, QuestionFilled, ChatLineSquare, FullScreen, Close } from '@element-plus/icons-vue'
 import { getVideo, getSubtitle } from '@/api/video'
 
 // 从环境变量获取API基础URL
@@ -154,6 +201,13 @@ const fullSubtitles = ref([])
 const question = ref('')
 const isAsking = ref(false)
 const qaHistory = ref([])
+const isQaExpanded = ref(false)
+
+// 对话框位置
+const dialogPosition = ref({ x: 0, y: 0 })
+const qaDialog = ref(null)
+const isDragging = ref(false)
+const dragOffset = ref({ x: 0, y: 0 })
 
 // 计算属性
 const videoUrl = computed(() => {
@@ -359,6 +413,72 @@ const toggleSubtitles = () => {
   }
 }
 
+// 开始拖拽
+const startDrag = (event) => {
+  if (!isQaExpanded.value) return
+  
+  isDragging.value = true
+  const rect = qaDialog.value.getBoundingClientRect()
+  dragOffset.value = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  }
+  
+  // 添加移动和停止拖拽事件监听
+  document.addEventListener('mousemove', onDrag)
+  document.addEventListener('mouseup', stopDrag)
+}
+
+// 拖拽中
+const onDrag = (event) => {
+  if (!isDragging.value) return
+  
+  // 计算新位置
+  const newX = event.clientX - dragOffset.value.x
+  const newY = event.clientY - dragOffset.value.y
+  
+  // 获取窗口尺寸和对话框尺寸
+  const windowWidth = window.innerWidth
+  const windowHeight = window.innerHeight
+  const dialogRect = qaDialog.value.getBoundingClientRect()
+  
+  // 限制对话框不超出窗口边界
+  dialogPosition.value = {
+    x: Math.min(Math.max(0, newX), windowWidth - dialogRect.width),
+    y: Math.min(Math.max(0, newY), windowHeight - dialogRect.height)
+  }
+}
+
+// 停止拖拽
+const stopDrag = () => {
+  isDragging.value = false
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+}
+
+// 展开时初始化位置
+const initDialogPosition = () => {
+  if (!qaDialog.value) return
+  
+  const windowWidth = window.innerWidth
+  const windowHeight = window.innerHeight
+  const dialogRect = qaDialog.value.getBoundingClientRect()
+  
+  dialogPosition.value = {
+    x: (windowWidth - dialogRect.width) / 2,
+    y: (windowHeight - dialogRect.height) / 2
+  }
+}
+
+// 监听展开状态变化
+watch(isQaExpanded, (newValue) => {
+  if (newValue) {
+    nextTick(() => {
+      initDialogPosition()
+    })
+  }
+})
+
 // 组件卸载时清理资源
 onUnmounted(() => {
   if (subtitleTrackUrl.value) {
@@ -427,6 +547,11 @@ const askQuestion = async () => {
   } finally {
     isAsking.value = false
   }
+}
+
+// 切换问答区域展开/收起
+const toggleQaExpansion = () => {
+  isQaExpanded.value = !isQaExpanded.value
 }
 
 // 重试加载
@@ -508,68 +633,133 @@ const retryLoading = async () => {
 }
 
 .qa-section {
-  flex: 1;
-  background-color: #fff;
+  margin-top: 20px;
+  background: #fff;
   border-radius: 8px;
-  padding: 15px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
+  transition: all 0.3s ease;
+  max-height: 300px;
   overflow: hidden;
 }
 
-.qa-section h3 {
-  margin: 0 0 15px 0;
-  font-size: 16px;
-  color: #333;
+.qa-section.qa-expanded {
+  position: fixed;
+  transform: none;
+  z-index: 1000;
+  width: 800px;
+  max-height: 600px;
+  background: #1a1a1a;
+  color: #ffffff;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  cursor: move;
+}
+
+.qa-section.qa-expanded .qa-header {
+  background: #2a2a2a;
+  border-bottom: 1px solid #3a3a3a;
+  padding: 15px 20px;
+}
+
+.qa-section.qa-expanded h3 {
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.qa-section.qa-expanded .qa-content {
+  background: #1a1a1a;
+}
+
+.qa-section.qa-expanded .qa-item {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+}
+
+.qa-section.qa-expanded .qa-text {
+  color: #ffffff;
+}
+
+.qa-section.qa-expanded .el-input__inner,
+.qa-section.qa-expanded .el-textarea__inner {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  color: #ffffff;
+}
+
+.qa-section.qa-expanded .el-button--text {
+  color: #ffffff;
+}
+
+.qa-section.qa-expanded::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: -1;
+}
+
+.qa-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  border-bottom: 1px solid #eee;
 }
 
 .qa-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+  padding: 20px;
+  height: calc(100% - 50px);
+  overflow-y: auto;
 }
 
 .qa-input {
+  margin-bottom: 20px;
   display: flex;
   gap: 10px;
 }
 
-.qa-input .el-textarea {
-  flex: 1;
-}
-
 .qa-history {
-  flex: 1;
+  height: calc(100% - 80px);
   overflow-y: auto;
-  padding: 10px;
-  background-color: #f5f7fa;
-  border-radius: 6px;
 }
 
 .qa-item {
   margin-bottom: 15px;
   padding: 10px;
-  background-color: #fff;
-  border-radius: 6px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  background: #f5f7fa;
 }
 
 .question, .answer {
   display: flex;
+  align-items: start;
   gap: 8px;
   margin-bottom: 8px;
 }
 
 .qa-icon {
-  font-weight: bold;
+  font-size: 16px;
   color: #409eff;
 }
 
 .qa-text {
   flex: 1;
-  color: #333;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* 添加遮罩层 */
+.qa-section.qa-expanded::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: -1;
 }
 
 .subtitle-section {
@@ -654,15 +844,37 @@ const retryLoading = async () => {
   width: 6px;
 }
 
+.full-subtitle::-webkit-scrollbar-track,
+.qa-history::-webkit-scrollbar-track {
+  background: #f5f7fa;
+}
+
 .full-subtitle::-webkit-scrollbar-thumb,
 .qa-history::-webkit-scrollbar-thumb {
   background-color: #dcdfe6;
   border-radius: 3px;
 }
 
-.full-subtitle::-webkit-scrollbar-track,
-.qa-history::-webkit-scrollbar-track {
-  background-color: #f5f7fa;
+.full-subtitle::-webkit-scrollbar-thumb:hover,
+.qa-history::-webkit-scrollbar-thumb:hover {
+  background-color: #5a5a5a;
+}
+
+.qa-section.qa-expanded ::-webkit-scrollbar {
+  width: 8px;
+}
+
+.qa-section.qa-expanded ::-webkit-scrollbar-track {
+  background: #2a2a2a;
+}
+
+.qa-section.qa-expanded ::-webkit-scrollbar-thumb {
+  background-color: #4a4a4a;
+  border-radius: 4px;
+}
+
+.qa-section.qa-expanded ::-webkit-scrollbar-thumb:hover {
+  background-color: #5a5a5a;
 }
 
 .loading-overlay,
