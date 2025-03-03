@@ -180,23 +180,31 @@ const loadVideo = async () => {
   try {
     loading.value = true
     videoError.value = false
-    const response = await getVideo(route.params.id)
-    if (!response) {
+    console.log('开始加载视频')
+    const { data } = await getVideo(route.params.id)
+    if (!data) {
       throw new Error('视频数据为空')
     }
-    video.value = response
-    console.log('加载视频信息成功:', response)
+    video.value = data
+    console.log('加载视频信息成功:', data)
     
     // 重置视频元素
     if (videoPlayer.value) {
-      videoPlayer.value.load()
       console.log('重置视频元素')
+      videoPlayer.value.load()
+    }
+    
+    // 加载字幕
+    if (data.id && data.subtitle_filepath) {
+      await loadSubtitles()
+    } else {
+      console.log('视频ID不存在或没有字幕文件，跳过加载字幕')
     }
     
     return true
   } catch (error) {
     console.error('加载视频失败:', error)
-    ElMessage.error('加载视频失败：' + error.message)
+    ElMessage.error('加载视频失败：' + (error.response?.data?.error || error.message))
     videoError.value = true
     return false
   } finally {
@@ -302,10 +310,7 @@ const retryLoading = async () => {
 // 监听视频ID变化
 watch(() => route.params.id, async (newId) => {
   if (newId) {
-    const success = await loadVideo()
-    if (success) {
-      await loadSubtitles()
-    }
+    await loadVideo()
   }
 }, { immediate: true })
 

@@ -45,6 +45,7 @@ class Video(db.Model):
     width = db.Column(db.Integer, nullable=True)      # 视频宽度
     height = db.Column(db.Integer, nullable=True)     # 视频高度
     frame_count = db.Column(db.Integer, nullable=True) # 总帧数
+    md5 = db.Column(db.String(32), nullable=True)  # 添加MD5字段
     
     # 字幕关联
     subtitles = db.relationship('Subtitle', back_populates='video', lazy=True)
@@ -53,23 +54,18 @@ class Video(db.Model):
         return f'<Video {self.title or self.filename}>'
         
     def to_dict(self):
-        """转换为字典"""
+        """转换为字典表示"""
         return {
             'id': self.id,
-            'title': self.title,
             'filename': self.filename,
-            'processed_filename': self.processed_filename,
-            'preview_filename': self.preview_filename,
-            'status': self.status.value,
-            'error_message': self.error_message,
+            'filepath': self.filepath,
+            'title': self.title,
+            'status': self.status.value if isinstance(self.status, VideoStatus) else self.status,  # 确保状态可以被序列化
             'upload_time': self.upload_time.isoformat() if self.upload_time else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'process_progress': self.process_progress,
-            'current_step': self.current_step,
-            'task_id': self.task_id,
             'duration': self.duration,
             'fps': self.fps,
             'width': self.width,
             'height': self.height,
-            'frame_count': self.frame_count
+            'frame_count': self.frame_count,
+            'md5': self.md5
         }

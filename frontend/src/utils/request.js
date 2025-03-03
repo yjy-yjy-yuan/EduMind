@@ -42,8 +42,12 @@ service.interceptors.response.use(
       return response
     }
     
-    // 否则返回数据部分
-    return response.data
+    // 构造标准响应格式
+    return {
+      data: response.data,
+      status: response.status,
+      headers: response.headers
+    }
   },
   error => {
     console.error('响应错误:', error)

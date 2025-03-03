@@ -2,6 +2,7 @@ import os
 import traceback
 from flask import Blueprint, request, jsonify, current_app, send_file, make_response, Response
 from ..models.video import Video
+import hashlib
 
 bp = Blueprint('video', __name__, url_prefix='/api/videos')
 
@@ -68,6 +69,7 @@ def upload_video():
     try:
         # 检查是否有文件
         if 'file' not in request.files:
+            current_app.logger.error('未提供文件')
             return jsonify({'error': '没有文件'}), 400
             
         file = request.files['file']
@@ -76,13 +78,47 @@ def upload_video():
             return jsonify({'error': '没有选择文件'}), 400
             
         if not allowed_file(file.filename):
-            current_app.logger.error('不支持的文件类型')
+            current_app.logger.error(f'不支持的文件类型: {file.filename}')
             return jsonify({'error': '不支持的文件类型'}), 400
+
+        # 计算文件MD5
+        try:
+            file_content = file.read()
+            file_md5 = hashlib.md5(file_content).hexdigest()
+            file.seek(0)  # 重置文件指针到开始位置
+            current_app.logger.info(f'文件MD5: {file_md5}')
+        except Exception as e:
+            current_app.logger.error(f'计算MD5失败: {str(e)}')
+            return jsonify({'error': '文件处理失败'}), 500
+
+        # 检查是否存在相同MD5的视频
+        try:
+            existing_video = Video.query.filter_by(md5=file_md5).first()
+            if existing_video:
+                current_app.logger.info(f'发现重复视频: {existing_video.filename}')
+                video_dict = existing_video.to_dict()
+                current_app.logger.info(f'重复视频信息: {video_dict}')
+                return jsonify({
+                    'id': existing_video.id,
+                    'status': existing_video.status.value if isinstance(existing_video.status, VideoStatus) else existing_video.status,
+                    'message': '视频已存在',
+                    'duplicate': True,
+                    'existingVideo': video_dict
+                }), 200
+        except Exception as e:
+            current_app.logger.error(f'检查重复视频失败: {str(e)}')
+            current_app.logger.error(f'详细错误信息: {traceback.format_exc()}')
+            return jsonify({'error': '数据库查询失败'}), 500
 
         # 确保上传目录存在
         upload_folder = current_app.config['UPLOAD_FOLDER']
         if not os.path.exists(upload_folder):
-            os.makedirs(upload_folder)
+            try:
+                os.makedirs(upload_folder)
+                current_app.logger.info(f'创建上传目录: {upload_folder}')
+            except Exception as e:
+                current_app.logger.error(f'创建上传目录失败: {str(e)}')
+                return jsonify({'error': '服务器存储错误'}), 500
 
         # 获取原始文件名和扩展名
         original_filename = file.filename
@@ -96,49 +132,58 @@ def upload_video():
         filename = f"{title}{ext}"
         file_path = os.path.join(upload_folder, filename)
         
-        # 如果文件已存在，添加时间戳
+        # 如果文件已存在，添加时间戳（这里保留这个逻辑，以防万一出现MD5碰撞）
         if os.path.exists(file_path):
             title = f"{title}_{int(datetime.now().timestamp())}"
             filename = f"{title}{ext}"
             file_path = os.path.join(upload_folder, filename)
         
-        current_app.logger.info(f'保存文件: {file_path}')
-        file.save(file_path)
+        # 保存文件
+        try:
+            current_app.logger.info(f'保存文件: {file_path}')
+            file.save(file_path)
+        except Exception as e:
+            current_app.logger.error(f'保存文件失败: {str(e)}')
+            return jsonify({'error': '文件保存失败'}), 500
         
-        # 创建视频记录，状态设为UPLOADED
-        video = Video(
-            filename=filename,
-            filepath=file_path,
-            title=title,  # 使用带有local-前缀的标题
-            status=VideoStatus.UPLOADED
-        )
-        
-        # 检查是否存在对应的字幕文件
-        subtitle_path = None
-        possible_subtitle_files = [
-            os.path.join(current_app.config['SUBTITLE_FOLDER'], f"{filename}.srt"),
-            os.path.join(current_app.config['SUBTITLE_FOLDER'], f"{os.path.splitext(filename)[0]}.srt")
-        ]
-        
-        for path in possible_subtitle_files:
-            if os.path.exists(path):
-                subtitle_path = os.path.basename(path)
-                break
-        
-        db.session.add(video)
-        db.session.commit()
-        
-        current_app.logger.info(f'创建视频记录: {video.id}')
-        
-        return jsonify({
-            'id': video.id,
-            'status': 'uploaded',
-            'message': '视频上传成功'
-        })
+        # 创建视频记录
+        try:
+            video = Video(
+                filename=filename,
+                filepath=file_path,
+                title=title,
+                status=VideoStatus.UPLOADED,
+                md5=file_md5
+            )
+            
+            db.session.add(video)
+            db.session.commit()
+            
+            current_app.logger.info(f'创建视频记录: {video.id}')
+            
+            response_data = {
+                'id': video.id,
+                'status': 'uploaded',
+                'message': '视频上传成功',
+                'duplicate': False,
+                'data': video.to_dict()
+            }
+            
+            current_app.logger.info(f'返回数据: {response_data}')
+            return jsonify(response_data)
+            
+        except Exception as e:
+            current_app.logger.error(f'创建视频记录失败: {str(e)}')
+            # 如果数据库操作失败，删除已上传的文件
+            try:
+                os.remove(file_path)
+                current_app.logger.info(f'删除文件: {file_path}')
+            except Exception as del_e:
+                current_app.logger.error(f'删除文件失败: {str(del_e)}')
+            return jsonify({'error': '数据库操作失败'}), 500
         
     except Exception as e:
-        current_app.logger.error(f"Upload error: {str(e)}")
-        import traceback
+        current_app.logger.error(f"上传错误: {str(e)}")
         current_app.logger.error(f"详细错误信息: {traceback.format_exc()}")
         return jsonify({'error': '上传失败，请重试'}), 500
 
@@ -582,17 +627,34 @@ def get_video_status(video_id):
     """获取视频状态"""
     try:
         video = Video.query.get_or_404(video_id)
-        status = video.status.value if hasattr(video.status, 'value') else str(video.status)
-        current_app.logger.info(f"获取视频状态成功: 视频ID={video_id}, 状态={status}")
-        return jsonify({
+        current_app.logger.info(f"获取视频状态: ID={video_id}, 原始状态={video.status}")
+        
+        # 确保返回正确的状态值
+        if video.status == VideoStatus.COMPLETED:
+            status = 'completed'
+        elif video.status == VideoStatus.PROCESSING:
+            status = 'processing'
+        elif video.status == VideoStatus.FAILED:
+            status = 'failed'
+        elif video.status == VideoStatus.UPLOADED:
+            status = 'uploaded'
+        else:
+            status = str(video.status.value) if hasattr(video.status, 'value') else str(video.status)
+            
+        response_data = {
             'id': video.id,
             'status': status,
-            'progress': video.process_progress,
-            'current_step': video.current_step,
+            'progress': video.process_progress or 0,
+            'current_step': video.current_step or '',
             'task_id': video.task_id
-        })
+        }
+        
+        current_app.logger.info(f"返回视频状态: {response_data}")
+        return jsonify(response_data)
+        
     except Exception as e:
         current_app.logger.error(f"获取视频状态失败: {str(e)}")
+        current_app.logger.error(f"详细错误信息: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
 
 @bp.route('/<int:video_id>/process', methods=['POST', 'OPTIONS'])
@@ -684,6 +746,17 @@ def delete_video(video_id):
 @bp.route('/<int:video_id>/stream', methods=['GET', 'OPTIONS'])
 def get_video_stream(video_id):
     """流式传输视频"""
+    # 处理OPTIONS请求
+    if request.method == 'OPTIONS':
+        headers = {
+            'Access-Control-Allow-Origin': request.headers.get('Origin', '*'),
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Range',
+            'Access-Control-Allow-Credentials': 'true',
+            'Access-Control-Max-Age': '86400'
+        }
+        return '', 200, headers
+        
     current_app.logger.info(f'收到视频流请求: video_id={video_id}')
     current_app.logger.info(f'请求头: {dict(request.headers)}')
     
@@ -737,19 +810,23 @@ def get_video_stream(video_id):
                 headers['Content-Length'] = str(chunk_size)
                 
                 def generate():
-                    with open(video.filepath, 'rb') as f:
-                        f.seek(start)
-                        remaining = chunk_size
-                        buffer_size = min(8192, remaining)  # 8KB chunks
-                        
-                        while remaining:
-                            if remaining < buffer_size:
-                                buffer_size = remaining
-                            data = f.read(buffer_size)
-                            if not data:
-                                break
-                            remaining -= len(data)
-                            yield data
+                    try:
+                        with open(video.filepath, 'rb') as f:
+                            f.seek(start)
+                            remaining = chunk_size
+                            buffer_size = min(8192, remaining)  # 8KB chunks
+                            
+                            while remaining:
+                                if remaining < buffer_size:
+                                    buffer_size = remaining
+                                data = f.read(buffer_size)
+                                if not data:
+                                    break
+                                remaining -= len(data)
+                                yield data
+                    except Exception as e:
+                        current_app.logger.error(f'生成视频流时出错: {str(e)}')
+                        return jsonify({'error': '读取视频文件失败'}), 500
                 
                 return Response(
                     generate(),
@@ -763,23 +840,31 @@ def get_video_stream(video_id):
                 return jsonify({'error': '无效的Range头'}), 400
         
         # 如果没有Range头，返回整个文件
-        current_app.logger.info('返回完整文件')
-        return send_file(
-            video.filepath,
-            mimetype='video/mp4',
-            as_attachment=False,
-            conditional=True,
-            etag=True,
-            last_modified=True
+        headers['Content-Length'] = str(file_size)
+        
+        def generate_full():
+            try:
+                with open(video.filepath, 'rb') as f:
+                    while True:
+                        chunk = f.read(8192)  # 8KB chunks
+                        if not chunk:
+                            break
+                        yield chunk
+            except Exception as e:
+                current_app.logger.error(f'生成完整视频流时出错: {str(e)}')
+                return jsonify({'error': '读取视频文件失败'}), 500
+        
+        return Response(
+            generate_full(),
+            200,
+            headers=headers,
+            direct_passthrough=True
         )
         
     except Exception as e:
         current_app.logger.error(f"视频流传输失败: {str(e)}")
-        current_app.logger.error(traceback.format_exc())
-        return jsonify({
-            'error': '视频流传输失败',
-            'message': str(e)
-        }), 500
+        current_app.logger.error(f"详细错误信息: {traceback.format_exc()}")
+        return jsonify({'error': '视频流传输失败'}), 500
 
 @bp.route('/<int:video_id>/subtitle', methods=['GET'])
 def get_subtitle(video_id):

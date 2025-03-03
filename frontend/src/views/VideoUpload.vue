@@ -202,27 +202,64 @@ const beforeUpload = (file) => {
 
 // 处理文件上传
 const handleUpload = async ({ file }) => {
+  uploadProgress.value = 0
+  uploadStatus.value = ''
+  uploadStepInfo.value = '准备上传...'
+
+  const formData = new FormData()
+  formData.append('file', file)
+
   try {
-    uploadProgress.value = 0
-    uploadStatus.value = ''
-    
-    const formData = new FormData()
-    formData.append('file', file)
-    
-    await uploadLocalVideo(formData, (progressEvent) => {
-      if (progressEvent.lengthComputable) {
-        uploadProgress.value = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+    const response = await uploadLocalVideo(formData, (progressEvent) => {
+      const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+      uploadProgress.value = progress
+      if (progress < 100) {
+        uploadStepInfo.value = `上传中... ${progress}%`
+      } else {
+        uploadStepInfo.value = '处理中...'
       }
     })
-    
-    uploadProgress.value = 100
-    uploadStatus.value = 'success'
-    ElMessage.success('上传成功！')
-    refreshList()
+
+    // 确保response.data存在
+    if (!response || !response.data) {
+      throw new Error('服务器响应格式错误')
+    }
+
+    const responseData = response.data
+
+    if (responseData.duplicate) {
+      // 处理重复视频的情况
+      const existingVideo = responseData.existingVideo
+      ElMessageBox.confirm(
+        `该视频已存在（文件名：${existingVideo.filename}），是否查看已有视频？`,
+        '视频已存在',
+        {
+          confirmButtonText: '查看视频',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+      ).then(() => {
+        // 跳转到视频播放页面
+        router.push({
+          name: 'VideoPlayer',
+          params: { id: existingVideo.id }
+        })
+      }).catch(() => {
+        // 用户取消，不做任何操作
+      })
+    } else {
+      // 处理正常上传的情况
+      uploadProgress.value = 100
+      uploadStatus.value = 'success'
+      uploadStepInfo.value = '上传成功'
+      ElMessage.success(responseData.message || '视频上传成功')
+      refreshList()
+    }
   } catch (error) {
-    uploadStatus.value = 'exception'
     console.error('上传错误:', error)
-    ElMessage.error(error.response?.data?.error || '上传失败，请重试')
+    uploadStatus.value = 'exception'
+    uploadStepInfo.value = '上传失败'
+    ElMessage.error('上传失败：' + (error.response?.data?.error || error.message || '未知错误'))
   }
 }
 
@@ -447,9 +484,9 @@ const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
 const refreshList = async () => {
   try {
     loading.value = true
-    const response = await getVideoList()
-    if (response && response.videos) {
-      videoList.value = response.videos
+    const { data } = await getVideoList()
+    if (data && data.videos) {
+      videoList.value = data.videos
       // 清空选中的视频
       selectedVideos.value = []
     } else {
@@ -833,7 +870,7 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
     console.log(`正在检查视频${videoId}的处理状态，第${attempts+1}次尝试`)
     
     // 获取视频状态
-    const statusResponse = await getVideoStatus(videoId)
+    const { data: statusResponse } = await getVideoStatus(videoId)
     if (statusResponse) {
       const status = statusResponse.status
       const progress = statusResponse.progress || 0
@@ -900,6 +937,9 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
           type: 'info',
           duration: 5000
         })
+        
+        // 最后一次刷新列表
+        refreshList()
       }
     }
   } catch (error) {
