@@ -185,13 +185,20 @@ def export_subtitles(video_id):
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(content)
 
-        # 返回文件
-        return send_file(
+        # 返回文件，使用safe_filename处理中文文件名
+        safe_filename = filename.encode('utf-8').decode('latin-1')
+        response = send_file(
             file_path,
             mimetype=mime_type,
             as_attachment=True,
-            download_name=filename
+            download_name=safe_filename
         )
+        
+        # 添加必要的响应头
+        response.headers['Access-Control-Expose-Headers'] = 'Content-Disposition'
+        response.headers['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
+
+        return response
 
     except Exception as e:
         logging.error(f"导出字幕时发生错误: {str(e)}")

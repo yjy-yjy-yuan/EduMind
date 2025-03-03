@@ -835,7 +835,10 @@ def get_subtitle(video_id):
             
         # 如果是下载请求，添加Content-Disposition头
         if request.args.get('download') == 'true':
-            response.headers['Content-Disposition'] = f'attachment; filename={filename}.{format_type}'
+            # 使用 RFC 5987 编码处理中文文件名
+            filename_encoded = filename.encode('utf-8').decode('latin-1')
+            response.headers['Content-Disposition'] = f"attachment; filename*=UTF-8''{filename_encoded}.{format_type}"
+            response.headers['Access-Control-Expose-Headers'] = 'Content-Disposition'
         
         return response
         

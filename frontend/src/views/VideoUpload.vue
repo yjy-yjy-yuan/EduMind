@@ -634,17 +634,6 @@ const handleProcess = async (video) => {
             // 英语语言选项
             models = [
               { 
-                value: 'tiny.en', 
-                text: 'tiny.en', 
-                desc: '最小',
-                color: '#67C23A',
-                speed: '极快',
-                accuracy: '一般',
-                useCase: '简单内容，对速度要求高',
-                speedColor: '#67C23A',
-                accuracyColor: '#E6A23C'
-              },
-              { 
                 value: 'base.en', 
                 text: 'base.en', 
                 desc: '基础',
@@ -683,28 +672,6 @@ const handleProcess = async (video) => {
             // 其他语言选项
             models = [
               { 
-                value: 'tiny', 
-                text: 'tiny', 
-                desc: '最小',
-                color: '#67C23A',
-                speed: '极快',
-                accuracy: '一般',
-                useCase: '简单内容，对速度要求高',
-                speedColor: '#67C23A',
-                accuracyColor: '#E6A23C'
-              },
-              { 
-                value: 'base', 
-                text: 'base', 
-                desc: '基础',
-                color: '#85CF4E',
-                speed: '很快',
-                accuracy: '良好',
-                useCase: '一般内容，速度和准确度平衡',
-                speedColor: '#85CF4E',
-                accuracyColor: '#E6A23C'
-              },
-              { 
                 value: 'small', 
                 text: 'small', 
                 desc: '小型',
@@ -724,17 +691,6 @@ const handleProcess = async (video) => {
                 accuracy: '很好',
                 useCase: '复杂内容，对准确度要求较高',
                 speedColor: '#E6A23C',
-                accuracyColor: '#409EFF'
-              },
-              { 
-                value: 'large', 
-                text: 'large', 
-                desc: '大型',
-                color: '#F56C6C',
-                speed: '较慢',
-                accuracy: '极高',
-                useCase: '专业内容，对准确度要求高',
-                speedColor: '#F56C6C',
                 accuracyColor: '#409EFF'
               },
               { 
