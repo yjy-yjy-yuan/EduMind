@@ -87,6 +87,12 @@
           </el-button>
         </div>
         <div class="qa-content">
+          <div class="qa-mode-switch">
+            <el-radio-group v-model="qaMode" size="small">
+              <el-radio-button label="video">视频内容问答</el-radio-button>
+              <el-radio-button label="free">自由问答</el-radio-button>
+            </el-radio-group>
+          </div>
           <div class="qa-input">
             <el-input v-model="question" placeholder="请输入问题" type="textarea" />
             <el-button type="primary" @click="askQuestion" :loading="isAsking">提问</el-button>
@@ -119,6 +125,12 @@
           </el-button>
         </div>
         <div class="qa-content">
+          <div class="qa-mode-switch">
+            <el-radio-group v-model="qaMode" size="small">
+              <el-radio-button label="video">视频内容问答</el-radio-button>
+              <el-radio-button label="free">自由问答</el-radio-button>
+            </el-radio-group>
+          </div>
           <div class="qa-input">
             <el-input v-model="question" placeholder="请输入问题" type="textarea" />
             <el-button type="primary" @click="askQuestion" :loading="isAsking">提问</el-button>
@@ -180,7 +192,7 @@ import { ref, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Loading, Warning, QuestionFilled, ChatLineSquare, FullScreen, Close } from '@element-plus/icons-vue'
-import { getVideo, getSubtitle } from '@/api/video'
+import { getVideo, getSubtitle, askVideoQuestion, askFreeQuestion } from '@/api/video'
 
 // 从环境变量获取API基础URL
 const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
@@ -202,8 +214,7 @@ const question = ref('')
 const isAsking = ref(false)
 const qaHistory = ref([])
 const isQaExpanded = ref(false)
-
-// 对话框位置
+const qaMode = ref('video') // 新增：问答模式
 const dialogPosition = ref({ x: 0, y: 0 })
 const qaDialog = ref(null)
 const isDragging = ref(false)
@@ -525,7 +536,7 @@ const downloadSubtitle = async (format, isDownload = false) => {
   }
 }
 
-// 提问功能（预留）
+// 提问功能
 const askQuestion = async () => {
   if (!question.value.trim()) {
     ElMessage.warning('请输入问题')
@@ -534,16 +545,23 @@ const askQuestion = async () => {
   
   isAsking.value = true
   try {
-    // TODO: 调用后端API进行问答
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const videoId = route.params.id
+    let response
+    
+    if (qaMode.value === 'video') {
+      response = await askVideoQuestion(videoId, question.value)
+    } else {
+      response = await askFreeQuestion(question.value)
+    }
+
     qaHistory.value.unshift({
       question: question.value,
-      answer: '智能问答功能正在开发中...'
+      answer: response.data
     })
     question.value = ''
   } catch (error) {
     ElMessage.error('提问失败，请重试')
+    console.error('提问失败:', error)
   } finally {
     isAsking.value = false
   }
@@ -748,6 +766,22 @@ const retryLoading = async () => {
   flex: 1;
   line-height: 1.5;
   word-break: break-word;
+}
+
+.qa-mode-switch {
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.qa-mode-switch .el-radio-group {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.qa-mode-switch .el-radio-button {
+  flex: 1;
+  max-width: 150px;
 }
 
 /* 添加遮罩层 */

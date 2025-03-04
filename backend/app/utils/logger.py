@@ -1,0 +1,13 @@
+"""
+日志工具模块
+"""
+import logging
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+
+# 创建日志记录器
+logger = logging.getLogger(__name__)

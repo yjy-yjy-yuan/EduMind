@@ -1,4 +1,70 @@
 from datetime import timedelta
+import re
+
+def parse_srt_file(filepath):
+    """解析SRT格式的字幕文件
+    
+    Args:
+        filepath (str): SRT文件路径
+        
+    Returns:
+        list: 包含字幕信息的字典列表，每个字典包含：
+            - start_time: 开始时间（秒）
+            - end_time: 结束时间（秒）
+            - text: 字幕文本
+    """
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        # 分割字幕块
+        subtitle_blocks = re.split(r'\n\n+', content.strip())
+        subtitles = []
+        
+        for block in subtitle_blocks:
+            lines = block.split('\n')
+            if len(lines) < 3:  # 跳过无效块
+                continue
+                
+            # 解析时间戳
+            times = lines[1].split(' --> ')
+            if len(times) != 2:
+                continue
+                
+            # 将时间戳转换为秒
+            start_time = _timestamp_to_seconds(times[0].strip())
+            end_time = _timestamp_to_seconds(times[1].strip())
+            
+            # 获取文本（可能跨多行）
+            text = ' '.join(lines[2:]).strip()
+            
+            subtitles.append({
+                'start_time': start_time,
+                'end_time': end_time,
+                'text': text
+            })
+            
+        return subtitles
+        
+    except Exception as e:
+        print(f"解析SRT文件失败: {str(e)}")
+        return None
+
+def _timestamp_to_seconds(timestamp):
+    """将SRT时间戳转换为秒数
+    
+    Args:
+        timestamp (str): 格式为 "HH:MM:SS,mmm"
+        
+    Returns:
+        float: 秒数
+    """
+    # 移除毫秒
+    parts = timestamp.replace(',', '.').split(':')
+    hours = int(parts[0])
+    minutes = int(parts[1])
+    seconds = float(parts[2])
+    return hours * 3600 + minutes * 60 + seconds
 
 def format_timestamp(seconds, format='srt'):
     """将秒数转换为不同格式的时间戳"""

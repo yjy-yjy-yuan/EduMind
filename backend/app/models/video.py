@@ -1,6 +1,6 @@
 """视频模型"""
 from datetime import datetime
-from ..extensions import db
+from . import db
 from enum import Enum
 
 class VideoStatus(Enum):

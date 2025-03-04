@@ -91,3 +91,27 @@ export function deleteVideo(videoId) {
     method: 'delete'
   })
 }
+
+// 视频问答
+export function askVideoQuestion(videoId, question) {
+  return request({
+    url: `/api/videos/${videoId}/qa`,
+    method: 'post',
+    data: {
+      question,
+      mode: 'video'
+    }
+  })
+}
+
+// 自由问答
+export function askFreeQuestion(question) {
+  return request({
+    url: '/api/chat',
+    method: 'post',
+    data: {
+      question,
+      mode: 'free'
+    }
+  })
+}

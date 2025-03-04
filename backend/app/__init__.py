@@ -2,8 +2,15 @@
 import logging
 import os
 from flask import Flask, request, jsonify
-from .extensions import db, migrate, cors, celery
-from .config import config
+from flask_migrate import Migrate
+from flask_cors import CORS
+from celery import Celery
+from .models import db
+
+# 创建扩展实例
+migrate = Migrate()
+cors = CORS()
+celery = Celery()
 
 # 配置日志
 logging.basicConfig(
@@ -18,6 +25,7 @@ def create_app(config_name='default'):
         app = Flask(__name__)
         
         # 加载配置
+        from .config import config
         app.config.from_object(config[config_name])
         config[config_name].init_app(app)
         
@@ -36,13 +44,13 @@ def create_app(config_name='default'):
         
         # 配置CORS
         cors.init_app(app, resources={
-            r"/api/*": {
-                "origins": ["http://localhost:5173"],
-                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
-                "expose_headers": ["Content-Disposition"],
-                "supports_credentials": True,
-                "max_age": 3600
+            r"/*": {  # 允许所有路由
+                "origins": ["http://localhost:5173"],  # 允许的源
+                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 允许的方法
+                "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],  # 允许的头部
+                "expose_headers": ["Content-Disposition"],  # 暴露的头部
+                "supports_credentials": True,  # 支持凭证
+                "max_age": 3600  # 预检请求的有效期
             }
         })
         
@@ -78,11 +86,13 @@ def create_app(config_name='default'):
             db.create_all()
             
             # 注册蓝图
-            from .routes import video_bp, qa_bp
+            from .routes import video_bp, qa_bp, chat_bp
             if 'video_bp' not in app.blueprints:
                 app.register_blueprint(video_bp, url_prefix='/api/videos')
             if 'qa_bp' not in app.blueprints:
                 app.register_blueprint(qa_bp, url_prefix='/api/qa')
+            if 'chat_bp' not in app.blueprints:
+                app.register_blueprint(chat_bp)
         
         # 添加根路由
         @app.route('/')
