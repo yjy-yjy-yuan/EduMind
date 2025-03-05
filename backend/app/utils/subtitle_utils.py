@@ -4,42 +4,56 @@ def format_timestamp(seconds, format='srt'):
     """将秒数转换为不同格式的时间戳"""
     # 四舍五入到整数秒
     seconds = round(seconds)
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
+    minutes = seconds // 60
     seconds = seconds % 60
     
     if format == 'srt':
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        return f"{minutes:02d}:{seconds:02d}"
     elif format == 'vtt':
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-    else:  # 普通时间戳格式 [HH:MM:SS]
-        return f"[{hours:02d}:{minutes:02d}:{seconds:02d}]"
+        return f"{minutes:02d}:{seconds:02d}"
+    else:  # 普通时间戳格式 [MM:SS]
+        return f"[{minutes:02d}:{seconds:02d}]"
 
 def convert_to_srt(subtitles):
     """将字幕转换为SRT格式"""
-    srt_content = ""
+    srt_content = []
     for i, subtitle in enumerate(subtitles, 1):
-        start_time = format_timestamp(subtitle['start_time'], 'srt')
-        end_time = format_timestamp(subtitle['end_time'], 'srt')
-        srt_content += f"{i}\n{start_time} --> {end_time}\n{subtitle['text']}\n\n"
-    return srt_content
+        start_mm = int(float(subtitle.start_time) // 60)
+        start_ss = int(float(subtitle.start_time) % 60)
+        end_mm = int(float(subtitle.end_time) // 60)
+        end_ss = int(float(subtitle.end_time) % 60)
+        
+        srt_content.append(f"{i}\n{start_mm:02d}:{start_ss:02d} - {end_mm:02d}:{end_ss:02d}\n{subtitle.text}\n")
+    
+    return "\n".join(srt_content)
 
 def convert_to_vtt(subtitles):
     """将字幕转换为VTT格式"""
-    vtt_content = "WEBVTT\n\n"
-    for i, subtitle in enumerate(subtitles, 1):
-        start_time = format_timestamp(subtitle['start_time'], 'vtt')
-        end_time = format_timestamp(subtitle['end_time'], 'vtt')
-        vtt_content += f"{start_time} --> {end_time}\n{subtitle['text']}\n\n"
-    return vtt_content
+    vtt_content = ["WEBVTT\n"]
+    for subtitle in subtitles:
+        start_mm = int(float(subtitle.start_time) // 60)
+        start_ss = int(float(subtitle.start_time) % 60)
+        end_mm = int(float(subtitle.end_time) // 60)
+        end_ss = int(float(subtitle.end_time) % 60)
+        
+        vtt_content.append(f"{start_mm:02d}:{start_ss:02d} - {end_mm:02d}:{end_ss:02d}\n{subtitle.text}\n")
+    
+    return "\n".join(vtt_content)
 
 def convert_to_txt(subtitles):
     """将字幕转换为纯文本格式"""
-    txt_content = ""
+    return "\n".join(s.text for s in subtitles)
+
+def convert_to_tsv(subtitles):
+    """将字幕转换为TSV格式"""
+    tsv_content = ["start\tend\ttext"]
     for subtitle in subtitles:
-        timestamp = format_timestamp(subtitle['start_time'], 'txt')
-        txt_content += f"{timestamp} {subtitle['text']}\n"
-    return txt_content
+        # 将时间从毫秒转换为秒
+        start_time = int(float(subtitle.start_time))
+        end_time = int(float(subtitle.end_time))
+        tsv_content.append(f"{start_time}\t{end_time}\t{subtitle.text}")
+    
+    return "\n".join(tsv_content)
 
 def validate_subtitle_time(start_time, end_time, video_duration=None):
     """验证字幕时间是否有效"""

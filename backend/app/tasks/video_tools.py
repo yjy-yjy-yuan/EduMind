@@ -36,94 +36,133 @@ class VideoTools:
             print(f"转录视频失败: {str(e)}")
             return None
             
+    def _format_timestamp(self, seconds):
+        """格式化时间戳为SRT格式
+        Args:
+            seconds: 秒数
+        Returns:
+            str: SRT格式时间戳，例如: 01:30
+        """
+        minutes = int(seconds // 60)
+        seconds = int(seconds % 60)
+        return f"{minutes:02d}:{seconds:02d}"
+
     def format_timestamp(self, seconds):
         """格式化时间戳"""
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
+        minutes = int(seconds // 60)
         seconds = seconds % 60
-        return f"{hours:02d}:{minutes:02d}:{seconds:06.3f}"
+        return f"{minutes:02d}:{seconds:02d}"
         
     def create_paragraphs(self, transcript, to_simplified=True):
         """创建带时间戳的段落"""
         try:
-            if to_simplified:
-                cc = OpenCC('t2s')  # 繁体转简体
-            else:
-                cc = OpenCC('s2t')  # 简体转繁体
+            segments = []
+            for segment in transcript:
+                # 将时间从毫秒转换为秒
+                start_time = float(segment.get('start', 0)) / 1000
+                end_time = float(segment.get('end', 0)) / 1000
+                
+                text = segment.get('text', '').strip()
+                if to_simplified:
+                    text = self.opencc.convert(text)
+                
+                segments.append({
+                    'start': start_time,
+                    'end': end_time,
+                    'text': text
+                })
+            return segments
         except Exception as e:
-            print(f"简繁转换初始化失败: {e}")
-            cc = None
-            
-        formatted_lines = []
-        
-        if not transcript or 'segments' not in transcript:
-            return ""
-            
-        for segment in transcript['segments']:
-            start_time = segment['start']
-            end_time = segment['end']
-            
-            # 格式化时间戳
-            start_formatted = self.format_timestamp(start_time)
-            end_formatted = self.format_timestamp(end_time)
-            
-            # 处理文本
-            text = segment['text'].strip()
-            if cc:
-                try:
-                    text = cc.convert(text)
-                except Exception as e:
-                    print(f"转换文本失败: {e}")
-                    
-            # 使用方括号包裹时间戳
-            formatted_line = f"[{start_formatted} --> {end_formatted}] {text}\n\n"
-            formatted_lines.append(formatted_line)
-            
-        return ''.join(formatted_lines)
-        
+            logger.error(f"创建段落失败: {str(e)}")
+            return []
+
     def save_as_srt(self, segments, output_path, to_simplified=True):
         """保存为SRT格式字幕文件"""
         try:
-            if to_simplified:
-                cc = OpenCC('t2s')
-            else:
-                cc = OpenCC('s2t')
+            with open(output_path, 'w', encoding='utf-8') as f:
+                for i, segment in enumerate(segments, 1):
+                    start_mm = int(float(segment['start']) // 60)
+                    start_ss = int(float(segment['start']) % 60)
+                    end_mm = int(float(segment['end']) // 60)
+                    end_ss = int(float(segment['end']) % 60)
+                    
+                    text = segment['text']
+                    if to_simplified:
+                        text = self.opencc.convert(text)
+                    
+                    f.write(f"{i}\n")
+                    f.write(f"{start_mm:02d}:{start_ss:02d} - {end_mm:02d}:{end_ss:02d}\n")
+                    f.write(f"{text}\n\n")
+            return True
         except Exception as e:
-            print(f"简繁转换初始化失败: {e}")
-            cc = None
-            
-        with open(output_path, 'w', encoding='utf-8') as f:
-            for i, segment in enumerate(segments, 1):
-                start_time = segment['start']
-                end_time = segment['end']
-                
-                # 格式化时间为SRT格式 (HH:MM:SS,mmm)
-                start_formatted = f"{int(start_time // 3600):02d}:{int((start_time % 3600) // 60):02d}:{int(start_time % 60):02d},{int((start_time % 1) * 1000):03d}"
-                end_formatted = f"{int(end_time // 3600):02d}:{int((end_time % 3600) // 60):02d}:{int(end_time % 60):02d},{int((end_time % 1) * 1000):03d}"
-                
-                # 处理文本
-                text = segment['text'].strip()
-                if cc:
-                    try:
-                        text = cc.convert(text)
-                    except Exception as e:
-                        print(f"转换文本失败: {e}")
-                        
-                # 写入SRT格式
-                f.write(f"{i}\n")
-                f.write(f"{start_formatted} --> {end_formatted}\n")
-                f.write(f"{text}\n\n")
-                
+            logger.error(f"保存SRT字幕文件失败: {str(e)}")
+            return False
+
+    def save_as_vtt(self, segments, output_path, to_simplified=True):
+        """保存为VTT格式字幕文件"""
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write("WEBVTT\n\n")
+                for segment in segments:
+                    start_mm = int(float(segment['start']) // 60)
+                    start_ss = int(float(segment['start']) % 60)
+                    end_mm = int(float(segment['end']) // 60)
+                    end_ss = int(float(segment['end']) % 60)
+                    
+                    text = segment['text']
+                    if to_simplified:
+                        text = self.opencc.convert(text)
+                    
+                    f.write(f"{start_mm:02d}:{start_ss:02d} - {end_mm:02d}:{end_ss:02d}\n")
+                    f.write(f"{text}\n\n")
+            return True
+        except Exception as e:
+            logger.error(f"保存VTT字幕文件失败: {str(e)}")
+            return False
+
+    def save_as_tsv(self, segments, output_path, to_simplified=True):
+        """保存为TSV格式字幕文件"""
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write("start\tend\ttext\n")
+                for segment in segments:
+                    # 将时间从毫秒转换为秒
+                    start_time = int(float(segment['start']))
+                    end_time = int(float(segment['end']))
+                    
+                    text = segment['text']
+                    if to_simplified:
+                        text = self.opencc.convert(text)
+                    
+                    f.write(f"{start_time}\t{end_time}\t{text}\n")
+            return True
+        except Exception as e:
+            logger.error(f"保存TSV字幕文件失败: {str(e)}")
+            return False
+
     def save_subtitles(self, result, txt_path, srt_path, to_simplified=True):
         """保存字幕文件（TXT和SRT格式）"""
         try:
             # 保存TXT格式（带时间戳的段落）
             paragraphs = self.create_paragraphs(result, to_simplified)
             with open(txt_path, 'w', encoding='utf-8') as f:
-                f.write(paragraphs)
+                for segment in paragraphs:
+                    start_time = segment['start']
+                    end_time = segment['end']
+                    
+                    # 格式化时间戳
+                    start_formatted = self.format_timestamp(start_time)
+                    end_formatted = self.format_timestamp(end_time)
+                    
+                    # 处理文本
+                    text = segment['text'].strip()
+                    
+                    # 使用方括号包裹时间戳
+                    formatted_line = f"[{start_formatted} --> {end_formatted}] {text}\n\n"
+                    f.write(formatted_line)
                 
             # 保存SRT格式
-            self.save_as_srt(result['segments'], srt_path, to_simplified)
+            self.save_as_srt(paragraphs, srt_path, to_simplified)
             
             return True
             
@@ -264,18 +303,3 @@ class VideoTools:
         except Exception as e:
             logger.error(f"生成字幕文件失败: {str(e)}")
             return False
-            
-    def _format_timestamp(self, seconds):
-        """格式化时间戳为SRT格式
-        Args:
-            seconds: 秒数
-        Returns:
-            str: SRT格式时间戳，例如: 00:00:01,500
-        """
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        seconds = seconds % 60
-        milliseconds = int((seconds % 1) * 1000)
-        seconds = int(seconds)
-        
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"

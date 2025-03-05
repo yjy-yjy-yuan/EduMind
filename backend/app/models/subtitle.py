@@ -43,16 +43,16 @@ class Subtitle(db.Model):
         
     @staticmethod
     def format_time(seconds):
-        """将秒数转换为 SRT 格式的时间字符串 (HH:MM:SS,mmm)"""
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        seconds = seconds % 60
-        milliseconds = int((seconds % 1) * 1000)
-        seconds = int(seconds)
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
+        """将秒数转换为 SRT 格式的时间字符串 (MM:SS)"""
+        minutes = int(float(seconds) // 60)
+        seconds = int(float(seconds) % 60)
+        return f"{minutes:02d}:{seconds:02d}"
         
     def to_srt(self, index):
         """将字幕转换为 SRT 格式"""
-        start_time = self.format_time(self.start_time)
-        end_time = self.format_time(self.end_time)
-        return f"{index}\n{start_time} --> {end_time}\n{self.text}\n"
+        start_mm = int(float(self.start_time) // 60)
+        start_ss = int(float(self.start_time) % 60)
+        end_mm = int(float(self.end_time) // 60)
+        end_ss = int(float(self.end_time) % 60)
+        
+        return f"{index}\n{start_mm:02d}:{start_ss:02d} - {end_mm:02d}:{end_ss:02d}\n{self.text}\n"
