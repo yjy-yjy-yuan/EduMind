@@ -880,9 +880,16 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
       
       // 更新UI显示进度
       if (status === 'processing') {
-        uploadStatus.value = 'processing'
+        uploadStatus.value = ''  // 修改这里，使用空字符串代替'processing'
         uploadProgress.value = Math.round(progress)
         uploadStepInfo.value = currentStep || '处理中...'
+        
+        // 添加这里：当进度首次达到60%时刷新列表
+        if (progress >= 60 && !window.hasRefreshedAt60) {
+          window.hasRefreshedAt60 = true
+          console.log('进度达到60%，刷新视频列表')
+          refreshList()
+        }
       }
       
       // 如果视频处理完成或失败，停止轮询
