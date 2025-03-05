@@ -41,46 +41,17 @@
             您的浏览器不支持 HTML5 视频播放
           </video>
         </div>
-        <div class="video-info-bar">
-          <div class="video-info">
-            <h3>{{ videoTitle }}</h3>
-            <div class="video-details" v-if="video">
-              <p>时长：{{ formatDuration(video?.duration) }}</p>
-              <p>分辨率：{{ video?.width }} x {{ video?.height }}</p>
-              <p>帧率：{{ video?.fps }} FPS</p>
-            </div>
-          </div>
-          <div class="subtitle-controls">
-            <div class="subtitle-toggle">
-              <el-switch
-                v-model="showSubtitles"
-                active-text="显示字幕"
-                inactive-text="隐藏字幕"
-                @change="toggleSubtitles"
-              />
-            </div>
-            <div class="subtitle-download">
-              <el-button-group>
-                <el-button @click="downloadSubtitle('srt', true)">下载SRT字幕</el-button>
-                <el-button @click="downloadSubtitle('vtt', true)">下载VTT字幕</el-button>
-                <el-button @click="downloadSubtitle('txt', true)">下载TXT字幕</el-button>
-              </el-button-group>
-            </div>
-          </div>
-        </div>
       </div>
       <div 
         v-if="isQaExpanded" 
         class="qa-section qa-expanded"
         ref="qaDialog"
-        :style="{ left: dialogPosition.x + 'px', top: dialogPosition.y + 'px' }"
-        @mousedown="startDrag"
       >
-        <div class="qa-header" @mousedown.stop="startDrag">
+        <div class="qa-header">
           <h3>智能问答</h3>
           <el-button 
             type="text" 
-            @click="toggleQaExpansion"
+            @click="toggleQaExpand"
             :icon="Close"
           >
             收起
@@ -112,7 +83,7 @@
           <h3>智能问答</h3>
           <el-button 
             type="text" 
-            @click="toggleQaExpansion"
+            @click="toggleQaExpand"
             :icon="FullScreen"
           >
             展开
@@ -141,34 +112,63 @@
       </div>
     </div>
     <div class="subtitle-section">
-      <div class="subtitle-mode-switch">
-        <el-radio-group v-model="subtitleMode" size="small">
-          <el-radio-button label="realtime">实时字幕</el-radio-button>
-          <el-radio-button label="full">全部字幕</el-radio-button>
-        </el-radio-group>
-      </div>
-      <!-- 实时字幕显示 -->
-      <div v-if="subtitleMode === 'realtime'" class="subtitle-display">
-        <h3>实时字幕</h3>
-        <div class="subtitle-content" v-if="currentSubtitle">
-          {{ currentSubtitle }}
-        </div>
-        <div class="subtitle-placeholder" v-else>
-          字幕将在视频播放时显示...
-        </div>
-      </div>
-      <!-- 全部字幕显示 -->
-      <div v-else class="subtitle-display full-subtitle">
-        <h3>全部字幕</h3>
-        <div class="subtitle-content" v-if="fullSubtitles.length">
-          <div v-for="(sub, index) in fullSubtitles" :key="index" class="subtitle-item"
-               :class="{ 'current': isCurrentSubtitle(sub) }">
-            <span class="subtitle-time">{{ sub.startTime }} - {{ sub.endTime }}</span>
-            <p class="subtitle-text">{{ sub.text }}</p>
+      <div class="video-info-section">
+        <div class="video-info">
+          <h3>{{ videoTitle }}</h3>
+          <div class="video-details" v-if="video">
+            <p>时长：{{ formatDuration(video?.duration) }}</p>
+            <p>分辨率：{{ video?.width }} x {{ video?.height }}</p>
+            <p>帧率：{{ video?.fps }} FPS</p>
           </div>
         </div>
-        <div class="subtitle-placeholder" v-else>
-          正在加载字幕...
+        <div class="subtitle-controls">
+          <div class="subtitle-toggle">
+            <el-switch
+              v-model="showSubtitles"
+              active-text="显示字幕"
+              inactive-text="隐藏字幕"
+              @change="toggleSubtitles"
+            />
+          </div>
+          <div class="subtitle-download">
+            <el-button-group>
+              <el-button @click="downloadSubtitle('srt', true)">下载SRT字幕</el-button>
+              <el-button @click="downloadSubtitle('vtt', true)">下载VTT字幕</el-button>
+              <el-button @click="downloadSubtitle('txt', true)">下载TXT字幕</el-button>
+            </el-button-group>
+          </div>
+        </div>
+      </div>
+      <div class="subtitle-display-container">
+        <div class="subtitle-mode-switch">
+          <el-radio-group v-model="subtitleMode" size="small">
+            <el-radio-button label="realtime">实时字幕</el-radio-button>
+            <el-radio-button label="full">全部字幕</el-radio-button>
+          </el-radio-group>
+        </div>
+        <div class="subtitle-display">
+          <template v-if="subtitleMode === 'realtime'">
+            <div class="subtitle-content" v-if="currentSubtitle">
+              {{ currentSubtitle }}
+            </div>
+            <div class="subtitle-placeholder" v-else>
+              字幕将在视频播放时显示...
+            </div>
+          </template>
+          <template v-else>
+            <div class="subtitle-display full-subtitle">
+              <div class="subtitle-content" v-if="fullSubtitles.length">
+                <div v-for="(sub, index) in fullSubtitles" :key="index" class="subtitle-item"
+                     :class="{ 'current': isCurrentSubtitle(sub) }">
+                  <span class="subtitle-time">{{ formatTimeMMSS(sub.startTime) }} - {{ formatTimeMMSS(sub.endTime) }}</span>
+                  <p class="subtitle-text">{{ sub.text }}</p>
+                </div>
+              </div>
+              <div class="subtitle-placeholder" v-else>
+                正在加载字幕...
+              </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -202,12 +202,7 @@ const question = ref('')
 const isAsking = ref(false)
 const qaHistory = ref([])
 const isQaExpanded = ref(false)
-
-// 对话框位置
-const dialogPosition = ref({ x: 0, y: 0 })
 const qaDialog = ref(null)
-const isDragging = ref(false)
-const dragOffset = ref({ x: 0, y: 0 })
 
 // 计算属性
 const videoUrl = computed(() => {
@@ -230,6 +225,21 @@ const formatDuration = (seconds) => {
   return h > 0
     ? `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
     : `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+}
+
+// 格式化时间为分:秒格式
+const formatTimeMMSS = (timeStr) => {
+  try {
+    const [time] = timeStr.split('.')
+    const [hours, minutes, seconds] = time.split(':')
+    const totalSeconds = parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(seconds)
+    const mm = Math.floor(totalSeconds / 60)
+    const ss = totalSeconds % 60
+    return `${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`
+  } catch (error) {
+    console.error('时间格式转换失败:', error)
+    return '00:00'
+  }
 }
 
 // 视频事件处理
@@ -387,9 +397,9 @@ const parseSrtContent = (content) => {
 // 时间格式转换为秒
 const timeToSeconds = (timeStr) => {
   try {
-    const [time, ms] = timeStr.split(',')
+    const [time] = timeStr.split('.')
     const [hours, minutes, seconds] = time.split(':')
-    return parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(seconds) + parseInt(ms) / 1000
+    return parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(seconds)
   } catch (error) {
     console.error('时间格式转换失败:', error)
     return 0
@@ -413,92 +423,23 @@ const toggleSubtitles = () => {
   }
 }
 
-// 开始拖拽
-const startDrag = (event) => {
-  if (!isQaExpanded.value) return
-  
-  isDragging.value = true
-  const rect = qaDialog.value.getBoundingClientRect()
-  dragOffset.value = {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top
-  }
-  
-  // 添加移动和停止拖拽事件监听
-  document.addEventListener('mousemove', onDrag)
-  document.addEventListener('mouseup', stopDrag)
-}
-
-// 拖拽中
-const onDrag = (event) => {
-  if (!isDragging.value) return
-  
-  // 计算新位置
-  const newX = event.clientX - dragOffset.value.x
-  const newY = event.clientY - dragOffset.value.y
-  
-  // 获取窗口尺寸和对话框尺寸
-  const windowWidth = window.innerWidth
-  const windowHeight = window.innerHeight
-  const dialogRect = qaDialog.value.getBoundingClientRect()
-  
-  // 限制对话框不超出窗口边界
-  dialogPosition.value = {
-    x: Math.min(Math.max(0, newX), windowWidth - dialogRect.width),
-    y: Math.min(Math.max(0, newY), windowHeight - dialogRect.height)
-  }
-}
-
-// 停止拖拽
-const stopDrag = () => {
-  isDragging.value = false
-  document.removeEventListener('mousemove', onDrag)
-  document.removeEventListener('mouseup', stopDrag)
-}
-
-// 展开时初始化位置
-const initDialogPosition = () => {
-  if (!qaDialog.value) return
-  
-  const windowWidth = window.innerWidth
-  const windowHeight = window.innerHeight
-  const dialogRect = qaDialog.value.getBoundingClientRect()
-  
-  dialogPosition.value = {
-    x: (windowWidth - dialogRect.width) / 2,
-    y: (windowHeight - dialogRect.height) / 2
-  }
-}
-
-// 监听展开状态变化
-watch(isQaExpanded, (newValue) => {
-  if (newValue) {
+// 展开逻辑
+const toggleQaExpand = () => {
+  isQaExpanded.value = !isQaExpanded.value
+  if (isQaExpanded.value) {
     nextTick(() => {
-      initDialogPosition()
+      const qaSection = qaDialog.value
+      if (!qaSection) return
+      
+      // 获取未展开时的位置
+      const rect = qaSection.getBoundingClientRect()
+      
+      // 设置展开后的位置
+      qaSection.style.top = `${rect.top}px`
+      qaSection.style.left = `${rect.left}px`
     })
   }
-})
-
-// 组件卸载时清理资源
-onUnmounted(() => {
-  if (subtitleTrackUrl.value) {
-    URL.revokeObjectURL(subtitleTrackUrl.value)
-  }
-})
-
-// 组件挂载时加载视频
-onMounted(async () => {
-  if (route.params.id) {
-    await loadVideo()
-  }
-})
-
-// 监听路由变化
-watch(() => route.params.id, async (newId) => {
-  if (newId) {
-    await loadVideo()
-  }
-}, { immediate: true })
+}
 
 // 下载字幕
 const downloadSubtitle = async (format, isDownload = false) => {
@@ -549,240 +490,249 @@ const askQuestion = async () => {
   }
 }
 
-// 切换问答区域展开/收起
-const toggleQaExpansion = () => {
-  isQaExpanded.value = !isQaExpanded.value
-}
-
-// 重试加载
-const retryLoading = async () => {
-  if (retryCount.value >= 3) {
-    ElMessage.error('重试次数过多，请刷新页面')
-    return
+// 组件卸载时清理资源
+onUnmounted(() => {
+  if (subtitleTrackUrl.value) {
+    URL.revokeObjectURL(subtitleTrackUrl.value)
   }
-  
-  retryCount.value++
-  console.log(`第${retryCount.value}次重试加载视频`)
-  await loadVideo()
-}
+})
+
+// 组件挂载时加载视频
+onMounted(async () => {
+  if (route.params.id) {
+    await loadVideo()
+  }
+})
+
+// 监听路由变化
+watch(() => route.params.id, async (newId) => {
+  if (newId) {
+    await loadVideo()
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>
 .video-player-container {
   display: flex;
-  gap: 20px;
-  padding: 20px;
   height: 100vh;
-  background-color: #f5f7fa;
+  background-color: #1a1a1a;
 }
 
 .left-section {
-  flex: 1;
+  flex: 5.5;
   display: flex;
   flex-direction: column;
+  padding: 20px;
   gap: 20px;
-  max-width: 50%;
+  overflow: hidden;
+}
+
+.subtitle-section {
+  flex: 4.5;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  background-color: #2a2a2a;
+  overflow: hidden;
+}
+
+.video-info-section {
+  flex: 0.2;
+  background-color: #1a1a1a;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 15px;
+  min-height: fit-content;
+}
+
+.subtitle-display-container {
+  flex: 0.8;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.video-info h3 {
+  color: #fff;
+  margin: 0 0 8px 0;
+  font-size: 16px;
+}
+
+.video-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: #aaa;
+  font-size: 13px;
+}
+
+.subtitle-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.subtitle-toggle {
+  display: flex;
+  justify-content: center;
+}
+
+.subtitle-download {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
 }
 
 .video-wrapper {
-  background-color: #fff;
+  flex: 0.4;
+  display: flex;
+  flex-direction: column;
+  background-color: #2a2a2a;
   border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  min-height: 300px;
 }
 
 .video-section {
   position: relative;
   width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background-color: #000;
-  overflow: hidden;
 }
 
 .video-element {
   width: 100%;
-  display: block;
-}
-
-.video-info-bar {
-  padding: 15px;
-  border-top: 1px solid #eee;
-}
-
-.video-info {
-  margin-bottom: 15px;
-}
-
-.video-info h3 {
-  margin: 0 0 10px 0;
-  font-size: 16px;
-  color: #333;
-}
-
-.video-details {
-  display: flex;
-  gap: 15px;
-  font-size: 13px;
-  color: #666;
-}
-
-.subtitle-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 15px;
+  height: 100%;
+  object-fit: contain;
+  max-height: 100%;
 }
 
 .qa-section {
-  margin-top: 20px;
-  background: #fff;
+  flex: 0.6;
+  display: flex;
+  flex-direction: column;
+  background-color: #2a2a2a;
   border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-  max-height: 300px;
   overflow: hidden;
 }
 
 .qa-section.qa-expanded {
-  position: fixed;
-  transform: none;
+  position: absolute;
+  width: 40%;
+  height: 80%;
   z-index: 1000;
-  width: 800px;
-  max-height: 600px;
-  background: #1a1a1a;
-  color: #ffffff;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-  cursor: move;
-}
-
-.qa-section.qa-expanded .qa-header {
-  background: #2a2a2a;
-  border-bottom: 1px solid #3a3a3a;
-  padding: 15px 20px;
-}
-
-.qa-section.qa-expanded h3 {
-  color: #ffffff;
-  font-size: 18px;
-}
-
-.qa-section.qa-expanded .qa-content {
-  background: #1a1a1a;
-}
-
-.qa-section.qa-expanded .qa-item {
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-}
-
-.qa-section.qa-expanded .qa-text {
-  color: #ffffff;
-}
-
-.qa-section.qa-expanded .el-input__inner,
-.qa-section.qa-expanded .el-textarea__inner {
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  color: #ffffff;
-}
-
-.qa-section.qa-expanded .el-button--text {
-  color: #ffffff;
-}
-
-.qa-section.qa-expanded::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  z-index: -1;
+  background-color: #2a2a2a;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  transition: all 0.3s ease;
 }
 
 .qa-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 20px;
-  border-bottom: 1px solid #eee;
+  background-color: #1a1a1a;
+  padding: 12px 15px;
+  min-height: 40px;
+}
+
+.qa-header h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #fff;
 }
 
 .qa-content {
-  padding: 20px;
-  height: calc(100% - 50px);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 15px;
+  gap: 15px;
   overflow-y: auto;
 }
 
 .qa-input {
-  margin-bottom: 20px;
   display: flex;
   gap: 10px;
+  margin-bottom: 10px;
+}
+
+.qa-input .el-textarea {
+  flex: 1;
+}
+
+.qa-input .el-button {
+  align-self: flex-start;
 }
 
 .qa-history {
-  height: calc(100% - 80px);
+  flex: 1;
   overflow-y: auto;
 }
 
-.qa-item {
-  margin-bottom: 15px;
-  padding: 10px;
-  border-radius: 4px;
-  background: #f5f7fa;
+.qa-history ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
-.question, .answer {
+.qa-item {
+  background-color: #1a1a1a;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.qa-item .question,
+.qa-item .answer {
   display: flex;
-  align-items: start;
+  align-items: flex-start;
   gap: 8px;
   margin-bottom: 8px;
 }
 
+.qa-item .answer {
+  margin-bottom: 0;
+}
+
 .qa-icon {
+  flex-shrink: 0;
   font-size: 16px;
-  color: #409eff;
+  margin-top: 3px;
 }
 
 .qa-text {
   flex: 1;
+  color: #fff;
   line-height: 1.5;
   word-break: break-word;
 }
 
-/* 添加遮罩层 */
-.qa-section.qa-expanded::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: -1;
-}
-
-.subtitle-section {
-  flex: 1;
-  background-color: #fff;
-  border-radius: 8px;
-  padding: 15px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 .subtitle-mode-switch {
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   text-align: center;
+  padding: 8px;
+  background-color: #1a1a1a;
+  border-radius: 8px;
 }
 
 .subtitle-display {
   flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  background-color: #1a1a1a;
+  border-radius: 8px;
+  padding: 15px;
+  overflow-y: auto;
+}
+
+.subtitle-content {
+  color: #fff;
+  line-height: 1.6;
 }
 
 .full-subtitle {
@@ -793,39 +743,29 @@ const retryLoading = async () => {
   border-radius: 6px;
 }
 
-.subtitle-content {
-  height: 100%;
-  overflow-y: auto;
-  padding: 10px;
-  background-color: #f5f7fa;
-  border-radius: 6px;
-}
-
 .subtitle-item {
   padding: 12px;
   margin: 8px 0;
-  border-radius: 6px;
-  background-color: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
+  background-color: #2a2a2a;
+  border-radius: 8px;
+  transition: background-color 0.3s;
 }
 
 .subtitle-item.current {
-  background-color: #ecf5ff;
+  background-color: #3a3a3a;
   border-left: 3px solid #409eff;
 }
 
 .subtitle-time {
-  font-size: 12px;
-  color: #909399;
   display: block;
-  margin-bottom: 4px;
+  color: #909399;
+  font-size: 12px;
+  margin-bottom: 8px;
 }
 
 .subtitle-text {
-  margin: 4px 0 0;
-  color: #333;
-  font-size: 14px;
+  color: #fff;
+  margin: 0;
   line-height: 1.6;
 }
 
@@ -833,48 +773,66 @@ const retryLoading = async () => {
   color: #909399;
   text-align: center;
   padding: 20px;
-  background-color: #f5f7fa;
-  border-radius: 6px;
-  margin: 10px 0;
+  background-color: #2a2a2a;
+  border-radius: 8px;
 }
 
 /* 美化滚动条 */
-.full-subtitle::-webkit-scrollbar,
+.subtitle-display::-webkit-scrollbar,
 .qa-history::-webkit-scrollbar {
   width: 6px;
 }
 
-.full-subtitle::-webkit-scrollbar-track,
+.subtitle-display::-webkit-scrollbar-track,
 .qa-history::-webkit-scrollbar-track {
-  background: #f5f7fa;
+  background: #2a2a2a;
 }
 
-.full-subtitle::-webkit-scrollbar-thumb,
+.subtitle-display::-webkit-scrollbar-thumb,
 .qa-history::-webkit-scrollbar-thumb {
-  background-color: #dcdfe6;
+  background-color: #4a4a4a;
   border-radius: 3px;
 }
 
-.full-subtitle::-webkit-scrollbar-thumb:hover,
+.subtitle-display::-webkit-scrollbar-thumb:hover,
 .qa-history::-webkit-scrollbar-thumb:hover {
   background-color: #5a5a5a;
 }
 
-.qa-section.qa-expanded ::-webkit-scrollbar {
-  width: 8px;
+.video-info {
+  margin-bottom: 15px;
 }
 
-.qa-section.qa-expanded ::-webkit-scrollbar-track {
-  background: #2a2a2a;
+.video-info h3 {
+  color: #fff;
+  margin: 0 0 10px 0;
+  font-size: 18px;
 }
 
-.qa-section.qa-expanded ::-webkit-scrollbar-thumb {
-  background-color: #4a4a4a;
-  border-radius: 4px;
+.video-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  color: #aaa;
+  font-size: 14px;
 }
 
-.qa-section.qa-expanded ::-webkit-scrollbar-thumb:hover {
-  background-color: #5a5a5a;
+.subtitle-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.subtitle-toggle {
+  display: flex;
+  justify-content: center;
+}
+
+.subtitle-download {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
 }
 
 .loading-overlay,
@@ -888,8 +846,8 @@ const retryLoading = async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(0, 0, 0, 0.8);
   color: #fff;
-  gap: 10px;
+  z-index: 10;
 }
 </style>
