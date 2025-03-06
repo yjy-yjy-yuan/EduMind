@@ -3,6 +3,7 @@ from ..models import Video, Subtitle
 import whisper
 import logging
 import os
+from tqdm import tqdm
 
 @celery.task(name='app.tasks.subtitle_tasks.generate_subtitles')
 def generate_subtitles(video_id, language='zh', model_name='base'):
@@ -25,11 +26,32 @@ def generate_subtitles(video_id, language='zh', model_name='base'):
             
         # 加载Whisper模型
         logging.info(f"正在加载Whisper模型: {model_name}")
-        model = whisper.load_model(model_name)
+        with tqdm(total=1, desc="加载模型", unit="模型", ncols=100) as pbar:
+            model = whisper.load_model(model_name)
+            pbar.update(1)
         
         # 开始转写
         logging.info("开始转写音频...")
-        result = model.transcribe(video_path, language=language)
+        # 使用自定义回调函数来更新进度条
+        class ProgressCallback:
+            def __init__(self):
+                self.pbar = tqdm(total=100, desc="转写音频", unit="%", ncols=100)
+                self.last_progress = 0
+                
+            def __call__(self, progress):
+                # progress是0到1之间的值
+                current_progress = int(progress * 100)
+                update_amount = current_progress - self.last_progress
+                if update_amount > 0:
+                    self.pbar.update(update_amount)
+                    self.last_progress = current_progress
+                    
+            def close(self):
+                self.pbar.close()
+                
+        progress_callback = ProgressCallback()
+        result = model.transcribe(video_path, language=language, verbose=True, progress_callback=progress_callback)
+        progress_callback.close()
         
         # 保存字幕
         logging.info("正在保存字幕...")
@@ -38,15 +60,17 @@ def generate_subtitles(video_id, language='zh', model_name='base'):
             Subtitle.query.filter_by(video_id=video_id).delete()
             
             # 添加新的字幕
-            for segment in result["segments"]:
-                subtitle = Subtitle(
-                    video_id=video_id,
-                    start_time=round(segment["start"]),
-                    end_time=round(segment["end"]),
-                    text=segment["text"],
-                    language=language
-                )
-                db.session.add(subtitle)
+            with tqdm(total=len(result["segments"]), desc="保存字幕", unit="段", ncols=100) as pbar:
+                for segment in result["segments"]:
+                    subtitle = Subtitle(
+                        video_id=video_id,
+                        start_time=round(segment["start"]),
+                        end_time=round(segment["end"]),
+                        text=segment["text"],
+                        language=language
+                    )
+                    db.session.add(subtitle)
+                    pbar.update(1)
                 
             db.session.commit()
             return {
