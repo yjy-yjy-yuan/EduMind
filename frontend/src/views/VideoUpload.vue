@@ -850,7 +850,7 @@ const startPollingProcessStatus = (videoId) => {
   }
   
   let attempts = 0
-  const maxAttempts = 240 // 最多轮询20分钟 (240次 * 5秒)
+  const maxAttempts = 720 // 最多轮询60分钟 (360次 * 5秒)
   
   console.log(`开始轮询视频${videoId}的处理状态`)
   
