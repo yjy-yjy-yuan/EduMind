@@ -906,13 +906,23 @@ def get_subtitle(video_id):
         current_app.logger.info(f'读取字幕文件: {subtitle_path}')
         with open(subtitle_path, 'r', encoding='utf-8') as f:
             content = f.read()
-            
-        # 如果请求VTT格式，转换SRT为VTT
-        if format_type.lower() == 'vtt':
+        
+        # 根据请求的格式处理字幕内容
+        format_type = format_type.lower()
+        if format_type == 'vtt':
             current_app.logger.info('转换为VTT格式')
             vtt_content = 'WEBVTT\n\n' + content.replace(',', '.')
             response = make_response(vtt_content)
             response.headers['Content-Type'] = 'text/vtt; charset=utf-8'
+        elif format_type == 'txt':
+            current_app.logger.info('转换为TXT格式')
+            # 解析SRT内容，提取纯文本
+            import re
+            # 移除时间戳和序号，只保留文本内容
+            txt_content = re.sub(r'^\d+\s*\n\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}\s*\n', '', content, flags=re.MULTILINE)
+            txt_content = re.sub(r'^\s*\n', '', txt_content, flags=re.MULTILINE)  # 移除空行
+            response = make_response(txt_content)
+            response.headers['Content-Type'] = 'text/plain; charset=utf-8'
         else:
             current_app.logger.info('返回SRT格式')
             response = make_response(content)
