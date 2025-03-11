@@ -1,8 +1,60 @@
 <template>
   <div class="video-player-container">
+    <!-- 侧边栏开关按钮 -->
+    <div class="sidebar-toggle" @click="toggleSidebar">
+      <el-icon><arrow-right v-if="!sidebarVisible" /><arrow-left v-else /></el-icon>
+    </div>
+    
+    <!-- 侧边栏 -->
+    <div class="sidebar" :class="{ 'sidebar-visible': sidebarVisible }">
+      <div class="sidebar-header">
+        <h3>功能导航</h3>
+        <el-icon class="close-icon" @click="toggleSidebar"><close /></el-icon>
+      </div>
+      <div class="sidebar-content">
+        <!-- 功能列表 -->
+        <div class="sidebar-menu">
+          <div class="menu-item" @click="navigateToHome">
+            <el-icon><home-filled /></el-icon>
+            <span>返回首页</span>
+          </div>
+          <div class="menu-item" @click="navigateToVideoUpload">
+            <el-icon><video-camera /></el-icon>
+            <span>分析新视频</span>
+          </div>
+          
+          <!-- 已分析视频列表 -->
+          <div class="menu-section">
+            <h4>已分析视频</h4>
+            <div class="video-list" v-if="processedVideos.length > 0">
+              <div class="video-item" 
+                   v-for="video in processedVideos" 
+                   :key="video.id"
+                   @click="navigateToVideo(video.id)">
+                <div class="video-thumbnail" :style="video.thumbnail ? `background-image: url(${video.thumbnail})` : ''"></div>
+                <div class="video-info">
+                  <div class="video-title">{{ video.title || '未命名视频' }}</div>
+                  <div class="video-duration">{{ formatDuration(video.duration) }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="empty-list" v-else>
+              <el-icon><video-camera /></el-icon>
+              <span>暂无已处理视频</span>
+            </div>
+          </div>
+          
+          <div class="menu-item" @click="showHelpDialog">
+            <el-icon><document /></el-icon>
+            <span>帮助文档</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    
     <!-- 左侧区域 -->
-    <div class="left-section">
-      <!-- 上方区域：视频播放区域(70%)和视频播放器(30%)的左右布局 -->
+    <div class="left-section" :class="{ 'with-sidebar': sidebarVisible }">
+      <!-- 左侧上方区域：视频播放区域(70%)和视频播放器(30%)的左右布局 -->
       <div class="upper-section">
         <!-- 视频播放区域 -->
         <div class="video-main-area">
@@ -170,6 +222,71 @@
         </div>
       </div>
     </div>
+    
+    <!-- 帮助文档对话框 -->
+    <el-dialog
+      v-model="helpDialogVisible"
+      title="AI-EdVision 使用帮助"
+      width="60%"
+      :before-close="closeHelpDialog"
+    >
+      <div class="help-content">
+        <h3>欢迎使用 AI-EdVision 智能教育视频分析系统</h3>
+    
+        <div class="help-section">
+          <h4>1. 视频播放与字幕</h4>
+          <ul>
+            <li><strong>播放控制</strong>：使用视频播放器底部的控制栏进行播放、暂停、音量调节等操作。</li>
+            <li><strong>字幕显示</strong>：视频右侧会自动显示当前播放位置的字幕内容。</li>
+            <li><strong>字幕下载</strong>：点击字幕区域顶部的"下载字幕"按钮，可以下载SRT或TXT格式的字幕文件。</li>
+          </ul>
+        </div>
+    
+        <div class="help-section">
+          <h4>2. 智能问答功能</h4>
+          <ul>
+            <li><strong>提问</strong>：在视频右侧底部的问答区域，输入您的问题并点击发送按钮。</li>
+            <li><strong>查看回答</strong>：系统会基于视频内容智能分析并给出回答。</li>
+            <li><strong>清空对话</strong>：点击"清空对话"按钮可以清除当前的问答记录。</li>
+          </ul>
+        </div>
+    
+        <div class="help-section">
+          <h4>3. 侧边栏功能</h4>
+          <ul>
+            <li><strong>打开/关闭侧边栏</strong>：点击视频播放页面左上角的菜单按钮。</li>
+            <li><strong>返回首页</strong>：点击"返回首页"可以回到系统主页。</li>
+            <li><strong>分析新视频</strong>：点击"分析新视频"可以上传并处理新的视频文件。</li>
+            <li><strong>已分析视频</strong>：显示所有已处理完成的视频列表，点击任意视频可以直接播放。</li>
+          </ul>
+        </div>
+    
+        <div class="help-section">
+          <h4>4. 常见问题</h4>
+          <ul>
+            <li><strong>视频无法播放</strong>：请检查网络连接或刷新页面后重试。</li>
+            <li><strong>字幕不同步</strong>：可能是视频处理过程中的轻微误差，通常不影响整体使用。</li>
+            <li><strong>问答没有回复</strong>：请确保问题清晰明确，并与视频内容相关。</li>
+          </ul>
+        </div>
+    
+        <div class="help-section">
+          <h4>5. 使用技巧</h4>
+          <ul>
+            <li>提问时尽量使用视频中出现的关键词，可以获得更准确的回答。</li>
+            <li>点击字幕可以快速定位到视频的相应位置。</li>
+            <li>处理较长的视频可能需要更多时间，请耐心等待。</li>
+          </ul>
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="closeHelpDialog">关闭</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+
   </div>
 </template>
 
@@ -179,9 +296,10 @@ import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElLoading } from 'element-plus';
 import { 
   Loading, Warning, FullScreen, Close, 
-  QuestionFilled, ChatLineSquare, ArrowDown as ArrowDown
+  QuestionFilled, ChatLineSquare, ArrowDown as ArrowDown,
+  ArrowRight, ArrowLeft, HomeFilled, VideoCamera, Document
 } from '@element-plus/icons-vue';
-import { getVideo, getSubtitle } from '@/api/video';
+import { getVideo, getSubtitle, getVideoList, getVideoPreview } from '@/api/video';
 import { sendChatMessage } from '@/api/chat';
 import request from '@/utils/request';
 
@@ -216,6 +334,15 @@ const qaMode = ref('video');
 const question = ref('');
 const isAsking = ref(false);
 const qaHistory = ref([]);
+
+// 侧边栏状态
+const sidebarVisible = ref(false);
+
+// 帮助文档对话框状态
+const helpDialogVisible = ref(false);
+
+// 已处理视频列表
+const processedVideos = ref([]);
 
 // 加载视频信息
 const loadVideoInfo = async () => {
@@ -390,6 +517,76 @@ const downloadSubtitle = async (format, showMessage = false) => {
   }
 };
 
+// 获取已处理视频列表
+const fetchProcessedVideos = async () => {
+  try {
+    const response = await getVideoList();
+    console.log('视频列表响应:', response);
+    
+    // 处理不同的数据结构
+    let videoList = [];
+    
+    if (response && response.data) {
+      if (Array.isArray(response.data)) {
+        // 如果是数组，直接使用
+        videoList = response.data;
+      } else if (response.data.videos && Array.isArray(response.data.videos)) {
+        // 如果数据在videos字段中
+        videoList = response.data.videos;
+      } else if (typeof response.data === 'object') {
+        // 尝试将对象转换为数组
+        videoList = Object.values(response.data);
+      }
+    }
+    
+    // 过滤已处理的视频
+    const filteredVideos = videoList.filter(video => 
+      video && (video.status === 'completed' || video.status === 'processed')
+    );
+    
+    // 为每个视频加载预览图
+    processedVideos.value = await Promise.all(filteredVideos.map(async (video) => {
+      try {
+        // 获取预览图
+        const previewResponse = await getVideoPreview(video.id);
+        // 确保响应是一个有效的Blob对象
+        if (previewResponse && previewResponse.data instanceof Blob) {
+          // 创建预览图URL
+          const previewUrl = URL.createObjectURL(previewResponse.data);
+          // 添加预览图URL到视频对象
+          return { ...video, thumbnail: previewUrl };
+        } else {
+          console.warn(`视频 ${video.id} 预览图响应不是有效的Blob:`, previewResponse);
+          return video;
+        }
+      } catch (error) {
+        console.error(`获取视频 ${video.id} 预览图失败:`, error);
+        return video;
+      }
+    }));
+  } catch (error) {
+    console.error('获取视频列表失败:', error);
+    processedVideos.value = [];
+  }
+};
+
+// 导航到指定视频
+const navigateToVideo = (videoId) => {
+  if (videoId === Number(route.params.id)) {
+    // 如果是当前视频，关闭侧边栏
+    sidebarVisible.value = false;
+  } else {
+    // 关闭侧边栏
+    sidebarVisible.value = false;
+    
+    // 跳转到新视频
+    router.push(`/player/${videoId}`).then(() => {
+      // 页面跳转后刷新页面
+      window.location.reload();
+    });
+  }
+};
+
 // 问答功能
 const askQuestion = async () => {
   if (!question.value.trim()) {
@@ -446,11 +643,10 @@ const formatTimeMMSS = (seconds) => {
 
 // 格式化时长
 const formatDuration = (seconds) => {
-  if (!seconds && seconds !== 0) return '00:00:00';
-  const hours = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  if (!seconds && seconds !== 0) return '00:00';
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
 
 // 监听视频时间更新
@@ -470,6 +666,7 @@ onMounted(async () => {
   
   await loadVideoInfo();
   await loadSubtitles();
+  await fetchProcessedVideos();
   setupTimeUpdateListener();
 });
 
@@ -489,6 +686,41 @@ const cleanupEventListeners = () => {
 onUnmounted(() => {
   cleanupEventListeners();
 });
+
+// 切换侧边栏显示状态
+const toggleSidebar = () => {
+  sidebarVisible.value = !sidebarVisible.value;
+};
+
+// 跳转到指定时间
+const seekToTime = (time) => {
+  if (videoPlayer.value) {
+    videoPlayer.value.currentTime = time;
+    videoPlayer.value.play();
+  }
+};
+
+// 导航到首页
+const navigateToHome = () => {
+  router.push('/');
+};
+
+// 显示帮助文档对话框
+const showHelpDialog = () => {
+  helpDialogVisible.value = true;
+  // 如果侧边栏是打开的，关闭它
+  sidebarVisible.value = false;
+};
+
+// 关闭帮助文档对话框
+const closeHelpDialog = () => {
+  helpDialogVisible.value = false;
+};
+
+// 导航到视频上传/管理页面
+const navigateToVideoUpload = () => {
+  router.push('/video/upload');
+};
 </script>
 
 <style scoped>
@@ -498,6 +730,103 @@ onUnmounted(() => {
   background-color: #1a1a1a;
 }
 
+.help-content {
+  max-height: 65vh;
+  overflow-y: auto;
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
+}
+
+.help-content h3 {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 25px;
+  font-size: 1.8rem;
+  position: relative;
+  padding-bottom: 10px;
+}
+
+.help-content h3:after {
+  content: "";
+  position: absolute;
+  width: 80px;
+  height: 3px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 3px;
+}
+
+.help-section {
+  margin-bottom: 30px;
+  background-color: white;
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.help-section:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 15px 0 rgba(0, 0, 0, 0.1);
+}
+
+.help-section h4 {
+  margin-bottom: 15px;
+  color: #409EFF;
+  border-bottom: 2px solid #EBEEF5;
+  padding-bottom: 8px;
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+}
+
+.help-section h4:before {
+  content: "•";
+  color: #409EFF;
+  margin-right: 8px;
+  font-size: 1.5rem;
+}
+
+.help-section ul {
+  padding-left: 20px;
+  list-style-type: none;
+}
+
+.help-section li {
+  margin-bottom: 12px;
+  line-height: 1.6;
+  position: relative;
+  padding-left: 22px;
+}
+
+.help-section li:before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: #67C23A;
+  font-weight: bold;
+}
+
+.help-section li strong {
+  color: #606266;
+  font-weight: 600;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.dialog-footer .el-button {
+  padding: 10px 25px;
+  font-size: 1rem;
+}
+
 .left-section {
   flex: 6; /* 左侧栏占比6 */
   display: flex;
@@ -505,6 +834,32 @@ onUnmounted(() => {
   padding: 20px;
   gap: 20px;
   overflow: hidden;
+}
+
+.help-content {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0 10px;
+}
+
+.help-section {
+  margin-bottom: 20px;
+}
+
+.help-section h4 {
+  margin-bottom: 10px;
+  color: #409EFF;
+  border-bottom: 1px solid #EBEEF5;
+  padding-bottom: 5px;
+}
+
+.help-section ul {
+  padding-left: 20px;
+}
+
+.help-section li {
+  margin-bottom: 8px;
+  line-height: 1.5;
 }
 
 .subtitle-section {
@@ -690,6 +1045,266 @@ onUnmounted(() => {
   word-break: break-word;
 }
 
+/* 侧边栏样式 */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: -300px; /* 使用固定宽度而不是百分比 */
+  width: 300px;
+  height: 100%;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2c3e50 100%);
+  transition: all 0.3s ease;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 3px 0 15px rgba(0, 0, 0, 0.3);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-visible {
+  left: 0;
+}
+
+.sidebar-toggle {
+  position: fixed;
+  top: 20px; /* 放在页面顶部而不是中间 */
+  left: 20px;
+  background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
+  color: #fff;
+  padding: 12px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.sidebar-toggle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  letter-spacing: 1px;
+}
+
+.close-icon {
+  cursor: pointer;
+  font-size: 20px;
+  color: #fff;
+  transition: transform 0.3s ease;
+}
+
+.close-icon:hover {
+  transform: rotate(90deg);
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 100%);
+}
+
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-left: 3px solid transparent;
+}
+
+.menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  transform: translateX(5px);
+  border-left: 3px solid #67C23A;
+}
+
+.menu-item .el-icon {
+  font-size: 22px;
+  color: #67C23A;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.menu-item:hover .el-icon {
+  transform: scale(1.1);
+  color: #fff;
+  background: #67C23A;
+}
+
+.menu-item span {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.menu-section {
+  margin-top: 25px;
+  margin-bottom: 20px;
+}
+
+.menu-section h4 {
+  color: #fff;
+  font-size: 18px;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(103, 194, 58, 0.5);
+  position: relative;
+  display: inline-block;
+}
+
+.menu-section h4:after {
+  content: "";
+  position: absolute;
+  width: 40%;
+  height: 2px;
+  background: #67C23A;
+  bottom: -2px;
+  left: 0;
+}
+
+.video-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.video-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background-color: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-left: 3px solid transparent;
+  overflow: hidden;
+}
+
+.video-item:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  transform: translateX(5px);
+  border-left: 3px solid #409EFF;
+}
+
+.video-thumbnail {
+  width: 100px;
+  height: 56px;
+  background-color: #333;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+}
+
+.video-item:hover .video-thumbnail {
+  transform: scale(1.05);
+}
+
+.video-thumbnail:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0) 50%, rgba(0,0,0,0.7) 100%);
+}
+
+.video-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.video-title {
+  font-size: 15px;
+  color: #fff;
+  margin-bottom: 8px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.3;
+}
+
+.video-duration {
+  font-size: 13px;
+  color: #67C23A;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.video-duration:before {
+  content: "⏱";
+  font-size: 12px;
+}
+
+.empty-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  padding: 40px 0;
+  color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.empty-list .el-icon {
+  font-size: 40px;
+  color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 15px;
+  border-radius: 50%;
+}
+
+.empty-list span {
+  font-size: 16px;
+}
+
 .subtitle-display-container {
   flex: 1;
   display: flex;
@@ -831,5 +1446,239 @@ onUnmounted(() => {
   background-color: rgba(0, 0, 0, 0.8);
   color: #fff;
   z-index: 10;
+}
+
+/* 侧边栏样式 */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: -25%;
+  width: 25%;
+  height: 100%;
+  background-color: #1a1a1a;
+  transition: left 0.3s ease;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-visible {
+  left: 0;
+}
+
+.sidebar-toggle {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  background-color: #1a1a1a;
+  color: #fff;
+  padding: 15px 5px;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background-color: #2a2a2a;
+  border-bottom: 1px solid #333;
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 16px;
+}
+
+.close-icon {
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+}
+
+.sidebar-section {
+  margin-bottom: 20px;
+}
+
+.sidebar-section h4 {
+  color: #ddd;
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  border-bottom: 1px solid #333;
+  padding-bottom: 5px;
+}
+
+.chapter-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.chapter-list li {
+  padding: 8px 10px;
+  margin: 5px 0;
+  background-color: #2a2a2a;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  transition: background-color 0.2s;
+}
+
+.chapter-list li:hover {
+  background-color: #333;
+}
+
+.chapter-list li.active {
+  background-color: #409eff;
+}
+
+.chapter-time {
+  color: #aaa;
+  font-size: 12px;
+  margin-right: 10px;
+  min-width: 45px;
+}
+
+.chapter-title {
+  color: #fff;
+  font-size: 13px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.left-section.with-sidebar {
+  margin-left: 25%;
+  transition: margin-left 0.3s ease;
+}
+
+/* 侧边栏菜单样式 */
+.sidebar-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  background-color: #2a2a2a;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.menu-item:hover {
+  background-color: #333;
+}
+
+.menu-item .el-icon {
+  font-size: 18px;
+  color: #409eff;
+}
+
+.menu-item span {
+  color: #fff;
+  font-size: 14px;
+}
+
+.menu-section {
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.menu-section h4 {
+  color: #ddd;
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  border-bottom: 1px solid #333;
+  padding-bottom: 5px;
+}
+
+.video-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.video-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background-color: #2a2a2a;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.video-item:hover {
+  background-color: #333;
+}
+
+.video-thumbnail {
+  width: 60px;
+  height: 40px;
+  background-color: #333;
+  background-size: cover;
+  background-position: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.video-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.video-title {
+  color: #fff;
+  font-size: 13px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.video-duration {
+  color: #aaa;
+  font-size: 12px;
+}
+
+.empty-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background-color: #2a2a2a;
+  border-radius: 6px;
+  color: #aaa;
+  gap: 10px;
+}
+
+.empty-list .el-icon {
+  font-size: 24px;
+  color: #555;
 }
 </style>
