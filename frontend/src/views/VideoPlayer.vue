@@ -285,8 +285,6 @@
         </span>
       </template>
     </el-dialog>
-
-
   </div>
 </template>
 
@@ -724,12 +722,29 @@ const navigateToVideoUpload = () => {
 </script>
 
 <style scoped>
+/*视频播放容器*/
 .video-player-container {
   display: flex;
   height: 100vh;
-  background-color: #1a1a1a;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d3436 100%);
+  position: relative;
+  overflow: hidden;
 }
 
+/* 添加背景点缀效果 */
+.video-player-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="none"/><circle cx="10" cy="10" r="1" fill="rgba(255,255,255,0.05)"/></svg>');
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 帮助文档 */
 .help-content {
   max-height: 65vh;
   overflow-y: auto;
@@ -921,13 +936,16 @@ const navigateToVideoUpload = () => {
 .video-info-section {
   display: flex;
   flex-direction: column;
-  background-color: #1a1a1a;
-  border-radius: 8px;
-  padding: 12px;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2c3e50 100%);
+  border-radius: 12px;
+  padding: 20px;
   height: 100%;
   overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+/* 视频播放区域 */ 
 .video-section {
   position: relative;
   width: 100%;
@@ -935,7 +953,10 @@ const navigateToVideoUpload = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #000;
+  background: linear-gradient(135deg, #000 0%, #111 100%);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
 }
 
 .video-element {
@@ -943,30 +964,59 @@ const navigateToVideoUpload = () => {
   height: 100%;
   object-fit: contain;
   max-height: 100%;
+  transition: all 0.3s ease;
 }
 
+/* 问答区域 */
 .qa-section {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: #2a2a2a;
-  border-radius: 8px;
+  background: linear-gradient(135deg, #2a2a2a 0%, #1e272e 100%);
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.qa-section:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
 }
 
 .qa-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #1a1a1a;
-  padding: 8px 15px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  padding: 15px 20px;
   min-height: 30px;
+  border-radius: 12px 12px 0 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.qa-header::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.1) 75%, transparent 75%, transparent);
+  background-size: 10px 10px;
+  opacity: 0.2;
+  pointer-events: none;
 }
 
 .qa-header h3 {
   margin: 0;
-  font-size: 14px;
   color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  letter-spacing: 1px;
 }
 
 .qa-header-actions {
@@ -990,16 +1040,42 @@ const navigateToVideoUpload = () => {
 
 .qa-input {
   display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 15px;
+  margin-bottom: 15px;
 }
 
 .qa-input .el-textarea {
   flex: 1;
 }
 
+.qa-input .el-textarea__inner {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.qa-input .el-textarea__inner:focus {
+  border-color: #409EFF;
+  box-shadow: 0 0 10px rgba(64, 158, 255, 0.3);
+}
+
 .qa-input .el-button {
   align-self: flex-start;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  border: none;
+  border-radius: 8px;
+  padding: 12px 25px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.qa-input .el-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
 .qa-history {
@@ -1014,10 +1090,24 @@ const navigateToVideoUpload = () => {
 }
 
 .qa-item {
-  background-color: #1a1a1a;
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.qa-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
 .qa-item .question,
@@ -1034,15 +1124,27 @@ const navigateToVideoUpload = () => {
 
 .qa-icon {
   flex-shrink: 0;
-  font-size: 16px;
+  font-size: 18px;
   margin-top: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 8px;
+  border-radius: 50%;
+  color: #409EFF;
+}
+
+.qa-item .answer .qa-icon {
+  color: #67C23A;
 }
 
 .qa-text {
   flex: 1;
   color: #fff;
-  line-height: 1.5;
+  line-height: 1.6;
   word-break: break-word;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  position: relative;
 }
 
 /* 侧边栏样式 */
@@ -1376,25 +1478,32 @@ const navigateToVideoUpload = () => {
 }
 
 /* 美化滚动条 */
+/* 美化滚动条 */
 .subtitle-display::-webkit-scrollbar,
-.qa-history::-webkit-scrollbar {
+.qa-history::-webkit-scrollbar,
+.sidebar-content::-webkit-scrollbar {
   width: 6px;
 }
 
 .subtitle-display::-webkit-scrollbar-track,
-.qa-history::-webkit-scrollbar-track {
-  background: #2a2a2a;
-}
-
-.subtitle-display::-webkit-scrollbar-thumb,
-.qa-history::-webkit-scrollbar-thumb {
-  background-color: #4a4a4a;
+.qa-history::-webkit-scrollbar-track,
+.sidebar-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
   border-radius: 3px;
 }
 
+.subtitle-display::-webkit-scrollbar-thumb,
+.qa-history::-webkit-scrollbar-thumb,
+.sidebar-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  transition: all 0.3s ease;
+}
+
 .subtitle-display::-webkit-scrollbar-thumb:hover,
-.qa-history::-webkit-scrollbar-thumb:hover {
-  background-color: #5a5a5a;
+.qa-history::-webkit-scrollbar-thumb:hover,
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .video-info {
@@ -1404,27 +1513,63 @@ const navigateToVideoUpload = () => {
 
 .video-info h3 {
   color: #fff;
-  margin: 0 0 10px 0;
-  font-size: 18px;
+  margin: 0 0 15px 0;
+  font-size: 20px;
+  font-weight: 600;
+  padding-bottom: 10px;
+  border-bottom: 2px solid rgba(64, 158, 255, 0.3);
+  position: relative;
+}
+
+.video-info h3:after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 50px;
+  height: 2px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
 }
 
 .video-details {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  color: #aaa;
+  gap: 12px;
+  color: #ddd;
   font-size: 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.video-details p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.video-details p:before {
+  content: "•";
+  color: #67C23A;
+  font-size: 18px;
 }
 
 .subtitle-controls {
   display: flex;
   flex-direction: column;
   gap: 15px;
+  margin-top: 20px;
 }
 
 .subtitle-toggle {
   display: flex;
   justify-content: center;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .subtitle-download {
@@ -1432,6 +1577,26 @@ const navigateToVideoUpload = () => {
   justify-content: center;
 }
 
+.subtitle-download .el-dropdown {
+  width: 100%;
+}
+
+.subtitle-download .el-button {
+  width: 100%;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.subtitle-download .el-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* 加载和错误提示美化 */
 .loading-overlay,
 .error-overlay {
   position: absolute;
@@ -1443,9 +1608,51 @@ const navigateToVideoUpload = () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.8);
   color: #fff;
   z-index: 10;
+  backdrop-filter: blur(5px);
+  border-radius: 12px;
+}
+
+.loading-icon {
+  font-size: 40px;
+  margin-bottom: 15px;
+  animation: spin 1.5s linear infinite;
+  color: #409EFF;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error-icon {
+  font-size: 40px;
+  margin-bottom: 15px;
+  color: #F56C6C;
+}
+
+.loading-overlay span,
+.error-overlay span {
+  font-size: 16px;
+  margin-bottom: 15px;
+  text-align: center;
+  max-width: 80%;
+}
+
+.error-overlay .el-button {
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.error-overlay .el-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
 }
 
 /* 侧边栏样式 */
