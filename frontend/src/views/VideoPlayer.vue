@@ -29,7 +29,7 @@
             crossorigin="anonymous"
             preload="auto"
           >
-            <source v-if="videoUrl" :src="videoUrl" type="video/mp4" />
+            <source v-if="generateVideoUrl" :src="generateVideoUrl" type="video/mp4" />
             <track
               v-if="subtitleTrackUrl"
               kind="subtitles"
@@ -49,15 +49,31 @@
       >
         <div class="qa-header">
           <h3>智能问答</h3>
-          <el-button 
-            type="text" 
-            @click="toggleQaExpand"
-            :icon="Close"
-          >
-            收起
-          </el-button>
+          <div class="qa-header-actions">
+            <el-button 
+              type="text" 
+              @click="clearChat"
+              size="small"
+            >
+              清空记录
+            </el-button>
+            <el-button 
+              type="text" 
+              @click="toggleQaExpand"
+              :icon="Close"
+              size="small"
+            >
+              收起
+            </el-button>
+          </div>
         </div>
         <div class="qa-content">
+          <div class="qa-mode-switch">
+            <el-radio-group v-model="qaMode" size="small">
+              <el-radio-button label="video">基于视频内容</el-radio-button>
+              <el-radio-button label="free">自由问答</el-radio-button>
+            </el-radio-group>
+          </div>
           <div class="qa-input">
             <el-input v-model="question" placeholder="请输入问题" type="textarea" />
             <el-button type="primary" @click="askQuestion" :loading="isAsking">提问</el-button>
@@ -81,15 +97,31 @@
       <div v-else class="qa-section">
         <div class="qa-header">
           <h3>智能问答</h3>
-          <el-button 
-            type="text" 
-            @click="toggleQaExpand"
-            :icon="FullScreen"
-          >
-            展开
-          </el-button>
+          <div class="qa-header-actions">
+            <el-button 
+              type="text" 
+              @click="clearChat"
+              size="small"
+            >
+              清空记录
+            </el-button>
+            <el-button 
+              type="text" 
+              @click="toggleQaExpand"
+              :icon="FullScreen"
+              size="small"
+            >
+              展开
+            </el-button>
+          </div>
         </div>
         <div class="qa-content">
+          <div class="qa-mode-switch">
+            <el-radio-group v-model="qaMode" size="small">
+              <el-radio-button label="video">基于视频内容</el-radio-button>
+              <el-radio-button label="free">自由问答</el-radio-button>
+            </el-radio-group>
+          </div>
           <div class="qa-input">
             <el-input v-model="question" placeholder="请输入问题" type="textarea" />
             <el-button type="primary" @click="askQuestion" :loading="isAsking">提问</el-button>
@@ -181,113 +213,107 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Loading, Warning, QuestionFilled, ChatLineSquare, FullScreen, Close } from '@element-plus/icons-vue'
 import { getVideo, getSubtitle } from '@/api/video'
+import { sendChatMessage, getChatHistory, clearChatHistory } from '@/api/chat'
 
 // 从环境变量获取API基础URL
-const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+const baseUrl = '' // 使用相对路径，让 Vite 代理正常工作
 
 const route = useRoute()
 const videoPlayer = ref(null)
-const video = ref(null)
-const subtitleTrackUrl = ref(null)
-const loading = ref(false)
-const showSubtitles = ref(true)
-const currentSubtitle = ref('')
-const videoError = ref(false)
-const retryCount = ref(0)
-const subtitleMode = ref('realtime')
-const fullSubtitles = ref([])
-
-// 问答相关的响应式变量
-const question = ref('')
-const isAsking = ref(false)
-const qaHistory = ref([])
-const isQaExpanded = ref(false)
 const qaDialog = ref(null)
-
-// 计算属性
-const videoUrl = computed(() => {
-  if (!video.value?.id) return ''
-  const url = `${baseUrl}/api/videos/${video.value.id}/stream`
-  console.log('生成视频URL:', url)
-  return url
-})
-
-const videoTitle = computed(() => {
-  return video.value?.title || video.value?.filename || '加载中...'
-})
-
-// 格式化视频时长
-const formatDuration = (seconds) => {
-  if (!seconds) return '00:00'
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = Math.floor(seconds % 60)
-  return h > 0
-    ? `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-    : `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-}
-
-// 格式化时间为分:秒格式
-const formatTimeMMSS = (timeStr) => {
-  try {
-    const [time] = timeStr.split('.')
-    const [hours, minutes, seconds] = time.split(':')
-    const totalSeconds = parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(seconds)
-    const mm = Math.floor(totalSeconds / 60)
-    const ss = totalSeconds % 60
-    return `${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`
-  } catch (error) {
-    console.error('时间格式转换失败:', error)
-    return '00:00'
-  }
-}
-
-// 视频事件处理
-const onVideoLoaded = () => {
-  console.log('视频元数据加载完成')
-  if (videoPlayer.value) {
-    const videoElement = videoPlayer.value
-    console.log('视频信息:', {
-      duration: videoElement.duration,
-      width: videoElement.videoWidth,
-      height: videoElement.videoHeight,
-      readyState: videoElement.readyState,
-      networkState: videoElement.networkState,
-      error: videoElement.error
-    })
-    
-    // 设置视频属性
-    videoElement.crossOrigin = 'anonymous'
-    videoElement.preload = 'auto'
-    
-    // 如果视频已经可以播放，更新loading状态
-    if (videoElement.readyState >= 3) {
-      loading.value = false
+const loading = ref(true)
+const videoError = ref(false)
+const video = ref(null)
+const videoTitle = ref('视频播放器')
+const showSubtitles = ref(true)
+const subtitleTrackUrl = ref(null)
+const subtitleMode = ref('realtime')
+const currentSubtitle = ref('')
+const fullSubtitles = ref([])
+const isQaExpanded = ref(false)
+const qaMode = ref('free') // 默认为自由问答模式
+const question = ref('')
+const freeQaHistory = ref([])
+const videoQaHistory = ref([])
+const qaHistory = computed({
+  get: () => {
+    return qaMode.value === 'free' ? freeQaHistory.value : videoQaHistory.value
+  },
+  set: (newValue) => {
+    if (qaMode.value === 'free') {
+      freeQaHistory.value = newValue
+    } else {
+      videoQaHistory.value = newValue
     }
   }
-}
+})
+const isAsking = ref(false)
+const chatLoading = ref(false)
 
-const onVideoError = (error) => {
-  console.error('视频播放错误:', error)
-  videoError.value = true
-  loading.value = false
-  ElMessage.error('视频播放失败，请重试')
-}
+// 视频相关计算属性
+const generateVideoUrl = computed(() => {
+  if (!video.value) return null
+  return `${baseUrl}/api/videos/${route.params.id}/stream`
+})
 
-const onVideoWaiting = () => {
-  console.log('视频缓冲中...')
-  loading.value = true
-}
+// 组件挂载时加载视频
+onMounted(async () => {
+  await loadVideo()
+  await loadSubtitles()
+  // 初始加载聊天历史
+  await loadChatHistory()
+})
 
-const onVideoPlaying = () => {
-  console.log('视频开始播放')
-  loading.value = false
-  videoError.value = false
-}
+// 监听问答模式变化，加载对应的历史记录（如果尚未加载）
+watch(qaMode, async (newMode) => {
+  // 检查当前模式的历史记录是否已经加载
+  const currentHistory = newMode === 'free' ? freeQaHistory : videoQaHistory
+  
+  // 只有当当前模式的历史记录为空时才加载
+  if (currentHistory.value.length === 0) {
+    await loadChatHistory()
+  }
+})
 
-const onVideoCanPlay = () => {
-  console.log('视频可以播放')
-  loading.value = false
+// 加载聊天历史
+const loadChatHistory = async () => {
+  try {
+    chatLoading.value = true
+    // 根据当前模式加载对应的历史记录
+    const history = await getChatHistory(qaMode.value)
+    
+    // 转换历史记录格式
+    if (history && history.length > 0) {
+      // 重新构建问答历史，将连续的用户问题和助手回答配对
+      const formattedHistory = []
+      for (let i = 0; i < history.length; i += 2) {
+        if (i + 1 < history.length && history[i].role === 'user' && history[i + 1].role === 'assistant') {
+          formattedHistory.push({
+            question: history[i].content,
+            answer: history[i + 1].content
+          })
+        } else if (history[i].role === 'user') {
+          // 如果只有用户问题没有回答
+          formattedHistory.push({
+            question: history[i].content,
+            answer: '(无回答)'
+          })
+        }
+      }
+      
+      // 直接设置对应模式的历史记录
+      if (qaMode.value === 'free') {
+        freeQaHistory.value = formattedHistory
+      } else {
+        videoQaHistory.value = formattedHistory
+      }
+    }
+  } catch (error) {
+    console.error('加载聊天历史失败:', error)
+    // 不显示错误消息，只在控制台记录
+  } finally {
+    chatLoading.value = false
+  }
 }
 
 // 加载视频信息
@@ -295,18 +321,25 @@ const loadVideo = async () => {
   try {
     loading.value = true
     videoError.value = false
-    const { data } = await getVideo(route.params.id)
-    video.value = data
-    console.log('加载视频信息成功:', data)
     
-    // 重置视频元素
-    if (videoPlayer.value) {
-      videoPlayer.value.load()
-    }
-    
-    // 加载字幕
-    if (data?.id) {
-      await loadSubtitles()
+    try {
+      const { data } = await getVideo(route.params.id)
+      video.value = data
+      console.log('加载视频信息成功:', data)
+      
+      // 重置视频元素
+      if (videoPlayer.value) {
+        videoPlayer.value.load()
+      }
+      
+      // 加载字幕
+      if (data?.id) {
+        await loadSubtitles()
+      }
+    } catch (apiError) {
+      console.error('API调用失败:', apiError)
+      videoError.value = true
+      ElMessage.error('无法连接到服务器，请检查后端服务是否正常运行')
     }
   } catch (error) {
     console.error('加载视频失败:', error)
@@ -321,44 +354,55 @@ const loadVideo = async () => {
 const loadSubtitles = async () => {
   try {
     // 先加载SRT格式字幕用于全部字幕显示
-    const srtResponse = await getSubtitle(route.params.id, 'srt', false)
-    if (srtResponse.data) {
-      const reader = new FileReader()
-      reader.onload = () => {
-        fullSubtitles.value = parseSrtContent(reader.result)
+    try {
+      const srtResponse = await getSubtitle(route.params.id, 'srt', false)
+      if (srtResponse.data) {
+        const reader = new FileReader()
+        reader.onload = () => {
+          fullSubtitles.value = parseSrtContent(reader.result)
+        }
+        reader.readAsText(new Blob([srtResponse.data]))
       }
-      reader.readAsText(new Blob([srtResponse.data]))
+    } catch (srtError) {
+      console.error('加载SRT字幕失败:', srtError)
+      // 不显示错误消息，继续尝试加载VTT字幕
     }
 
     // 加载VTT格式字幕用于视频播放
-    const vttResponse = await getSubtitle(route.params.id, 'vtt', false)
-    if (vttResponse.data) {
-      if (subtitleTrackUrl.value) {
-        URL.revokeObjectURL(subtitleTrackUrl.value)
-      }
-      const blob = new Blob([vttResponse.data], { type: 'text/vtt' })
-      subtitleTrackUrl.value = URL.createObjectURL(blob)
-      
-      // 确保字幕轨道被正确设置
-      await nextTick()
-      if (videoPlayer.value && videoPlayer.value.textTracks.length > 0) {
-        const track = videoPlayer.value.textTracks[0]
-        track.mode = showSubtitles.value ? 'showing' : 'hidden'
+    try {
+      const vttResponse = await getSubtitle(route.params.id, 'vtt', false)
+      if (vttResponse.data) {
+        if (subtitleTrackUrl.value) {
+          URL.revokeObjectURL(subtitleTrackUrl.value)
+        }
+        const blob = new Blob([vttResponse.data], { type: 'text/vtt' })
+        subtitleTrackUrl.value = URL.createObjectURL(blob)
         
-        // 监听字幕变化
-        track.oncuechange = () => {
-          if (track.activeCues && track.activeCues.length > 0) {
-            currentSubtitle.value = track.activeCues[0].text
-          } else {
-            currentSubtitle.value = ''
+        // 确保字幕轨道被正确设置
+        await nextTick()
+        if (videoPlayer.value && videoPlayer.value.textTracks.length > 0) {
+          const track = videoPlayer.value.textTracks[0]
+          track.mode = showSubtitles.value ? 'showing' : 'hidden'
+          
+          // 监听字幕变化
+          track.oncuechange = () => {
+            if (track.activeCues && track.activeCues.length > 0) {
+              currentSubtitle.value = track.activeCues[0].text
+            } else {
+              currentSubtitle.value = ''
+            }
           }
         }
       }
+    } catch (vttError) {
+      console.error('加载VTT字幕失败:', vttError)
+      // 不显示错误消息，避免多个错误提示
     }
+    
     console.log('字幕加载成功')
   } catch (error) {
     console.error('加载字幕失败:', error)
-    ElMessage.error('加载字幕失败')
+    // 不显示错误消息，避免影响用户体验
   }
 }
 
@@ -394,6 +438,32 @@ const parseSrtContent = (content) => {
   }
 }
 
+// 格式化视频时长
+const formatDuration = (seconds) => {
+  if (!seconds) return '00:00'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = Math.floor(seconds % 60)
+  return h > 0
+    ? `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+    : `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
+}
+
+// 格式化时间为分:秒格式
+const formatTimeMMSS = (timeStr) => {
+  try {
+    const [time] = timeStr.split('.')
+    const [hours, minutes, seconds] = time.split(':')
+    const totalSeconds = parseInt(hours) * 3600 + parseInt(minutes) * 60 + parseInt(seconds)
+    const mm = Math.floor(totalSeconds / 60)
+    const ss = totalSeconds % 60
+    return `${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`
+  } catch (error) {
+    console.error('时间格式转换失败:', error)
+    return '00:00'
+  }
+}
+
 // 时间格式转换为秒
 const timeToSeconds = (timeStr) => {
   try {
@@ -415,6 +485,65 @@ const isCurrentSubtitle = (sub) => {
   return currentTime >= startTime && currentTime <= endTime
 }
 
+// 视频事件处理
+const onVideoLoaded = () => {
+  console.log('视频元数据加载完成')
+  if (videoPlayer.value) {
+    const videoElement = videoPlayer.value
+    console.log('视频信息:', {
+      duration: videoElement.duration,
+      width: videoElement.videoWidth,
+      height: videoElement.videoHeight,
+      readyState: videoElement.readyState,
+      networkState: videoElement.networkState,
+      error: videoElement.error
+    })
+    
+    // 设置视频属性
+    videoElement.crossOrigin = 'anonymous'
+    videoElement.preload = 'auto'
+    
+    // 如果视频已经可以播放，更新loading状态
+    if (videoElement.readyState >= 3) {
+      loading.value = false
+    }
+  }
+}
+
+const onVideoError = (error) => {
+  console.error('视频播放错误:', error)
+  videoError.value = true
+  loading.value = false
+  
+  // 检查是否是因为后端服务不可用导致的错误
+  if (videoPlayer.value && videoPlayer.value.error) {
+    const errorCode = videoPlayer.value.error.code;
+    if (errorCode === 2 || errorCode === 4) { // MEDIA_ERR_NETWORK 或 MEDIA_ERR_SRC_NOT_SUPPORTED
+      ElMessage.error('无法加载视频，请检查网络连接或后端服务是否正常运行')
+    } else {
+      ElMessage.error('视频播放失败，请重试')
+    }
+  } else {
+    ElMessage.error('视频播放失败，请重试')
+  }
+}
+
+const onVideoWaiting = () => {
+  console.log('视频缓冲中...')
+  loading.value = true
+}
+
+const onVideoPlaying = () => {
+  console.log('视频开始播放')
+  loading.value = false
+  videoError.value = false
+}
+
+const onVideoCanPlay = () => {
+  console.log('视频可以播放')
+  loading.value = false
+}
+
 // 切换字幕显示
 const toggleSubtitles = () => {
   if (videoPlayer.value && videoPlayer.value.textTracks.length > 0) {
@@ -426,6 +555,8 @@ const toggleSubtitles = () => {
 // 展开逻辑
 const toggleQaExpand = () => {
   isQaExpanded.value = !isQaExpanded.value
+  
+  // 展开时需要设置位置
   if (isQaExpanded.value) {
     nextTick(() => {
       const qaSection = qaDialog.value
@@ -434,9 +565,11 @@ const toggleQaExpand = () => {
       // 获取未展开时的位置
       const rect = qaSection.getBoundingClientRect()
       
-      // 设置展开后的位置
+      // 设置展开后的位置，保持原位置的中心点
+      qaSection.style.position = 'fixed'
       qaSection.style.top = `${rect.top}px`
       qaSection.style.left = `${rect.left}px`
+      qaSection.style.transform = 'translate(0, 0)' // 重置可能的transform
     })
   }
 }
@@ -466,7 +599,7 @@ const downloadSubtitle = async (format, isDownload = false) => {
   }
 }
 
-// 提问功能（预留）
+// 提问功能
 const askQuestion = async () => {
   if (!question.value.trim()) {
     ElMessage.warning('请输入问题')
@@ -474,19 +607,79 @@ const askQuestion = async () => {
   }
   
   isAsking.value = true
+  const userQuestion = question.value
+  
   try {
-    // TODO: 调用后端API进行问答
-    // 模拟API调用
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    qaHistory.value.unshift({
-      question: question.value,
-      answer: '智能问答功能正在开发中...'
+    // 获取当前模式的历史记录数组
+    const currentHistory = qaMode.value === 'free' ? freeQaHistory : videoQaHistory
+    
+    // 添加用户问题到历史记录
+    currentHistory.value.unshift({
+      question: userQuestion,
+      answer: '正在思考中...'
     })
+    
+    // 清空输入框
     question.value = ''
+    
+    // 调用API发送问题
+    let answer = ''
+    try {
+      // 根据当前模式发送问题
+      const currentMode = qaMode.value
+      const currentVideoId = currentMode === 'video' ? route.params.id : null
+      
+      await sendChatMessage(userQuestion, {
+        mode: currentMode,
+        videoId: currentVideoId,
+        onData: (data) => {
+          // 更新最新回答
+          answer = data
+          currentHistory.value[0].answer = answer
+        },
+        onError: (error) => {
+          console.error(`提问失败: ${error}`)
+          currentHistory.value[0].answer = '抱歉，我暂时无法回答这个问题，请稍后再试。'
+          
+          // 如果是视频模式失败，提示用户
+          if (currentMode === 'video') {
+            ElMessage.warning('基于视频内容的问答失败，可能是字幕文件问题或视频内容不相关')
+          }
+        },
+        onComplete: () => {
+          console.log('回答完成')
+          // 移除重新加载历史记录的代码，保留当前历史
+          // setTimeout(() => loadChatHistory(), 500)
+        }
+      })
+    } catch (apiError) {
+      console.error('API调用失败:', apiError)
+      currentHistory.value[0].answer = '抱歉，服务器连接失败，请检查网络连接或稍后再试。'
+    }
   } catch (error) {
+    console.error('提问失败:', error)
     ElMessage.error('提问失败，请重试')
   } finally {
     isAsking.value = false
+  }
+}
+
+// 清空聊天记录
+const clearChat = async () => {
+  try {
+    await clearChatHistory(qaMode.value)
+    
+    // 清空当前模式的历史记录
+    if (qaMode.value === 'free') {
+      freeQaHistory.value = []
+    } else {
+      videoQaHistory.value = []
+    }
+    
+    ElMessage.success('聊天记录已清空')
+  } catch (error) {
+    console.error('清空聊天记录失败:', error)
+    ElMessage.error('清空聊天记录失败')
   }
 }
 
@@ -497,10 +690,11 @@ onUnmounted(() => {
   }
 })
 
-// 组件挂载时加载视频
+// 组件挂载时加载视频和聊天历史
 onMounted(async () => {
   if (route.params.id) {
     await loadVideo()
+    await loadChatHistory() // 加载聊天历史
   }
 })
 
@@ -622,7 +816,7 @@ watch(() => route.params.id, async (newId) => {
 }
 
 .qa-section.qa-expanded {
-  position: absolute;
+  position: fixed;
   width: 40%;
   height: 80%;
   z-index: 1000;
@@ -638,14 +832,19 @@ watch(() => route.params.id, async (newId) => {
   justify-content: space-between;
   align-items: center;
   background-color: #1a1a1a;
-  padding: 12px 15px;
-  min-height: 40px;
+  padding: 8px 15px;
+  min-height: 30px;
 }
 
 .qa-header h3 {
   margin: 0;
   font-size: 14px;
   color: #fff;
+}
+
+.qa-header-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .qa-content {
@@ -655,6 +854,11 @@ watch(() => route.params.id, async (newId) => {
   padding: 15px;
   gap: 15px;
   overflow-y: auto;
+}
+
+.qa-mode-switch {
+  margin-bottom: 12px;
+  text-align: center;
 }
 
 .qa-input {

@@ -312,7 +312,7 @@ def merge_transcriptions(chunks_results):
     return merged_result
 
 @celery.task(name='app.tasks.process_video', bind=True, max_retries=3, retry_backoff=True, retry_backoff_max=240, retry_jitter=True)
-def process_video(self, video_id, language='zh', model='large'):
+def process_video(self, video_id, language='zh', model='turbo'):
     """处理视频任务"""
     try:
         # 设置任务ID

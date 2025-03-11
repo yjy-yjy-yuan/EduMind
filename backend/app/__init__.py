@@ -78,11 +78,13 @@ def create_app(config_name='default'):
             db.create_all()
             
             # 注册蓝图
-            from .routes import video_bp, qa_bp
+            from .routes import video_bp, qa_bp, chat_bp
             if 'video_bp' not in app.blueprints:
                 app.register_blueprint(video_bp, url_prefix='/api/videos')
             if 'qa_bp' not in app.blueprints:
                 app.register_blueprint(qa_bp, url_prefix='/api/qa')
+            if 'chat_bp' not in app.blueprints:
+                app.register_blueprint(chat_bp, url_prefix='/api/chat')
         
         # 添加根路由
         @app.route('/')

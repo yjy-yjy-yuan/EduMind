@@ -72,10 +72,19 @@ conda activate ivs
 pip install -r requirements.txt
 
 # 2. 安装 PyTorch（使用 CUDA 11.8）
+# 2.1 GPU环境
 conda install pytorch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 pytorch-cuda=11.8 -c pytorch -c nvidia
 
+# 2.2 CPU环境
+pip install torch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 --index-url https://download.pytorch.org/whl/cpu
+
+
 # 3. 安装 FAISS-GPU
+# 3.1 如果你有 CUDA 11.8 的 GPU 资源
 conda install -c conda-forge faiss-gpu=1.8.0 -y
+
+# 3.2 如果你只有 CPU 资源
+conda install -c conda-forge faiss-cpu=1.8.0 -y
 
 ```
 
