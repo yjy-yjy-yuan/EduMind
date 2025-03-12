@@ -146,6 +146,12 @@
           <div class="qa-section">
             <div class="qa-header">
               <h3>智能问答</h3>
+              <div class="qa-mode-switch">
+                <el-radio-group v-model="qaMode" size="small">
+                  <el-radio-button label="video">基于视频内容</el-radio-button>
+                  <el-radio-button label="free">自由问答</el-radio-button>
+                </el-radio-group>
+              </div>
               <div class="qa-header-actions">
                 <el-button 
                   type="text" 
@@ -157,12 +163,7 @@
               </div>
             </div>
             <div class="qa-content">
-              <div class="qa-mode-switch">
-                <el-radio-group v-model="qaMode" size="small">
-                  <el-radio-button label="video">基于视频内容</el-radio-button>
-                  <el-radio-button label="free">自由问答</el-radio-button>
-                </el-radio-group>
-              </div>
+              
               <div class="qa-input">
                 <el-input v-model="question" placeholder="请输入问题" type="textarea" />
                 <el-button type="primary" @click="askQuestion" :loading="isAsking">提问</el-button>
@@ -196,6 +197,7 @@
             <el-radio-button label="full">全部字幕</el-radio-button>
           </el-radio-group>
         </div>
+      
         <div class="subtitle-display">
           <template v-if="subtitleMode === 'realtime'">
             <div class="subtitle-content" v-if="currentSubtitle">
@@ -726,7 +728,7 @@ const navigateToVideoUpload = () => {
 .video-player-container {
   display: flex;
   height: 100vh;
-  background: linear-gradient(135deg, #1a1a1a 0%, #2d3436 100%);
+  background: #ffffff; /* 纯白色背景 */
   position: relative;
   overflow: hidden;
 }
@@ -842,14 +844,22 @@ const navigateToVideoUpload = () => {
   font-size: 1rem;
 }
 
+/* 左侧区域 */
 .left-section {
   flex: 6; /* 左侧栏占比6 */
   display: flex;
   flex-direction: column;
+  background-color: #ffffff; /* 纯白色背景 */
   padding: 20px;
   gap: 20px;
   overflow: hidden;
 }
+
+.left-section.with-sidebar {
+  margin-left: 25%;
+  transition: margin-left 0.3s ease;
+}
+
 
 .help-content {
   max-height: 60vh;
@@ -891,19 +901,19 @@ const navigateToVideoUpload = () => {
   flex: 1; /* 上方区域占左侧栏50% */
   display: flex;
   gap: 20px;
-  overflow: hidden;
+  overflow: hidden; /* 隐藏滚动条 */
 }
 
 /* 左侧下方区域布局 */
 .lower-section {
   flex: 1; /* 下方区域占左侧栏50% */
-  display: flex;
-  overflow: hidden;
+  display: flex; /* 使用flexbox布局 */
+  overflow: hidden; /* 隐藏滚动条 */
 }
 
 /* 视频播放区域 */
 .video-main-area {
-  flex: 0.7; /* 视频播放区域占上方区域70% */
+  flex: 0.63; /* 视频播放区域占上方区域63% */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -911,7 +921,7 @@ const navigateToVideoUpload = () => {
 
 /* 视频播放器区域 */
 .video-player-area {
-  flex: 0.3; /* 视频播放器区域占上方区域30% */
+  flex: 0.37; /* 视频播放器区域占上方区域35% */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -953,8 +963,8 @@ const navigateToVideoUpload = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #000 0%, #111 100%);
-  border-radius: 12px;
+  background: #f7f7f7; /* 非常浅的灰色，与白色形成微妙对比 */
+  border-radius: 8px;
   overflow: hidden;
   box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
 }
@@ -972,11 +982,11 @@ const navigateToVideoUpload = () => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #2a2a2a 0%, #1e272e 100%);
-  border-radius: 12px;
+  background: #F6EFBD; /* 背景 */
+  border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid #f0f0f0;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
@@ -985,18 +995,20 @@ const navigateToVideoUpload = () => {
   box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
 }
 
+/* 问答头部 */
 .qa-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: linear-gradient(90deg, #409EFF, #67C23A);
-  padding: 15px 20px;
-  min-height: 30px;
-  border-radius: 12px 12px 0 0;
+  background: #A2D2DF; /* 背景 */
+  padding: 10px 15px; /* 减小内边距使顶部栏变小 */
+  min-height: 20px; /* 减小最小高度 */
+  border-radius: 20px 20px 0 0;
   position: relative;
   overflow: hidden;
 }
 
+/* 添加背景点缀效果 */
 .qa-header::before {
   content: "";
   position: absolute;
@@ -1004,15 +1016,16 @@ const navigateToVideoUpload = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.1) 75%, transparent 75%, transparent);
+  background: linear-gradient(45deg, rgba(19, 217, 248, 0.427) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.1) 75%, transparent 75%, transparent);
   background-size: 10px 10px;
   opacity: 0.2;
   pointer-events: none;
 }
 
+/* 文本(智能问答) */
 .qa-header h3 {
   margin: 0;
-  color: #fff;
+  color: #fff; 
   font-size: 18px;
   font-weight: 600;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
@@ -1038,32 +1051,59 @@ const navigateToVideoUpload = () => {
   text-align: center;
 }
 
+.qa-mode-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.qa-mode-toggle .el-radio-group {
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.qa-mode-toggle .el-radio-button__inner {
+  padding: 6px 12px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #fff;
+}
+
+.qa-mode-toggle .el-radio-button__orig-radio:checked + .el-radio-button__inner {
+  background: rgba(255, 255, 255, 0.4);
+  box-shadow: none;
+  color: #fff;
+  font-weight: bold;
+}
+
 .qa-input {
   display: flex;
   gap: 15px;
-  margin-bottom: 15px;
+  margin-bottom: 15px; 
 }
 
 .qa-input .el-textarea {
   flex: 1;
 }
 
+/* 输入框 */
 .qa-input .el-textarea__inner {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: #ffffff; /* 白色背景 */
+  border: 1px solid #f0f0f0;
+  color: #333333; /* 深灰色 */
   border-radius: 8px;
   transition: all 0.3s ease;
 }
 
 .qa-input .el-textarea__inner:focus {
-  border-color: #409EFF;
-  box-shadow: 0 0 10px rgba(64, 158, 255, 0.3);
+  border-color: #e0e0e0;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.03);
 }
 
+/* 提问按钮 */
 .qa-input .el-button {
   align-self: flex-start;
-  background: linear-gradient(90deg, #409EFF, #67C23A);
+  background: linear-gradient(90deg, #d54911, #67C23A);
   border: none;
   border-radius: 8px;
   padding: 12px 25px;
@@ -1074,8 +1114,9 @@ const navigateToVideoUpload = () => {
 }
 
 .qa-input .el-button:hover {
+  background: #f7f7f7;
   transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
 }
 
 .qa-history {
@@ -1089,17 +1130,16 @@ const navigateToVideoUpload = () => {
   margin: 0;
 }
 
+/* 问答历史记录 */
 .qa-item {
-  background: rgba(0, 0, 0, 0.2);
+  background: #ffffff;
   border-radius: 12px;
   padding: 15px;
   margin-bottom: 15px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
+  border: 1px solid #f0f0f0;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  animation: fadeIn 0.5s ease;
 }
-
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
@@ -1107,7 +1147,7 @@ const navigateToVideoUpload = () => {
 
 .qa-item:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
 }
 
 .qa-item .question,
@@ -1121,6 +1161,7 @@ const navigateToVideoUpload = () => {
 .qa-item .answer {
   margin-bottom: 0;
 }
+
 
 .qa-icon {
   flex-shrink: 0;
@@ -1138,11 +1179,11 @@ const navigateToVideoUpload = () => {
 
 .qa-text {
   flex: 1;
-  color: #fff;
+  color: #333333; /* 深灰色 */
   line-height: 1.6;
   word-break: break-word;
   padding: 10px;
-  background: rgba(255, 255, 255, 0.05);
+  background: #f9f9f9; /* 非常浅的灰色 */
   border-radius: 8px;
   position: relative;
 }
@@ -1151,38 +1192,41 @@ const navigateToVideoUpload = () => {
 .sidebar {
   position: fixed;
   top: 0;
-  left: -300px; /* 使用固定宽度而不是百分比 */
-  width: 300px;
+  left: -23%;
+  width: 23%;
   height: 100%;
-  background: linear-gradient(135deg, #1a1a1a 0%, #2c3e50 100%);
+  background: #FBFBFB; /* 白色背景 */
   transition: all 0.3s ease;
   z-index: 1000;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 3px 0 15px rgba(0, 0, 0, 0.3);
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 1px solid #f0f0f0; /* 添加阴影 */
+  border-right: 2px 0 10px rgba(0, 0, 0, 0.03); /* 添加边框 */
 }
 
 .sidebar-visible {
   left: 0;
 }
 
+/* 侧边栏切换按钮 */
 .sidebar-toggle {
   position: fixed;
-  top: 20px; /* 放在页面顶部而不是中间 */
-  left: 20px;
-  background: linear-gradient(135deg, #409EFF 0%, #67C23A 100%);
-  color: #fff;
-  padding: 12px;
-  border-radius: 50%;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  background-color: #ffffff; /* 白色背景 */
+  color: #333333;
+  padding: 15px 5px;
+  border-radius: 0 4px 4px 0;
   cursor: pointer;
   z-index: 1001;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05); 
+  border: 1px solid #f0f0f0; /* 添加边框 */
+  border-left: none; 
 }
 
 .sidebar-toggle:hover {
@@ -1422,17 +1466,35 @@ const navigateToVideoUpload = () => {
   border-radius: 8px;
 }
 
+/* 字幕背景 */
 .subtitle-display {
   flex: 1;
-  background-color: #1a1a1a;
-  border-radius: 8px;
-  padding: 15px;
   overflow-y: auto;
+  padding: 15px;
+  background: #F6EFBD; /* 浅黄色背景，与问答区域保持一致 */
+  border-radius: 8px;
+  margin-bottom: 15px;
+  border: 1px solid #e0e0e0;
+  color: #333333; /* 深灰色文字 */
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
 }
 
-.subtitle-content {
-  color: #fff;
+.subtitle-display p {
+  margin: 8px 0;
   line-height: 1.6;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.6); /* 半透明白色背景 */
+  border-radius: 6px;
+  border-left: 3px solid #A2D2DF; /* 左侧边框颜色与问答头部保持一致 */
+}
+
+
+.subtitle-content {
+  color: #333333; /* 深灰色文字，与其他文本保持一致 */
+  margin: 0;
+  line-height: 1.6;
+  font-size: 15px; /* 调整字幕大小，可以根据需要修改数值 */
+  font-weight: 500; /* 稍微加粗 */
 }
 
 .full-subtitle {
@@ -1478,7 +1540,6 @@ const navigateToVideoUpload = () => {
 }
 
 /* 美化滚动条 */
-/* 美化滚动条 */
 .subtitle-display::-webkit-scrollbar,
 .qa-history::-webkit-scrollbar,
 .sidebar-content::-webkit-scrollbar {
@@ -1511,13 +1572,14 @@ const navigateToVideoUpload = () => {
   margin-bottom: 15px;
 }
 
+/*视频信息区域*/
 .video-info h3 {
-  color: #fff;
+  color: #FFFFFF; /* 白色文字 */
   margin: 0 0 15px 0;
   font-size: 20px;
   font-weight: 600;
   padding-bottom: 10px;
-  border-bottom: 2px solid rgba(64, 158, 255, 0.3);
+  border-bottom: 2px solid#f0f0f0;
   position: relative;
 }
 
@@ -1528,14 +1590,15 @@ const navigateToVideoUpload = () => {
   bottom: -2px;
   width: 50px;
   height: 2px;
-  background: linear-gradient(90deg, #409EFF, #67C23A);
+  background: #00A0E9; /* 明亮蓝色 */
 }
 
+/*视频详情(时长、分辨率)*/
 .video-details {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  color: #ddd;
+  color: #FFFFFF; /* 白色文字 */
   font-size: 14px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 8px;
@@ -1552,10 +1615,11 @@ const navigateToVideoUpload = () => {
 
 .video-details p:before {
   content: "•";
-  color: #67C23A;
+  color: #0da2f3; /* 柔和金色 */
   font-size: 18px;
 }
 
+/*· 字幕控制区域*/
 .subtitle-controls {
   display: flex;
   flex-direction: column;
@@ -1566,10 +1630,18 @@ const navigateToVideoUpload = () => {
 .subtitle-toggle {
   display: flex;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.7); /* 半透明白色背景 */
   padding: 15px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid #e0e0e0;
+}
+
+.subtitle-toggle .el-switch__core {
+  background-color: #e0e0e0;
+}
+
+.subtitle-toggle .el-switch.is-checked .el-switch__core {
+  background-color: #A2D2DF; /* 与问答头部保持一致 */
 }
 
 .subtitle-download {
@@ -1581,17 +1653,21 @@ const navigateToVideoUpload = () => {
   width: 100%;
 }
 
+/*下载字幕按钮*/
 .subtitle-download .el-button {
   width: 100%;
-  background: linear-gradient(90deg, #409EFF, #67C23A);
+  background: #00A0E9; /* 明亮蓝色 */
   border: none;
   border-radius: 8px;
   padding: 12px;
   transition: all 0.3s ease;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  color: #FFFFFF; /* 白色文字 */
 }
 
+/*下载字幕按钮鼠标悬停效果*/
 .subtitle-download .el-button:hover {
+  background: #f50baf; /* 稍深的蓝色 */
   transform: translateY(-3px);
   box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
 }
@@ -1662,7 +1738,7 @@ const navigateToVideoUpload = () => {
   left: -25%;
   width: 25%;
   height: 100%;
-  background-color: #1a1a1a;
+  background-color: #05cad8;
   transition: left 0.3s ease;
   z-index: 1000;
   display: flex;
@@ -1772,10 +1848,6 @@ const navigateToVideoUpload = () => {
   -webkit-box-orient: vertical;
 }
 
-.left-section.with-sidebar {
-  margin-left: 25%;
-  transition: margin-left 0.3s ease;
-}
 
 /* 侧边栏菜单样式 */
 .sidebar-menu {
@@ -1860,7 +1932,7 @@ const navigateToVideoUpload = () => {
 
 .video-title {
   color: #fff;
-  font-size: 13px;
+  font-size: 10px;
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;

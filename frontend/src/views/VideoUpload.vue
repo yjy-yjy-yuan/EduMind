@@ -1,5 +1,10 @@
 <template>
   <div class="upload-container">
+    <div class="page-title">
+      <h1>视频管理中心</h1>
+      <p class="subtitle">上传、管理和处理您的教育视频</p>
+    </div>
+    
     <el-card class="upload-card">
       <template #header>
         <div class="card-header">
@@ -10,25 +15,27 @@
       <el-form ref="uploadForm" :model="formData" label-width="120px">
         <!-- 本地视频上传 -->
         <el-form-item label="本地视频">
-          <el-upload
-            class="upload-demo"
-            drag
-            :action="null"
-            :http-request="handleUpload"
-            :before-upload="beforeUpload"
-            :show-file-list="false"
-            accept=".mp4,.avi,.mov,.mkv,.webm"
-          >
-            <el-icon class="el-icon--upload"><upload-filled /></el-icon>
-            <div class="el-upload__text">
-              拖拽文件到此处或 <em>点击上传</em>
-            </div>
-            <template #tip>
-              <div class="el-upload__tip">
-                支持的格式：MP4, AVI, MOV, MKV, WEBM
+          <div class="upload-flex-container">
+            <el-upload
+              class="upload-demo"
+              drag
+              :action="null"
+              :http-request="handleUpload"
+              :before-upload="beforeUpload"
+              :show-file-list="false"
+              accept=".mp4,.avi,.mov,.mkv,.webm"
+            >
+              <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+              <div class="el-upload__text">
+                拖拽文件到此处或 <em>点击上传</em>
               </div>
-            </template>
-          </el-upload>
+            </el-upload>
+            
+            <div class="upload-format-tip">
+              <el-icon><info-filled /></el-icon>
+              <span>支持的格式：MP4, AVI, MOV, MKV, WEBM</span>
+            </div>
+          </div>
           
           <!-- 上传进度条 -->
           <div v-if="uploadProgress > 0" class="progress-container">
@@ -109,10 +116,10 @@
         </el-table-column>
         <el-table-column label="视频信息">
           <template #default="scope">
-            <div v-if="scope.row.duration">
-              <div>时长: {{ formatDuration(scope.row.duration) }}</div>
-              <div>分辨率: {{ scope.row.width }}x{{ scope.row.height }}</div>
-              <div>帧率: {{ scope.row.fps ? scope.row.fps.toFixed(2) : '未知' }} FPS</div>
+            <div v-if="scope.row.duration" class="video-info-box">
+              <div><i class="el-icon-time"></i> 时长: {{ formatDuration(scope.row.duration) }}</div>
+              <div><i class="el-icon-picture"></i> 分辨率: {{ scope.row.width }}x{{ scope.row.height }}</div>
+              <div><i class="el-icon-video-play"></i> 帧率: {{ scope.row.fps ? scope.row.fps.toFixed(2) : '未知' }} FPS</div>
             </div>
             <span v-else>暂无信息</span>
           </template>
@@ -124,31 +131,150 @@
         </el-table-column>
         <el-table-column label="操作" width="200">
           <template #default="scope">
-            <el-button 
-              :icon="VideoPlay"
-              circle
-              @click="handlePlay(scope.row)"
-              :disabled="!['completed'].includes(scope.row.status)"
-              title="播放视频"
-            />
-            <el-button 
-              :icon="VideoCamera"
-              circle
-              @click="handleProcess(scope.row)"
-              :disabled="!['uploaded', 'pending'].includes(scope.row.status) || scope.row.status === 'downloading'"
-              title="处理视频"
-            />
-            <el-button 
-              type="danger" 
-              :icon="Delete"
-              circle
-              @click="handleDelete(scope.row)"
-              title="删除视频"
-            />
+            <div class="action-buttons">
+              <el-button 
+                :icon="VideoPlay"
+                circle
+                @click="handlePlay(scope.row)"
+                :disabled="!['completed'].includes(scope.row.status)"
+                title="播放视频"
+                class="action-button play-button"
+              />
+              <el-button 
+                :icon="VideoCamera"
+                circle
+                @click="handleProcess(scope.row)"
+                :disabled="!['uploaded', 'pending'].includes(scope.row.status) || scope.row.status === 'downloading'"
+                title="处理视频"
+                class="action-button process-button"
+              />
+              <el-button 
+                type="danger" 
+                :icon="Delete"
+                circle
+                @click="handleDelete(scope.row)"
+                title="删除视频"
+                class="action-button delete-button"
+              />
+            </div>
           </template>
         </el-table-column>
       </el-table>
+      
+      <!-- 空状态提示 -->
+      <div v-if="videoList.length === 0 && !loading" class="empty-state">
+        <div class="empty-icon">
+          <el-icon><video-camera /></el-icon>
+        </div>
+        <p>暂无上传视频</p>
+        <p class="empty-tip">您可以通过上方表单上传视频文件或提交视频链接</p>
+      </div>
     </el-card>
+
+    <!-- 上传指南卡片 -->
+    <el-row :gutter="20" class="guide-row">
+      <el-col :span="8">
+        <div class="guide-card" style="animation: fadeInLeft 0.5s ease-out;">
+          <div class="guide-icon">
+            <el-icon><upload-filled /></el-icon>
+          </div>
+          <h3>上传指南</h3>
+          <ul>
+            <li>支持多种视频格式</li>
+            <li>单个文件大小不超过2GB</li>
+            <li>视频时长建议在5-120分钟</li>
+            <li>高清视频效果更佳</li>
+          </ul>
+        </div>
+      </el-col>
+      <el-col :span="8">
+        <div class="guide-card" style="animation: fadeInLeft 0.5s ease-out 0.2s; animation-fill-mode: both;">
+          <div class="guide-icon">
+            <el-icon><video-camera /></el-icon>
+          </div>
+          <h3>处理流程</h3>
+          <div class="process-steps">
+            <div class="process-step">
+              <div class="step-number">1</div>
+              <div class="step-text">上传视频</div>
+            </div>
+            <div class="process-arrow">→</div>
+            <div class="process-step">
+              <div class="step-number">2</div>
+              <div class="step-text">AI处理</div>
+            </div>
+            <div class="process-arrow">→</div>
+            <div class="process-step">
+              <div class="step-number">3</div>
+              <div class="step-text">分析完成</div>
+            </div>
+          </div>
+        </div>
+      </el-col>
+      <el-col :span="8">
+        <div class="guide-card" style="animation: fadeInLeft 0.5s ease-out 0.4s; animation-fill-mode: both;">
+          <div class="guide-icon">
+            <el-icon><connection /></el-icon>
+          </div>
+          <h3>视频分析</h3>
+          <p>AI-EdVision 将自动分析您的视频内容，提取关键信息，生成字幕和摘要，并支持智能问答功能。</p>
+          <div class="feature-tags">
+            <span class="feature-tag">自动字幕</span>
+            <span class="feature-tag">内容摘要</span>
+            <span class="feature-tag">智能问答</span>
+            <span class="feature-tag">知识图谱</span>
+          </div>
+        </div>
+      </el-col>
+    </el-row>
+
+    <!-- 底部信息卡片 -->
+    <div class="bottom-info-section">
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <div class="info-card" style="animation: slideUp 0.5s ease-out;">
+            <h3><el-icon><info-filled /></el-icon> 使用提示</h3>
+            <div class="info-content">
+              <p>1. 上传完成后，需要点击"处理视频"按钮进行AI分析</p>
+              <p>2. 处理完成后，可以点击"播放视频"按钮查看视频和AI分析结果</p>
+              <p>3. 视频处理时间取决于视频长度，请耐心等待</p>
+              <p>4. 如有任何问题，请联系系统管理员获取帮助</p>
+            </div>
+          </div>
+        </el-col>
+        <el-col :span="12">
+          <div class="info-card stats-card" style="animation: slideUp 0.5s ease-out 0.2s; animation-fill-mode: both;">
+            <h3><el-icon><data-analysis /></el-icon> 系统状态</h3>
+            <div class="stats-content">
+              <div class="stat-item">
+                <div class="stat-label">处理引擎</div>
+                <div class="stat-value"><span class="status-dot active"></span> 运行中</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">AI模型</div>
+                <div class="stat-value"><span class="status-dot active"></span> 已加载</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">存储空间</div>
+                <div class="stat-value">
+                  <el-progress :percentage="65" :show-text="false" style="width: 100px;"></el-progress>
+                  <span>65%</span>
+                </div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">系统版本</div>
+                <div class="stat-value">v2.5.3</div>
+              </div>
+            </div>
+          </div>
+        </el-col>
+      </el-row>
+    </div>
+    
+    <!-- 页脚 -->
+    <div class="page-footer">
+      <p>&copy; 2025 AI-EdVision 智能教育视频分析系统</p>
+    </div>
   </div>
 </template>
 
@@ -161,7 +287,10 @@ import {
   VideoCamera,
   VideoPlay,
   Delete, 
-  Refresh 
+  Refresh,
+  InfoFilled,
+  DataAnalysis,
+  Connection 
 } from '@element-plus/icons-vue'
 import { 
   uploadLocalVideo, 
@@ -531,7 +660,8 @@ const handleProcess = async (video) => {
           </div>
           <input type="hidden" id="language-select" value="Other">
           <div style="font-size: 12px; color: #909399; margin-top: 5px;">
-            <i class="el-icon-info-circle" style="margin-right: 3px;"></i>选择与视频主要语言相符的选项
+            <i class="el-icon-info-circle" style="margin-right: 3px;"></i>
+            <span>选择与视频主要语言相符的选项</span>
           </div>
         </div>
         
@@ -1118,24 +1248,110 @@ onUnmounted(() => {
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
+  background-color: #f5f7fa;
+  min-height: calc(100vh - 60px);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 添加背景点缀效果 */
+.upload-container::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="none"/><circle cx="10" cy="10" r="1" fill="rgba(30,60,114,0.05)"/></svg>');
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page-title {
+  text-align: center;
+  margin-bottom: 30px;
+  position: relative;
+  z-index: 1;
+}
+
+.page-title h1 {
+  font-size: 2.2rem;
+  color: #1e3c72;
+  margin-bottom: 10px;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: fadeIn 1s ease-out;
+}
+
+.subtitle {
+  font-size: 1.1rem;
+  color: #606266;
+  opacity: 0.8;
+  animation: slideUp 1s ease-out;
 }
 
 .upload-card, .video-list-card {
-  margin-bottom: 20px;
+  margin-bottom: 30px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  transition: transform 0.3s, box-shadow 0.3s;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  animation: fadeIn 0.8s ease-out;
+}
+
+.upload-card:hover, .video-list-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  color: #fff;
+  padding: 15px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 添加卡片标题背景效果 */
+.card-header::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.1) 75%, transparent 75%, transparent);
+  background-size: 10px 10px;
+  opacity: 0.2;
+  pointer-events: none;
+}
+
+.card-header h2, .card-header h3 {
+  margin: 0;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  position: relative;
 }
 
 .progress-container {
   margin-top: 15px;
-  padding: 10px;
-  border-radius: 4px;
+  padding: 20px;
+  border-radius: 10px;
   background-color: #f8f9fa;
   border: 1px solid #ebeef5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  animation: pulse 2s infinite;
 }
 
 .video-actions {
@@ -1155,26 +1371,575 @@ onUnmounted(() => {
 .language-option {
   cursor: pointer;
   transition: all 0.3s;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .language-option:hover {
-  transform: translateY(-2px);
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
 .model-option.selected {
   transform: scale(1.05);
   z-index: 2;
-  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+  border: 2px solid #409EFF;
 }
 
 .processing-step {
-  font-size: 13px;
+  font-size: 14px;
   color: #409EFF;
   font-weight: 500;
-  margin-top: 5px;
-  padding: 5px 10px;
+  margin-top: 12px;
+  padding: 12px 15px;
   background-color: #ecf5ff;
-  border-radius: 4px;
+  border-radius: 8px;
+  border-left: 4px solid #409EFF;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  animation: fadeInLeft 0.5s ease-out;
+}
+
+/* 美化上传区域 */
+:deep(.el-upload-dragger) {
+  background: linear-gradient(to bottom, #f9f9f9, #f0f0f0);
+  border: 2px dashed #c0c4cc;
+  border-radius: 12px;
+  transition: all 0.4s;
+  padding: 30px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+:deep(.el-upload-dragger)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+  z-index: 0;
+}
+
+:deep(.el-upload-dragger:hover) {
+  border-color: #409EFF;
+  background: linear-gradient(to bottom, #f0f7ff, #e6f1fc);
+  transform: scale(1.02);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.el-icon--upload) {
+  font-size: 48px;
+  color: #409EFF;
+  margin-bottom: 15px;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.1));
+  animation: bounce 2s infinite;
+}
+
+:deep(.el-upload__text) {
+  color: #606266;
+  font-size: 16px;
+  margin-top: 15px;
+  position: relative;
+  z-index: 1;
+}
+
+:deep(.el-upload__text em) {
+  color: #409EFF;
+  font-style: normal;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+:deep(.el-upload__tip) {
+  color: #909399;
+  font-size: 13px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background-color: rgba(64, 158, 255, 0.08);
+  border-radius: 6px;
+  display: inline-block;
+}
+
+/* 美化表格 */
+:deep(.el-table) {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+:deep(.el-table__header) {
+  background: linear-gradient(to right, #f0f2f5, #e4e7ed);
+}
+
+:deep(.el-table__header-wrapper th) {
+  background-color: transparent;
+  font-weight: 600;
+  color: #1e3c72;
+  padding: 12px 0;
+}
+
+:deep(.el-table__row) {
+  transition: all 0.3s;
+}
+
+:deep(.el-table__row:hover) {
+  background-color: #f0f7ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+:deep(.el-button) {
+  transition: all 0.3s;
+}
+
+:deep(.el-button:hover) {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+:deep(.el-tag) {
+  border-radius: 6px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  padding: 4px 8px;
+  letter-spacing: 0.5px;
+}
+
+:deep(.el-image) {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.4s;
+  border: 2px solid transparent;
+}
+
+:deep(.el-image:hover) {
+  transform: scale(1.08);
+  border-color: #409EFF;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+:deep(.el-form-item__label) {
+  font-weight: 500;
+  color: #1e3c72;
+  font-size: 15px;
+}
+
+:deep(.el-input__wrapper) {
+  border-radius: 8px;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px #409EFF inset, 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.el-progress) {
+  margin: 10px 0;
+}
+
+:deep(.el-progress__text) {
+  font-weight: 600;
+  color: #1e3c72;
+}
+
+:deep(.el-progress-bar__outer) {
+  border-radius: 10px;
+  background-color: #e6e6e6;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.el-progress-bar__inner) {
+  border-radius: 10px;
+  background: linear-gradient(to right, #1e3c72, #2a5298);
+  box-shadow: 0 2px 6px rgba(30, 60, 114, 0.3);
+  transition: width 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 视频信息样式 */
+.video-info-box {
+  background: rgba(240, 247, 255, 0.5);
+  border-radius: 8px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
   border-left: 3px solid #409EFF;
+}
+
+.video-info-box div {
+  margin: 5px 0;
+  font-size: 13px;
+  color: #606266;
+}
+
+/* 操作按钮样式 */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.action-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.action-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+  transform: scale(0);
+  opacity: 0;
+  transition: transform 0.5s, opacity 0.3s;
+}
+
+.action-button:hover::before {
+  transform: scale(2);
+  opacity: 1;
+}
+
+.play-button:not(:disabled):hover {
+  background-color: #67C23A;
+  border-color: #67C23A;
+}
+
+.process-button:not(:disabled):hover {
+  background-color: #409EFF;
+  border-color: #409EFF;
+}
+
+.delete-button:hover {
+  transform: rotate(5deg);
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+  50% { box-shadow: 0 4px 20px rgba(64, 158, 255, 0.2); }
+  100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes fadeInLeft {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* 指南卡片样式 */
+.guide-row {
+  margin: 20px 0 80px 0;
+}
+
+.guide-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  height: 100%;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  animation: fadeIn 0.8s ease-out;
+}
+
+.guide-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 5px;
+  background: linear-gradient(90deg, #1e3c72, #2a5298);
+}
+
+.guide-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.guide-icon {
+  font-size: 36px;
+  color: #1e3c72;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: rgba(30, 60, 114, 0.1);
+  margin: 0 auto 15px;
+}
+
+.guide-card h3 {
+  text-align: center;
+  color: #1e3c72;
+  margin-bottom: 15px;
+  font-size: 18px;
+}
+
+.guide-card ul {
+  padding-left: 20px;
+  margin: 0;
+}
+
+.guide-card li {
+  margin-bottom: 8px;
+  color: #606266;
+  position: relative;
+}
+
+.guide-card li::before {
+  content: "✓";
+  color: #409EFF;
+  position: absolute;
+  left: -18px;
+}
+
+.guide-card p {
+  color: #606266;
+  line-height: 1.6;
+}
+
+.process-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.process-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.step-number {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.step-text {
+  font-size: 14px;
+  color: #606266;
+}
+
+.process-arrow {
+  margin: 0 15px;
+  color: #909399;
+  font-size: 20px;
+}
+
+.feature-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.feature-tag {
+  background: rgba(64, 158, 255, 0.1);
+  color: #409EFF;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* 空状态样式 */
+.empty-state {
+  padding: 40px 0;
+  text-align: center;
+  color: #909399;
+}
+
+.empty-icon {
+  font-size: 60px;
+  margin-bottom: 20px;
+  color: #dcdfe6;
+}
+
+.empty-state p {
+  margin: 5px 0;
+}
+
+.empty-tip {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+/* 底部信息卡片 */
+.bottom-info-section {
+  margin-top: 80px;
+  margin-bottom: 30px;
+  clear: both;
+  position: relative;
+}
+
+.info-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  height: 100%;
+}
+
+.info-card h3 {
+  color: #1e3c72;
+  margin-top: 0;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+}
+
+.info-content p {
+  margin: 8px 0;
+  color: #606266;
+}
+
+.stats-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #909399;
+}
+
+.stat-value {
+  font-size: 16px;
+  color: #303133;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.active {
+  background-color: #67C23A;
+  box-shadow: 0 0 5px rgba(103, 194, 58, 0.5);
+}
+
+.status-dot.inactive {
+  background-color: #F56C6C;
+  box-shadow: 0 0 5px rgba(245, 108, 108, 0.5);
+}
+
+/* 页脚 */
+.page-footer {
+  text-align: center;
+  padding: 20px 0;
+  color: #909399;
+  font-size: 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  margin-top: 30px;
+}
+
+/* 视频信息盒子样式 */
+.video-info-box {
+  background: rgba(64, 158, 255, 0.05);
+  border-left: 3px solid #409EFF;
+  padding: 8px 12px;
+  border-radius: 0 4px 4px 0;
+}
+
+.video-info-box div {
+  margin: 4px 0;
+  color: #606266;
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(64, 158, 255, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(64, 158, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(64, 158, 255, 0); }
+}
+
+@keyframes fadeInLeft {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.upload-flex-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.upload-format-tip {
+  background: rgba(30, 60, 114, 0.05);
+  border-left: 3px solid #1e3c72;
+  padding: 15px;
+  border-radius: 0 4px 4px 0;
+  color: #606266;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: fit-content;
+  margin-top: 10px;
+}
+
+.upload-format-tip .el-icon {
+  color: #1e3c72;
+  font-size: 18px;
 }
 </style>
