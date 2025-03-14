@@ -27,8 +27,6 @@ class Config:
     # 文件上传配置
     MAX_CONTENT_LENGTH = 500 * 1024 * 1024  # 限制上传大小为500MB
     UPLOAD_FOLDER = os.path.join(basedir, 'uploads')
-    SUBTITLE_FOLDER = os.path.join(UPLOAD_FOLDER, 'subtitles')
-    PREVIEW_FOLDER = os.path.join(UPLOAD_FOLDER, 'previews')
     ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv'}
     
     # Whisper模型配置
@@ -51,8 +49,6 @@ class Config:
     def init_app(app):
         # 确保上传目录存在
         os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-        os.makedirs(app.config['SUBTITLE_FOLDER'], exist_ok=True)
-        os.makedirs(app.config['PREVIEW_FOLDER'], exist_ok=True)
 
 class DevelopmentConfig(Config):
     DEBUG = True

@@ -21,9 +21,18 @@ def create_app(config_name='default'):
         app.config.from_object(config[config_name])
         config[config_name].init_app(app)
         
+        # 配置文件上传目录
+        app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
+        app.config['SUBTITLE_FOLDER'] = os.path.join(app.config['UPLOAD_FOLDER'], 'subtitles')
+        app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 增加到500MB
+        
         # 配置文件上传相关参数
         app.config['MAX_CONTENT_PATH'] = None  # 不限制文件路径长度
         app.config['UPLOAD_EXTENSIONS'] = ['.mp4', '.avi', '.mov', '.mkv', '.flv']  # 允许的文件类型
+        
+        # 确保上传目录存在
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+        os.makedirs(app.config['SUBTITLE_FOLDER'], exist_ok=True)
         
         # 配置CORS
         cors.init_app(app, resources={
@@ -67,11 +76,6 @@ def create_app(config_name='default'):
         with app.app_context():
             # 创建数据库表
             db.create_all()
-            
-            # 确保上传目录存在
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            os.makedirs(app.config['SUBTITLE_FOLDER'], exist_ok=True)
-            os.makedirs(app.config['PREVIEW_FOLDER'], exist_ok=True)
             
             # 注册蓝图
             from .routes import video_bp, qa_bp, chat_bp
