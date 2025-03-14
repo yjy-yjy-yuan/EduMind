@@ -104,8 +104,8 @@ def generate_preview(video_path):
     import cv2
     import numpy as np
     try:
-        # 创建预览图目录
-        preview_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'previews')
+        # 使用应用配置中定义的预览图目录
+        preview_dir = current_app.config['PREVIEW_FOLDER']
         os.makedirs(preview_dir, exist_ok=True)
         
         # 设置预览图路径
@@ -383,7 +383,7 @@ def process_video(self, video_id, language='zh', model='turbo'):
             db.session.commit()
             
             # 确保预览图目录存在
-            preview_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'previews')
+            preview_dir = current_app.config['PREVIEW_FOLDER']
             os.makedirs(preview_dir, exist_ok=True)
             
             # 设置预览图路径
@@ -492,7 +492,7 @@ def process_video(self, video_id, language='zh', model='turbo'):
             # 检查是否是占位文件，如果是则跳过字幕处理
             if not is_placeholder:
                 # 创建字幕输出目录
-                subtitle_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'subtitles')
+                subtitle_dir = current_app.config['SUBTITLE_FOLDER']
                 os.makedirs(subtitle_dir, exist_ok=True)
                 
                 # 设置输出文件路径
@@ -819,6 +819,11 @@ def cleanup_video(video_id):
                 'status': 'error',
                 'message': f'未找到ID为{video_id}的视频'
             }
+            
+        # 先删除与该视频关联的问题记录
+        from ..models.qa import Question
+        Question.query.filter_by(video_id=video_id).delete()
+        db.session.commit()
             
         # 删除原始视频文件
         if video.filepath and os.path.exists(video.filepath):

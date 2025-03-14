@@ -726,6 +726,11 @@ def delete_video(video_id):
     try:
         video = Video.query.get_or_404(video_id)
         
+        # 先删除与该视频关联的问题记录
+        from ..models.qa import Question
+        Question.query.filter_by(video_id=video_id).delete()
+        db.session.commit()
+        
         # 启动清理任务
         from ..tasks.video_processing import cleanup_video
         task = cleanup_video.delay(video.id)

@@ -33,7 +33,7 @@
                    @click="navigateToVideo(video.id)">
                 <div class="video-thumbnail" :style="video.thumbnail ? `background-image: url(${video.thumbnail})` : ''"></div>
                 <div class="video-info">
-                  <div class="video-title">{{ video.title || '未命名视频' }}</div>
+                  <div class="video-title" :title="video.title || '未命名视频'">{{ video.title || '未命名视频' }}</div>
                   <div class="video-duration">{{ formatDuration(video.duration) }}</div>
                 </div>
               </div>
@@ -105,25 +105,37 @@
         <div class="video-player-area">
           <div class="video-info-section">
             <div class="video-info">
-              <h3>{{ videoTitle }}</h3>
-              <div class="video-details" v-if="video">
-                <p>时长：{{ formatDuration(video?.duration) }}</p>
-                <p>分辨率：{{ video?.width }} x {{ video?.height }}</p>
-                <p>帧率：{{ video?.fps }} FPS</p>
+              <h3 :title="videoTitle">{{ videoTitle }}</h3>
+              <div class="video-details-card" v-if="video">
+                <div class="video-detail-item">
+                  <span class="detail-label">时长</span>
+                  <span class="detail-value">{{ formatDuration(video?.duration) }}</span>
+                </div>
+                <div class="video-detail-item">
+                  <span class="detail-label">分辨率</span>
+                  <span class="detail-value">{{ video?.width }} x {{ video?.height }}</span>
+                </div>
+                <div class="video-detail-item">
+                  <span class="detail-label">帧率</span>
+                  <span class="detail-value">{{ video?.fps }} FPS</span>
+                </div>
               </div>
             </div>
-            <div class="subtitle-controls">
-              <div class="subtitle-toggle">
+            <div class="subtitle-controls-card">
+              <div class="subtitle-control-item">
+                <span class="control-label">字幕显示</span>
                 <el-switch
                   v-model="showSubtitles"
-                  active-text="显示字幕"
-                  inactive-text="隐藏字幕"
+                  active-text="显示"
+                  inactive-text="隐藏"
                   @change="toggleSubtitles"
+                  class="custom-switch"
                 />
               </div>
-              <div class="subtitle-download">
+              <div class="subtitle-control-item">
+                <span class="control-label">字幕下载</span>
                 <el-dropdown>
-                  <el-button type="primary">
+                  <el-button type="primary" class="download-button">
                     下载字幕<el-icon class="el-icon--right"><arrow-down /></el-icon>
                   </el-button>
                   <template #dropdown>
@@ -172,11 +184,11 @@
                 <ul>
                   <li v-for="(item, index) in qaHistory" :key="index" class="qa-item">
                     <div class="question">
-                      <el-icon class="qa-icon"><QuestionFilled /></el-icon>
                       <span class="qa-text">{{ item.question }}</span>
+                      <el-icon class="qa-icon"><User /></el-icon> <!-- 用户图标 -->
                     </div>
                     <div class="answer">
-                      <el-icon class="qa-icon"><ChatLineSquare /></el-icon>
+                      <el-icon class="qa-icon"><Monitor /></el-icon> <!-- 智能分析图标 -->
                       <span class="qa-text">{{ item.answer }}</span>
                     </div>
                   </li>
@@ -295,12 +307,12 @@ import { ref, onMounted, computed, watch, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElLoading } from 'element-plus';
 import { 
-  Loading, Warning, FullScreen, Close, 
+  Loading, Warning, FullScreen, Close, User, Monitor, 
   QuestionFilled, ChatLineSquare, ArrowDown as ArrowDown,
   ArrowRight, ArrowLeft, HomeFilled, VideoCamera, Document
 } from '@element-plus/icons-vue';
 import { getVideo, getSubtitle, getVideoList, getVideoPreview } from '@/api/video';
-import { sendChatMessage } from '@/api/chat';
+import { askQuestionStream } from '@/api/qa';
 import request from '@/utils/request';
 
 const route = useRoute();
@@ -333,7 +345,29 @@ const fullSubtitles = ref([]);
 const qaMode = ref('video');
 const question = ref('');
 const isAsking = ref(false);
-const qaHistory = ref([]);
+// 分别为两种模式创建独立的历史记录数组，并从localStorage中恢复数据
+const videoQaHistory = ref(JSON.parse(localStorage.getItem(`videoQaHistory_${videoId.value}`) || '[]'));
+const freeQaHistory = ref(JSON.parse(localStorage.getItem('freeQaHistory') || '[]'));
+// 计算属性：根据当前模式返回对应的历史记录
+const qaHistory = computed(() => {
+  return qaMode.value === 'video' ? videoQaHistory.value : freeQaHistory.value;
+});
+
+// 监听历史记录变化，保存到localStorage
+watch(videoQaHistory, (newHistory) => {
+  localStorage.setItem(`videoQaHistory_${videoId.value}`, JSON.stringify(newHistory));
+}, { deep: true });
+
+watch(freeQaHistory, (newHistory) => {
+  localStorage.setItem('freeQaHistory', JSON.stringify(newHistory));
+}, { deep: true });
+
+// 监听videoId变化，更新视频相关的问答历史
+watch(videoId, (newVideoId) => {
+  if (newVideoId) {
+    videoQaHistory.value = JSON.parse(localStorage.getItem(`videoQaHistory_${newVideoId}`) || '[]');
+  }
+});
 
 // 侧边栏状态
 const sidebarVisible = ref(false);
@@ -600,24 +634,48 @@ const askQuestion = async () => {
   try {
     let answer = '';
     
-    await sendChatMessage(questionText, {
-      mode: qaMode.value,
-      videoId: qaMode.value === 'video' ? videoId.value : null,
-      onData: (data) => {
-        answer = data;
+    // 使用视频ID或null，取决于当前问答模式
+    const videoIdParam = qaMode.value === 'video' ? videoId.value : null;
+    
+    // 使用新的流式问答API
+    await askQuestionStream(
+      {
+        question: questionText,
+        video_id: videoIdParam,
+        api_key: "sk-178e130a121445659860893fdfae1e7d", // 使用与后端相同的API密钥
+        mode: qaMode.value
       },
-      onError: (error) => {
-        console.error('提问失败:', error);
-        ElMessage.error('提问失败，请重试');
-      },
-      onComplete: () => {
-        qaHistory.value.push({
-          question: questionText,
-          answer: answer || '抱歉，我无法回答这个问题'
-        });
-        question.value = '';
+      {
+        onData: (data) => {
+          answer = data;
+          // 实时更新最新的回答到历史记录
+          const lastIndex = qaHistory.value.length - 1;
+          if (lastIndex >= 0 && qaHistory.value[lastIndex].question === questionText) {
+            qaHistory.value[lastIndex].answer = answer;
+          } else {
+            // 根据当前模式添加到对应的历史记录数组
+            if (qaMode.value === 'video') {
+              videoQaHistory.value.push({
+                question: questionText,
+                answer: answer
+              });
+            } else {
+              freeQaHistory.value.push({
+                question: questionText,
+                answer: answer
+              });
+            }
+          }
+        },
+        onError: (error) => {
+          console.error('提问失败:', error);
+          ElMessage.error('提问失败，请重试');
+        },
+        onComplete: () => {
+          question.value = '';
+        }
       }
-    });
+    );
   } catch (error) {
     console.error('提问失败:', error);
     ElMessage.error('提问失败，请重试');
@@ -628,7 +686,14 @@ const askQuestion = async () => {
 
 // 清空聊天记录
 const clearChat = () => {
-  qaHistory.value = [];
+  // 根据当前模式清空对应的历史记录
+  if (qaMode.value === 'video') {
+    videoQaHistory.value = [];
+    localStorage.removeItem(`videoQaHistory_${videoId.value}`);
+  } else {
+    freeQaHistory.value = [];
+    localStorage.removeItem('freeQaHistory');
+  }
   question.value = '';
   ElMessage.success('聊天记录已清空');
 };
@@ -668,6 +733,12 @@ onMounted(async () => {
   await loadSubtitles();
   await fetchProcessedVideos();
   setupTimeUpdateListener();
+});
+
+// 监听问答模式变化
+watch(qaMode, (newMode) => {
+  console.log(`问答模式切换为: ${newMode}`);
+  // 模式切换时可以在这里添加其他逻辑
 });
 
 // 监听字幕模式变化
@@ -728,313 +799,224 @@ const navigateToVideoUpload = () => {
 .video-player-container {
   display: flex;
   height: 100vh;
-  background: #ffffff; /* 纯白色背景 */
-  position: relative;
+  width: 100%;
   overflow: hidden;
-}
-
-/* 添加背景点缀效果 */
-.video-player-container::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="none"/><circle cx="10" cy="10" r="1" fill="rgba(255,255,255,0.05)"/></svg>');
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* 帮助文档 */
-.help-content {
-  max-height: 65vh;
-  overflow-y: auto;
-  padding: 15px;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
-}
-
-.help-content h3 {
-  text-align: center;
-  color: #2c3e50;
-  margin-bottom: 25px;
-  font-size: 1.8rem;
   position: relative;
-  padding-bottom: 10px;
+  background: linear-gradient(135deg, #1c92d2, #f2fcfe);
+  color: #333;
 }
 
-.help-content h3:after {
-  content: "";
-  position: absolute;
-  width: 80px;
-  height: 3px;
-  background: linear-gradient(90deg, #409EFF, #67C23A);
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  border-radius: 3px;
-}
-
-.help-section {
-  margin-bottom: 30px;
-  background-color: white;
-  padding: 15px 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
-  transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.help-section:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 4px 15px 0 rgba(0, 0, 0, 0.1);
-}
-
-.help-section h4 {
-  margin-bottom: 15px;
-  color: #409EFF;
-  border-bottom: 2px solid #EBEEF5;
-  padding-bottom: 8px;
-  font-size: 1.3rem;
-  display: flex;
-  align-items: center;
-}
-
-.help-section h4:before {
-  content: "•";
-  color: #409EFF;
-  margin-right: 8px;
-  font-size: 1.5rem;
-}
-
-.help-section ul {
-  padding-left: 20px;
-  list-style-type: none;
-}
-
-.help-section li {
-  margin-bottom: 12px;
-  line-height: 1.6;
-  position: relative;
-  padding-left: 22px;
-}
-
-.help-section li:before {
-  content: "✓";
-  position: absolute;
-  left: 0;
-  color: #67C23A;
-  font-weight: bold;
-}
-
-.help-section li strong {
-  color: #606266;
-  font-weight: 600;
-}
-
-.dialog-footer {
-  display: flex;
-  justify-content: center;
-  margin-top: 10px;
-}
-
-.dialog-footer .el-button {
-  padding: 10px 25px;
-  font-size: 1rem;
-}
-
-/* 左侧区域 */
+/*左侧区域*/
 .left-section {
-  flex: 6; /* 左侧栏占比6 */
+  flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: #ffffff; /* 纯白色背景 */
-  padding: 20px;
-  gap: 20px;
+  transition: all 0.3s ease;
+  margin-left: 0;
+  height: 100%;
   overflow: hidden;
 }
 
 .left-section.with-sidebar {
   margin-left: 25%;
-  transition: margin-left 0.3s ease;
 }
 
-
-.help-content {
-  max-height: 60vh;
-  overflow-y: auto;
-  padding: 0 10px;
-}
-
-.help-section {
-  margin-bottom: 20px;
-}
-
-.help-section h4 {
-  margin-bottom: 10px;
-  color: #409EFF;
-  border-bottom: 1px solid #EBEEF5;
-  padding-bottom: 5px;
-}
-
-.help-section ul {
-  padding-left: 20px;
-}
-
-.help-section li {
-  margin-bottom: 8px;
-  line-height: 1.5;
-}
-
-.subtitle-section {
-  flex: 4; /* 右侧栏占比4 */
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-  background-color: #2a2a2a;
-  overflow: hidden;
-}
-
-/* 左侧上方区域布局 */
+/*上方区域*/
 .upper-section {
-  flex: 1; /* 上方区域占左侧栏50% */
   display: flex;
-  gap: 20px;
-  overflow: hidden; /* 隐藏滚动条 */
+  height: 50%;
+  width: 100%;
+  margin-bottom: 10px;
 }
 
-/* 左侧下方区域布局 */
-.lower-section {
-  flex: 1; /* 下方区域占左侧栏50% */
-  display: flex; /* 使用flexbox布局 */
-  overflow: hidden; /* 隐藏滚动条 */
-}
-
-/* 视频播放区域 */
+/*视频主区域*/
 .video-main-area {
-  flex: 0.63; /* 视频播放区域占上方区域63% */
-  display: flex;
-  flex-direction: column;
+  flex: 0.7;
+  padding: 15px;
   overflow: hidden;
-}
-
-/* 视频播放器区域 */
-.video-player-area {
-  flex: 0.37; /* 视频播放器区域占上方区域35% */
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.qa-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
 }
 
 .video-wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background-color: #2a2a2a;
-  border-radius: 8px;
-  overflow: hidden;
-  min-height: 300px;
-}
-
-.video-info-section {
-  display: flex;
-  flex-direction: column;
-  background: linear-gradient(135deg, #1a1a1a 0%, #2c3e50 100%);
-  border-radius: 12px;
-  padding: 20px;
-  height: 100%;
-  overflow-y: auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-/* 视频播放区域 */ 
-.video-section {
-  position: relative;
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f7f7f7; /* 非常浅的灰色，与白色形成微妙对比 */
+  position: relative;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+.video-section {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/*视频元素*/
 .video-element {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  max-height: 100%;
+  background-color: transparent;
+}
+
+/*视频播放区域*/
+.video-player-area {
+  flex: 0.3;
+  padding: 15px;
+  overflow: auto;
+}
+
+.video-info-section {
+  height: 100%;
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.video-info h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #409EFF;
+  font-weight: 600;
+  font-size: 20px; /* 减小字体大小 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap; /* 确保长标题不会换行 */
+}
+
+.video-details-card {
+  background: linear-gradient(135deg, #f5f7fa, #e4e7eb);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 15px;
+}
+
+.video-detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.video-detail-item:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-weight: 500;
+  color: #606266;
+}
+
+.detail-value {
+  color: #303133;
+  font-weight: 600;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  padding: 4px 10px;
+  border-radius: 12px;
+  color: white;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/*字幕控制*/
+.subtitle-controls-card {
+  background: linear-gradient(135deg, #f5f7fa, #e4e7eb);
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.subtitle-control-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.subtitle-control-item:last-child {
+  border-bottom: none;
+}
+
+.control-label {
+  font-weight: 500;
+  color: #606266;
+}
+
+.custom-switch {
+  --el-switch-on-color: #1e3c72;
+}
+
+.download-button {
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
 }
 
-/* 问答区域 */
+.download-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/*下方区域*/
+.lower-section {
+  flex: 1;
+  padding: 0 15px 15px;
+  overflow-y: auto; /* 从 overflow: hidden 改为 overflow-y: auto */
+}
+
+/*问答容器*/
+.qa-container {
+  height: 100%;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
 .qa-section {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #F6EFBD; /* 背景 */
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  border: 1px solid #f0f0f0;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background: #fff;
+  border-radius: 8px;
+  overflow-y: auto;
+  height: 100%;
 }
 
-.qa-section:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-}
-
-/* 问答头部 */
 .qa-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  background: #A2D2DF; /* 背景 */
-  padding: 10px 15px; /* 减小内边距使顶部栏变小 */
-  min-height: 20px; /* 减小最小高度 */
-  border-radius: 20px 20px 0 0;
-  position: relative;
-  overflow: hidden;
+  justify-content: space-between;
+  padding: 15px;
+  background: linear-gradient(135deg, #1c92d2, #f2fcfe);
+  color: #fff;
 }
 
-/* 添加背景点缀效果 */
-.qa-header::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(45deg, rgba(19, 217, 248, 0.427) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.1) 75%, transparent 75%, transparent);
-  background-size: 10px 10px;
-  opacity: 0.2;
-  pointer-events: none;
-}
-
-/* 文本(智能问答) */
 .qa-header h3 {
   margin: 0;
-  color: #fff; 
-  font-size: 18px;
   font-weight: 600;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  letter-spacing: 1px;
+}
+
+.qa-mode-switch {
+  margin: 0 15px;
 }
 
 .qa-header-actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
 .qa-content {
@@ -1042,86 +1024,28 @@ const navigateToVideoUpload = () => {
   display: flex;
   flex-direction: column;
   padding: 15px;
-  gap: 15px;
   overflow-y: auto;
-}
-
-.qa-mode-switch {
-  margin-bottom: 12px;
-  text-align: center;
-}
-
-.qa-mode-toggle {
-  display: flex;
-  align-items: center;
-}
-
-.qa-mode-toggle .el-radio-group {
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.qa-mode-toggle .el-radio-button__inner {
-  padding: 6px 12px;
-  font-size: 12px;
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: #fff;
-}
-
-.qa-mode-toggle .el-radio-button__orig-radio:checked + .el-radio-button__inner {
-  background: rgba(255, 255, 255, 0.4);
-  box-shadow: none;
-  color: #fff;
-  font-weight: bold;
+  height: 100%; /* 确保有高度 */
 }
 
 .qa-input {
   display: flex;
-  gap: 15px;
-  margin-bottom: 15px; 
+  gap: 10px;
+  margin-bottom: 15px;
 }
 
-.qa-input .el-textarea {
+.qa-input .el-input {
   flex: 1;
-}
-
-/* 输入框 */
-.qa-input .el-textarea__inner {
-  background: #ffffff; /* 白色背景 */
-  border: 1px solid #f0f0f0;
-  color: #333333; /* 深灰色 */
-  border-radius: 8px;
-  transition: all 0.3s ease;
-}
-
-.qa-input .el-textarea__inner:focus {
-  border-color: #e0e0e0;
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.03);
-}
-
-/* 提问按钮 */
-.qa-input .el-button {
-  align-self: flex-start;
-  background: linear-gradient(90deg, #d54911, #67C23A);
-  border: none;
-  border-radius: 8px;
-  padding: 12px 25px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-  transition: all 0.3s ease;
-}
-
-.qa-input .el-button:hover {
-  background: #f7f7f7;
-  transform: translateY(-3px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
 }
 
 .qa-history {
   flex: 1;
   overflow-y: auto;
+  padding-right: 10px;
+  height: calc(100% - 60px); /* 减去输入框的高度 */
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .qa-history ul {
@@ -1130,132 +1054,224 @@ const navigateToVideoUpload = () => {
   margin: 0;
 }
 
-/* 问答历史记录 */
 .qa-item {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 15px;
-  margin-bottom: 15px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
-  border: 1px solid #f0f0f0;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  margin-bottom: 20px;
+  width: 100%;
 }
 
-.qa-item:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
-}
-
-.qa-item .question,
-.qa-item .answer {
+.question, .answer {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
-.qa-item .answer {
-  margin-bottom: 0;
+.question {
+  background-color: #faf5f5;
+  margin-left: auto; /* 将问题靠右对齐 */
+  margin-right: 0;
+  max-width: 80%; /* 限制宽度 */
+  justify-content: flex-end; /* 内容靠右 */
+  border-top-left-radius: 15px;
+  border-top-right-radius: 5px;
+  border-bottom-left-radius: 15px;
+  border-bottom-right-radius: 15px;
+  background: linear-gradient(135deg, #1c92d2, #f2fcfe); /* 使用与主题相符的渐变色 */
+  color: #333; /* 改为深色文字，提高可读性 */
+  font-weight: 500; /* 加粗文字 */
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.5); /* 添加文字阴影增强可读性 */
 }
 
+.question .qa-icon {
+  order: 2; /* 图标放在右侧 */
+  margin-right: 0;
+  margin-left: 10px;
+  color: #ee66a1; /* 图标颜色 */
+}
+
+.question .qa-text {
+  text-align: right; /* 文本右对齐 */
+  color: #151414; /* 确保文本为白色 */
+  font-weight: 600; /* 加粗文字 */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); /* 添加文字阴影增强可读性 */
+}
+
+.answer {
+  background-color: #ecf5ff;
+  margin-right: auto; /* 回答靠左对齐 */
+  margin-left: 0;
+  max-width: 80%; /* 限制宽度 */
+  border-top-left-radius: 5px;
+  border-top-right-radius: 15px;
+  border-bottom-left-radius: 15px;
+  border-bottom-right-radius: 15px;
+  background: linear-gradient(135deg, #1e3c72, #2a5298); /* 使用深蓝色渐变 */
+  color: #fff; /* 白色文字 */
+}
+
+.answer .qa-icon {
+  color: #fff; /* 图标颜色 */
+}
 
 .qa-icon {
-  flex-shrink: 0;
-  font-size: 18px;
+  margin-right: 10px;
   margin-top: 3px;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 8px;
-  border-radius: 50%;
   color: #409EFF;
-}
-
-.qa-item .answer .qa-icon {
-  color: #67C23A;
 }
 
 .qa-text {
   flex: 1;
-  color: #333333; /* 深灰色 */
-  line-height: 1.6;
   word-break: break-word;
-  padding: 10px;
-  background: #f9f9f9; /* 非常浅的灰色 */
-  border-radius: 8px;
-  position: relative;
+  line-height: 1.5;
 }
 
-/* 侧边栏样式 */
+/*字幕区域*/
+.subtitle-section {
+  width: 40%;
+  height: 100%;
+  padding: 15px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.15);
+}
+
+.subtitle-display-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.subtitle-mode-switch {
+  padding: 15px;
+  background: linear-gradient(135deg, #1c92d2, #f2fcfe);
+  color: #fff;
+  text-align: center;
+}
+
+.subtitle-display {
+  flex: 1;
+  padding: 15px;
+  overflow-y: auto;
+}
+
+.subtitle-item {
+  margin-bottom: 15px;
+  padding: 10px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.subtitle-item:hover {
+  background-color: #f5f7fa;
+  transform: translateY(-2px);
+}
+
+.subtitle-item.current {
+  background-color: #ecf5ff;
+  border-left: 3px solid #409EFF;
+}
+
+.subtitle-time {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 5px;
+}
+
+.subtitle-content {
+  color: #333333;
+  margin: 0;
+  line-height: 1.6;
+  font-size: 15px;
+}
+
+/*加载和错误覆盖层*/
+.loading-overlay, .error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  z-index: 10;
+}
+
+.loading-icon, .error-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.error-overlay .el-button {
+  margin-top: 15px;
+}
+
+/*帮助对话框*/
+.help-dialog .el-dialog__body {
+  padding: 20px;
+}
+
+.help-content h3 {
+  margin-top: 20px;
+  margin-bottom: 10px;
+  color: #409EFF;
+}
+
+.help-content p, .help-content li {
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+
+.help-content ul {
+  padding-left: 20px;
+}
+
+/*侧边栏*/
 .sidebar {
   position: fixed;
   top: 0;
-  left: -23%;
-  width: 23%;
+  left: -25%;
+  width: 25%;
   height: 100%;
-  background: #FBFBFB; /* 白色背景 */
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
   transition: all 0.3s ease;
   z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 1px solid #f0f0f0; /* 添加阴影 */
-  border-right: 2px 0 10px rgba(0, 0, 0, 0.03); /* 添加边框 */
+  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+  overflow-y: auto;
+  color: #fff;
 }
 
 .sidebar-visible {
   left: 0;
 }
 
-/* 侧边栏切换按钮 */
-.sidebar-toggle {
-  position: fixed;
-  top: 50%;
-  left: 0;
-  transform: translateY(-50%);
-  background-color: #ffffff; /* 白色背景 */
-  color: #333333;
-  padding: 15px 5px;
-  border-radius: 0 4px 4px 0;
-  cursor: pointer;
-  z-index: 1001;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.05); 
-  border: 1px solid #f0f0f0; /* 添加边框 */
-  border-left: none; 
-}
-
-.sidebar-toggle:hover {
-  transform: scale(1.1);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-}
-
 .sidebar-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
-  background: linear-gradient(90deg, #409EFF, #67C23A);
+  padding: 15px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-header h3 {
   margin: 0;
-  color: #fff;
-  font-size: 20px;
   font-weight: 600;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  letter-spacing: 1px;
 }
 
 .close-icon {
   cursor: pointer;
   font-size: 20px;
-  color: #fff;
   transition: transform 0.3s ease;
 }
 
@@ -1264,684 +1280,105 @@ const navigateToVideoUpload = () => {
 }
 
 .sidebar-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 100%);
+  padding: 15px;
 }
 
 .sidebar-menu {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 10px;
 }
 
 .menu-item {
   display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 15px;
-  border-radius: 10px;
-  background-color: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  padding: 12px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
-  border-left: 3px solid transparent;
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .menu-item:hover {
-  background-color: rgba(255, 255, 255, 0.15);
-  transform: translateX(5px);
-  border-left: 3px solid #67C23A;
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
 }
 
 .menu-item .el-icon {
-  font-size: 22px;
-  color: #67C23A;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 8px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-}
-
-.menu-item:hover .el-icon {
-  transform: scale(1.1);
-  color: #fff;
-  background: #67C23A;
-}
-
-.menu-item span {
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.menu-section {
-  margin-top: 25px;
-  margin-bottom: 20px;
-}
-
-.menu-section h4 {
-  color: #fff;
-  font-size: 18px;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 2px solid rgba(103, 194, 58, 0.5);
-  position: relative;
-  display: inline-block;
-}
-
-.menu-section h4:after {
-  content: "";
-  position: absolute;
-  width: 40%;
-  height: 2px;
-  background: #67C23A;
-  bottom: -2px;
-  left: 0;
-}
-
-.video-list {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.video-item {
-  display: flex;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 10px;
-  background-color: rgba(255, 255, 255, 0.08);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border-left: 3px solid transparent;
-  overflow: hidden;
-}
-
-.video-item:hover {
-  background-color: rgba(255, 255, 255, 0.15);
-  transform: translateX(5px);
-  border-left: 3px solid #409EFF;
-}
-
-.video-thumbnail {
-  width: 100px;
-  height: 56px;
-  background-color: #333;
-  border-radius: 6px;
-  background-size: cover;
-  background-position: center;
-  flex-shrink: 0;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s ease;
-}
-
-.video-item:hover .video-thumbnail {
-  transform: scale(1.05);
-}
-
-.video-thumbnail:before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(to bottom, rgba(0,0,0,0) 50%, rgba(0,0,0,0.7) 100%);
-}
-
-.video-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 3px 0;
-}
-
-.video-title {
-  font-size: 15px;
-  color: #fff;
-  margin-bottom: 8px;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  line-height: 1.3;
-}
-
-.video-duration {
-  font-size: 13px;
-  color: #67C23A;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.video-duration:before {
-  content: "⏱";
-  font-size: 12px;
-}
-
-.empty-list {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
-  padding: 40px 0;
-  color: rgba(255, 255, 255, 0.6);
-  background-color: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
-  border: 1px dashed rgba(255, 255, 255, 0.1);
-}
-
-.empty-list .el-icon {
-  font-size: 40px;
-  color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.05);
-  padding: 15px;
-  border-radius: 50%;
-}
-
-.empty-list span {
-  font-size: 16px;
-}
-
-.subtitle-display-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.subtitle-mode-switch {
-  margin-bottom: 12px;
-  text-align: center;
-  padding: 8px;
-  background-color: #1a1a1a;
-  border-radius: 8px;
-}
-
-/* 字幕背景 */
-.subtitle-display {
-  flex: 1;
-  overflow-y: auto;
-  padding: 15px;
-  background: #F6EFBD; /* 浅黄色背景，与问答区域保持一致 */
-  border-radius: 8px;
-  margin-bottom: 15px;
-  border: 1px solid #e0e0e0;
-  color: #333333; /* 深灰色文字 */
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
-}
-
-.subtitle-display p {
-  margin: 8px 0;
-  line-height: 1.6;
-  padding: 8px;
-  background: rgba(255, 255, 255, 0.6); /* 半透明白色背景 */
-  border-radius: 6px;
-  border-left: 3px solid #A2D2DF; /* 左侧边框颜色与问答头部保持一致 */
-}
-
-
-.subtitle-content {
-  color: #333333; /* 深灰色文字，与其他文本保持一致 */
-  margin: 0;
-  line-height: 1.6;
-  font-size: 15px; /* 调整字幕大小，可以根据需要修改数值 */
-  font-weight: 500; /* 稍微加粗 */
-}
-
-.full-subtitle {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
-  background-color: #1a1a1a;
-  border-radius: 6px;
-}
-
-.subtitle-item {
-  padding: 12px;
-  margin: 8px 0;
-  background-color: #2a2a2a;
-  border-radius: 8px;
-  transition: background-color 0.3s;
-}
-
-.subtitle-item.current {
-  background-color: #3a3a3a;
-  border-left: 3px solid #409eff;
-}
-
-.subtitle-time {
-  display: block;
-  color: #909399;
-  font-size: 12px;
-  margin-bottom: 8px;
-}
-
-.subtitle-text {
-  color: #fff;
-  margin: 0;
-  line-height: 1.6;
-}
-
-.subtitle-placeholder {
-  color: #909399;
-  text-align: center;
-  padding: 20px;
-  background-color: #2a2a2a;
-  border-radius: 8px;
-}
-
-/* 美化滚动条 */
-.subtitle-display::-webkit-scrollbar,
-.qa-history::-webkit-scrollbar,
-.sidebar-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.subtitle-display::-webkit-scrollbar-track,
-.qa-history::-webkit-scrollbar-track,
-.sidebar-content::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
-}
-
-.subtitle-display::-webkit-scrollbar-thumb,
-.qa-history::-webkit-scrollbar-thumb,
-.sidebar-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-  transition: all 0.3s ease;
-}
-
-.subtitle-display::-webkit-scrollbar-thumb:hover,
-.qa-history::-webkit-scrollbar-thumb:hover,
-.sidebar-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.video-info {
-  flex: 1;
-  margin-bottom: 15px;
-}
-
-/*视频信息区域*/
-.video-info h3 {
-  color: #FFFFFF; /* 白色文字 */
-  margin: 0 0 15px 0;
-  font-size: 20px;
-  font-weight: 600;
-  padding-bottom: 10px;
-  border-bottom: 2px solid#f0f0f0;
-  position: relative;
-}
-
-.video-info h3:after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: -2px;
-  width: 50px;
-  height: 2px;
-  background: #00A0E9; /* 明亮蓝色 */
-}
-
-/*视频详情(时长、分辨率)*/
-.video-details {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  color: #FFFFFF; /* 白色文字 */
-  font-size: 14px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  padding: 15px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.video-details p {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.video-details p:before {
-  content: "•";
-  color: #0da2f3; /* 柔和金色 */
-  font-size: 18px;
-}
-
-/*· 字幕控制区域*/
-.subtitle-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-  margin-top: 20px;
-}
-
-.subtitle-toggle {
-  display: flex;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.7); /* 半透明白色背景 */
-  padding: 15px;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
-}
-
-.subtitle-toggle .el-switch__core {
-  background-color: #e0e0e0;
-}
-
-.subtitle-toggle .el-switch.is-checked .el-switch__core {
-  background-color: #A2D2DF; /* 与问答头部保持一致 */
-}
-
-.subtitle-download {
-  display: flex;
-  justify-content: center;
-}
-
-.subtitle-download .el-dropdown {
-  width: 100%;
-}
-
-/*下载字幕按钮*/
-.subtitle-download .el-button {
-  width: 100%;
-  background: #00A0E9; /* 明亮蓝色 */
-  border: none;
-  border-radius: 8px;
-  padding: 12px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  color: #FFFFFF; /* 白色文字 */
-}
-
-/*下载字幕按钮鼠标悬停效果*/
-.subtitle-download .el-button:hover {
-  background: #f50baf; /* 稍深的蓝色 */
-  transform: translateY(-3px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
-}
-
-/* 加载和错误提示美化 */
-.loading-overlay,
-.error-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.8);
-  color: #fff;
-  z-index: 10;
-  backdrop-filter: blur(5px);
-  border-radius: 12px;
-}
-
-.loading-icon {
-  font-size: 40px;
-  margin-bottom: 15px;
-  animation: spin 1.5s linear infinite;
-  color: #409EFF;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.error-icon {
-  font-size: 40px;
-  margin-bottom: 15px;
-  color: #F56C6C;
-}
-
-.loading-overlay span,
-.error-overlay span {
-  font-size: 16px;
-  margin-bottom: 15px;
-  text-align: center;
-  max-width: 80%;
-}
-
-.error-overlay .el-button {
-  background: linear-gradient(90deg, #409EFF, #67C23A);
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-}
-
-.error-overlay .el-button:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
-}
-
-/* 侧边栏样式 */
-.sidebar {
-  position: fixed;
-  top: 0;
-  left: -25%;
-  width: 25%;
-  height: 100%;
-  background-color: #05cad8;
-  transition: left 0.3s ease;
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.sidebar-visible {
-  left: 0;
-}
-
-.sidebar-toggle {
-  position: fixed;
-  top: 50%;
-  left: 0;
-  transform: translateY(-50%);
-  background-color: #1a1a1a;
-  color: #fff;
-  padding: 15px 5px;
-  border-radius: 0 4px 4px 0;
-  cursor: pointer;
-  z-index: 1001;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
-}
-
-.sidebar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px;
-  background-color: #2a2a2a;
-  border-bottom: 1px solid #333;
-}
-
-.sidebar-header h3 {
-  margin: 0;
-  color: #fff;
-  font-size: 16px;
-}
-
-.close-icon {
-  cursor: pointer;
-  font-size: 18px;
-}
-
-.sidebar-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 15px;
-}
-
-.sidebar-section {
-  margin-bottom: 20px;
-}
-
-.sidebar-section h4 {
-  color: #ddd;
-  margin: 0 0 10px 0;
-  font-size: 14px;
-  border-bottom: 1px solid #333;
-  padding-bottom: 5px;
-}
-
-.chapter-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.chapter-list li {
-  padding: 8px 10px;
-  margin: 5px 0;
-  background-color: #2a2a2a;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: flex-start;
-  transition: background-color 0.2s;
-}
-
-.chapter-list li:hover {
-  background-color: #333;
-}
-
-.chapter-list li.active {
-  background-color: #409eff;
-}
-
-.chapter-time {
-  color: #aaa;
-  font-size: 12px;
   margin-right: 10px;
-  min-width: 45px;
-}
-
-.chapter-title {
-  color: #fff;
-  font-size: 13px;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-
-/* 侧边栏菜单样式 */
-.sidebar-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 15px;
-  background-color: #2a2a2a;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.menu-item:hover {
-  background-color: #333;
-}
-
-.menu-item .el-icon {
-  font-size: 18px;
-  color: #409eff;
-}
-
-.menu-item span {
-  color: #fff;
-  font-size: 14px;
 }
 
 .menu-section {
   margin-top: 20px;
-  margin-bottom: 20px;
 }
 
 .menu-section h4 {
-  color: #ddd;
-  margin: 0 0 10px 0;
-  font-size: 14px;
-  border-bottom: 1px solid #333;
-  padding-bottom: 5px;
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .video-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 5px; /* 添加右侧内边距，避免滚动条挤压内容 */
 }
 
 .video-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
-  background-color: #2a2a2a;
-  border-radius: 6px;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.1);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .video-item:hover {
-  background-color: #333;
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
 }
 
 .video-thumbnail {
-  width: 60px;
-  height: 40px;
+  min-width: 80px; /* 使用最小宽度确保缩略图不会被压缩 */
+  height: 45px; /* 增加高度，使图片更加清晰 */
   background-color: #333;
+  border-radius: 4px;
+  margin-right: 10px;
   background-size: cover;
   background-position: center;
-  border-radius: 4px;
-  flex-shrink: 0;
+  flex-shrink: 0; /* 防止缩略图被压缩 */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); /* 添加阴影效果 */
 }
 
 .video-info {
   flex: 1;
-  overflow: hidden;
+  min-width: 0; /* 允许内容在必要时缩小 */
+  overflow: hidden; /* 确保溢出内容被隐藏 */
 }
 
 .video-title {
-  color: #fff;
-  font-size: 10px;
-  margin-bottom: 4px;
+  font-weight: 600;
+  margin-bottom: 5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%; /* 确保标题不会超出父容器 */
+  color: rgba(255, 255, 255, 0.9); /* 增加对比度 */
 }
 
 .video-duration {
-  color: #aaa;
   font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.2); /* 添加背景色使时长更加醒目 */
+  padding: 2px 6px;
+  border-radius: 10px;
+  display: inline-block;
 }
 
 .empty-list {
@@ -1950,14 +1387,59 @@ const navigateToVideoUpload = () => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background-color: #2a2a2a;
-  border-radius: 6px;
-  color: #aaa;
-  gap: 10px;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .empty-list .el-icon {
   font-size: 24px;
-  color: #555;
+  margin-bottom: 10px;
+}
+
+/*侧边栏开关按钮*/
+.sidebar-toggle {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1c92d2, #f2fcfe);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.sidebar-toggle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* 添加动画效果 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.video-player-container {
+  animation: fadeIn 0.5s ease;
+}
+
+/* 添加粒子背景效果 */
+.video-player-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.2) 1px, transparent 1px),
+                    radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.2) 1px, transparent 1px);
+  background-size: 50px 50px;
+  opacity: 0.5;
+  pointer-events: none;
 }
 </style>
