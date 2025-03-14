@@ -175,11 +175,6 @@
               </div>
             </div>
             <div class="qa-content">
-              
-              <div class="qa-input">
-                <el-input v-model="question" placeholder="请输入问题" type="textarea" />
-                <el-button type="primary" @click="askQuestion" :loading="isAsking">提问</el-button>
-              </div>
               <div class="qa-history">
                 <ul>
                   <li v-for="(item, index) in qaHistory" :key="index" class="qa-item">
@@ -193,6 +188,10 @@
                     </div>
                   </li>
                 </ul>
+              </div>
+              <div class="qa-input">
+                <el-input v-model="question" placeholder="请输入问题" type="textarea" :rows="2" />
+                <el-button type="primary" @click="askQuestion" :loading="isAsking">提问</el-button>
               </div>
             </div>
           </div>
@@ -300,10 +299,17 @@
       </template>
     </el-dialog>
   </div>
+  <!-- 底部美化区域 -->
+  <div class="page-footer">
+    <div class="footer-wave"></div>
+    <div class="footer-content">
+      <div class="footer-text">AI-EdVision · 智能教育视频分析平台</div>
+    </div>
+  </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, onUnmounted } from 'vue';
+import { ref, onMounted, computed, watch, onUnmounted , nextTick  } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElLoading } from 'element-plus';
 import { 
@@ -634,8 +640,29 @@ const askQuestion = async () => {
   try {
     let answer = '';
     
+    // 添加问题到历史记录
+    if (qaMode.value === 'video') {
+      videoQaHistory.value.push({
+        question: questionText,
+        answer: '正在思考...'
+      });
+    } else {
+      freeQaHistory.value.push({
+        question: questionText,
+        answer: '正在思考...'
+      });
+    }
+    // 滚动到底部
+    scrollToBottom();
+
     // 使用视频ID或null，取决于当前问答模式
     const videoIdParam = qaMode.value === 'video' ? videoId.value : null;
+    
+    console.log('开始提问:', {
+      问题: questionText,
+      模式: qaMode.value,
+      视频ID: videoIdParam
+    });
     
     // 使用新的流式问答API
     await askQuestionStream(
@@ -648,31 +675,47 @@ const askQuestion = async () => {
       {
         onData: (data) => {
           answer = data;
+          console.log('收到回答:', answer);
+          
           // 实时更新最新的回答到历史记录
-          const lastIndex = qaHistory.value.length - 1;
-          if (lastIndex >= 0 && qaHistory.value[lastIndex].question === questionText) {
-            qaHistory.value[lastIndex].answer = answer;
+          if (qaMode.value === 'video') {
+            // 找到最后一个匹配的问题并更新
+            const lastIndex = videoQaHistory.value.findIndex(item => item.question === questionText);
+            if (lastIndex >= 0) {
+              videoQaHistory.value[lastIndex].answer = answer;
+            }
           } else {
-            // 根据当前模式添加到对应的历史记录数组
-            if (qaMode.value === 'video') {
-              videoQaHistory.value.push({
-                question: questionText,
-                answer: answer
-              });
-            } else {
-              freeQaHistory.value.push({
-                question: questionText,
-                answer: answer
-              });
+            // 找到最后一个匹配的问题并更新
+            const lastIndex = freeQaHistory.value.findIndex(item => item.question === questionText);
+            if (lastIndex >= 0) {
+              freeQaHistory.value[lastIndex].answer = answer;
             }
           }
+          // 滚动到底部
+          scrollToBottom();
         },
         onError: (error) => {
           console.error('提问失败:', error);
           ElMessage.error('提问失败，请重试');
+          
+          // 更新错误信息到历史记录
+          if (qaMode.value === 'video') {
+            const lastIndex = videoQaHistory.value.findIndex(item => item.question === questionText);
+            if (lastIndex >= 0) {
+              videoQaHistory.value[lastIndex].answer = `提问失败: ${error}`;
+            }
+          } else {
+            const lastIndex = freeQaHistory.value.findIndex(item => item.question === questionText);
+            if (lastIndex >= 0) {
+              freeQaHistory.value[lastIndex].answer = `提问失败: ${error}`;
+            }
+          }
         },
         onComplete: () => {
           question.value = '';
+          console.log('问答完成');
+          // 滚动到底部
+          scrollToBottom();
         }
       }
     );
@@ -696,6 +739,16 @@ const clearChat = () => {
   }
   question.value = '';
   ElMessage.success('聊天记录已清空');
+};
+
+// 滚动问答历史到底部
+const scrollToBottom = () => {
+  nextTick(() => {
+    const qaHistoryElement = document.querySelector('.qa-history');
+    if (qaHistoryElement) {
+      qaHistoryElement.scrollTop = qaHistoryElement.scrollHeight;
+    }
+  });
 };
 
 // 格式化时间 (MM:SS)
@@ -806,6 +859,7 @@ const navigateToVideoUpload = () => {
   color: #333;
 }
 
+
 /*左侧区域*/
 .left-section {
   flex: 1;
@@ -824,14 +878,14 @@ const navigateToVideoUpload = () => {
 /*上方区域*/
 .upper-section {
   display: flex;
-  height: 50%;
+  height: 38%;
   width: 100%;
   margin-bottom: 10px;
 }
 
 /*视频主区域*/
 .video-main-area {
-  flex: 0.7;
+  flex: 0.55;
   padding: 15px;
   overflow: hidden;
 }
@@ -864,51 +918,51 @@ const navigateToVideoUpload = () => {
 
 /*视频播放区域*/
 .video-player-area {
-  flex: 0.3;
+  flex: 0.45; /* 从0.4增加到0.45 */
   padding: 15px;
-  overflow: auto;
+  overflow: auto; /* 保持滚动功能 */
 }
 
 .video-info-section {
   height: 100%;
   background-color: #fff;
   border-radius: 8px;
-  padding: 15px;
+  padding: 10px; /* 减少内边距 */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  overflow-y: auto; /* 添加垂直滚动 */
 }
 
 .video-info h3 {
   margin-top: 0;
-  margin-bottom: 15px;
+  margin-bottom: 10px; /* 减少下边距 */
   color: #409EFF;
   font-weight: 600;
-  font-size: 20px; /* 减小字体大小 */
+  font-size: 18px; /* 进一步减小字体大小 */
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap; /* 确保长标题不会换行 */
+  white-space: nowrap;
 }
 
 .video-details-card {
   background: linear-gradient(135deg, #f5f7fa, #e4e7eb);
   border-radius: 8px;
-  padding: 12px;
+  padding: 8px; /* 减少内边距 */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  margin-bottom: 15px;
+  margin-bottom: 10px; /* 减少下边距 */
 }
 
 .video-detail-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 5px; /* 减少每个项目之间的间距 */
+  font-size: 13px; /* 减小字体大小 */
 }
 
 .video-detail-item:last-child {
-  border-bottom: none;
+  margin-bottom: 0; /* 最后一项不需要下边距 */
 }
 
 .detail-label {
@@ -1019,33 +1073,33 @@ const navigateToVideoUpload = () => {
   gap: 10px;
 }
 
-.qa-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  padding: 15px;
-  overflow-y: auto;
-  height: 100%; /* 确保有高度 */
-}
-
 .qa-input {
   display: flex;
-  gap: 10px;
-  margin-bottom: 15px;
+  gap: 8px;
+  padding: 8px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .qa-input .el-input {
   flex: 1;
 }
 
+.qa-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  overflow: hidden; /* 改为hidden，避免双滚动条 */
+  height: 100%; /* 确保有高度 */
+}
+
 .qa-history {
   flex: 1;
   overflow-y: auto;
   padding-right: 10px;
-  height: calc(100% - 60px); /* 减去输入框的高度 */
-  max-height: 100%;
-  display: flex;
-  flex-direction: column;
+  margin-bottom: 10px; /* 为底部输入框留出空间 */
 }
 
 .qa-history ul {
@@ -1069,9 +1123,26 @@ const navigateToVideoUpload = () => {
   box-sizing: border-box;
 }
 
+.answer {
+  background-color: #ecf5ff;
+  margin-right: auto; /* 回答靠左对齐 */
+  margin-left: 0;
+  max-width: 80%; /* 限制宽度 */
+  border-top-left-radius: 5px;
+  border-top-right-radius: 15px;
+  border-bottom-left-radius: 15px;
+  border-bottom-right-radius: 15px;
+  background: linear-gradient(135deg, #1e3c72, #2a5298); /* 使用深蓝色渐变 */
+  color: #fff; /* 白色文字 */
+}
+
+.answer .qa-icon {
+  color: #fff; /* 图标颜色 */
+}
+
 .question {
   background-color: #faf5f5;
-  margin-left: auto; /* 将问题靠右对齐 */
+  margin-left: auto; /* 问题靠右对齐 */
   margin-right: 0;
   max-width: 80%; /* 限制宽度 */
   justify-content: flex-end; /* 内容靠右 */
@@ -1097,23 +1168,6 @@ const navigateToVideoUpload = () => {
   color: #151414; /* 确保文本为白色 */
   font-weight: 600; /* 加粗文字 */
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); /* 添加文字阴影增强可读性 */
-}
-
-.answer {
-  background-color: #ecf5ff;
-  margin-right: auto; /* 回答靠左对齐 */
-  margin-left: 0;
-  max-width: 80%; /* 限制宽度 */
-  border-top-left-radius: 5px;
-  border-top-right-radius: 15px;
-  border-bottom-left-radius: 15px;
-  border-bottom-right-radius: 15px;
-  background: linear-gradient(135deg, #1e3c72, #2a5298); /* 使用深蓝色渐变 */
-  color: #fff; /* 白色文字 */
-}
-
-.answer .qa-icon {
-  color: #fff; /* 图标颜色 */
 }
 
 .qa-icon {
@@ -1442,4 +1496,67 @@ const navigateToVideoUpload = () => {
   opacity: 0.5;
   pointer-events: none;
 }
+
+/* 页脚样式 - 增强版 */
+.page-footer {
+  width: 100%;
+  height: 50px; /* 增加高度 */
+  position: relative;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  margin-top: auto;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.footer-wave {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 100%;
+  background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 1200 120" xmlns="http://www.w3.org/2000/svg"><path d="M0 0v46.29c47.79 22.2 103.59 32.17 158 28 70.36-5.37 136.33-33.31 206.8-37.5 73.84-4.36 147.54 16.88 218.2 35.26 69.27 18 138.3 24.88 209.4 13.08 36.15-6 69.85-17.84 104.45-29.34C989.49 25 1113-14.29 1200 52.47V0z" opacity=".25" fill="%23FFFFFF" /></svg>');
+  background-size: 1200px 100%;
+  animation: wave-animation 12s linear infinite;
+  opacity: 0.3;
+}
+
+@keyframes wave-animation {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.footer-content {
+  color: white;
+  font-size: 15px;
+  text-align: center;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.footer-text {
+  opacity: 0.95;
+  letter-spacing: 1px;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* 添加装饰点 */
+.footer-content::before,
+.footer-content::after {
+  content: "•";
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 10px;
+}
+
 </style>

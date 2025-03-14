@@ -67,8 +67,9 @@ class QASystem:
                 del self.index
                 self.index = None
             
-            # 创建 CPU 索引
-            cpu_index = faiss.IndexFlatL2(dimension)
+            # 创建 CPU 索引 - 使用内积索引用于余弦相似度（向量需要归一化）
+            # 注意：使用IndexFlatIP时，相似度越高，分数越大（正值）
+            cpu_index = faiss.IndexFlatIP(dimension)
             
             if self.use_gpu:
                 try:
@@ -168,6 +169,9 @@ class QASystem:
                 
             # 将文本转换为向量
             vectors = self.model.encode(texts)
+            
+            # L2归一化，用于余弦相似度
+            vectors = vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
             vectors = vectors.astype('float32')
             
             # 创建索引
@@ -197,13 +201,16 @@ class QASystem:
             self.index = None
             raise
             
-    def search_similar_segments(self, query: str, top_k: int = 3) -> List[Dict]:
+    def search_similar_segments(self, query: str, top_k: int = 5) -> List[Dict]:
         """搜索与查询最相似的片段"""
         if not self.texts:
             raise ValueError("知识库未初始化")
             
         # 将查询转换为向量
         query_vector = self.model.encode([query])
+        
+        # L2归一化，用于余弦相似度
+        query_vector = query_vector / np.linalg.norm(query_vector, axis=1, keepdims=True)
         query_vector = query_vector.astype('float32')
         
         # 搜索最相似的片段
@@ -211,15 +218,51 @@ class QASystem:
         
         if FAISS_AVAILABLE and self.index:
             # 使用FAISS搜索
-            distances, indices = self.index.search(query_vector, top_k)
+            # 增加检索数量，提高覆盖率
+            # 这里的search_k是初始检索的数量，越大越能找到更多潜在相关的片段
+            search_k = min(20, len(self.texts))  # 搜索更多结果，最多20个或全部文本
+            similarities, indices = self.index.search(query_vector, search_k)
             
+            print(f"搜索查询: '{query}'")
+            print(f"初始检索数量: {search_k}")
+            print(f"检索到 {len(indices[0])} 个结果")
+            print(f"相似度分数: {similarities[0]}")
+            
+            # 注意：使用IndexFlatIP时，相似度越高，分数越大（正值）
+            # 对于余弦相似度，范围是[-1, 1]，但由于向量归一化，实际上是[0, 1]
+            # 设置较低的阈值以确保能找到足够的结果
+            min_similarity_threshold = 0.5  # 降低相似度阈值
+            
+            # 过滤的意义：移除相似度过低的结果，确保只返回真正相关的内容
+            filtered_results = []
             for i, idx in enumerate(indices[0]):
-                if idx < len(self.texts):
-                    results.append({
+                if idx < len(self.texts) and similarities[0][i] >= min_similarity_threshold:
+                    filtered_results.append({
                         'text': self.texts[idx],
                         'timestamp': self.timestamps[idx],
-                        'score': float(distances[0][i])
+                        'score': float(similarities[0][i])
                     })
+                    print(f"接受的结果 #{i}: 分数={similarities[0][i]}, 文本={self.texts[idx][:50]}...")
+                else:
+                    if idx < len(self.texts):
+                        print(f"拒绝的结果 #{i}: 分数={similarities[0][i]}, 文本={self.texts[idx][:50]}...")
+            
+            print(f"过滤后结果数量: {len(filtered_results)}")
+            
+            # 如果过滤后的结果太少，放宽限制
+            if len(filtered_results) < 2:
+                print("过滤后结果太少，放宽限制...")
+                # 完全放宽限制，直接返回前top_k个结果
+                results = [{
+                    'text': self.texts[idx],
+                    'timestamp': self.timestamps[idx],
+                    'score': float(similarities[0][i])
+                } for i, idx in enumerate(indices[0][:top_k]) if idx < len(self.texts)]
+                print(f"放宽限制后结果数量: {len(results)}")
+            else:
+                # 返回所有过滤后的结果，不限制数量
+                results = filtered_results
+                print(f"最终返回结果数量: {len(results)}")
         else:
             # 备用方案：返回前几个文档
             for i, text in enumerate(self.texts[:top_k]):
@@ -246,16 +289,36 @@ class QASystem:
                 raise ValueError("知识库未初始化，无法回答基于视频的问题")
                 
             # 搜索相关片段
-            similar_segments = self.search_similar_segments(question, top_k=3)
-            context = "\n".join([seg['text'] for seg in similar_segments])
+            similar_segments = self.search_similar_segments(question, top_k=5)
             
-            # 构建提示
-            prompt = f"""基于以下视频内容回答问题。如果问题无法从内容中得到答案，请说明无法回答。
+            # 检查是否找到相关内容
+            if len(similar_segments) == 0:
+                print(f"未找到与问题 '{question}' 相关的内容")
+                prompt = f"""你是一个教育助手。用户问了以下问题，但我未能在视频内容中找到相关信息。请礼貌地告知用户：
 
-内容：
+问题：{question}
+
+请告知用户视频内容中没有相关信息，并建议用户尝试其他问题或使用自由问答模式。"""
+            else:
+                # 格式化上下文，包含时间戳
+                context = "\n".join([f"[{seg['timestamp']['start_time']} --> {seg['timestamp']['end_time']}] {seg['text']}" for seg in similar_segments])
+                print(f"找到相关内容: {context}")
+                
+                # 构建更强的提示词模板
+                prompt = f"""你是一个教育视频内容助手。请基于以下视频内容片段回答用户问题。这些片段可能很短，但它们包含了重要信息。
+
+视频内容片段：
 {context}
 
-问题：{question}"""
+用户问题：{question}
+
+指导原则：
+1. 即使视频内容片段很短或看似不完整，也请尽量从中提取有用信息来回答问题
+2. 视频内容片段中的任何文字都可能是有用的线索，请充分利用
+3. 如果视频内容片段确实无法回答问题，再说明"视频内容中没有提供相关信息"
+4. 绝对不要编造不在视频内容中的信息
+5. 回答要简洁、准确、有条理
+6. 如果合适，可以引用视频中的具体时间点"""
             
         else:  # 自由对话模式
             prompt = f"""你是一个教育助手。请回答以下问题，提供安全、有帮助、准确的回答：
@@ -267,10 +330,10 @@ class QASystem:
             response = client.chat.completions.create(
                 model="qwen-turbo",
                 messages=[
-                    {"role": "system", "content": "你是一个教育助手。你会为用户提供安全，有帮助，准确的回答。"},
+                    {"role": "system", "content": "你是一个教育助手。你会为用户提供安全，有帮助，准确的回答。即使只有很短的信息片段，也要尽量从中提取有用信息来回答问题。"},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3
+                temperature=0.7  # 增加温度参数，提高创造性
             )
             
             return response.choices[0].message.content.strip()
@@ -293,16 +356,37 @@ class QASystem:
                 raise ValueError("知识库未初始化，无法回答基于视频的问题")
                 
             # 搜索相关片段
-            similar_segments = self.search_similar_segments(question, top_k=3)
-            context = "\n".join([seg['text'] for seg in similar_segments])
+            similar_segments = self.search_similar_segments(question, top_k=5)
             
-            # 构建提示
-            prompt = f"""基于以下视频内容回答问题。如果问题无法从内容中得到答案，请说明无法回答。
+            # 检查是否找到相关内容 - 不应该为空，因为我们已经放宽了限制
+            # 只有在similar_segments为空列表时才认为没有找到相关内容
+            if len(similar_segments) == 0:
+                print(f"未找到与问题 '{question}' 相关的内容")
+                prompt = f"""你是一个教育助手。用户问了以下问题，但我未能在视频内容中找到相关信息。请礼貌地告知用户：
 
-内容：
+问题：{question}
+
+请告知用户视频内容中没有相关信息，并建议用户尝试其他问题或使用自由问答模式。"""
+            else:
+                # 格式化上下文，包含时间戳
+                context = "\n".join([f"[{seg['timestamp']['start_time']} --> {seg['timestamp']['end_time']}] {seg['text']}" for seg in similar_segments])
+                print(f"找到相关内容: {context}")
+                
+                # 构建更强的提示词模板
+                prompt = f"""你是一个教育视频内容助手。请基于以下视频内容片段回答用户问题。这些片段可能很短，但它们包含了重要信息。
+
+视频内容片段：
 {context}
 
-问题：{question}"""
+用户问题：{question}
+
+指导原则：
+1. 即使视频内容片段很短或看似不完整，也请尽量从中提取有用信息来回答问题
+2. 视频内容片段中的任何文字都可能是有用的线索，请充分利用
+3. 如果视频内容片段确实无法回答问题，再说明"视频内容中没有提供相关信息"
+4. 绝对不要编造不在视频内容中的信息
+5. 回答要简洁、准确、有条理
+6. 如果合适，可以引用视频中的具体时间点"""
             
         else:  # 自由对话模式
             prompt = f"""你是一个教育助手。请回答以下问题，提供安全、有帮助、准确的回答：
@@ -312,12 +396,12 @@ class QASystem:
         try:
             # 创建流式聊天完成
             stream = client.chat.completions.create(
-                model="qwen-turbo",
+                model="qwen-max",
                 messages=[
-                    {"role": "system", "content": "你是一个教育助手。你会为用户提供安全，有帮助，准确的回答。"},
+                    {"role": "system", "content": "你是一个教育助手。你会为用户提供安全，有帮助，准确的回答。即使只有很短的信息片段，也要尽量从中提取有用信息来回答问题。"},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.3,
+                temperature=0.7,  # 增加温度参数，提高创造性
                 stream=True  # 启用流式输出
             )
             

@@ -22,6 +22,8 @@ export async function askQuestionStream(data, { onData, onError, onComplete }) {
       stream: true // 使用流式响应
     }
     
+    console.log('发送问答请求:', requestData)
+    
     // 发送请求
     const response = await fetch(`${API_BASE_URL}/api/qa/ask`, {
       method: 'POST',
@@ -36,6 +38,8 @@ export async function askQuestionStream(data, { onData, onError, onComplete }) {
     if (!response.ok) {
       throw new Error(`请求失败: ${response.status}`)
     }
+    
+    console.log('收到流式响应:', response.status)
     
     // 处理流式响应
     const reader = response.body.getReader()
@@ -56,8 +60,12 @@ export async function askQuestionStream(data, { onData, onError, onComplete }) {
       }
       
       // 解码并处理数据
-      const text = decoder.decode(value)
+      const text = decoder.decode(value, { stream: true })
       buffer += text
+      
+      // 输出调试信息
+      console.log('收到流式数据片段:', text)
+      console.log('当前累积内容:', buffer)
       
       if (onData) {
         onData(buffer)
