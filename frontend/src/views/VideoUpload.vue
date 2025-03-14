@@ -635,81 +635,83 @@ const handleProcess = async (video) => {
   try {
     // 创建对话框内容
     const dialogHtml = `
-      <div style="font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;">
-        <div style="margin-bottom: 20px; border-bottom: 1px solid #ebeef5; padding-bottom: 15px;">
-          <div style="display: flex; align-items: center; margin-bottom: 10px;">
-            <i class="el-icon-video-camera" style="color: #409EFF; font-size: 18px; margin-right: 8px;"></i>
-            <span style="font-size: 16px; font-weight: 600; color: #303133;">视频转录设置</span>
-          </div>
-          <p style="margin: 5px 0 0; font-size: 13px; color: #909399;">请选择视频语言和转录模型大小，以获得最佳转录效果</p>
+  <div class="process-dialog-wrapper">
+    <!-- 标题部分 -->
+    <div class="dialog-header">
+      <div style="display: flex; align-items: center; margin-bottom: 15px;">
+        <i class="el-icon-video-camera" style="font-size: 24px; margin-right: 12px;"></i>
+        <span style="font-size: 20px; font-weight: 600;">智能视频分析设置</span>
+      </div>
+      <p style="margin: 0; font-size: 14px; opacity: 0.9;">选择最适合您视频内容的语言和模型，以获得最佳的智能分析效果</p>
+    </div>
+    
+    <!-- 语言选择 -->
+    <div class="content-card">
+      <label style="display: block; margin-bottom: 12px; font-weight: 600; color: #303133; font-size: 16px;">
+        <i class="el-icon-s-flag" style="margin-right: 8px; color: #409EFF;"></i>视频语言
+      </label>
+      <div class="language-selector" style="display: flex; width: 100%; margin-bottom: 10px;">
+        <div class="language-option" data-value="English" style="flex: 1; text-align: center; padding: 15px; border: 2px solid #dcdfe6; border-radius: 8px 0 0 8px; cursor: pointer; background-color: #f5f7fa; color: #606266; transition: all 0.3s; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);">
+          <div style="font-weight: 600; margin-bottom: 5px; font-size: 16px;">English</div>
+          <div style="font-size: 13px; color: #909399;">英语</div>
         </div>
-        
-        <div style="margin-bottom: 20px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #606266; font-size: 14px;">
-            <i class="el-icon-s-flag" style="margin-right: 5px;"></i>视频语言：
-          </label>
-          <div class="language-selector" style="display: flex; width: 100%; margin-bottom: 5px;">
-            <div class="language-option" data-value="English" style="flex: 1; text-align: center; padding: 10px; border: 1px solid #dcdfe6; border-radius: 4px 0 0 4px; cursor: pointer; background-color: #f5f7fa; color: #606266; transition: all 0.3s;">
-              <div style="font-weight: 500; margin-bottom: 3px;">English</div>
-              <div style="font-size: 12px; color: #909399;">英语</div>
-            </div>
-            <div class="language-option selected" data-value="Other" style="flex: 1; text-align: center; padding: 10px; border: 1px solid #409EFF; border-radius: 0 4px 4px 0; cursor: pointer; background-color: #ecf5ff; color: #409EFF; transition: all 0.3s;">
-              <div style="font-weight: 500; margin-bottom: 3px;">Other</div>
-              <div style="font-size: 12px; color: #409EFF;">其他语言</div>
-            </div>
-          </div>
-          <input type="hidden" id="language-select" value="Other">
-          <div style="font-size: 12px; color: #909399; margin-top: 5px;">
-            <i class="el-icon-info-circle" style="margin-right: 3px;"></i>
-            <span>选择与视频主要语言相符的选项</span>
-          </div>
+        <div class="language-option selected" data-value="Chinese" style="flex: 1; text-align: center; padding: 15px; border: 2px solid #409EFF; border-radius: 0 8px 8px 0; cursor: pointer; background-color: #ecf5ff; color: #409EFF; transition: all 0.3s; box-shadow: 0 2px 12px rgba(64, 158, 255, 0.2);">
+          <div style="font-weight: 600; margin-bottom: 5px; font-size: 16px;">Chinese</div>
+          <div style="font-size: 13px; color: #409EFF;">中文/多种语言</div>
         </div>
-        
-        <div style="margin-bottom: 10px;">
-          <label style="display: block; margin-bottom: 8px; font-weight: 500; color: #606266; font-size: 14px;">
-            <i class="el-icon-s-operation" style="margin-right: 5px;"></i>转录模型大小：
-          </label>
-          <div id="model-options-container">
-            <div class="model-size-slider" style="margin-bottom: 15px;">
-              <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                <span style="font-size: 12px; color: #909399;">更快速</span>
-                <span style="font-size: 12px; color: #909399;">更准确</span>
-              </div>
-              <div style="position: relative; height: 60px; background: linear-gradient(to right, #67C23A, #E6A23C, #F56C6C); border-radius: 4px; overflow: hidden;">
-                <div id="model-options" style="display: flex; height: 100%; position: relative;">
-                  <!-- 模型选项将在这里动态生成 -->
-                </div>
-              </div>
-            </div>
-            <div id="model-description" style="background-color: #f5f7fa; border-radius: 4px; padding: 12px; margin-top: 5px; border-left: 3px solid #409EFF;">
-              <div style="font-weight: 500; color: #303133; margin-bottom: 5px;">turbo 模型 (推荐)</div>
-              <div style="font-size: 13px; color: #606266;">
-                <p style="margin: 0 0 5px;">• 处理速度：<span style="color: #67C23A; font-weight: 500;">极快</span></p>
-                <p style="margin: 0 0 5px;">• 准确度：<span style="color: #409EFF; font-weight: 500;">良好</span></p>
-                <p style="margin: 0;">• 适用场景：<span style="color: #606266;">一般视频转录，对速度要求高</span></p>
-              </div>
-            </div>
+      </div>
+      <input type="hidden" id="language-select" value="Chinese">
+      <div class="info-tip">
+        <i class="el-icon-info-circle" style="color: #409EFF;"></i>
+        <span>选择与视频主要语言相符的选项，以提高转录准确度</span>
+      </div>
+    </div>
+
+    <!-- 模型选择 -->
+    <div class="content-card">
+      <label style="display: block; margin-bottom: 12px; font-weight: 600; color: #303133; font-size: 16px;">
+        <i class="el-icon-s-operation" style="margin-right: 8px; color: #409EFF;"></i>智能转录模型
+      </label>
+      <div id="model-options-container">
+        <div class="model-size-slider" style="margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+            <span style="font-size: 13px; color: #67C23A; font-weight: 500;">更快速</span>
+            <span style="font-size: 13px; color: #F56C6C; font-weight: 500;">更准确</span>
           </div>
-          <input type="hidden" id="model-select" value="turbo">
-          <div style="font-size: 12px; color: #909399; margin-top: 10px; display: flex; align-items: center;">
-            <i class="el-icon-info-circle" style="margin-right: 3px;"></i>
-            <span>从左到右：模型越大，转录准确度越高，但处理时间也越长</span>
+          <div style="position: relative; height: 70px; background: linear-gradient(to right, #67C23A, #E6A23C, #F56C6C); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);">
+            <div id="model-options" style="display: flex; height: 100%; position: relative;">
+              <!-- 模型选项将在这里动态生成 -->
+            </div>
           </div>
         </div>
-        
-        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ebeef5; font-size: 13px; color: #606266;">
-          <div style="display: flex; align-items: center;">
-            <i class="el-icon-warning-outline" style="color: #e6a23c; margin-right: 5px;"></i>
-            <span>选择后将开始处理视频，请耐心等待</span>
+        <div id="model-description" style="background-color: #f8f9fb; border-radius: 8px; padding: 15px; margin-top: 10px; border-left: 4px solid #409EFF; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);">
+          <div style="font-weight: 600; color: #303133; margin-bottom: 8px; font-size: 16px;">turbo 模型 (推荐)</div>
+          <div style="font-size: 14px; color: #606266;">
+            <p style="margin: 0 0 8px; display: flex; align-items: center;">
+              <span style="display: inline-block; width: 20px; height: 20px; background-color: #67C23A; border-radius: 50%; margin-right: 8px;"></span>
+              处理速度：<span style="color: #67C23A; font-weight: 600; margin-left: 5px;">极快</span>
+            </p>
+            <p style="margin: 0 0 8px; display: flex; align-items: center;">
+              <span style="display: inline-block; width: 20px; height: 20px; background-color: #409EFF; border-radius: 50%; margin-right: 8px;"></span>
+              准确度：<span style="color: #409EFF; font-weight: 600; margin-left: 5px;">良好</span>
+            </p>
+            <p style="margin: 0;">适用场景：<span style="color: #606266;">一般视频转录，对速度要求高</span></p>
           </div>
         </div>
       </div>
-    `;
+      <input type="hidden" id="model-select" value="turbo">
+      <div class="info-tip">
+        <i class="el-icon-info-circle" style="color: #409EFF;"></i>
+        <span>从左到右：模型越大，转录准确度越高，但处理时间也越长</span>
+      </div>
+    </div>
+  </div>
+`;
 
     // 显示对话框
-    ElMessageBox.confirm(dialogHtml, '处理视频', {
+    ElMessageBox.confirm(dialogHtml, '智能视频分析', {
       dangerouslyUseHTMLString: true,
-      confirmButtonText: '开始处理',
+      confirmButtonText: '开始智能分析',
       cancelButtonText: '取消',
       customClass: 'video-process-dialog',
       beforeClose: (action, instance, done) => {
@@ -1248,6 +1250,11 @@ onUnmounted(() => {
   padding: 20px;
   max-width: 1200px;
   margin: 0 auto;
+}
+.upload-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
   background-color: #f5f7fa;
   min-height: calc(100vh - 60px);
   position: relative;
@@ -1293,11 +1300,12 @@ onUnmounted(() => {
   animation: slideUp 1s ease-out;
 }
 
+
 .upload-card, .video-list-card {
   margin-bottom: 30px;
   border-radius: 12px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-  transition: transform 0.3s, box-shadow 0.3s;
+  transition: box-shadow 0.3s;
   overflow: hidden;
   position: relative;
   z-index: 1;
@@ -1307,7 +1315,6 @@ onUnmounted(() => {
 }
 
 .upload-card:hover, .video-list-card:hover {
-  transform: translateY(-8px);
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
 }
 
@@ -1366,6 +1373,8 @@ onUnmounted(() => {
 .video-process-dialog .el-message-box__content {
   max-height: 500px;
   overflow-y: auto;
+  padding: 0 !important;
+  background: #f5f7fa;
 }
 
 .language-option {
@@ -1377,7 +1386,7 @@ onUnmounted(() => {
 }
 
 .language-option:hover {
-  transform: translateY(-5px) scale(1.02);
+  transform: translateY(-5px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
@@ -1419,14 +1428,13 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+  background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
   z-index: 0;
 }
 
 :deep(.el-upload-dragger:hover) {
   border-color: #409EFF;
   background: linear-gradient(to bottom, #f0f7ff, #e6f1fc);
-  transform: scale(1.02);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 }
 
@@ -1489,7 +1497,6 @@ onUnmounted(() => {
 
 :deep(.el-table__row:hover) {
   background-color: #f0f7ff;
-  transform: translateY(-2px);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
 }
 
@@ -1498,7 +1505,6 @@ onUnmounted(() => {
 }
 
 :deep(.el-button:hover) {
-  transform: translateY(-3px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -1677,7 +1683,6 @@ onUnmounted(() => {
 }
 
 .guide-card:hover {
-  transform: translateY(-5px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 
@@ -1941,5 +1946,159 @@ onUnmounted(() => {
 .upload-format-tip .el-icon {
   color: #1e3c72;
   font-size: 18px;
+}
+</style>
+
+
+<style>
+/* 对话框样式 */
+.video-process-dialog {
+  width: 800px !important;
+  max-width: 90vw !important;
+}
+
+.video-process-dialog .el-message-box__header {
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  padding: 15px 20px !important;
+  border-bottom: none !important;
+}
+
+.video-process-dialog .el-message-box__title {
+  color: white !important;
+}
+
+.video-process-dialog .el-message-box__content {
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 0 !important;
+  background: #f5f7fa;
+}
+
+.video-process-dialog .el-message-box__message {
+  padding: 0 !important;
+  width: 100% !important;
+}
+
+.video-process-dialog .el-message-box__message p {
+  margin: 0 !important;
+}
+
+/* 处理对话框内容布局 */
+.process-dialog-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  width: 100%;
+  background: #f5f7fa;
+}
+
+/* 标题区域样式 */
+.dialog-header {
+  border-radius: 12px;
+  padding: 25px;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  color: white;
+  box-shadow: 0 8px 20px rgba(30, 60, 114, 0.15);
+  transform: translateY(0);
+  transition: all 0.3s ease;
+}
+
+.dialog-header:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 25px rgba(30, 60, 114, 0.2);
+}
+
+/* 内容卡片样式 */
+.content-card {
+  background: white;
+  border-radius: 12px;
+  padding: 25px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.content-card:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+/* 语言选择器样式 */
+.language-option {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.language-option:hover {
+  transform: scale(1.02);
+}
+
+.language-option.selected::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, rgba(64, 158, 255, 0.1), rgba(64, 158, 255, 0.2));
+  z-index: 0;
+}
+
+/* 模型选择器样式 */
+.model-size-slider {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.model-size-slider:hover {
+  transform: scale(1.01);
+}
+
+#model-description {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+#model-description:hover {
+  transform: translateX(5px);
+}
+
+/* 信息提示样式 */
+.info-tip {
+  background: rgba(64, 158, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.3s ease;
+}
+
+.info-tip:hover {
+  background: rgba(64, 158, 255, 0.15);
+  transform: translateX(5px);
+}
+
+/* 按钮样式 */
+.el-message-box__btns {
+  padding: 20px !important;
+  background: #f5f7fa;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.el-message-box__btns button {
+  padding: 12px 25px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.el-message-box__btns button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 </style>
