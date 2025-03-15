@@ -205,7 +205,8 @@
         <div class="subtitle-mode-switch">
           <el-radio-group v-model="subtitleMode" size="small">
             <el-radio-button label="realtime">实时字幕</el-radio-button>
-            <el-radio-button label="full">全部字幕</el-radio-button>
+            <el-radio-button label="full">分段字幕</el-radio-button>
+            <el-radio-button label="merged">合并字幕</el-radio-button>
           </el-radio-group>
         </div>
       
@@ -218,7 +219,7 @@
               字幕将在视频播放时显示...
             </div>
           </template>
-          <template v-else>
+          <template v-else-if="subtitleMode === 'full'">
             <div class="subtitle-display full-subtitle">
               <div class="subtitle-content" v-if="fullSubtitles.length">
                 <div v-for="(sub, index) in fullSubtitles" :key="index" class="subtitle-item"
@@ -230,6 +231,21 @@
               <div class="subtitle-placeholder" v-else>
                 正在加载字幕...
               </div>
+            </div>
+          </template>
+          <template v-else-if="subtitleMode === 'merged'">
+            <div class="subtitle-content" v-if="mergedSubtitles.length">
+              <div v-for="(section, index) in mergedSubtitles" :key="index" 
+                   class="subtitle-item merged-item">
+                <div class="subtitle-header">
+                  <span class="subtitle-time">{{ formatTimeMMSS(section.start_time) }} - {{ formatTimeMMSS(section.end_time) }}</span>
+                  <h4 class="subtitle-title">{{ section.title }}</h4>
+                </div>
+                <p class="subtitle-text">{{ section.text }}</p>
+              </div>
+            </div>
+            <div class="subtitle-placeholder" v-else>
+              正在加载合并字幕...
             </div>
           </template>
         </div>
@@ -346,6 +362,8 @@ const showSubtitles = ref(true);
 const subtitleMode = ref('realtime');
 const currentSubtitle = ref('');
 const fullSubtitles = ref([]);
+const mergedSubtitles = ref([]);
+const showMergedSubtitles = ref(false);
 
 // 问答状态
 const qaMode = ref('video');
@@ -372,6 +390,15 @@ watch(freeQaHistory, (newHistory) => {
 watch(videoId, (newVideoId) => {
   if (newVideoId) {
     videoQaHistory.value = JSON.parse(localStorage.getItem(`videoQaHistory_${newVideoId}`) || '[]');
+  }
+});
+
+// 监听字幕模式变化
+watch(subtitleMode, (newMode) => {
+  console.log('字幕模式切换为:', newMode);
+  if (newMode === 'merged' && mergedSubtitles.value.length === 0) {
+    // 如果切换到合并模式且尚未加载合并字幕，则加载
+    loadMergedSubtitles();
   }
 });
 
@@ -469,6 +496,42 @@ const convertSRTTimeToSeconds = (timeString) => {
   const milliseconds = parseInt(parts[3], 10);
   
   return hours * 3600 + minutes * 60 + seconds + milliseconds / 1000;
+};
+
+// 在data部分添加新的状态变量
+const loadMergedSubtitles = async () => {
+  console.log('开始加载合并字幕，视频ID:', videoId.value);
+  try {
+    const apiUrl = `/api/videos/${videoId.value}/subtitles/semantic-merged`;
+    console.log('请求API:', apiUrl);
+    
+    const response = await request({
+      url: apiUrl,
+      method: 'get'
+    });
+    
+    console.log('合并字幕API响应:', response);
+    
+    if (response && response.data) {
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        console.log(`成功加载${response.data.length}条合并字幕`);
+        mergedSubtitles.value = response.data;
+        ElMessage.success(`成功加载${response.data.length}条语义合并字幕`);
+      } else {
+        console.warn('服务器返回了空的合并字幕数组');
+        mergedSubtitles.value = [];
+        ElMessage.warning('没有找到可合并的字幕');
+      }
+    } else {
+      console.warn('合并字幕响应无效');
+      mergedSubtitles.value = [];
+      ElMessage.warning('获取合并字幕失败');
+    }
+  } catch (error) {
+    console.error('加载合并字幕失败:', error);
+    mergedSubtitles.value = [];
+    ElMessage.error('加载合并字幕失败');
+  }
 };
 
 // 视频事件处理
@@ -785,7 +848,9 @@ onMounted(async () => {
   await loadVideoInfo();
   await loadSubtitles();
   await fetchProcessedVideos();
+  await loadMergedSubtitles();
   setupTimeUpdateListener();
+  
 });
 
 // 监听问答模式变化
@@ -878,7 +943,7 @@ const navigateToVideoUpload = () => {
 /*上方区域*/
 .upper-section {
   display: flex;
-  height: 38%;
+  height: 40%;
   width: 100%;
   margin-bottom: 10px;
 }
@@ -1020,6 +1085,37 @@ const navigateToVideoUpload = () => {
 .download-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 合并字幕样式 */
+.merged-item {
+  margin-bottom: 15px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(42, 82, 152, 0.1);
+  transition: all 0.3s ease;
+}
+
+.merged-item:hover {
+  background: rgba(42, 82, 152, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.subtitle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid rgba(42, 82, 152, 0.2);
+}
+
+.subtitle-title {
+  font-weight: bold;
+  color: #1e3c72;
+  margin: 0;
+  font-size: 1.1em;
 }
 
 /*下方区域*/
