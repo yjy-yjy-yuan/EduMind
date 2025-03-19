@@ -358,7 +358,6 @@ class QASystem:
             # 搜索相关片段
             similar_segments = self.search_similar_segments(question, top_k=5)
             
-            # 检查是否找到相关内容 - 不应该为空，因为我们已经放宽了限制
             # 只有在similar_segments为空列表时才认为没有找到相关内容
             if len(similar_segments) == 0:
                 print(f"未找到与问题 '{question}' 相关的内容")
@@ -386,7 +385,7 @@ class QASystem:
 3. 如果视频内容片段确实无法回答问题，再说明"视频内容中没有提供相关信息"
 4. 绝对不要编造不在视频内容中的信息
 5. 回答要简洁、准确、有条理
-6. 如果合适，可以引用视频中的具体时间点"""
+6. 如果合适，一定要引用视频中的具体时间点"""
             
         else:  # 自由对话模式
             prompt = f"""你是一个教育助手。请回答以下问题，提供安全、有帮助、准确的回答：

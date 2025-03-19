@@ -189,6 +189,7 @@ def upload_video():
 
 @bp.route('/upload-url', methods=['POST', 'OPTIONS'])
 def upload_video_url():
+    import traceback  # 添加这一行，确保traceback模块被导入
     current_app.logger.info(f'收到{request.method}请求: /upload-url')
     
     if request.method == 'OPTIONS':
@@ -401,6 +402,19 @@ def upload_video_url():
                     
                     try:
                         # 先获取视频信息
+                        current_app.logger.info(f'开始获取视频信息: {video_url}')
+                        
+                        # 为哔哩哔哩视频设置特殊的网络参数
+                        if is_bilibili:
+                            # 增加重试次数和超时时间
+                            ydl.params['retries'] = 10  # 增加重试次数
+                            ydl.params['socket_timeout'] = 60  # 增加超时时间到60秒
+                            ydl.params['fragment_retries'] = 10  # 片段下载重试次数
+                            current_app.logger.info(f'哔哩哔哩视频：已设置更高的重试次数和更长的超时时间')
+                            
+                            # 添加代理设置（如果需要）
+                            # ydl.params['proxy'] = 'http://127.0.0.1:7890'  # 如果有代理，可以取消注释
+                        
                         info = ydl.extract_info(video_url, download=False)
                         video_title = info.get('title', '未知标题')
                         # 清理标题中的特殊字符，但保留中文字符
@@ -413,6 +427,7 @@ def upload_video_url():
                         ydl_opts['outtmpl'] = os.path.join(download_folder, f'{title}.%(ext)s')
                         
                         # 使用新的配置下载视频
+                        current_app.logger.info(f'开始下载视频: {video_url}')
                         with yt_dlp.YoutubeDL(ydl_opts) as ydl2:
                             ydl2.download([video_url])
                         

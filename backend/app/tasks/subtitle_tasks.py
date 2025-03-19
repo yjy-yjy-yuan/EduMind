@@ -4,6 +4,7 @@ import whisper
 import logging
 import os
 from tqdm import tqdm
+import opencc  # 导入OpenCC用于繁简转换
 
 @celery.task(name='app.tasks.subtitle_tasks.generate_subtitles')
 def generate_subtitles(video_id, language='zh', model_name='base'):
@@ -53,6 +54,9 @@ def generate_subtitles(video_id, language='zh', model_name='base'):
         result = model.transcribe(video_path, language=language, verbose=True, progress_callback=progress_callback)
         progress_callback.close()
         
+        # 初始化繁体到简体的转换器
+        converter = opencc.OpenCC('t2s')
+        
         # 保存字幕
         logging.info("正在保存字幕...")
         try:
@@ -62,11 +66,14 @@ def generate_subtitles(video_id, language='zh', model_name='base'):
             # 添加新的字幕
             with tqdm(total=len(result["segments"]), desc="保存字幕", unit="段", ncols=100) as pbar:
                 for segment in result["segments"]:
+                    # 将可能的繁体字幕转换为简体
+                    simplified_text = converter.convert(segment["text"])
+                    
                     subtitle = Subtitle(
                         video_id=video_id,
                         start_time=round(segment["start"]),
                         end_time=round(segment["end"]),
-                        text=segment["text"],
+                        text=simplified_text,  # 使用转换后的简体文本
                         language=language
                     )
                     db.session.add(subtitle)

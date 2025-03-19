@@ -204,9 +204,9 @@
       <div class="subtitle-display-container">
         <div class="subtitle-mode-switch">
           <el-radio-group v-model="subtitleMode" size="small">
+            <el-radio-button label="merged">语义合并字幕</el-radio-button>
+            <el-radio-button label="full">标准分段字幕</el-radio-button>
             <el-radio-button label="realtime">实时字幕</el-radio-button>
-            <el-radio-button label="full">分段字幕</el-radio-button>
-            <el-radio-button label="merged">合并字幕</el-radio-button>
           </el-radio-group>
         </div>
       
@@ -393,14 +393,6 @@ watch(videoId, (newVideoId) => {
   }
 });
 
-// 监听字幕模式变化
-watch(subtitleMode, (newMode) => {
-  console.log('字幕模式切换为:', newMode);
-  if (newMode === 'merged' && mergedSubtitles.value.length === 0) {
-    // 如果切换到合并模式且尚未加载合并字幕，则加载
-    loadMergedSubtitles();
-  }
-});
 
 // 侧边栏状态
 const sidebarVisible = ref(false);
@@ -499,16 +491,27 @@ const convertSRTTimeToSeconds = (timeString) => {
 };
 
 // 在data部分添加新的状态变量
-const loadMergedSubtitles = async () => {
+const loadMergedSubtitles = async (retryCount = 0, maxRetries = 3) => {
   console.log('开始加载合并字幕，视频ID:', videoId.value);
   try {
     const apiUrl = `/api/videos/${videoId.value}/subtitles/semantic-merged`;
     console.log('请求API:', apiUrl);
     
+    // 显示加载提示
+    const loadingMessage = ElMessage({
+      message: '正在处理视频字幕，这可能需要几分钟时间...',
+      type: 'info',
+      duration: 0,
+      showClose: true
+    });
+    
     const response = await request({
       url: apiUrl,
       method: 'get'
     });
+    
+    // 关闭加载提示
+    loadingMessage.close();
     
     console.log('合并字幕API响应:', response);
     
@@ -529,8 +532,21 @@ const loadMergedSubtitles = async () => {
     }
   } catch (error) {
     console.error('加载合并字幕失败:', error);
+    
+    // 如果是超时错误且未超过最大重试次数，则重试
+    if (error.code === 'ECONNABORTED' && retryCount < maxRetries) {
+      ElMessage.info(`字幕处理超时，正在进行第 ${retryCount + 1} 次重试...`);
+      console.log(`字幕处理超时，正在进行第 ${retryCount + 1} 次重试...`);
+      
+      // 等待3秒后重试
+      setTimeout(() => {
+        loadMergedSubtitles(retryCount + 1, maxRetries);
+      }, 3000);
+      return;
+    }
+    
     mergedSubtitles.value = [];
-    ElMessage.error('加载合并字幕失败');
+    ElMessage.error(`加载合并字幕失败: ${error.message || '未知错误'}`);
   }
 };
 
@@ -861,7 +877,8 @@ watch(qaMode, (newMode) => {
 
 // 监听字幕模式变化
 watch(subtitleMode, (newMode) => {
-  console.log(`字幕模式切换为: ${newMode}`);
+  console.log('字幕模式切换为:', newMode);
+  // 不再自动加载合并字幕，避免重复请求
 });
 
 // 清理事件监听器

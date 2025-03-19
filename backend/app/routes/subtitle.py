@@ -7,7 +7,7 @@ from ..utils.subtitle_utils import (
     convert_to_srt, convert_to_vtt, convert_to_txt,
     validate_subtitle_time, merge_subtitles
 )
-from ..utils.semantic_utils import merge_subtitles_by_semantics
+from ..utils.semantic_utils import merge_subtitles_by_semantics, merge_subtitles_by_semantics_ollama
 import redis
 import logging
 import io
@@ -112,8 +112,8 @@ def get_merged_subtitles(video_id):
             current_app.logger.warning("没有解析出有效的字幕")
             return jsonify([]), 200
         
-        # 调用语义合并和标题生成函数
-        merged_subtitles = merge_subtitles_by_semantics(subtitles)
+        # 调用基于Ollama的语义合并和标题生成函数
+        merged_subtitles = merge_subtitles_by_semantics_ollama(subtitles)
         
         current_app.logger.info(f"合并后的字幕数量: {len(merged_subtitles)}")
         

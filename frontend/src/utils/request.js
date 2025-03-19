@@ -7,7 +7,7 @@ const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
 // 创建axios实例
 const service = axios.create({
   baseURL,
-  timeout: 60000, // 增加超时时间到60秒，确保大文件能够正常下载
+  timeout: 600000, // 增加超时时间到5分钟，确保长视频字幕处理能够完成
   withCredentials: true
 })
 
