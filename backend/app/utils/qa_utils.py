@@ -856,6 +856,9 @@ class QASystem:
 {final_answer}"""
                     
                     logger.info(f"返回格式化回答，思考过程长度={len(thinking_process)}，最终答案长度={len(final_answer)}")
+                    # 清除"思考中..."的提示，先发送一个空字符串
+                    if has_yielded and deep_thinking:
+                        yield ""
                     yield self._format_answer(formatted_answer)
                     formatted_answer_yielded = True
                     

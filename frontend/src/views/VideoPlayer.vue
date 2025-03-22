@@ -184,16 +184,6 @@
                   :active-value="true"
                   :inactive-value="false"
                 />
-                <el-switch
-                  v-model="deepThinking"
-                  active-text="深度思考"
-                  inactive-text="快速回答"
-                  size="small"
-                  style="margin-right: 10px;"
-                  :active-value="true"
-                  :inactive-value="false"
-                />
-    
                 <el-button 
                   type="text" 
                   @click="clearChat"
@@ -204,6 +194,16 @@
               </div>
             </div>
             <div class="qa-content">
+              <!-- 添加模式提示信息区域 -->
+              <div class="qa-mode-info">
+                <el-alert
+                  :title="getModeTitle"
+                  :description="getModeDescription"
+                  :type="useOllama ? 'success' : 'info'"
+                  :closable="false"
+                  show-icon
+                />
+              </div>
               <div class="qa-history">
                 <ul>
                   <li v-for="(item, index) in qaHistory" :key="index" class="qa-item">
@@ -227,7 +227,12 @@
                     style="margin-bottom: 10px;"
                   />
                 </div>
-                <el-input v-model="question" placeholder="请输入问题" type="textarea" :rows="2" />
+                <el-input 
+                  v-model="question" 
+                  :placeholder="getPlaceholderByMode" 
+                  type="textarea" 
+                  :rows="2" 
+                />
                 <el-button type="primary" @click="askQuestion" :loading="isAsking">提问</el-button>
               </div>
             </div>
@@ -243,20 +248,11 @@
           <el-radio-group v-model="subtitleMode" size="small">
             <el-radio-button label="merged">语义合并字幕</el-radio-button>
             <el-radio-button label="full">标准分段字幕</el-radio-button>
-            <el-radio-button label="realtime">实时字幕</el-radio-button>
           </el-radio-group>
         </div>
       
         <div class="subtitle-display">
-          <template v-if="subtitleMode === 'realtime'">
-            <div class="subtitle-content" v-if="currentSubtitle">
-              {{ currentSubtitle }}
-            </div>
-            <div class="subtitle-placeholder" v-else>
-              字幕将在视频播放时显示...
-            </div>
-          </template>
-          <template v-else-if="subtitleMode === 'full'">
+          <template v-if="subtitleMode === 'full'">
             <div class="subtitle-display full-subtitle">
               <div class="subtitle-content" v-if="fullSubtitles.length">
                 <div v-for="(sub, index) in fullSubtitles" :key="index" class="subtitle-item"
@@ -270,7 +266,7 @@
               </div>
             </div>
           </template>
-          <template v-else-if="subtitleMode === 'merged'">
+          <template v-else>
             <div class="subtitle-content" v-if="mergedSubtitles.length">
               <div v-for="(section, index) in mergedSubtitles" :key="index" 
                    class="subtitle-item merged-item">
@@ -402,8 +398,7 @@ const subtitleTrackUrl = computed(() => {
 
 // 字幕状态
 const showSubtitles = ref(true);
-const subtitleMode = ref('realtime');
-const currentSubtitle = ref('');
+const subtitleMode = ref('merged');
 const fullSubtitles = ref([]);
 const mergedSubtitles = ref([]);
 const showMergedSubtitles = ref(false);
@@ -710,18 +705,6 @@ const toggleSubtitles = () => {
   }
 };
 
-// 更新当前字幕
-const updateCurrentSubtitle = () => {
-  if (!videoPlayer.value || !fullSubtitles.value.length) return;
-  
-  const currentTime = videoPlayer.value.currentTime;
-  const subtitle = fullSubtitles.value.find(
-    sub => currentTime >= sub.startTime && currentTime <= sub.endTime
-  );
-  
-  currentSubtitle.value = subtitle ? subtitle.text : '';
-};
-
 // 检查是否为当前字幕
 const isCurrentSubtitle = (subtitle) => {
   if (!videoPlayer.value) return false;
@@ -914,21 +897,32 @@ const askQuestion = async () => {
             timeoutId = null;
           }
           
+          // 如果收到空字符串，跳过处理
+          if (data === "") {
+            console.log('收到空字符串，跳过处理');
+            return;
+          }
+
           answer = data;
           console.log('收到回答:', answer.substring(0, 50) + '...');
+          
+          // 检查是否包含深度思考的格式化回答（通常包含<details>标签）
+          const isFormattedAnswer = data.includes('<details>') && data.includes('</details>');
           
           // 实时更新最新的回答到历史记录
           if (qaMode.value === 'video') {
             // 找到最后一个匹配的问题并更新
             const lastIndex = videoQaHistory.value.findIndex(item => item.question === questionText);
             if (lastIndex >= 0) {
-              videoQaHistory.value[lastIndex].answer = answer;
+              // 只要不是空字符串，就更新答案
+                videoQaHistory.value[lastIndex].answer = answer;
             }
           } else {
             // 找到最后一个匹配的问题并更新
             const lastIndex = freeQaHistory.value.findIndex(item => item.question === questionText);
             if (lastIndex >= 0) {
-              freeQaHistory.value[lastIndex].answer = answer;
+              // 只要不是空字符串，就更新答案
+                freeQaHistory.value[lastIndex].answer = answer;
             }
           }
           // 滚动到底部
@@ -1035,7 +1029,7 @@ const formatDuration = (seconds) => {
 // 监听视频时间更新
 const setupTimeUpdateListener = () => {
   if (videoPlayer.value) {
-    videoPlayer.value.addEventListener('timeupdate', updateCurrentSubtitle);
+    videoPlayer.value.addEventListener('timeupdate', () => {});
   }
 };
 
@@ -1053,6 +1047,69 @@ onMounted(async () => {
   await loadMergedSubtitles();
   setupTimeUpdateListener();
   
+});
+
+// 根据当前模式获取输入框提示文本
+const getPlaceholderByMode = computed(() => {
+  if (qaMode.value === 'video') {
+    if (deepThinking.value) {
+      return useOllama.value 
+        ? "深度思考模式（离线）：可以提问视频中的复杂问题，AI将展示详细思考过程（响应较慢）" 
+        : "深度思考模式（在线）：可以提问视频中的复杂问题，AI将展示详细思考过程";
+    } else {
+      return useOllama.value 
+        ? "基于视频内容模式（离线）：可以提问与视频内容相关的问题，例如：'视频中讲了哪些主要内容？'" 
+        : "基于视频内容模式（在线）：可以提问与视频内容相关的问题，例如：'视频中讲了哪些主要内容？'";
+    }
+  } else {
+    if (deepThinking.value) {
+      return useOllama.value 
+        ? "自由问答深度思考模式（离线）：可以提问任何问题，AI将展示详细思考过程（响应较慢）" 
+        : "自由问答深度思考模式（在线）：可以提问任何问题，AI将展示详细思考过程";
+    } else {
+      return useOllama.value 
+        ? "自由问答模式（离线）：可以提问任何问题，不限于视频内容" 
+        : "自由问答模式（在线）：可以提问任何问题，不限于视频内容";
+    }
+  }
+});
+
+// 获取模式标题
+const getModeTitle = computed(() => {
+  if (qaMode.value === 'video') {
+    return deepThinking.value 
+      ? "基于视频内容的深度思考模式" 
+      : "基于视频内容的问答模式";
+  } else {
+    return deepThinking.value 
+      ? "自由问答的深度思考模式" 
+      : "自由问答模式";
+  }
+});
+
+// 获取模式描述
+const getModeDescription = computed(() => {
+  if (qaMode.value === 'video') {
+    if (deepThinking.value) {
+      return useOllama.value 
+        ? "可以提问视频中的复杂问题，AI将展示详细思考过程（离线模式，响应较慢）" 
+        : "可以提问视频中的复杂问题，AI将展示详细思考过程（在线模式）";
+    } else {
+      return useOllama.value 
+        ? "可以提问与视频内容相关的问题，例如：'视频中讲了哪些主要内容？'（离线模式）" 
+        : "可以提问与视频内容相关的问题，例如：'视频中讲了哪些主要内容？'（在线模式）";
+    }
+  } else {
+    if (deepThinking.value) {
+      return useOllama.value 
+        ? "可以提问任何问题，AI将展示详细思考过程（离线模式，响应较慢）" 
+        : "可以提问任何问题，AI将展示详细思考过程（在线模式）";
+    } else {
+      return useOllama.value 
+        ? "可以提问任何问题，不限于视频内容（离线模式）" 
+        : "可以提问任何问题，不限于视频内容（在线模式）";
+    }
+  }
 });
 </script>
 
@@ -1469,7 +1526,6 @@ onMounted(async () => {
   border-radius: 4px;
   white-space: pre-wrap;
 }
-
 /*字幕区域*/
 .subtitle-section {
   width: 40%;
@@ -1870,4 +1926,12 @@ onMounted(async () => {
   }
 }
 
+/* 添加模式提示信息区域样式 */
+.qa-mode-info {
+  margin-bottom: 15px;
+}
+
+.qa-mode-info .el-alert {
+  border-radius: 8px;
+}
 </style>
