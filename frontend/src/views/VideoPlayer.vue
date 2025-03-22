@@ -157,7 +157,17 @@
         <div class="qa-container">
           <div class="qa-section">
             <div class="qa-header">
-              <h3>智能问答</h3>
+              <h3>
+                智能问答
+                <el-tag 
+                  size="small" 
+                  :type="useOllama ? 'success' : 'primary'"
+                  effect="dark"
+                  class="mode-tag"
+                >
+                  {{ useOllama ? '离线模式' : '在线模式' }}
+                </el-tag>
+              </h3>
               <div class="qa-mode-switch">
                 <el-radio-group v-model="qaMode" size="small">
                   <el-radio-button label="video">基于视频内容</el-radio-button>
@@ -165,6 +175,25 @@
                 </el-radio-group>
               </div>
               <div class="qa-header-actions">
+                <el-switch
+                  v-model="useOllama"
+                  active-text="离线模式"
+                  inactive-text="在线模式"
+                  size="small"
+                  style="margin-right: 10px;"
+                  :active-value="true"
+                  :inactive-value="false"
+                />
+                <el-switch
+                  v-model="deepThinking"
+                  active-text="深度思考"
+                  inactive-text="快速回答"
+                  size="small"
+                  style="margin-right: 10px;"
+                  :active-value="true"
+                  :inactive-value="false"
+                />
+    
                 <el-button 
                   type="text" 
                   @click="clearChat"
@@ -184,12 +213,20 @@
                     </div>
                     <div class="answer">
                       <el-icon class="qa-icon"><Monitor /></el-icon> <!-- 智能分析图标 -->
-                      <span class="qa-text">{{ item.answer }}</span>
+                      <span class="qa-text formatted-answer" v-html="sanitizeHtml(item.answer)"></span>
                     </div>
                   </li>
                 </ul>
               </div>
               <div class="qa-input">
+                <div class="qa-input-options">
+                  <el-switch
+                    v-model="deepThinking"
+                    active-text="深度思考模式"
+                    inactive-text="普通模式"
+                    style="margin-bottom: 10px;"
+                  />
+                </div>
                 <el-input v-model="question" placeholder="请输入问题" type="textarea" :rows="2" />
                 <el-button type="primary" @click="askQuestion" :loading="isAsking">提问</el-button>
               </div>
@@ -325,6 +362,7 @@
 </template>
 
 <script setup>
+import DOMPurify from 'dompurify';
 import { ref, onMounted, computed, watch, onUnmounted , nextTick  } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElLoading } from 'element-plus';
@@ -342,6 +380,11 @@ const router = useRouter();
 const videoId = computed(() => route.params.id);
 const videoPlayer = ref(null);
 const qaDialog = ref(null);
+
+const sanitizeHtml = (html) => {
+  if (!html) return '';
+  return DOMPurify.sanitize(html);
+};
 
 // 视频状态
 const loading = ref(true);
@@ -367,8 +410,16 @@ const showMergedSubtitles = ref(false);
 
 // 问答状态
 const qaMode = ref('video');
+const useOllama = ref(false); // 是否使用Ollama离线模式
+const deepThinking = ref(false); // 是否深度思考
 const question = ref('');
+// 界面状态
+const sidebarVisible = ref(false); // 侧边栏是否可见
+const helpDialogVisible = ref(false); // 帮助对话框是否可见
 const isAsking = ref(false);
+const processedVideos = ref([]); // 初始化为空数组
+// API密钥
+const apiKey = ref('sk-178e130a121445659860893fdfae1e7d'); // 设置为固定值
 // 分别为两种模式创建独立的历史记录数组，并从localStorage中恢复数据
 const videoQaHistory = ref(JSON.parse(localStorage.getItem(`videoQaHistory_${videoId.value}`) || '[]'));
 const freeQaHistory = ref(JSON.parse(localStorage.getItem('freeQaHistory') || '[]'));
@@ -393,15 +444,82 @@ watch(videoId, (newVideoId) => {
   }
 });
 
+// 监听问答模式变化
+watch(qaMode, (newMode) => {
+  console.log(`问答模式切换为: ${newMode}`);
+  // 模式切换时可以在这里添加其他逻辑
+});
 
-// 侧边栏状态
-const sidebarVisible = ref(false);
+// 监听模式切换
+watch(useOllama, (newValue) => {
+  if (newValue) {
+    ElMessage.success('已切换到离线模式，使用本地Ollama服务');
+  } else {
+    ElMessage.info('已切换到在线模式，使用云端服务');
+  }
+});
 
-// 帮助文档对话框状态
-const helpDialogVisible = ref(false);
+// 监听深度思考模式切换
+watch(deepThinking, (newValue) => {
+  if (newValue) {
+    ElMessage.success('已启用深度思考模式，回答将更加全面但需要更多时间');
+  } else {
+    ElMessage.info('已切换到快速回答模式，回答将更加简洁');
+  }
+});
 
-// 已处理视频列表
-const processedVideos = ref([]);
+// 监听字幕模式变化
+watch(subtitleMode, (newMode) => {
+  console.log('字幕模式切换为:', newMode);
+  // 不再自动加载合并字幕，避免重复请求
+});
+
+// 清理事件监听器
+const cleanupEventListeners = () => {
+  if (videoPlayer.value) {
+    videoPlayer.value.removeEventListener('timeupdate', updateCurrentSubtitle);
+  }
+};
+
+// 组件卸载前清理
+onUnmounted(() => {
+  cleanupEventListeners();
+});
+
+// 切换侧边栏显示状态
+const toggleSidebar = () => {
+  sidebarVisible.value = !sidebarVisible.value;
+};
+
+// 跳转到指定时间
+const seekToTime = (time) => {
+  if (videoPlayer.value) {
+    videoPlayer.value.currentTime = time;
+    videoPlayer.value.play();
+  }
+};
+
+// 导航到首页
+const navigateToHome = () => {
+  router.push('/');
+};
+
+// 显示帮助文档对话框
+const showHelpDialog = () => {
+  helpDialogVisible.value = true;
+  // 如果侧边栏是打开的，关闭它
+  sidebarVisible.value = false;
+};
+
+// 关闭帮助文档对话框
+const closeHelpDialog = () => {
+  helpDialogVisible.value = false;
+};
+
+// 导航到视频上传/管理页面
+const navigateToVideoUpload = () => {
+  router.push('/video/upload');
+};
 
 // 加载视频信息
 const loadVideoInfo = async () => {
@@ -706,10 +824,16 @@ const navigateToVideo = (videoId) => {
   }
 };
 
+
 // 问答功能
 const askQuestion = async () => {
   if (!question.value.trim()) {
     ElMessage.warning('请输入问题');
+    return;
+  }
+  
+  if (isAsking.value) {
+    ElMessage.warning('正在回答中，请稍候...');
     return;
   }
   
@@ -723,38 +847,75 @@ const askQuestion = async () => {
     if (qaMode.value === 'video') {
       videoQaHistory.value.push({
         question: questionText,
-        answer: '正在思考...'
+        answer: useOllama.value ? '正在思考...' : '正在连接AI服务...',
+        timestamp: new Date().toLocaleString(),
+        deepThinking: deepThinking.value // 记录是否使用深度思考模式
       });
     } else {
       freeQaHistory.value.push({
         question: questionText,
-        answer: '正在思考...'
+        answer: useOllama.value ? '正在思考...' : '正在连接AI服务...',
+        timestamp: new Date().toLocaleString(),
+        deepThinking: deepThinking.value // 记录是否使用深度思考模式
       });
     }
     // 滚动到底部
     scrollToBottom();
 
+    console.log('使用的API服务:', useOllama.value ? 'Ollama本地服务' : '在线API服务');
     // 使用视频ID或null，取决于当前问答模式
     const videoIdParam = qaMode.value === 'video' ? videoId.value : null;
     
     console.log('开始提问:', {
       问题: questionText,
       模式: qaMode.value,
-      视频ID: videoIdParam
+      视频ID: videoIdParam,
+      使用离线模式: useOllama.value,
+      深度思考: deepThinking.value
     });
+    
+    // 设置超时检查，如果30秒后仍然显示"正在思考..."，则更新为错误消息
+    let timeoutId = null;
+    if (useOllama.value) {
+      timeoutId = setTimeout(() => {
+        console.warn('Ollama响应超时检查');
+        // 检查是否仍然显示"正在思考..."
+        if (qaMode.value === 'video') {
+          const lastIndex = videoQaHistory.value.findIndex(item => item.question === questionText);
+          if (lastIndex >= 0 && videoQaHistory.value[lastIndex].answer === '正在思考...') {
+            console.error('Ollama响应超时');
+            videoQaHistory.value[lastIndex].answer = '无法获取回答，请检查Ollama服务是否正常运行，或尝试使用在线模式。';
+          }
+        } else {
+          const lastIndex = freeQaHistory.value.findIndex(item => item.question === questionText);
+          if (lastIndex >= 0 && freeQaHistory.value[lastIndex].answer === '正在思考...') {
+            console.error('Ollama响应超时');
+            freeQaHistory.value[lastIndex].answer = '无法获取回答，请检查Ollama服务是否正常运行，或尝试使用在线模式。';
+          }
+        }
+      }, 30000); // 30秒超时
+    }
     
     // 使用新的流式问答API
     await askQuestionStream(
       {
         question: questionText,
         video_id: videoIdParam,
-        api_key: "sk-178e130a121445659860893fdfae1e7d", // 使用与后端相同的API密钥
-        mode: qaMode.value
+        api_key: useOllama.value ? "" : "sk-178e130a121445659860893fdfae1e7d", // 使用固定API密钥
+        mode: qaMode.value,
+        use_ollama: useOllama.value, // 确保使用.value获取响应式值
+        deep_thinking: deepThinking.value // 添加深度思考模式
       },
       {
         onData: (data) => {
+          // 如果收到数据，清除超时检查
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          
           answer = data;
-          console.log('收到回答:', answer);
+          console.log('收到回答:', answer.substring(0, 50) + '...');
           
           // 实时更新最新的回答到历史记录
           if (qaMode.value === 'video') {
@@ -774,6 +935,12 @@ const askQuestion = async () => {
           scrollToBottom();
         },
         onError: (error) => {
+          // 如果发生错误，清除超时检查
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          
           console.error('提问失败:', error);
           ElMessage.error('提问失败，请重试');
           
@@ -791,6 +958,12 @@ const askQuestion = async () => {
           }
         },
         onComplete: () => {
+          // 完成时清除超时检查
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          
           question.value = '';
           console.log('问答完成');
           // 滚动到底部
@@ -801,6 +974,19 @@ const askQuestion = async () => {
   } catch (error) {
     console.error('提问失败:', error);
     ElMessage.error('提问失败，请重试');
+    
+    // 更新错误信息到历史记录
+    if (qaMode.value === 'video') {
+      const lastIndex = videoQaHistory.value.findIndex(item => item.question === questionText);
+      if (lastIndex >= 0) {
+        videoQaHistory.value[lastIndex].answer = `提问失败: ${error}`;
+      }
+    } else {
+      const lastIndex = freeQaHistory.value.findIndex(item => item.question === questionText);
+      if (lastIndex >= 0) {
+        freeQaHistory.value[lastIndex].answer = `提问失败: ${error}`;
+      }
+    }
   } finally {
     isAsking.value = false;
   }
@@ -868,65 +1054,6 @@ onMounted(async () => {
   setupTimeUpdateListener();
   
 });
-
-// 监听问答模式变化
-watch(qaMode, (newMode) => {
-  console.log(`问答模式切换为: ${newMode}`);
-  // 模式切换时可以在这里添加其他逻辑
-});
-
-// 监听字幕模式变化
-watch(subtitleMode, (newMode) => {
-  console.log('字幕模式切换为:', newMode);
-  // 不再自动加载合并字幕，避免重复请求
-});
-
-// 清理事件监听器
-const cleanupEventListeners = () => {
-  if (videoPlayer.value) {
-    videoPlayer.value.removeEventListener('timeupdate', updateCurrentSubtitle);
-  }
-};
-
-// 组件卸载前清理
-onUnmounted(() => {
-  cleanupEventListeners();
-});
-
-// 切换侧边栏显示状态
-const toggleSidebar = () => {
-  sidebarVisible.value = !sidebarVisible.value;
-};
-
-// 跳转到指定时间
-const seekToTime = (time) => {
-  if (videoPlayer.value) {
-    videoPlayer.value.currentTime = time;
-    videoPlayer.value.play();
-  }
-};
-
-// 导航到首页
-const navigateToHome = () => {
-  router.push('/');
-};
-
-// 显示帮助文档对话框
-const showHelpDialog = () => {
-  helpDialogVisible.value = true;
-  // 如果侧边栏是打开的，关闭它
-  sidebarVisible.value = false;
-};
-
-// 关闭帮助文档对话框
-const closeHelpDialog = () => {
-  helpDialogVisible.value = false;
-};
-
-// 导航到视频上传/管理页面
-const navigateToVideoUpload = () => {
-  router.push('/video/upload');
-};
 </script>
 
 <style scoped>
@@ -1053,14 +1180,10 @@ const navigateToVideoUpload = () => {
 }
 
 .detail-value {
-  color: #303133;
-  font-weight: 600;
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
-  padding: 4px 10px;
-  border-radius: 12px;
-  color: white;
-  font-size: 14px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #333333;
+  margin: 0;
+  line-height: 1.6;
+  font-size: 15px;
 }
 
 /*字幕控制*/
@@ -1253,6 +1376,35 @@ const navigateToVideoUpload = () => {
   color: #fff; /* 图标颜色 */
 }
 
+.answer-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.deep-thinking-tag {
+  margin-left: 8px;
+  font-size: 12px;
+}
+
+/* 美化思考过程的显示 */
+.thinking-process {
+  background-color: #f8f9fa;
+  border-left: 3px solid #4caf50;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+}
+
+.thinking-process p {
+  margin: 5px 0;
+}
+
+.thinking-process strong {
+  color: #4caf50;
+}
+
 .question {
   background-color: #faf5f5;
   margin-left: auto; /* 问题靠右对齐 */
@@ -1266,7 +1418,7 @@ const navigateToVideoUpload = () => {
   background: linear-gradient(135deg, #1c92d2, #f2fcfe); /* 使用与主题相符的渐变色 */
   color: #333; /* 改为深色文字，提高可读性 */
   font-weight: 500; /* 加粗文字 */
-  text-shadow: 0 0 2px rgba(255, 255, 255, 0.5); /* 添加文字阴影增强可读性 */
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5); /* 添加文字阴影增强可读性 */
 }
 
 .question .qa-icon {
@@ -1293,6 +1445,29 @@ const navigateToVideoUpload = () => {
   flex: 1;
   word-break: break-word;
   line-height: 1.5;
+}
+
+/* 深度思考模式样式 */
+.qa-text :deep(details) {
+  margin: 10px 0;
+  border-radius: 8px;
+}
+
+.qa-text :deep(details summary) {
+  cursor: pointer;
+  font-weight: bold;
+  color: #409EFF;
+  padding: 5px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.qa-text :deep(details p) {
+  margin: 10px 0;
+  padding: 10px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  white-space: pre-wrap;
 }
 
 /*字幕区域*/
@@ -1562,6 +1737,8 @@ const navigateToVideoUpload = () => {
   margin-bottom: 10px;
 }
 
+
+
 /*侧边栏开关按钮*/
 .sidebar-toggle {
   position: fixed;
@@ -1670,6 +1847,27 @@ const navigateToVideoUpload = () => {
   font-size: 20px;
   color: rgba(255, 255, 255, 0.7);
   margin: 0 10px;
+}
+
+/* 模式标签样式 */
+.mode-tag {
+  margin-left: 8px;
+  vertical-align: middle;
+  font-size: 0.8em;
+  transform: translateY(-2px);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.7;
+  }
 }
 
 </style>

@@ -6,7 +6,7 @@ class Question(db.Model):
     __tablename__ = 'questions'
     
     id = db.Column(db.Integer, primary_key=True)
-    video_id = db.Column(db.Integer, db.ForeignKey('videos.id'), nullable=False)
+    video_id = db.Column(db.Integer, db.ForeignKey('videos.id'), nullable=True)  # 允许为NULL，以支持自由问答模式
     content = db.Column(db.Text, nullable=False)  # 问题内容
     answer = db.Column(db.Text)  # 回答内容
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
