@@ -194,8 +194,8 @@
               </div>
             </div>
             <div class="qa-content">
-              <!-- 添加模式提示信息区域 -->
-              <div class="qa-mode-info">
+              <!-- 添加模式提示信息区域，只在没有问答历史记录时显示 -->
+              <div class="qa-mode-info" v-if="qaHistory.length === 0">
                 <el-alert
                   :title="getModeTitle"
                   :description="getModeDescription"
@@ -825,6 +825,7 @@ const askQuestion = async () => {
   
   try {
     let answer = '';
+    let currentQuestionIndex = -1; // 用于存储当前问题的索引，避免因切换模式后询问相同的问题导致错误
     
     // 添加问题到历史记录
     if (qaMode.value === 'video') {
@@ -834,6 +835,7 @@ const askQuestion = async () => {
         timestamp: new Date().toLocaleString(),
         deepThinking: deepThinking.value // 记录是否使用深度思考模式
       });
+      currentQuestionIndex = videoQaHistory.value.length - 1; // 记录索引
     } else {
       freeQaHistory.value.push({
         question: questionText,
@@ -841,6 +843,7 @@ const askQuestion = async () => {
         timestamp: new Date().toLocaleString(),
         deepThinking: deepThinking.value // 记录是否使用深度思考模式
       });
+      currentQuestionIndex = freeQaHistory.value.length - 1; // 记录索引
     }
     // 滚动到底部
     scrollToBottom();
@@ -910,20 +913,10 @@ const askQuestion = async () => {
           const isFormattedAnswer = data.includes('<details>') && data.includes('</details>');
           
           // 实时更新最新的回答到历史记录
-          if (qaMode.value === 'video') {
-            // 找到最后一个匹配的问题并更新
-            const lastIndex = videoQaHistory.value.findIndex(item => item.question === questionText);
-            if (lastIndex >= 0) {
-              // 只要不是空字符串，就更新答案
-                videoQaHistory.value[lastIndex].answer = answer;
-            }
-          } else {
-            // 找到最后一个匹配的问题并更新
-            const lastIndex = freeQaHistory.value.findIndex(item => item.question === questionText);
-            if (lastIndex >= 0) {
-              // 只要不是空字符串，就更新答案
-                freeQaHistory.value[lastIndex].answer = answer;
-            }
+          if (qaMode.value === 'video' && currentQuestionIndex >= 0) {
+            videoQaHistory.value[currentQuestionIndex].answer = answer;
+          } else if (qaMode.value !== 'video' && currentQuestionIndex >= 0) {
+            freeQaHistory.value[currentQuestionIndex].answer = answer;
           }
           // 滚动到底部
           scrollToBottom();
@@ -939,16 +932,10 @@ const askQuestion = async () => {
           ElMessage.error('提问失败，请重试');
           
           // 更新错误信息到历史记录
-          if (qaMode.value === 'video') {
-            const lastIndex = videoQaHistory.value.findIndex(item => item.question === questionText);
-            if (lastIndex >= 0) {
-              videoQaHistory.value[lastIndex].answer = `提问失败: ${error}`;
-            }
-          } else {
-            const lastIndex = freeQaHistory.value.findIndex(item => item.question === questionText);
-            if (lastIndex >= 0) {
-              freeQaHistory.value[lastIndex].answer = `提问失败: ${error}`;
-            }
+          if (qaMode.value === 'video' && currentQuestionIndex >= 0) {
+            videoQaHistory.value[currentQuestionIndex].answer = `提问失败: ${error}`;
+          } else if (qaMode.value !== 'video' && currentQuestionIndex >= 0) {
+            freeQaHistory.value[currentQuestionIndex].answer = `提问失败: ${error}`;
           }
         },
         onComplete: () => {
@@ -970,16 +957,10 @@ const askQuestion = async () => {
     ElMessage.error('提问失败，请重试');
     
     // 更新错误信息到历史记录
-    if (qaMode.value === 'video') {
-      const lastIndex = videoQaHistory.value.findIndex(item => item.question === questionText);
-      if (lastIndex >= 0) {
-        videoQaHistory.value[lastIndex].answer = `提问失败: ${error}`;
-      }
-    } else {
-      const lastIndex = freeQaHistory.value.findIndex(item => item.question === questionText);
-      if (lastIndex >= 0) {
-        freeQaHistory.value[lastIndex].answer = `提问失败: ${error}`;
-      }
+    if (qaMode.value === 'video' && currentQuestionIndex >= 0) {
+      videoQaHistory.value[currentQuestionIndex].answer = `提问失败: ${error}`;
+    } else if (qaMode.value !== 'video' && currentQuestionIndex >= 0) {
+      freeQaHistory.value[currentQuestionIndex].answer = `提问失败: ${error}`;
     }
   } finally {
     isAsking.value = false;
