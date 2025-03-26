@@ -143,9 +143,21 @@
                       <el-dropdown-item @click="downloadSubtitle('srt', true)">下载SRT字幕</el-dropdown-item>
                       <el-dropdown-item @click="downloadSubtitle('vtt', true)">下载VTT字幕</el-dropdown-item>
                       <el-dropdown-item @click="downloadSubtitle('txt', true)">下载TXT字幕</el-dropdown-item>
+                      <el-dropdown-item @click="downloadMergedSubtitle('txt', true)">语义合并字幕</el-dropdown-item>
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
+              </div>
+              <div class="subtitle-control-item">
+                <span class="control-label">语义合并</span>
+                <el-button 
+                  type="primary" 
+                  size="small" 
+                  @click="refreshMergedSubtitles" 
+                  :loading="mergeSubtitlesLoading"
+                >
+                  重新合并字幕
+                </el-button>
               </div>
             </div>
           </div>
@@ -402,6 +414,7 @@ const subtitleMode = ref('merged');
 const fullSubtitles = ref([]);
 const mergedSubtitles = ref([]);
 const showMergedSubtitles = ref(false);
+const mergeSubtitlesLoading = ref(false);
 
 // 问答状态
 const qaMode = ref('video');
@@ -604,10 +617,11 @@ const convertSRTTimeToSeconds = (timeString) => {
 };
 
 // 在data部分添加新的状态变量
-const loadMergedSubtitles = async (retryCount = 0, maxRetries = 3) => {
-  console.log('开始加载合并字幕，视频ID:', videoId.value);
+const loadMergedSubtitles = async (retryCount = 0, maxRetries = 3, force = false) => {
+  console.log('开始加载合并字幕，视频ID:', videoId.value, '强制刷新:', force);
   try {
-    const apiUrl = `/api/videos/${videoId.value}/subtitles/semantic-merged`;
+    // 构建API URL，添加force_refresh参数
+    const apiUrl = `/api/videos/${videoId.value}/subtitles/semantic-merged${force ? '?force_refresh=true' : ''}`;
     console.log('请求API:', apiUrl);
     
     // 显示加载提示
@@ -632,7 +646,7 @@ const loadMergedSubtitles = async (retryCount = 0, maxRetries = 3) => {
       if (Array.isArray(response.data) && response.data.length > 0) {
         console.log(`成功加载${response.data.length}条合并字幕`);
         mergedSubtitles.value = response.data;
-        ElMessage.success(`成功加载${response.data.length}条语义合并字幕`);
+        ElMessage.success(`成功加载${response.data.length}条语义合并字幕${force ? ' (重新合并)' : ''}`);
       } else {
         console.warn('服务器返回了空的合并字幕数组');
         mergedSubtitles.value = [];
@@ -653,7 +667,7 @@ const loadMergedSubtitles = async (retryCount = 0, maxRetries = 3) => {
       
       // 等待3秒后重试
       setTimeout(() => {
-        loadMergedSubtitles(retryCount + 1, maxRetries);
+        loadMergedSubtitles(retryCount + 1, maxRetries, force);
       }, 3000);
       return;
     }
@@ -737,6 +751,35 @@ const downloadSubtitle = async (format, showMessage = false) => {
   }
 };
 
+// 下载合并字幕
+const downloadMergedSubtitle = async (format, showMessage = false) => {
+  try {
+    const response = await request({
+      url: `/api/videos/${videoId.value}/subtitles/semantic-merged?format=${format}`,
+      method: 'get',
+      responseType: 'blob'
+    });
+    // 从response中获取blob数据
+    const blob = response.data;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    // 使用与后端一致的文件名格式：local-视频标题.格式
+    a.download = `local-${videoTitle.value}-merged.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    if (showMessage) {
+      ElMessage.success(`合并${format.toUpperCase()} 字幕下载成功`);
+    }
+  } catch (error) {
+    console.error(`下载合并 ${format} 字幕失败:`, error);
+    ElMessage.error(`下载合并 ${format} 字幕失败，请重试`);
+  }
+};
+
 // 获取已处理视频列表
 const fetchProcessedVideos = async () => {
   try {
@@ -807,6 +850,15 @@ const navigateToVideo = (videoId) => {
   }
 };
 
+// 重新合并字幕
+const refreshMergedSubtitles = async () => {
+  mergeSubtitlesLoading.value = true;
+  try {
+    await loadMergedSubtitles(0, 3, true); // 传入force=true参数，强制刷新
+  } finally {
+    mergeSubtitlesLoading.value = false;
+  }
+};
 
 // 问答功能
 const askQuestion = async () => {

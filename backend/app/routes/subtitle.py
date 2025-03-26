@@ -12,6 +12,7 @@ import redis
 import logging
 import io
 import os
+import json
 
 subtitle_bp = Blueprint('subtitle', __name__, url_prefix='/api')
 
@@ -46,76 +47,145 @@ def check_celery_connection():
 def get_merged_subtitles(video_id):
     """获取语义合并后的字幕"""
     try:
+        # 检查是否需要强制刷新
+        force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
+        
+        # 检查是否请求下载特定格式
+        format_type = request.args.get('format')
+        
         # 获取视频信息
         video = Video.query.get_or_404(video_id)
         
         # 检查字幕文件是否存在
         if not video.subtitle_filepath or not os.path.exists(video.subtitle_filepath):
             return jsonify({"error": "字幕文件不存在"}), 404
+        
+        # 构建缓存文件路径
+        cache_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'cache')
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_file = os.path.join(cache_dir, f'semantic_merged_{video_id}.json')
+        
+        # 获取合并字幕（从缓存或重新生成）
+        merged_subtitles = None
+        
+        # 如果缓存文件存在且不需要强制刷新，直接返回缓存结果
+        if os.path.exists(cache_file) and not force_refresh:
+            current_app.logger.info(f"使用缓存的语义合并字幕: {cache_file}")
+            try:
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    merged_subtitles = json.load(f)
+            except Exception as e:
+                current_app.logger.error(f"读取缓存文件时出错: {str(e)}")
+                # 如果读取缓存失败，继续执行后续代码重新生成
+        
+        # 如果没有从缓存获取到合并字幕，则重新生成
+        if merged_subtitles is None:
+            # 读取字幕文件
+            try:
+                with open(video.subtitle_filepath, 'r', encoding='utf-8') as f:
+                    subtitle_content = f.read()
+            except Exception as e:
+                current_app.logger.error(f"读取字幕文件时出错: {str(e)}")
+                return jsonify({"error": f"读取字幕文件时出错: {str(e)}"}), 500
             
-        # 读取字幕文件
-        try:
-            with open(video.subtitle_filepath, 'r', encoding='utf-8') as f:
-                subtitle_content = f.read()
-        except Exception as e:
-            current_app.logger.error(f"读取字幕文件时出错: {str(e)}")
-            return jsonify({"error": f"读取字幕文件时出错: {str(e)}"}), 500
+            # 解析.srt文件内容
+            subtitle_blocks = subtitle_content.strip().split('\n\n')
+            current_app.logger.info(f"分割出的字幕块数量: {len(subtitle_blocks)}")
+            
+            subtitles = []
+            for block in subtitle_blocks:
+                lines = block.strip().split('\n')
+                if len(lines) >= 3:  # 确保至少有索引、时间和文本
+                    # 解析时间行
+                    time_line = lines[1]
+                    if '-->' in time_line:
+                        start_time_str, end_time_str = time_line.split('-->')
+                        
+                        # 转换时间格式为秒
+                        start_time_parts = start_time_str.strip().split(':')
+                        if len(start_time_parts) == 2:  # MM:SS 格式
+                            start_minutes = int(start_time_parts[0])
+                            start_seconds = float(start_time_parts[1].replace(',', '.'))
+                            start_time = start_minutes * 60 + start_seconds
+                        else:  # HH:MM:SS 格式
+                            start_hours = int(start_time_parts[0])
+                            start_minutes = int(start_time_parts[1])
+                            start_seconds = float(start_time_parts[2].replace(',', '.'))
+                            start_time = start_hours * 3600 + start_minutes * 60 + start_seconds
+                        
+                        end_time_parts = end_time_str.strip().split(':')
+                        if len(end_time_parts) == 2:  # MM:SS 格式
+                            end_minutes = int(end_time_parts[0])
+                            end_seconds = float(end_time_parts[1].replace(',', '.'))
+                            end_time = end_minutes * 60 + end_seconds
+                        else:  # HH:MM:SS 格式
+                            end_hours = int(end_time_parts[0])
+                            end_minutes = int(end_time_parts[1])
+                            end_seconds = float(end_time_parts[2].replace(',', '.'))
+                            end_time = end_hours * 3600 + end_minutes * 60 + end_seconds
+                        
+                        # 获取文本（可能有多行）
+                        text = '\n'.join(lines[2:])
+                        
+                        subtitles.append({
+                            'start_time': start_time,
+                            'end_time': end_time,
+                            'text': text
+                        })
+            
+            current_app.logger.info(f"从文件中解析出{len(subtitles)}条字幕")
+            
+            if not subtitles:
+                current_app.logger.warning("没有解析出有效的字幕")
+                return jsonify([]), 200
+            
+            # 调用基于Ollama的语义合并和标题生成函数
+            merged_subtitles = merge_subtitles_by_semantics_ollama(subtitles)
+            
+            current_app.logger.info(f"合并后的字幕数量: {len(merged_subtitles)}")
+            
+            # 将结果保存到缓存文件
+            try:
+                with open(cache_file, 'w', encoding='utf-8') as f:
+                    json.dump(merged_subtitles, f, ensure_ascii=False, indent=2)
+                current_app.logger.info(f"语义合并字幕已缓存到: {cache_file}")
+            except Exception as e:
+                current_app.logger.error(f"保存缓存文件时出错: {str(e)}")
+                # 保存缓存失败不影响返回结果
         
-        # 解析.srt文件内容
-        subtitle_blocks = subtitle_content.strip().split('\n\n')
-        current_app.logger.info(f"分割出的字幕块数量: {len(subtitle_blocks)}")
-        
-        subtitles = []
-        for block in subtitle_blocks:
-            lines = block.strip().split('\n')
-            if len(lines) >= 3:  # 确保至少有索引、时间和文本
-                # 解析时间行
-                time_line = lines[1]
-                if '-->' in time_line:
-                    start_time_str, end_time_str = time_line.split('-->')
-                    
-                    # 转换时间格式为秒
-                    start_time_parts = start_time_str.strip().split(':')
-                    if len(start_time_parts) == 2:  # MM:SS 格式
-                        start_minutes = int(start_time_parts[0])
-                        start_seconds = float(start_time_parts[1].replace(',', '.'))
-                        start_time = start_minutes * 60 + start_seconds
-                    else:  # HH:MM:SS 格式
-                        start_hours = int(start_time_parts[0])
-                        start_minutes = int(start_time_parts[1])
-                        start_seconds = float(start_time_parts[2].replace(',', '.'))
-                        start_time = start_hours * 3600 + start_minutes * 60 + start_seconds
-                    
-                    end_time_parts = end_time_str.strip().split(':')
-                    if len(end_time_parts) == 2:  # MM:SS 格式
-                        end_minutes = int(end_time_parts[0])
-                        end_seconds = float(end_time_parts[1].replace(',', '.'))
-                        end_time = end_minutes * 60 + end_seconds
-                    else:  # HH:MM:SS 格式
-                        end_hours = int(end_time_parts[0])
-                        end_minutes = int(end_time_parts[1])
-                        end_seconds = float(end_time_parts[2].replace(',', '.'))
-                        end_time = end_hours * 3600 + end_minutes * 60 + end_seconds
-                    
-                    # 获取文本（可能有多行）
-                    text = '\n'.join(lines[2:])
-                    
-                    subtitles.append({
-                        'start_time': start_time,
-                        'end_time': end_time,
-                        'text': text
-                    })
-        
-        current_app.logger.info(f"从文件中解析出{len(subtitles)}条字幕")
-        
-        if not subtitles:
-            current_app.logger.warning("没有解析出有效的字幕")
-            return jsonify([]), 200
-        
-        # 调用基于Ollama的语义合并和标题生成函数
-        merged_subtitles = merge_subtitles_by_semantics_ollama(subtitles)
-        
-        current_app.logger.info(f"合并后的字幕数量: {len(merged_subtitles)}")
+        # 如果请求下载特定格式，则转换并返回
+        if format_type:
+            if not merged_subtitles or len(merged_subtitles) == 0:
+                return jsonify({"error": "没有可用的合并字幕"}), 404
+                
+            # 根据请求的格式转换字幕
+            if format_type == 'srt':
+                content = convert_merged_to_srt(merged_subtitles)
+                mimetype = 'text/plain'
+            elif format_type == 'vtt':
+                content = convert_merged_to_vtt(merged_subtitles)
+                mimetype = 'text/vtt'
+            elif format_type == 'txt':
+                content = convert_merged_to_txt(merged_subtitles)
+                mimetype = 'text/plain'
+            else:
+                return jsonify({"error": f"不支持的格式: {format_type}"}), 400
+                
+            # 创建一个内存文件对象
+            mem_file = io.BytesIO()
+            mem_file.write(content.encode('utf-8'))
+            mem_file.seek(0)
+            
+            # 获取视频标题用于文件名
+            video_title = video.title or f"video_{video_id}"
+            filename = f"merged-{video_title}.{format_type}"
+            
+            return send_file(
+                mem_file,
+                mimetype=mimetype,
+                as_attachment=True,
+                download_name=filename
+            )
         
         # 返回合并后的字幕
         return jsonify(merged_subtitles), 200
@@ -124,6 +194,54 @@ def get_merged_subtitles(video_id):
         import traceback
         current_app.logger.error(traceback.format_exc())
         return jsonify({"error": "处理字幕时发生错误"}), 500
+
+# 将合并字幕转换为SRT格式
+def convert_merged_to_srt(merged_subtitles):
+    srt_content = ""
+    for i, subtitle in enumerate(merged_subtitles):
+        start_time = format_seconds_to_srt_time(subtitle['start_time'])
+        end_time = format_seconds_to_srt_time(subtitle['end_time'])
+        srt_content += f"{i+1}\n{start_time} --> {end_time}\n{subtitle['text']}\n\n"
+    return srt_content
+
+# 将合并字幕转换为VTT格式
+def convert_merged_to_vtt(merged_subtitles):
+    vtt_content = "WEBVTT\n\n"
+    for i, subtitle in enumerate(merged_subtitles):
+        start_time = format_seconds_to_vtt_time(subtitle['start_time'])
+        end_time = format_seconds_to_vtt_time(subtitle['end_time'])
+        vtt_content += f"{i+1}\n{start_time} --> {end_time}\n{subtitle['text']}\n\n"
+    return vtt_content
+
+# 将合并字幕转换为TXT格式
+def convert_merged_to_txt(merged_subtitles):
+    txt_content = ""
+    for subtitle in merged_subtitles:
+        start_time = format_seconds_to_display_time(subtitle['start_time'])
+        end_time = format_seconds_to_display_time(subtitle['end_time'])
+        title = subtitle.get('title', '无标题')
+        txt_content += f"[{start_time} - {end_time}] {title}\n{subtitle['text']}\n\n"
+    return txt_content
+
+# 时间格式转换函数
+def format_seconds_to_srt_time(seconds):
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    ms = int((seconds % 1) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{ms:03d}"
+
+def format_seconds_to_vtt_time(seconds):
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    ms = int((seconds % 1) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
+
+def format_seconds_to_display_time(seconds):
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{minutes:02d}:{secs:02d}"
 
 @subtitle_bp.route('/videos/<int:video_id>/subtitles/generate', methods=['POST'])
 def generate_video_subtitles(video_id):
