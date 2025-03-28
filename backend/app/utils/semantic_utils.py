@@ -50,22 +50,38 @@ def process_long_video_subtitles(subtitles):
     # 存储所有处理结果
     all_results = []
     
-    # 分块处理
-    for i in range(0, len(subtitles), chunk_size):
-        end_idx = min(i + chunk_size, len(subtitles))
-        chunk = subtitles[i:end_idx]
+    # 导入并行处理模块
+    import concurrent.futures
+    
+    # 使用线程池并行处理字幕块
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+        # 准备任务列表
+        future_to_chunk = {}
         
-        logger.info(f"处理字幕块 {i}-{end_idx-1}，共{len(chunk)}条字幕")
+        # 提交所有任务到线程池
+        for i in range(0, len(subtitles), chunk_size):
+            end_idx = min(i + chunk_size, len(subtitles))
+            chunk = subtitles[i:end_idx]
+            
+            logger.info(f"提交字幕块 {i}-{end_idx-1} 到线程池，共{len(chunk)}条字幕")
+            future = executor.submit(process_subtitle_chunk, chunk, i)
+            future_to_chunk[future] = (i, end_idx-1)
         
-        # 处理当前块
-        try:
-            chunk_results = process_subtitle_chunk(chunk, i)
-            if chunk_results:
-                all_results.extend(chunk_results)
-        except Exception as e:
-            logger.error(f"处理字幕块 {i}-{end_idx-1} 时出错: {str(e)}")
-            # 如果处理失败，直接抛出异常，让上层函数处理
-            raise
+        # 收集结果
+        for future in concurrent.futures.as_completed(future_to_chunk):
+            chunk_range = future_to_chunk[future]
+            try:
+                chunk_results = future.result()
+                if chunk_results:
+                    all_results.extend(chunk_results)
+                    logger.info(f"字幕块 {chunk_range[0]}-{chunk_range[1]} 处理完成，生成了 {len(chunk_results)} 个段落")
+            except Exception as e:
+                logger.error(f"处理字幕块 {chunk_range[0]}-{chunk_range[1]} 时出错: {str(e)}")
+                # 记录错误但继续处理其他块
+                logger.error(traceback.format_exc())
+    
+    # 按照开始时间排序结果
+    all_results.sort(key=lambda x: x["start_time"])
     
     logger.info(f"长视频分块处理完成，共生成{len(all_results)}个语义段落")
     return all_results
@@ -78,18 +94,16 @@ def process_subtitle_chunk(chunk, start_offset):
     for i, subtitle in enumerate(chunk):
         chunk_text += f"{i+1}. {subtitle['text']}\n"
     
-    # 构建提示词
+    # 构建提示词 - 简化提示词以加快处理速度
     prompt_template = """请分析以下字幕文本，按语义将其分成若干段落，并为每个段落生成标题。
 
 {{ text }}
 
 要求：
 1. 基于语义内容进行分段，相关主题应该在同一段落中
-2. 不要生成摘要，保留原始内容
-3. 为每个段落添加适当的标点符号，使其更易于阅读
-4. 确保每个段落的开始和结束索引正确
-5. 提供分段的理由
-6. 为每个段落生成一个简短、具体的标题，反映其主要内容
+2. 为每个段落添加适当的标点符号，使其更易于阅读
+3. 确保每个段落的开始和结束索引正确
+4. 为每个段落生成一个简短的标题（不超过10个字）
 
 返回格式（JSON）：
 ```
@@ -97,21 +111,19 @@ def process_subtitle_chunk(chunk, start_offset):
   {{
     "start_index": 0,
     "end_index": 5,
-    "reason": "介绍了主题背景",
     "formatted_text": "这是添加了标点符号的文本。这样更容易阅读和理解。",
     "title": "主题介绍"
   }},
   {{
     "start_index": 6,
     "end_index": 12,
-    "reason": "讨论了第一个要点",
-    "formatted_text": "这是第二段添加了标点符号的文本。包含了完整的标点和语法修正。",
+    "formatted_text": "这是第二段添加了标点符号的文本。",
     "title": "要点讨论"
   }}
 ]
 ```
 
-请直接返回JSON格式的结果，不要有任何解释或其他内容。确保JSON格式正确，每个属性之间都有逗号分隔。"""
+请直接返回JSON格式的结果，不要有任何解释或其他内容。"""
     # 替换变量
     prompt = prompt_template.replace("{{ text }}", chunk_text)
     
@@ -129,9 +141,13 @@ def process_subtitle_chunk(chunk, start_offset):
                 json={
                     "model": OLLAMA_MODEL,
                     "prompt": prompt,
-                    "stream": False
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.1,  # 降低温度以加快生成速度
+                        "num_predict": 1024  # 限制生成的token数量
+                    }
                 },
-                timeout=60
+                timeout=30  # 减少超时时间
             )
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
@@ -259,7 +275,7 @@ def merge_subtitles_by_semantics_ollama(subtitles):
         prompt_template = """请分析以下视频字幕文本，并完成三个任务：
 1. 根据内容的语义连贯性将其分成若干个有意义的段落
 2. 为每个段落添加适当的标点符号，使其更易于阅读（注意：返回的文本中不要包含索引标记[0]、[1]等）
-3. 为每个段落生成一个简短的标题（不超过15个字）
+3. 为每个段落生成一个简短的标题（不超过10个字）
 
 字幕文本（每行前面的数字是字幕的索引）：
 {{ text }}
@@ -267,9 +283,9 @@ def merge_subtitles_by_semantics_ollama(subtitles):
 要求：
 1. 根据内容的语义连贯性和主题变化进行分段，而不是简单地按固定间隔分段
 2. 每个段落应该表达一个相对完整的意思或主题
-3. 对于短视频（不到5分钟），应该生成2-5个段落，不要过度分段
-4. 确保分段是连续的，不要有重叠或遗漏
-5. 为每个段落添加适当的标点符号，保持原文意思不变
+3. 返回JSON格式的结果，包含每个段落的开始和结束字幕索引
+4. 对于短视频（不到5分钟），应该生成2-5个段落，不要过度分段
+5. 确保分段是连续的，不要有重叠或遗漏
 6. 返回的文本中不要包含索引标记[0]、[1]等
 7. 为每个段落生成一个简短、具体的标题，反映其主要内容
 
@@ -356,54 +372,49 @@ def merge_subtitles_by_semantics_ollama(subtitles):
         
         # 合并字幕 - 直接使用Ollama返回的格式化文本和标题
         merged_subtitles = []
-        try:
-            for segment in segments_info:
-                start_index = segment.get("start_index")
-                end_index = segment.get("end_index")
-                formatted_text = segment.get("formatted_text", "")
-                title = segment.get("title", "")
-                
-                if start_index is None or end_index is None:
-                    logger.warning(f"段落信息不完整: {segment}")
-                    continue
-                
-                # 确保索引在有效范围内
-                start_index = max(0, min(start_index, len(subtitles) - 1))
-                end_index = max(start_index, min(end_index, len(subtitles) - 1))
-                
-                # 移除文本中的索引标记 [0], [1], [2] 等
-                if formatted_text:
-                    formatted_text = re.sub(r'\[\d+\]\s*', '', formatted_text)
-                
-                # 如果没有格式化文本，使用原始合并文本
-                if not formatted_text:
-                    formatted_text = " ".join([subtitles[i]["text"] for i in range(start_index, end_index + 1)])
-                
-                # 如果没有标题，生成一个简单的标题
-                if not title:
-                    title = f"第{len(merged_subtitles) + 1}部分"
-                
-                # 创建合并后的字幕
-                merged_subtitle = {
-                    "start_time": subtitles[start_index]["start_time"],
-                    "end_time": subtitles[end_index]["end_time"],
-                    "text": formatted_text,
-                    "title": title,
-                    "original_indices": list(range(start_index, end_index + 1))
-                }
-                
-                merged_subtitles.append(merged_subtitle)
+        for segment in segments_info:
+            start_index = segment.get("start_index")
+            end_index = segment.get("end_index")
+            formatted_text = segment.get("formatted_text", "")
+            title = segment.get("title", "")
             
-            if not merged_subtitles:
-                logger.warning("Ollama没有返回有效的段落，使用方案二")
-                return merge_subtitles_by_semantics(subtitles)
-                
-            logger.info(f"Ollama语义分段完成，共{len(merged_subtitles)}个语义段落")
-            return merged_subtitles
+            if start_index is None or end_index is None:
+                logger.warning(f"段落信息不完整: {segment}")
+                continue
             
-        except Exception as e:
-            logger.error(f"处理Ollama返回的段落时出错: {str(e)}")
+            # 确保索引在有效范围内
+            start_index = max(0, min(start_index, len(subtitles) - 1))
+            end_index = max(start_index, min(end_index, len(subtitles) - 1))
+            
+            # 移除文本中的索引标记 [0], [1], [2] 等
+            if formatted_text:
+                formatted_text = re.sub(r'\[\d+\]\s*', '', formatted_text)
+            
+            # 如果没有格式化文本，使用原始合并文本
+            if not formatted_text:
+                formatted_text = " ".join([subtitles[i]["text"] for i in range(start_index, end_index + 1)])
+            
+            # 如果没有标题，生成一个简单的标题
+            if not title:
+                title = f"第{len(merged_subtitles) + 1}部分"
+            
+            # 创建合并后的字幕
+            merged_subtitle = {
+                "start_time": subtitles[start_index]["start_time"],
+                "end_time": subtitles[end_index]["end_time"],
+                "text": formatted_text,
+                "title": title,
+                "original_indices": list(range(start_index, end_index + 1))
+            }
+            
+            merged_subtitles.append(merged_subtitle)
+        
+        if not merged_subtitles:
+            logger.warning("Ollama没有返回有效的段落，使用方案二")
             return merge_subtitles_by_semantics(subtitles)
+            
+        logger.info(f"Ollama语义分段完成，共{len(merged_subtitles)}个语义段落")
+        return merged_subtitles
             
     except Exception as e:
         logger.error(f"使用Ollama合并字幕时出错: {str(e)}")
@@ -438,6 +449,9 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
         texts = [sub['text'] for sub in subtitles]
         logger.info(f"提取了{len(texts)}条字幕文本")
         
+        # 判断是否为长视频（超过150条字幕）
+        is_long_video = len(subtitles) > 150
+        
         # 使用LLM API进行语义分段
         try:
             # 创建OpenAI客户端，使用固定的API密钥
@@ -451,9 +465,36 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
             for i, sub in enumerate(subtitles):
                 full_text += f"[{i}] {sub['text']}\n"
             
-            # 构建提示词
-            prompt_template = """请分析以下视频字幕文本，并根据内容的语义连贯性将其分成若干个有意义的段落。
-            
+            # 构建提示词 - 根据视频长度调整提示词
+            if is_long_video:
+                # 长视频提示词 - 鼓励生成更多段落
+                prompt_template = """请分析以下视频字幕文本，并根据内容的语义连贯性将其分成若干个有意义的段落。
+                
+字幕文本（每行前面的数字是字幕的索引）：
+{text}
+
+要求：
+1. 根据内容的语义连贯性和主题变化进行分段，而不是简单地按固定间隔分段
+2. 每个段落应该表达一个相对完整的意思或主题
+3. 返回JSON格式的结果，包含每个段落的开始和结束字幕索引
+4. 由于这是一个长视频，请尽量细致地分段，建议生成8-15个段落
+5. 每个段落不要太长，建议每个段落包含的字幕数量在10-30条之间
+6. 确保分段是连续的，不要有重叠或遗漏
+
+返回格式示例：
+```
+[
+  {"start_index": 0, "end_index": 15, "reason": "介绍了主题背景"},
+  {"start_index": 16, "end_index": 32, "reason": "讨论了第一个要点"},
+  {"start_index": 33, "end_index": 48, "reason": "总结了结论"}
+]
+```
+
+请直接返回JSON格式的结果，不要有任何解释或其他内容。"""
+            else:
+                # 短视频提示词 - 保持原有逻辑
+                prompt_template = """请分析以下视频字幕文本，并根据内容的语义连贯性将其分成若干个有意义的段落。
+                
 字幕文本（每行前面的数字是字幕的索引）：
 {text}
 
@@ -482,7 +523,8 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
             response = client.chat.completions.create(
                 model="qwen-turbo",
                 messages=[
-                    {"role": "system", "content": "你是一个专业的视频内容分析助手。你的任务是分析视频字幕，并根据语义将其分成有意义的段落。"},
+                    {"role": "system", "content": "你是一个专业的视频内容分析助手。你的任务是分析视频字幕，并根据语义将其分成有意义的段落。" + 
+                     ("对于长视频，请尽量细致地分段，生成更多的段落。" if is_long_video else "")},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3  # 使用较低的温度以获得更确定性的结果
