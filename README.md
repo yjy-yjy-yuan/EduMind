@@ -38,15 +38,26 @@ IVS-Flask-Vue/
 - 下载最新的 Redis-x64-xxx.msi 安装包，双击安装包进行安装
 - 安装时选择"Add the Redis installation folder to the PATH environment variable"
 
+### 配置ffmpeg
+[ffmpeg配置](https://blog.csdn.net/qq_45956730/article/details/125272407?ops_request_misc=%257B%2522request%255Fid%2522%253A%2522fe6e09d28e4e26828992bf3d6d5ba651%2522%252C%2522scm%2522%253A%252220140713.130102334..%2522%257D&request_id=fe6e09d28e4e26828992bf3d6d5ba651&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~top_positive~default-1-125272407-null-null.142^v102^pc_search_result_base3&utm_term=ffmpeg%E5%AE%89%E8%A3%85&spm=1018.2226.3001.4187)
+
+### 本地部署ollama并Pull指定模型
+- 官网下载ollama：https://ollama.com/
+- 配置ollama：[配置ollama，避免存储空间紧张](https://blog.csdn.net/2501_90561511/article/details/145615092?ops_request_misc=%257B%2522request%255Fid%2522%253A%2522ed67978029517f895d00870bb578cd9e%2522%252C%2522scm%2522%253A%252220140713.130102334..%2522%257D&request_id=ed67978029517f895d00870bb578cd9e&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~baidu_landing_v2~default-1-145615092-null-null.142^v102^pc_search_result_base3&utm_term=ollama%E9%85%8D%E7%BD%AE%E5%AE%89%E8%A3%85&spm=1018.2226.3001.4187)
+- Pull指定模型：
+    ```bash
+    ollama run deepseek-r1:8b
+    ollama run qwen2.5:7b
+    ```
 ### 后端
 - Python 3.10
 - Flask 2.0+
 - 其他依赖见 requirements.txt
 
 ### 前端
-- Node.js 16+ ，参考：[text](https://blog.csdn.net/WHF__/article/details/129362462?ops_request_misc=%257B%2522request%255Fid%2522%253A%252292c74e602ab165368dc9716d84d7b355%2522%252C%2522scm%2522%253A%252220140713.130102334..%2522%257D&request_id=92c74e602ab165368dc9716d84d7b355&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~top_positive~default-1-129362462-null-null.142^v101^pc_search_result_base3&utm_term=nodejs%E5%AE%89%E8%A3%85%E5%8F%8A%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE&spm=1018.2226.3001.4187)
+- Node.js 16+ ，参考：[Node.js安装及环境配置](https://blog.csdn.net/WHF__/article/details/129362462?ops_request_misc=%257B%2522request%255Fid%2522%253A%252292c74e602ab165368dc9716d84d7b355%2522%252C%2522scm%2522%253A%252220140713.130102334..%2522%257D&request_id=92c74e602ab165368dc9716d84d7b355&biz_id=0&utm_medium=distribute.pc_search_result.none-task-blog-2~all~top_positive~default-1-129362462-null-null.142^v101^pc_search_result_base3&utm_term=nodejs%E5%AE%89%E8%A3%85%E5%8F%8A%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE&spm=1018.2226.3001.4187)
 
-- Vue 3，参考：https://blog.csdn.net/qq_41729329/article/details/141890131?ops_request_misc=&request_id=&biz_id=102&utm_term=vue3%E5%AE%89%E8%A3%85&utm_medium=distribute.pc_search_result.none-task-blog-2~all~sobaiduweb~default-1-141890131.142^v101^pc_search_result_base3&spm=1018.2226.3001.4187
+- Vue 3，参考：[Vue 3安装配置](https://blog.csdn.net/qq_41729329/article/details/141890131?ops_request_misc=&request_id=&biz_id=102&utm_term=vue3%E5%AE%89%E8%A3%85&utm_medium=distribute.pc_search_result.none-task-blog-2~all~sobaiduweb~default-1-141890131.142^v101^pc_search_result_base3&spm=1018.2226.3001.4187)
 
 - 其他依赖见 package.json(看下就好，不用太在意)
 
