@@ -48,6 +48,10 @@
             <el-icon><document /></el-icon>
             <span>帮助文档</span>
           </div>
+          <div class="menu-item" @click="navigateToNoteSystem">
+            <el-icon><edit /></el-icon>
+            <span>笔记系统</span>
+          </div>
         </div>
       </div>
     </div>
@@ -359,6 +363,41 @@
         </span>
       </template>
     </el-dialog>
+    
+    <!-- 功能引导提示弹窗 -->
+    <el-dialog
+      v-model="showGuideDialog"
+      title="功能引导"
+      width="400px"
+      :show-close="true"
+      :close-on-click-modal="true"
+      :close-on-press-escape="true"
+    >
+      <div class="guide-content">
+        <h3>欢迎使用 AI-EdVision 视频学习系统</h3>
+        
+        <div class="guide-section">
+          <h4><el-icon><edit /></el-icon> 记录学习笔记</h4>
+          <p>想要记录学习笔记？只需点击左上角的侧边栏按钮 <el-icon><arrow-right /></el-icon>，然后选择"笔记系统"即可进入笔记页面。</p>
+        </div>
+        
+        <div class="guide-section">
+          <h4>侧边栏其他功能</h4>
+          <ul>
+            <li><el-icon><home-filled /></el-icon> <strong>返回首页</strong>：回到系统主页</li>
+            <li><el-icon><video-camera /></el-icon> <strong>分析新视频</strong>：上传并分析新的视频</li>
+            <li><el-icon><document /></el-icon> <strong>帮助文档</strong>：查看系统使用帮助</li>
+          </ul>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-checkbox v-model="dontShowGuideAgain">不再显示</el-checkbox>
+          <el-button type="primary" @click="closeGuideDialog">我知道了</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
   <!-- 底部美化区域 -->
   <div class="page-footer">
@@ -377,7 +416,7 @@ import { ElMessage, ElLoading } from 'element-plus';
 import { 
   Loading, Warning, FullScreen, Close, User, Monitor, 
   QuestionFilled, ChatLineSquare, ArrowDown as ArrowDown,
-  ArrowRight, ArrowLeft, HomeFilled, VideoCamera, Document
+  ArrowRight, ArrowLeft, HomeFilled, VideoCamera, Document, Edit as Edit
 } from '@element-plus/icons-vue';
 import { getVideo, getSubtitle, getVideoList, getVideoPreview } from '@/api/video';
 import { askQuestionStream } from '@/api/qa';
@@ -1068,6 +1107,14 @@ const setupTimeUpdateListener = () => {
 
 // 组件挂载
 onMounted(async () => {
+  // 检查是否需要显示功能引导弹窗
+  const dontShowGuide = localStorage.getItem('dontShowGuideAgain');
+  if (!dontShowGuide) {
+    // 延迟显示引导弹窗，等待页面加载完成
+    setTimeout(() => {
+      showGuideDialog.value = true;
+    }, 1000);
+  }
   if (!videoId.value) {
     ElMessage.error('无效的视频ID');
     router.push('/');
@@ -1144,6 +1191,26 @@ const getModeDescription = computed(() => {
     }
   }
 });
+
+// 导航到笔记系统
+const navigateToNoteSystem = () => {
+  router.push({
+    path: '/notes',
+    query: { videoId: videoId.value }
+  });
+};
+
+// 功能引导提示弹窗相关状态
+const showGuideDialog = ref(false);
+const dontShowGuideAgain = ref(false);
+
+// 关闭功能引导提示弹窗
+const closeGuideDialog = () => {
+  showGuideDialog.value = false;
+  if (dontShowGuideAgain.value) {
+    localStorage.setItem('dontShowGuideAgain', 'true');
+  }
+};
 </script>
 
 <style scoped>
@@ -1966,5 +2033,48 @@ const getModeDescription = computed(() => {
 
 .qa-mode-info .el-alert {
   border-radius: 8px;
+}
+
+/* 功能引导弹窗样式 */
+.guide-content {
+  padding: 10px;
+}
+
+.guide-content h3 {
+  text-align: center;
+  margin-bottom: 15px;
+  color: #409EFF;
+}
+
+.guide-section {
+  margin-bottom: 15px;
+  padding: 10px;
+  border-radius: 8px;
+  background-color: #f5f7fa;
+}
+
+.guide-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.guide-section ul {
+  padding-left: 20px;
+}
+
+.guide-section li {
+  margin-bottom: 5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 </style>

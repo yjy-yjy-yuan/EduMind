@@ -4,6 +4,7 @@ import os
 from flask import Flask, request, jsonify
 from .extensions import db, migrate, cors, celery
 from .config import config
+from flask_cors import CORS
 
 # 配置日志
 logging.basicConfig(
@@ -35,16 +36,17 @@ def create_app(config_name='default'):
         os.makedirs(app.config['SUBTITLE_FOLDER'], exist_ok=True)
         
         # 配置CORS
-        cors.init_app(app, resources={
-            r"/api/*": {
-                "origins": ["http://localhost:5173"],
-                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
-                "expose_headers": ["Content-Disposition"],
-                "supports_credentials": True,
-                "max_age": 3600
-            }
-        })
+        cors = CORS()
+        cors.init_app(app, resources={r"/*": {"origins": "http://localhost:5173", "supports_credentials": True}})
+        
+        # 添加CORS响应头处理
+        @app.after_request
+        def after_request(response):
+            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+            response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+            response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+            response.headers.add('Access-Control-Allow-Credentials', 'true')
+            return response
         
         # 初始化数据库
         db.init_app(app)
@@ -52,6 +54,14 @@ def create_app(config_name='default'):
         
         # 配置Celery
         celery.conf.update(app.config)
+        
+        # 创建Celery任务上下文
+        class ContextTask(celery.Task):
+            def __call__(self, *args, **kwargs):
+                with app.app_context():
+                    return self.run(*args, **kwargs)
+        
+        celery.Task = ContextTask
         
         # 请求日志中间件
         @app.before_request
@@ -75,10 +85,16 @@ def create_app(config_name='default'):
         # 注册蓝图
         with app.app_context():
             # 创建数据库表
-            db.create_all()
+            try:
+                logger.info('正在创建数据库表...')
+                db.create_all()
+                logger.info('数据库表创建成功')
+            except Exception as e:
+                logger.error(f'创建数据库表失败: {str(e)}')
+                raise
             
             # 注册蓝图
-            from .routes import video_bp, qa_bp, chat_bp, subtitle_bp
+            from .routes import video_bp, qa_bp, chat_bp, subtitle_bp, note_bp
             if 'video_bp' not in app.blueprints:
                 app.register_blueprint(video_bp, url_prefix='/api/videos')
             if 'qa_bp' not in app.blueprints:
@@ -87,6 +103,8 @@ def create_app(config_name='default'):
                 app.register_blueprint(chat_bp, url_prefix='/api/chat')
             if 'subtitle_bp' not in app.blueprints:
                 app.register_blueprint(subtitle_bp)
+            if 'note_bp' not in app.blueprints:
+                app.register_blueprint(note_bp)
         
         # 添加根路由
         @app.route('/')

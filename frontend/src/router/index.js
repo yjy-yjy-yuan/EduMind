@@ -3,7 +3,7 @@ import Home from '../views/Home.vue'
 import VideoUpload from '../views/VideoUpload.vue'
 import VideoDetail from '../views/VideoDetail.vue'
 import VideoPlayer from '../views/VideoPlayer.vue'
-import Notes from '../views/Notes.vue'
+import Note from '../views/Note.vue'
 import LearningPath from '../views/LearningPath.vue'
 
 const routes = [
@@ -50,7 +50,7 @@ const routes = [
   {
     path: '/notes',
     name: 'Notes',
-    component: Notes,
+    component: Note,
     meta: {
       title: '笔记系统'
     }
