@@ -242,6 +242,7 @@
               controls
               controlslist="nodownload"
               @timeupdate="onVideoTimeUpdate"
+              @seeked="onVideoSeeked"
               v-if="videoUrl"
             >
               <source :src="videoUrl" type="video/mp4" />
@@ -273,7 +274,7 @@
                 :class="{ 'active': isCurrentSubtitle(subtitle) }"
                 :data-id="subtitle.id || index"
                 :id="`subtitle-${index}`"
-                @click="addSubtitleToNote(subtitle)"
+                @click="handleSubtitleClick(subtitle)"
               >
                 <div class="subtitle-time">{{ formatTimeMMSS(subtitle.start_time || subtitle.start) }}</div>
                 <div class="subtitle-text">{{ subtitle.content || subtitle.text }}</div>
@@ -815,6 +816,12 @@ const onVideoTimeUpdate = () => {
       }
     }
   }
+};
+
+// 视频拖动进度条完成处理
+const onVideoSeeked = () => {
+  // 设置需要滚动到字幕的标志
+  needScrollToSubtitle.value = true;
 };
 
 // 初始化笔记编辑器
@@ -1830,6 +1837,16 @@ const addSubtitleToNote = (subtitle) => {
   } else { // 即使没有当前笔记，也保存到本地存储
     autoSaveToLocalStorage();
   }
+};
+
+// 处理字幕点击事件
+const handleSubtitleClick = (subtitle) => {
+  // 首先跳转到对应的视频时间点
+  const startTime = subtitle.start_time || subtitle.start;
+  seekToTime(startTime);
+  
+  // 然后添加字幕到笔记
+  addSubtitleToNote(subtitle);
 };
 
 // 移除时间戳
