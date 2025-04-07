@@ -17,7 +17,7 @@ note_bp = Blueprint('note', __name__)
 # 创建TF-IDF向量化器
 tfidf_vectorizer = TfidfVectorizer(max_features=100)
 
-@note_bp.route('/api/notes', methods=['GET'])
+@note_bp.route('/notes', methods=['GET'])
 def get_notes():
     """获取所有笔记"""
     # 获取查询参数
@@ -57,7 +57,7 @@ def get_notes():
         'data': [note.to_dict() for note in notes]
     })
 
-@note_bp.route('/api/notes/<int:note_id>', methods=['GET'])
+@note_bp.route('/notes/<int:note_id>', methods=['GET'])
 def get_note(note_id):
     """获取单个笔记"""
     note = Note.query.get_or_404(note_id)
@@ -110,7 +110,7 @@ def generate_content_vector(text):
         current_app.logger.error(f"生成内容向量时出错: {str(e)}")
         return json.dumps([0.0] * 10)  # 返回固定长度的零向量
 
-@note_bp.route('/api/notes', methods=['POST'])
+@note_bp.route('/notes', methods=['POST'])
 def create_note():
     """创建新笔记"""
     data = request.json
@@ -174,7 +174,7 @@ def create_note():
         'data': note.to_dict()
     })
 
-@note_bp.route('/api/notes/<int:note_id>', methods=['PUT'])
+@note_bp.route('/notes/<int:note_id>', methods=['PUT'])
 def update_note(note_id):
     """更新笔记"""
     note = Note.query.get_or_404(note_id)
@@ -229,7 +229,7 @@ def update_note(note_id):
         'data': note.to_dict()
     })
 
-@note_bp.route('/api/notes/<int:note_id>', methods=['DELETE'])
+@note_bp.route('/notes/<int:note_id>', methods=['DELETE'])
 def delete_note(note_id):
     """删除笔记"""
     note = Note.query.get_or_404(note_id)
@@ -242,7 +242,7 @@ def delete_note(note_id):
         'message': '笔记已删除'
     })
 
-@note_bp.route('/api/notes/<int:note_id>/timestamps', methods=['POST'])
+@note_bp.route('/notes/<int:note_id>/timestamps', methods=['POST'])
 def add_timestamp(note_id):
     """添加时间戳"""
     note = Note.query.get_or_404(note_id)
@@ -270,7 +270,7 @@ def add_timestamp(note_id):
         'data': timestamp.to_dict()
     })
 
-@note_bp.route('/api/notes/<int:note_id>/timestamps/<int:timestamp_id>', methods=['DELETE'])
+@note_bp.route('/notes/<int:note_id>/timestamps/<int:timestamp_id>', methods=['DELETE'])
 def delete_timestamp(note_id, timestamp_id):
     """删除时间戳"""
     timestamp = NoteTimestamp.query.filter_by(id=timestamp_id, note_id=note_id).first_or_404()
@@ -283,7 +283,7 @@ def delete_timestamp(note_id, timestamp_id):
         'message': '时间戳已删除'
     })
 
-@note_bp.route('/api/tags', methods=['GET'])
+@note_bp.route('/tags', methods=['GET'])
 def get_tags():
     """获取所有标签"""
     # 查询所有笔记的标签
@@ -307,7 +307,7 @@ def get_tags():
         'data': sorted_tags
     })
 
-@note_bp.route('/api/notes/similar', methods=['POST'])
+@note_bp.route('/notes/similar', methods=['POST'])
 def get_similar_notes():
     """获取相似笔记"""
     data = request.json
@@ -402,7 +402,7 @@ def get_similar_notes():
         'data': [note.to_dict() for note in unique_notes]
     })
 
-@note_bp.route('/api/notes/batch-delete', methods=['POST'])
+@note_bp.route('/notes/batch-delete', methods=['POST'])
 def batch_delete_notes():
     """批量删除笔记"""
     data = request.json
@@ -437,7 +437,7 @@ def batch_delete_notes():
             'message': f'批量删除笔记失败: {str(e)}'
         }), 500
 
-@note_bp.route('/api/notes/batch-export', methods=['POST'])
+@note_bp.route('/notes/batch-export', methods=['POST'])
 def batch_export_notes():
     """批量导出笔记"""
     data = request.json
@@ -496,7 +496,7 @@ def batch_export_notes():
             'message': f'批量导出笔记失败: {str(e)}'
         }), 500
 
-@note_bp.route('/api/notes/<int:note_id>/export', methods=['GET'])
+@note_bp.route('/notes/<int:note_id>/export', methods=['GET'])
 def export_single_note(note_id):
     """导出单个笔记"""
     try:
@@ -541,7 +541,7 @@ def export_single_note(note_id):
             'message': f'导出笔记失败: {str(e)}'
         }), 500
 
-@note_bp.route('/api/tags/sync', methods=['POST'])
+@note_bp.route('/tags/sync', methods=['POST'])
 def sync_tags():
     """同步标签数据，清除不存在于任何笔记中的标签"""
     try:

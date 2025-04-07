@@ -1,5 +1,5 @@
 <template>
-  <div class="video-player-container">
+  <div class="video-player-container" :class="{ 'with-sidebar': sidebarVisible }">
     <!-- 侧边栏开关按钮 -->
     <div class="sidebar-toggle" @click="toggleSidebar">
       <el-icon><arrow-right v-if="!sidebarVisible" /><arrow-left v-else /></el-icon>
@@ -285,7 +285,7 @@
           <template v-else>
             <div class="subtitle-content" v-if="mergedSubtitles.length">
               <div v-for="(section, index) in mergedSubtitles" :key="index" 
-                   class="subtitle-item merged-item">
+                   :class="['subtitle-item', 'merged-item', { 'current': isCurrentMergedSubtitle(section) }]">
                 <div class="subtitle-header">
                   <span class="subtitle-time">{{ formatTimeMMSS(section.start_time) }} - {{ formatTimeMMSS(section.end_time) }}</span>
                   <h4 class="subtitle-title">{{ section.title }}</h4>
@@ -774,6 +774,13 @@ const isCurrentSubtitle = (subtitle) => {
   return currentTime >= subtitle.startTime && currentTime <= subtitle.endTime;
 };
 
+// 检查是否为当前合并字幕
+const isCurrentMergedSubtitle = (section) => {
+  if (!videoPlayer.value) return false;
+  const currentTime = videoPlayer.value.currentTime;
+  return currentTime >= section.start_time && currentTime <= section.end_time;
+};
+
 // 字幕下载
 const downloadSubtitle = async (format, showMessage = false) => {
   try {
@@ -1252,12 +1259,24 @@ const closeGuideDialog = () => {
 <style scoped>
 /*视频播放容器*/
 .video-player-container {
+  --primary-color: #3CAEA3;
+  --primary-light: rgba(60, 174, 163, 0.2);
+  --text-primary: #2C3E50;
+  --text-secondary: #8492A6;
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F8FA;
+  --border-color: #E5E9F2;
+  --transition-default: all 0.3s ease;
+  --indigo-600: #4F46E5;
+  --indigo-400: #818CF8;
+  --indigo-100: #E0E7FF;
+  --primary-gradient: linear-gradient(135deg, #667eea, #764ba2);
   display: flex;
   height: 100vh;
   width: 100%;
   overflow: hidden;
   position: relative;
-  background: linear-gradient(135deg, #1c92d2, #f2fcfe);
+  background: var(--primary-gradient);
   color: #333;
 }
 
@@ -1268,13 +1287,14 @@ const closeGuideDialog = () => {
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
-  margin-left: 0;
+  width: 60%; /* 初始宽度为60%，与右侧栏40%对应 */
   height: 100%;
   overflow: hidden;
 }
 
 .left-section.with-sidebar {
-  margin-left: 25%;
+  width: 50%; /* 侧边栏打开时宽度变为50% */
+  margin-left: 20%; /* 左边距为侧边栏宽度 */
 }
 
 /*上方区域*/
@@ -1305,7 +1325,7 @@ const closeGuideDialog = () => {
   width: 100%;
   height: 100%;
   position: relative;
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  background: var(--primary-gradient);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -1416,6 +1436,7 @@ const closeGuideDialog = () => {
 }
 
 .download-button:hover {
+  background-color: var(--indigo-400);
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
@@ -1425,12 +1446,12 @@ const closeGuideDialog = () => {
   margin-bottom: 15px;
   padding: 10px;
   border-radius: 8px;
-  background: rgba(42, 82, 152, 0.1);
+  background: var(--primary-light);
   transition: all 0.3s ease;
 }
 
 .merged-item:hover {
-  background: rgba(42, 82, 152, 0.2);
+  background: rgba(60, 174, 163, 0.3);
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
@@ -1446,7 +1467,7 @@ const closeGuideDialog = () => {
 
 .subtitle-title {
   font-weight: bold;
-  color: #1e3c72;
+  color: #1a1a1a; /* 接近黑色但不那么刺眼 */
   margin: 0;
   font-size: 1.1em;
 }
@@ -1484,7 +1505,7 @@ const closeGuideDialog = () => {
   align-items: center;
   justify-content: space-between;
   padding: 15px;
-  background: linear-gradient(135deg, #1c92d2, #f2fcfe);
+  background: var(--primary-gradient);
   color: #fff;
 }
 
@@ -1664,12 +1685,17 @@ const closeGuideDialog = () => {
 }
 /*字幕区域*/
 .subtitle-section {
-  width: 40%;
+  width: 40%; /* 初始宽度为40% */
   height: 100%;
   padding: 15px;
   overflow: hidden;
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
-  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.15);
+  background: var(--primary-gradient);
+  transition: all 0.3s ease; /* 添加过渡效果 */
+}
+
+/* 当侧边栏可见时，调整右侧栏的宽度 */
+.video-player-container.with-sidebar .subtitle-section {
+  width: 30%; /* 侧边栏打开时减小宽度 */
 }
 
 .subtitle-display-container {
@@ -1684,7 +1710,7 @@ const closeGuideDialog = () => {
 
 .subtitle-mode-switch {
   padding: 15px;
-  background: linear-gradient(135deg, #1c92d2, #f2fcfe);
+  background: var(--primary-gradient);
   color: #fff;
   text-align: center;
 }
@@ -1699,18 +1725,49 @@ const closeGuideDialog = () => {
   margin-bottom: 15px;
   padding: 10px;
   border-radius: 8px;
+  background: var(--primary-light); /* 添加与merged-item相同的背景色 */
   transition: all 0.3s ease;
   cursor: pointer;
 }
 
 .subtitle-item:hover {
-  background-color: #f5f7fa;
+  background: rgba(60, 174, 163, 0.3); /* 与merged-item的hover状态相同 */
   transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 添加阴影效果 */
 }
 
-.subtitle-item.current {
-  background-color: #ecf5ff;
-  border-left: 3px solid #409EFF;
+.subtitle-item.current, 
+.merged-item.current {
+  background-color: rgba(60, 174, 163, 0.6); /* 增加背景色透明度，使颜色更深 */
+  border-left: 4px solid var(--primary-color); /* 增加边框宽度 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); /* 增强阴影效果 */
+  transform: translateY(-3px); /* 添加轻微上浮效果 */
+  position: relative; /* 为伪元素定位做准备 */
+}
+
+/* 添加左侧标记，增强视觉效果 */
+.subtitle-item.current::before, 
+.merged-item.current::before {
+  content: "";
+  position: absolute;
+  left: -4px; /* 与边框宽度相同 */
+  top: 0;
+  height: 100%;
+  width: 4px;
+  background: linear-gradient(to bottom, #ee07da, #e30997); /* 渐变色边框 */
+  border-radius: 2px;
+}
+
+/* 可以考虑添加右侧指示器 */
+.subtitle-item.current::after,
+.merged-item.current::after {
+  content: "▶";
+  position: absolute;
+  right: 10px;
+  top: 60%;
+  transform: translateY(-50%);
+  color: red;
+  font-size: 20px;
 }
 
 .subtitle-time {
@@ -1775,18 +1832,20 @@ const closeGuideDialog = () => {
 .sidebar {
   position: fixed;
   top: 0;
-  left: -25%;
-  width: 25%;
+  left: -25%; /* 初始位置在屏幕外 */
+  width: 20%;
   height: 100%;
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  background: linear-gradient(135deg, #667eea, #764ba2);
   transition: all 0.3s ease;
-  z-index: 1000;
+  z-index: 1000; /* 确保侧边栏在内容之上 */
   box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
   overflow-y: auto;
   color: #fff;
 }
 
 .sidebar-visible {
+  background-color: #667eea; /* 使用与渐变色起始颜色相同的颜色 */
+  color: white;
   left: 0;
 }
 
@@ -1830,15 +1889,17 @@ const closeGuideDialog = () => {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
-  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  background-color: rgba(0, 0, 0, 0.2); /* 使用深色背景，而不是白色透明背景 */
 }
 
 .menu-item:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(0, 0, 0, 0.3); /* 悬停时使用更深的颜色 */
   transform: translateY(-2px);
 }
 
 .menu-item .el-icon {
+  color: #fff;
   margin-right: 10px;
 }
 
@@ -1866,7 +1927,7 @@ const closeGuideDialog = () => {
   align-items: center;
   padding: 12px;
   border-radius: 8px;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(0, 0, 0, 0.2); /* 使用深色背景，而不是白色透明背景 */
   cursor: pointer;
   transition: all 0.3s ease;
   width: 100%;
@@ -1874,7 +1935,7 @@ const closeGuideDialog = () => {
 }
 
 .video-item:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(0, 0, 0, 0.3); /* 悬停时使用更深的颜色 */
   transform: translateY(-2px);
 }
 
@@ -1903,12 +1964,12 @@ const closeGuideDialog = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%; /* 确保标题不会超出父容器 */
-  color: rgba(255, 255, 255, 0.9); /* 增加对比度 */
+  color: #fff; /* 增加对比度 */
 }
 
 .video-duration {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  color: #fff;
   background: rgba(0, 0, 0, 0.2); /* 添加背景色使时长更加醒目 */
   padding: 2px 6px;
   border-radius: 10px;
@@ -1934,12 +1995,14 @@ const closeGuideDialog = () => {
 /*侧边栏开关按钮*/
 .sidebar-toggle {
   position: fixed;
-  top: 20px;
+  top: 50%;
   left: 20px;
+  transform: translateY(-50%); /* 确保完全居中 */
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #1c92d2, #f2fcfe);
+  background-color: var(--primary-color); /* 使用实色而不是渐变色，确保可见 */
+  color: white; /* 确保图标是白色 */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1950,7 +2013,7 @@ const closeGuideDialog = () => {
 }
 
 .sidebar-toggle:hover {
-  transform: scale(1.1);
+  transform: translateY(-50%) scale(1.1); /* 保持垂直居中的同时添加缩放效果 */
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
@@ -1962,6 +2025,13 @@ const closeGuideDialog = () => {
 
 .video-player-container {
   animation: fadeIn 0.5s ease;
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  background: var(--primary-gradient);
+  color: #333;
 }
 
 /* 添加粒子背景效果 */
@@ -1984,7 +2054,7 @@ const closeGuideDialog = () => {
   width: 100%;
   height: 50px; /* 增加高度 */
   position: relative;
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  background: var(--primary-gradient);
   margin-top: auto;
   overflow: hidden;
   display: flex;

@@ -122,4 +122,5 @@ python run.py
 # 3. 启动前端开发服务器(在Powershell中)  
 cd ....../AI-EdVision/frontend  #切换为自己的frontend文件路径
 npm run dev
+npm run dev -- --host # 可以让同一局域网下都可以访问，生成的192.168.xx.xx可以作为服务外网访问
 ```
