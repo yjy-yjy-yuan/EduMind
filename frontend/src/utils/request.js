@@ -1,14 +1,15 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { API_BASE_URL } from '../config'
 
-// 获取环境变量中的API基础URL，如果没有则使用默认值
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+// 使用从配置文件导入的API基础URL
+const baseURL = API_BASE_URL // 使用相对路径，让代理正常工作
 
 // 创建axios实例
 const service = axios.create({
   baseURL,
   timeout: 600000, // 增加超时时间到5分钟，确保长视频字幕处理能够完成
-  withCredentials: true
+  withCredentials: false // 修改为false，避免发送cookies导致CORS预检请求
 })
 
 // 请求拦截器

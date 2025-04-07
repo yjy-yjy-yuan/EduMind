@@ -65,10 +65,14 @@ export async function getSubtitle(videoId, format = 'srt', isDownload = false) {
 }
 
 // 获取视频列表
-export function getVideoList() {
+export function getVideoList(page = 1, pageSize = 5) {
   return request({
     url: '/api/videos/list',
-    method: 'get'
+    method: 'get',
+    params: {
+      page,
+      per_page: pageSize
+    }
   })
 }
 

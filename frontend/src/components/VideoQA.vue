@@ -1,4 +1,4 @@
-&lt;template>
+<template>
   <div class="video-qa">
     <el-card class="qa-card">
       <template #header>
@@ -56,9 +56,9 @@
       </div>
     </el-card>
   </div>
-&lt;/template>
+</template>
 
-&lt;script setup>
+<script setup>
 import { ref, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { askQuestion, getQAHistory } from '@/api/qa'
@@ -150,9 +150,9 @@ onMounted(() => {
     loadQAHistory()
   }
 })
-&lt;/script>
+</script>
 
-&lt;style scoped>
+<style scoped>
 .video-qa {
   margin-top: 20px;
 }
@@ -197,4 +197,4 @@ onMounted(() => {
   align-items: center;
   margin-top: 10px;
 }
-&lt;/style>
+</style>

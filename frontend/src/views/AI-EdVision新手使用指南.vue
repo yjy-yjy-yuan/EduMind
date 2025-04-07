@@ -1,318 +1,1340 @@
-<!-- The exported code uses Tailwind CSS. Install Tailwind CSS in your dev environment to ensure all styles work. -->
-
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <div class="container mx-auto px-4 py-8 max-w-7xl">
-      <header class="mb-10">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center">
-            <div class="text-3xl font-bold text-blue-600">AI-EdVision</div>
-            <div class="ml-4 text-gray-500">智能教育视频分析系统</div>
-          </div>
-          <div class="flex items-center space-x-4">
-            <button class="text-gray-600 hover:text-blue-600 cursor-pointer">
-              <i class="fas fa-question-circle text-xl"></i>
-            </button>
-            <button class="text-gray-600 hover:text-blue-600 cursor-pointer">
-              <i class="fas fa-user-circle text-xl"></i>
-            </button>
+  <div class="user-guide">
+    <!-- 英雄区域 -->
+    <section class="hero-section">
+      <div class="hero-overlay"></div>
+      <div class="hero-container">
+        <div class="hero-content-wrapper">
+          <div class="hero-text full-width">
+            <h1 class="main-title">AI-EdVision<br><span class="highlight">新手使用指南</span></h1>
+            <p class="subtitle">通过本指南快速掌握 AI-EdVision 的核心功能，让您的学习体验更高效、更智能、更个性化</p>
+            <el-button type="primary" size="large" class="hero-button" @click="navigateToUpload">
+              开始上传视频
+            </el-button>
           </div>
         </div>
-      </header>
+      </div>
+    </section>
 
-      <main class="relative">
-        <!-- 主内容区 -->
-        <div class="flex">
-          <!-- 左侧内容区 (70%) -->
-          <div class="w-[70%] pr-6">
-            <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-10 text-white mb-10">
-              <h1 class="text-4xl font-bold mb-4">智能教育视频分析系统</h1>
-              <p class="text-xl mb-8">利用AI技术，让每一个教育视频都成为个性化学习资源</p>
-              <button class="bg-white text-blue-600 px-8 py-3 rounded-button font-semibold hover:bg-blue-50 transition duration-300 cursor-pointer whitespace-nowrap">
-                开始上传
-              </button>
-            </div>
-
-            <div class="grid grid-cols-3 gap-6 mb-10">
-              <div class="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition duration-300">
-                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                  <i class="fas fa-cloud-upload-alt text-blue-600 text-2xl"></i>
-                </div>
-                <h3 class="text-xl font-semibold mb-2">视频上传与处理</h3>
-                <p class="text-gray-600">支持本地视频上传和视频链接导入，AI自动生成字幕和知识点</p>
-              </div>
-              <div class="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition duration-300">
-                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                  <i class="fas fa-robot text-blue-600 text-2xl"></i>
-                </div>
-                <h3 class="text-xl font-semibold mb-2">智能问答系统</h3>
-                <p class="text-gray-600">基于RAG技术的智能问答，支持在线/离线模式随时切换</p>
-              </div>
-              <div class="bg-white p-6 rounded-xl shadow-sm hover:shadow-md transition duration-300">
-                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                  <i class="fas fa-sticky-note text-blue-600 text-2xl"></i>
-                </div>
-                <h3 class="text-xl font-semibold mb-2">智能笔记管理</h3>
-                <p class="text-gray-600">记录笔记、导出笔记，系统自动推荐相似知识点</p>
+    <!-- 使用流程 -->
+    <section class="workflow-section">
+      <div class="section-header">
+        <h2 class="section-title">使用流程</h2>
+        <p class="section-subtitle">按照以下步骤，轻松开始使用 AI-EdVision</p>
+      </div>
+      <div class="workflow-container">
+        <div class="workflow-diagram">
+          <img src="../assets/workflow.svg" alt="AI-EdVision使用流程图" class="workflow-image" />
+          <div class="workflow-description">
+            <div class="workflow-step-card">
+              <div class="step-number">1</div>
+              <div class="step-content">
+                <h3 class="step-title">登录/注册</h3>
+                <p class="step-desc">创建账号或登录系统，开始您的学习之旅</p>
               </div>
             </div>
-
-            <div class="bg-white p-8 rounded-xl shadow-sm mb-10">
-              <h2 class="text-2xl font-semibold mb-6">系统功能概览</h2>
-              <div class="space-y-6">
-                <div class="flex items-start">
-                  <img class="w-32 h-24 rounded-lg object-cover object-top mr-6" :src="featureImage1" alt="视频上传功能" />
-                  <div>
-                    <h3 class="text-xl font-semibold mb-2">视频上传和处理</h3>
-                    <p class="text-gray-600">支持本地视频上传和哔哩哔哩/YouTube视频链接上传学习视频，使用Whisper语音转录模型进行视频的转录，实时生成字幕。</p>
+            
+            <div class="workflow-step-card">
+              <div class="step-number">2</div>
+              <div class="step-content">
+                <h3 class="step-title">上传视频并分析</h3>
+                <p class="step-desc">上传教学视频，系统自动分析内容</p>
+              </div>
+            </div>
+            
+            <div class="workflow-step-card">
+              <div class="step-number">3</div>
+              <div class="step-content">
+                <h3 class="step-title">视频学习功能</h3>
+                <p class="step-desc">系统提供多种学习辅助功能</p>
+                
+                <div class="substeps-container">
+                  <div class="substep-item">
+                    <div class="substep-dot"></div>
+                    <div class="substep-content">
+                      <h4 class="substep-title">视频播放</h4>
+                      <p class="substep-desc">观看处理完成的视频</p>
+                    </div>
+                  </div>
+                  
+                  <div class="substep-item">
+                    <div class="substep-dot"></div>
+                    <div class="substep-content">
+                      <h4 class="substep-title">智能问答与字幕查看</h4>
+                      <p class="substep-desc">使用AI助手解答疑问</p>
+                    </div>
+                  </div>
+                  
+                  <div class="substep-item">
+                    <div class="substep-dot"></div>
+                    <div class="substep-content">
+                      <h4 class="substep-title">笔记系统辅助学习</h4>
+                      <p class="substep-desc">创建和管理学习笔记</p>
+                    </div>
+                  </div>
+                  
+                  <div class="substep-item">
+                    <div class="substep-dot"></div>
+                    <div class="substep-content">
+                      <h4 class="substep-title">知识点总览与扩展</h4>
+                      <p class="substep-desc">查看知识点并拓展学习</p>
+                    </div>
                   </div>
                 </div>
-                <div class="flex items-start">
-                  <img class="w-32 h-24 rounded-lg object-cover object-top mr-6" :src="featureImage2" alt="视频播放功能" />
-                  <div>
-                    <h3 class="text-xl font-semibold mb-2">智能视频播放</h3>
-                    <p class="text-gray-600">视频基础播放功能、智能问答系统、两种字幕显示格式（标准分段字幕和语义合并显示字幕），侧边栏可快速切换到其他功能页面。</p>
-                  </div>
-                </div>
-                <div class="flex items-start">
-                  <img class="w-32 h-24 rounded-lg object-cover object-top mr-6" :src="featureImage3" alt="笔记功能" />
-                  <div>
-                    <h3 class="text-xl font-semibold mb-2">笔记管理系统</h3>
-                    <p class="text-gray-600">记录笔记和管理笔记，防止知识遗忘，可以播放视频、显示语义合并字幕、导出笔记、批量管理笔记，系统会基于已记录的笔记进行相似性推荐。</p>
-                  </div>
-                </div>
-                <div class="flex items-start">
-                  <img class="w-32 h-24 rounded-lg object-cover object-top mr-6" :src="featureImage4" alt="知识图谱功能" />
-                  <div>
-                    <h3 class="text-xl font-semibold mb-2">知识点总览与扩展</h3>
-                    <p class="text-gray-600">基于知识图谱的知识点总览与扩展，可以查看当前视频的全部知识点以及推荐的相似知识点，帮助用户构建完整知识体系。</p>
-                  </div>
-                </div>
               </div>
-            </div>
-          </div>
-
-          <!-- 右侧引导面板 (30%) -->
-          <div class="w-[30%] bg-white rounded-xl shadow-md p-6 h-fit sticky top-4">
-            <div class="flex justify-between items-center mb-6">
-              <h2 class="text-2xl font-bold text-blue-600">欢迎使用 AI-EdVision</h2>
-              <button class="text-gray-400 hover:text-gray-600 cursor-pointer">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-            
-            <p class="text-gray-600 mb-6">让我们快速了解系统的核心功能</p>
-            
-            <div class="flex mb-6">
-              <div v-for="(step, index) in 4" :key="index" 
-                   :class="`h-2 rounded-full flex-1 mx-1 ${currentStep >= step ? 'bg-blue-600' : 'bg-gray-200'}`">
-              </div>
-            </div>
-            
-            <div class="overflow-y-auto max-h-[500px] mb-6 pr-2 custom-scrollbar">
-              <div v-if="currentStep === 1" class="guide-step">
-                <div class="bg-blue-50 rounded-lg p-4 mb-4">
-                  <div class="text-blue-600 font-semibold mb-2">步骤 1</div>
-                  <h3 class="text-xl font-bold mb-3">开始上传您的学习视频</h3>
-                </div>
-                <img :src="guideImage1" alt="视频上传指南" class="w-full h-48 object-cover object-top rounded-lg mb-4" />
-                <p class="text-gray-700 mb-4">AI-EdVision 支持两种视频上传方式：</p>
-                <ul class="list-disc pl-5 mb-4 text-gray-600 space-y-2">
-                  <li>本地视频文件上传（支持 MP4、AVI、MOV 等格式）</li>
-                  <li>哔哩哔哩/YouTube 视频链接导入</li>
-                </ul>
-                <p class="text-gray-700 mb-2">操作提示：</p>
-                <p class="text-gray-600 mb-4">点击首页的"开始上传"按钮，或直接将视频文件拖拽到上传区域。</p>
-              </div>
-              
-              <div v-if="currentStep === 2" class="guide-step">
-                <div class="bg-blue-50 rounded-lg p-4 mb-4">
-                  <div class="text-blue-600 font-semibold mb-2">步骤 2</div>
-                  <h3 class="text-xl font-bold mb-3">AI 智能处理</h3>
-                </div>
-                <img :src="guideImage2" alt="视频处理指南" class="w-full h-48 object-cover object-top rounded-lg mb-4" />
-                <p class="text-gray-700 mb-4">上传视频后，AI-EdVision 将自动进行：</p>
-                <ul class="list-disc pl-5 mb-4 text-gray-600 space-y-2">
-                  <li>使用 Whisper 语音转录模型生成精准字幕</li>
-                  <li>分析视频内容，提取关键知识点</li>
-                  <li>构建知识图谱，为智能问答做准备</li>
-                </ul>
-                <p class="text-gray-700 mb-2">操作提示：</p>
-                <p class="text-gray-600 mb-4">等待处理完成后，系统会自动跳转到视频播放页面。处理时间取决于视频长度。</p>
-              </div>
-              
-              <div v-if="currentStep === 3" class="guide-step">
-                <div class="bg-blue-50 rounded-lg p-4 mb-4">
-                  <div class="text-blue-600 font-semibold mb-2">步骤 3</div>
-                  <h3 class="text-xl font-bold mb-3">观看与互动</h3>
-                </div>
-                <img :src="guideImage3" alt="视频播放指南" class="w-full h-48 object-cover object-top rounded-lg mb-4" />
-                <p class="text-gray-700 mb-4">视频播放页面提供多种智能功能：</p>
-                <ul class="list-disc pl-5 mb-4 text-gray-600 space-y-2">
-                  <li>基于 RAG 系统的智能问答，支持深度思考模式</li>
-                  <li>在线/离线模式任意切换，离线也可进行问答学习</li>
-                  <li>两种字幕显示格式：标准分段字幕和语义合并显示字幕</li>
-                </ul>
-                <p class="text-gray-700 mb-2">操作提示：</p>
-                <p class="text-gray-600 mb-4">点击问答按钮开始对话，使用侧边栏切换至其他功能页面。</p>
-              </div>
-              
-              <div v-if="currentStep === 4" class="guide-step">
-                <div class="bg-blue-50 rounded-lg p-4 mb-4">
-                  <div class="text-blue-600 font-semibold mb-2">步骤 4</div>
-                  <h3 class="text-xl font-bold mb-3">知识管理</h3>
-                </div>
-                <img :src="guideImage4" alt="笔记管理指南" class="w-full h-48 object-cover object-top rounded-lg mb-4" />
-                <p class="text-gray-700 mb-4">AI-EdVision 提供强大的知识管理功能：</p>
-                <ul class="list-disc pl-5 mb-4 text-gray-600 space-y-2">
-                  <li>记录笔记，系统自动关联视频内容</li>
-                  <li>基于已记录笔记进行相似性推荐，更好地串联知识点</li>
-                  <li>知识点总览与扩展，构建完整知识体系</li>
-                  <li>笔记导出功能，支持多种格式</li>
-                </ul>
-                <p class="text-gray-700 mb-2">操作提示：</p>
-                <p class="text-gray-600 mb-4">通过视频播放页面的侧边栏进入笔记页面和知识点总览页面。</p>
-              </div>
-            </div>
-            
-            <div class="flex justify-between items-center">
-              <button 
-                @click="prevStep" 
-                :class="`px-4 py-2 rounded-button ${currentStep > 1 ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'} whitespace-nowrap cursor-pointer`"
-                :disabled="currentStep <= 1">
-                <i class="fas fa-arrow-left mr-2"></i>上一步
-              </button>
-              
-              <div class="text-gray-500">{{ currentStep }}/4</div>
-              
-              <button 
-                @click="nextStep" 
-                :class="`px-4 py-2 rounded-button ${currentStep < 4 ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'} whitespace-nowrap cursor-pointer`"
-                :disabled="currentStep >= 4">
-                下一步<i class="fas fa-arrow-right ml-2"></i>
-              </button>
-            </div>
-            
-            <div class="text-center mt-4">
-              <button class="text-gray-500 hover:text-blue-600 text-sm cursor-pointer whitespace-nowrap">跳过教程</button>
             </div>
           </div>
         </div>
-      </main>
+      </div>
+    </section>
 
-      <footer class="mt-16 border-t border-gray-200 pt-8 pb-12">
-        <div class="grid grid-cols-4 gap-8">
-          <div>
-            <h3 class="text-lg font-semibold mb-4">AI-EdVision</h3>
-            <p class="text-gray-500">智能教育视频分析系统，让每一个教育视频都成为个性化学习资源。</p>
+    <!-- 详细教程 -->
+    <section class="tutorials-section">
+      <div class="section-header">
+        <h2 class="section-title">详细教程</h2>
+        <p class="section-subtitle">跟随以下步骤，轻松掌握 AI-EdVision 的全部功能</p>
+      </div>
+
+      <div class="tutorials-container">
+        <!-- 1. 登录/注册教程 -->
+        <div class="tutorial-card">
+          <div class="tutorial-header">
+            <div class="tutorial-icon-wrapper">
+              <i class="el-icon-user"></i>
+            </div>
+            <div class="tutorial-title-container">
+              <div class="tutorial-order">01</div>
+              <h3 class="tutorial-title">登录/注册</h3>
+            </div>
           </div>
-          <div>
-            <h3 class="text-lg font-semibold mb-4">功能</h3>
-            <ul class="space-y-2 text-gray-500">
-              <li class="cursor-pointer hover:text-blue-600">视频上传与处理</li>
-              <li class="cursor-pointer hover:text-blue-600">智能视频播放</li>
-              <li class="cursor-pointer hover:text-blue-600">笔记管理系统</li>
-              <li class="cursor-pointer hover:text-blue-600">知识点总览与扩展</li>
+          <div class="tutorial-content full-width">
+            <div class="tutorial-steps">
+              <div class="step">
+                <span class="step-number">1</span>
+                <p>访问 AI-EdVision 首页，点击右上角的<strong>「登录/注册」</strong>按钮</p>
+              </div>
+              <div class="step">
+                <span class="step-number">2</span>
+                <p>新用户选择<strong>「注册」</strong>，填写用户名、邮箱和密码</p>
+              </div>
+              <div class="step">
+                <span class="step-number">3</span>
+                <p>老用户直接<strong>「登录」</strong>，输入用户名和密码</p>
+              </div>
+              <div class="step">
+                <span class="step-number">4</span>
+                <p>登录后即可使用所有功能，包括视频上传、分析和笔记管理</p>
+              </div>
+              <div class="tip">
+                <i class="el-icon-info-filled tip-icon"></i>
+                <p>首次注册用户将获得更多免费分析时长</p>
+              </div>
+            </div>
+            <div class="tutorial-action">
+              <el-button type="primary" @click="navigateToLogin">前往登录/注册</el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 视频上传教程 -->
+        <div class="tutorial-card">
+          <div class="tutorial-header">
+            <div class="tutorial-icon-wrapper">
+              <i class="el-icon-upload"></i>
+            </div>
+            <div class="tutorial-title-container">
+              <div class="tutorial-order">02</div>
+              <h3 class="tutorial-title">视频上传与分析</h3>
+            </div>
+          </div>
+          <div class="tutorial-content full-width">
+            <div class="tutorial-steps">
+              <div class="step">
+                <span class="step-number">1</span>
+                <p>点击导航栏中的<strong>「视频上传」</strong>进入上传页面</p>
+              </div>
+              <div class="step">
+                <span class="step-number">2</span>
+                <p>选择<strong>本地上传</strong>或<strong>链接导入</strong>方式</p>
+              </div>
+              <div class="step">
+                <span class="step-number">3</span>
+                <p>上传完成后，系统自动开始分析视频内容</p>
+              </div>
+              <div class="step">
+                <span class="step-number">4</span>
+                <p>分析完成后，视频状态变为<strong>「已完成」</strong>，即可观看</p>
+              </div>
+              <div class="tip">
+                <i class="el-icon-info-filled tip-icon"></i>
+                <p>支持的格式：MP4、AVI、MOV等主流视频格式，最大支持1GB</p>
+              </div>
+            </div>
+            <div class="tutorial-action">
+              <el-button type="primary" @click="navigateToUpload">前往视频上传</el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 视频播放教程 -->
+        <div class="tutorial-card">
+          <div class="tutorial-header">
+            <div class="tutorial-icon-wrapper">
+              <i class="el-icon-video-play"></i>
+            </div>
+            <div class="tutorial-title-container">
+              <div class="tutorial-order">03</div>
+              <h3 class="tutorial-title">视频播放</h3>
+            </div>
+          </div>
+          <div class="tutorial-content full-width">
+            <div class="tutorial-steps">
+              <div class="step">
+                <span class="step-number">1</span>
+                <p>在<strong>「已上传视频」</strong>列表中点击视频缩略图进入播放页面</p>
+              </div>
+              <div class="step">
+                <span class="step-number">2</span>
+                <p>使用播放器控制栏调整播放进度、音量和播放速度</p>
+              </div>
+              <div class="step">
+                <span class="step-number">3</span>
+                <p>点击<strong>全屏按钮</strong>可进入全屏模式观看</p>
+              </div>
+              <div class="step">
+                <span class="step-number">4</span>
+                <p>视频播放时自动显示智能生成的字幕</p>
+              </div>
+              <div class="tip">
+                <i class="el-icon-info-filled tip-icon"></i>
+                <p>支持快捷键控制：空格（播放/暂停）、方向键（快进/快退）</p>
+              </div>
+            </div>
+            <div class="tutorial-action">
+              <el-button type="primary" @click="navigateToVideos">浏览视频列表</el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 智能问答教程 -->
+        <div class="tutorial-card">
+          <div class="tutorial-header">
+            <div class="tutorial-icon-wrapper">
+              <i class="el-icon-chat-dot-round"></i>
+            </div>
+            <div class="tutorial-title-container">
+              <div class="tutorial-order">04</div>
+              <h3 class="tutorial-title">智能问答与字幕查看</h3>
+            </div>
+          </div>
+          <div class="tutorial-content full-width">
+            <div class="tutorial-steps">
+              <div class="step">
+                <span class="step-number">1</span>
+                <p>在视频播放页面，点击右侧面板的<strong>「字幕」</strong>标签查看完整字幕</p>
+              </div>
+              <div class="step">
+                <span class="step-number">2</span>
+                <p>点击任意字幕行可跳转至视频对应时间点</p>
+              </div>
+              <div class="step">
+                <span class="step-number">3</span>
+                <p>点击右下角的<strong>「智能问答」</strong>按钮打开问答面板</p>
+              </div>
+              <div class="step">
+                <span class="step-number">4</span>
+                <p>输入问题并发送，AI将基于视频内容给出回答</p>
+              </div>
+              <div class="tip">
+                <i class="el-icon-info-filled tip-icon"></i>
+                <p>提问越具体，回答质量越高。可以连续提问深入探讨</p>
+              </div>
+            </div>
+            <div class="tutorial-action">
+              <el-button type="primary" @click="navigateToVideos">体验智能问答</el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. 笔记管理教程 -->
+        <div class="tutorial-card">
+          <div class="tutorial-header">
+            <div class="tutorial-icon-wrapper">
+              <i class="el-icon-notebook-1"></i>
+            </div>
+            <div class="tutorial-title-container">
+              <div class="tutorial-order">05</div>
+              <h3 class="tutorial-title">笔记系统辅助学习</h3>
+            </div>
+          </div>
+          <div class="tutorial-content full-width">
+            <div class="tutorial-steps">
+              <div class="step">
+                <span class="step-number">1</span>
+                <p>在视频播放页面，点击右侧面板中的<strong>「添加笔记」</strong>按钮</p>
+              </div>
+              <div class="step">
+                <span class="step-number">2</span>
+                <p>输入笔记内容，系统会自动关联当前视频时间点</p>
+              </div>
+              <div class="step">
+                <span class="step-number">3</span>
+                <p>点击导航栏中的<strong>「笔记管理」</strong>查看所有笔记</p>
+              </div>
+              <div class="step">
+                <span class="step-number">4</span>
+                <p>在笔记管理页面可进行编辑、删除、导出等操作</p>
+              </div>
+              <div class="tip">
+                <i class="el-icon-info-filled tip-icon"></i>
+                <p>系统会智能推荐相似笔记，帮助您建立知识连接</p>
+              </div>
+            </div>
+            <div class="tutorial-action">
+              <el-button type="primary" @click="navigateToNotes">前往笔记管理</el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. 知识点总览教程 -->
+        <div class="tutorial-card">
+          <div class="tutorial-header">
+            <div class="tutorial-icon-wrapper">
+              <i class="el-icon-data-line"></i>
+            </div>
+            <div class="tutorial-title-container">
+              <div class="tutorial-order">06</div>
+              <h3 class="tutorial-title">知识点总览与扩展</h3>
+            </div>
+          </div>
+          <div class="tutorial-content full-width">
+            <div class="tutorial-steps">
+              <div class="step">
+                <span class="step-number">1</span>
+                <p>在视频播放页面，点击右侧面板中的<strong>「知识点」</strong>标签</p>
+              </div>
+              <div class="step">
+                <span class="step-number">2</span>
+                <p>浏览系统自动提取的视频关键知识点</p>
+              </div>
+              <div class="step">
+                <span class="step-number">3</span>
+                <p>点击任意知识点可跳转至相关视频片段</p>
+              </div>
+              <div class="step">
+                <span class="step-number">4</span>
+                <p>使用<strong>「知识图谱」</strong>功能查看知识点之间的关联</p>
+              </div>
+              <div class="tip">
+                <i class="el-icon-info-filled tip-icon"></i>
+                <p>知识点支持导出，方便复习和分享</p>
+              </div>
+            </div>
+            <div class="tutorial-action">
+              <el-button type="primary" @click="navigateToVideos">探索知识点</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 常见问题 -->
+    <section class="faq-section">
+      <div class="section-header">
+        <h2 class="section-title">常见问题</h2>
+        <p class="section-subtitle">解答您在使用过程中可能遇到的问题</p>
+      </div>
+      <div class="faq-container">
+        <div class="faq-item">
+          <div class="faq-question">
+            <i class="fas fa-question-circle question-icon"></i>
+            <h3>如何上传视频？</h3>
+          </div>
+          <div class="faq-answer">
+            <p>点击导航栏中的"视频上传"，或在个人中心页面点击"上传视频"按钮，选择本地视频文件或输入视频链接即可开始上传。</p>
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">
+            <i class="fas fa-question-circle question-icon"></i>
+            <h3>视频处理需要多长时间？</h3>
+          </div>
+          <div class="faq-answer">
+            <p>视频处理时间取决于视频长度和服务器负载。一般情况下，10分钟的视频大约需要2-5分钟完成处理。您可以在"已上传视频"页面查看处理进度。</p>
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">
+            <i class="fas fa-question-circle question-icon"></i>
+            <h3>如何使用AI问答功能？</h3>
+          </div>
+          <div class="faq-answer">
+            <p>在视频播放页面右侧，您可以看到AI问答区域。直接输入您的问题，AI将基于视频内容为您提供答案。您还可以切换深度思考模式，获取更详细的解答。</p>
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">
+            <i class="fas fa-question-circle question-icon"></i>
+            <h3>如何导出笔记？</h3>
+          </div>
+          <div class="faq-answer">
+            <p>在笔记页面，选择您想要导出的笔记，点击"导出"按钮，选择导出格式（PDF、Word或Markdown），系统将自动生成文件并下载到您的设备上。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA 区域 -->
+    <section class="cta-section">
+      <div class="cta-card">
+        <h2 class="cta-title">准备好开始智能学习之旅了吗？</h2>
+        <p class="cta-description">立即体验 AI-EdVision，让 AI 技术为您的学习提供全方位支持</p>
+        <el-button type="primary" size="large" class="cta-button" @click="navigateToUpload">
+          免费开始使用
+        </el-button>
+      </div>
+    </section>
+    
+    <!-- 页脚 -->
+    <footer class="footer-section">
+      <div class="container">
+        <div class="footer-grid">
+          <div class="footer-info">
+            <div class="footer-logo">
+              <i class="fas fa-brain"></i>
+              <h3>AI-EdVision</h3>
+            </div>
+            <p class="footer-description">
+              智能教育视频分析系统，让学习更高效、更智能、更个性化
+            </p>
+          </div>
+          
+          <div class="footer-links">
+            <h4 class="footer-title">功能</h4>
+            <ul>
+              <li><a href="#">视频上传</a></li>
+              <li><a href="#">智能字幕</a></li>
+              <li><a href="#">智能问答</a></li>
+              <li><a href="#">笔记管理</a></li>
             </ul>
           </div>
-          <div>
-            <h3 class="text-lg font-semibold mb-4">资源</h3>
-            <ul class="space-y-2 text-gray-500">
-              <li class="cursor-pointer hover:text-blue-600">使用指南</li>
-              <li class="cursor-pointer hover:text-blue-600">常见问题</li>
-              <li class="cursor-pointer hover:text-blue-600">API 文档</li>
-              <li class="cursor-pointer hover:text-blue-600">开发者社区</li>
+          
+          <div class="footer-links">
+            <h4 class="footer-title">资源</h4>
+            <ul>
+              <li><a href="#">使用指南</a></li>
+              <li><a href="#">API 文档</a></li>
+              <li><a href="#">常见问题</a></li>
+              <li><a href="#">博客</a></li>
             </ul>
           </div>
-          <div>
-            <h3 class="text-lg font-semibold mb-4">联系我们</h3>
-            <ul class="space-y-2 text-gray-500">
-              <li><i class="fas fa-envelope mr-2"></i>support@ai-edvision.com</li>
-              <li><i class="fas fa-phone mr-2"></i>400-123-4567</li>
-              <li class="flex mt-4 space-x-4">
-                <i class="fab fa-weixin text-xl cursor-pointer hover:text-blue-600"></i>
-                <i class="fab fa-weibo text-xl cursor-pointer hover:text-blue-600"></i>
-                <i class="fab fa-github text-xl cursor-pointer hover:text-blue-600"></i>
-              </li>
+          
+          <div class="footer-contact">
+            <h4 class="footer-title">联系我们</h4>
+            <ul>
+              <li><i class="fas fa-envelope"></i> contact@ai-edvision.com</li>
+              <li><i class="fas fa-phone"></i> +86 123 4567 8910</li>
+              <li><i class="fas fa-map-marker-alt"></i> 郑州市经济技术开发区</li>
             </ul>
+            <div class="footer-social">
+              <a href="#"><i class="fab fa-weixin"></i></a>
+              <a href="#"><i class="fab fa-weibo"></i></a>
+              <a href="#"><i class="fab fa-github"></i></a>
+              <a href="#"><i class="fab fa-linkedin"></i></a>
+            </div>
           </div>
         </div>
-        <div class="mt-8 pt-8 border-t border-gray-200 text-center text-gray-500">
-          <p>© 2025 AI-EdVision. 保留所有权利。</p>
-          <div class="flex justify-center mt-4 space-x-6">
-            <i class="fab fa-cc-visa text-xl"></i>
-            <i class="fab fa-cc-mastercard text-xl"></i>
-            <i class="fab fa-alipay text-xl"></i>
-            <i class="fab fa-cc-paypal text-xl"></i>
-          </div>
+        
+        <div class="footer-bottom">
+          <p>&copy; 2025 AI-EdVision. 保留所有权利。</p>
         </div>
-      </footer>
+      </div>
+    </footer>
+    
+    <!-- Toast 通知组件 -->
+    <div class="toast-notification" :class="{ show: showToast }">
+      {{ toastMessage }}
     </div>
   </div>
 </template>
 
-<script lang="ts" setup>
-import { ref } from "vue";
+<script>
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import authStore from '../store/auth'
 
-const currentStep = ref(1);
-
-const nextStep = () => {
-  if (currentStep.value < 4) {
-    currentStep.value++;
+export default {
+  name: 'AIEdVisionUserGuide',
+  setup() {
+    const router = useRouter()
+    const isLoading = ref(false)
+    const showToast = ref(false)
+    const toastMessage = ref('')
+    
+    // 获取用户认证状态
+    const authState = computed(() => authStore.getState())
+    
+    // 导航到上传页面
+    const navigateToUpload = () => {
+      isLoading.value = true
+      showToast.value = true
+      toastMessage.value = '正在准备上传页面...'
+      
+      // 模拟加载过程
+      setTimeout(() => {
+        isLoading.value = false
+        router.push('/video/upload')
+      }, 800)
+      
+      // 2秒后隐藏提示
+      setTimeout(() => {
+        showToast.value = false
+      }, 2000)
+    }
+    
+    // 导航到登录页面或个人中心
+    const navigateToLogin = () => {
+      isLoading.value = true
+      
+      // 根据登录状态决定跳转目标
+      if (authState.value.isAuthenticated) {
+        showToast.value = true
+        toastMessage.value = '正在前往个人中心...'
+        
+        // 模拟加载过程
+        setTimeout(() => {
+          isLoading.value = false
+          router.push('/profile')
+        }, 800)
+      } else {
+        showToast.value = true
+        toastMessage.value = '正在前往登录页面...'
+        
+        // 模拟加载过程
+        setTimeout(() => {
+          isLoading.value = false
+          router.push('/login')
+        }, 800)
+      }
+      
+      // 2秒后隐藏提示
+      setTimeout(() => {
+        showToast.value = false
+      }, 2000)
+    }
+    
+    return {
+      navigateToUpload,
+      navigateToLogin,
+      isLoading,
+      showToast,
+      toastMessage
+    }
   }
-};
-
-const prevStep = () => {
-  if (currentStep.value > 1) {
-    currentStep.value--;
-  }
-};
-
-// 功能展示图片
-const featureImage1 = "https://public.readdy.ai/ai/img_res/0bd77a093894060dfff25e902a4078ee.jpg";
-const featureImage2 = "https://public.readdy.ai/ai/img_res/8a5474b6e9dd8476e47e8cb3d7cb422a.jpg";
-const featureImage3 = "https://public.readdy.ai/ai/img_res/cf4f452ff5b23449786c51390e127729.jpg";
-const featureImage4 = "https://public.readdy.ai/ai/img_res/4dba3fc84f5c2f149898bcd41eb96d2f.jpg";
-
-// 引导图片
-const guideImage1 = "https://public.readdy.ai/ai/img_res/0ce075d310fee3cc88f9fbed4015e051.jpg";
-const guideImage2 = "https://public.readdy.ai/ai/img_res/f40840c3739010bb33d0c0cdbee246da.jpg";
-const guideImage3 = "https://public.readdy.ai/ai/img_res/6c326103b8b155db8c301a78eabe23e4.jpg";
-const guideImage4 = "https://public.readdy.ai/ai/img_res/f9272e0d2258eff8fa184faedb98e067.jpg";
+}
 </script>
 
 <style scoped>
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+/* 基本变量定义 */
+:root {
+  --primary-color: #4F46E5;
+  --secondary-color: #8B5CF6;
+  --accent-color: #EC4899;
+  --text-primary: #1F2937;
+  --text-secondary: #4B5563;
+  --bg-light: #F9FAFB;
+  --card-bg: #FFFFFF;
+  --border-radius: 8px;
+  --transition-speed: 0.3s;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
+/* 英雄区域样式 */
+.hero-section {
+  position: relative;
+  padding: 80px 20px;
+  background-image: none;
+  background-size: cover;
+  background-position: center;
+  color: #fff;
+  overflow: hidden;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #c5c5c5;
-  border-radius: 10px;
+.hero-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  background: linear-gradient(135deg, #667eea, #764ba2);
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #a0a0a0;
+.hero-container {
+  position: relative;
+  z-index: 2;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.guide-step {
-  animation: fadeIn 0.3s ease-in-out;
+.hero-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+.hero-text {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.hero-text.full-width {
+  padding-right: 0;
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* 通用部分样式 */
+section {
+  padding: 2.5rem 0;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.section-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  position: relative;
+  display: inline-block;
+}
+
+.section-title::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 3px;
+  background-color: var(--primary-color);
+  transition: width 0.3s ease;
+}
+
+.section-header:hover .section-title::after {
+  width: 120px;
+}
+
+.section-subtitle {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  max-width: 700px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+/* 工作流程区域样式 */
+.workflow-section {
+  background-color: var(--bg-light);
+  padding: 2.5rem 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.workflow-container {
+  margin-top: 2rem;
+  overflow-x: auto;
+  padding-bottom: 1rem;
+}
+
+.workflow-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.workflow-image {
+  max-width: 100%;
+  height: auto;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  transition: transform 0.3s ease;
+}
+
+.workflow-image:hover {
+  transform: scale(1.02);
+}
+
+.workflow-description {
+  background-color: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 800px;
+}
+
+.workflow-step-card {
+  display: flex;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.workflow-step-card:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, var(--primary-color, #667eea), var(--secondary-color, #764ba2));
+  color: white;
+  font-weight: bold;
+  border-radius: 50%;
+  margin-right: 1rem;
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary, #1F2937);
+  margin: 0 0 0.5rem 0;
+}
+
+.step-desc {
+  font-size: 1rem;
+  color: var(--text-secondary, #4B5563);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.substeps-container {
+  margin-top: 1rem;
+  padding-left: 1rem;
+  border-left: 2px solid #f0f0f0;
+}
+
+.substep-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.substep-item:last-child {
+  margin-bottom: 0;
+}
+
+.substep-dot {
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(135deg, var(--primary-color, #667eea), var(--secondary-color, #764ba2));
+  border-radius: 50%;
+  margin-right: 1rem;
+  margin-top: 0.4rem;
+  flex-shrink: 0;
+}
+
+.substep-content {
+  flex: 1;
+}
+
+.substep-title {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--text-primary, #1F2937);
+  margin: 0 0 0.25rem 0;
+}
+
+.substep-desc {
+  font-size: 0.95rem;
+  color: var(--text-secondary, #4B5563);
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+  .workflow-description {
+    padding: 1.5rem;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  
+  .step-number {
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+  }
+  
+  .step-title {
+    font-size: 1.1rem;
+  }
+  
+  .step-desc {
+    font-size: 0.95rem;
+  }
+  
+  .substep-title {
+    font-size: 1rem;
+  }
+  
+  .substep-desc {
+    font-size: 0.9rem;
+  }
+}
+
+/* 详细教程区域样式 */
+.tutorials-section {
+  padding: 5rem 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.tutorials-container {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem;
+  margin-top: 3rem;
+}
+
+.tutorial-card {
+  background-color: var(--card-bg, #FFFFFF);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  position: relative;
+  border-top: 5px solid transparent;
+  border-image: linear-gradient(to right, #667eea, #764ba2);
+  border-image-slice: 1;
+}
+
+.tutorial-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.tutorial-header {
+  display: flex;
+  align-items: center;
+  padding: 1.5rem;
+  background: linear-gradient(to right, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.tutorial-icon-wrapper {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 1rem;
+  flex-shrink: 0;
+}
+
+.tutorial-icon-wrapper i {
+  color: white;
+  font-size: 1.5rem;
+}
+
+.tutorial-title-container {
+  display: flex;
+  align-items: center;
+}
+
+.tutorial-order {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #667eea;
+  margin-right: 0.75rem;
+  opacity: 0.8;
+}
+
+.tutorial-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary, #1F2937);
+  margin: 0;
+}
+
+.tutorial-content {
+  padding: 1.5rem;
+}
+
+.tutorial-content.full-width {
+  padding: 1.5rem;
+  width: 100%;
+}
+
+.tutorial-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.step-number {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.step p {
+  margin: 0;
+  flex: 1;
+  line-height: 1.5;
+  color: var(--text-secondary, #4B5563);
+}
+
+.tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: rgba(102, 126, 234, 0.1);
+  border-radius: 8px;
+}
+
+.tip-icon {
+  color: #667eea;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.tip p {
+  margin: 0;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: var(--text-secondary, #4B5563);
+}
+
+.tutorial-action {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.tutorial-action .el-button {
+  padding: 0.6rem 1.5rem;
+  font-weight: 500;
+}
+
+@media (min-width: 768px) {
+  .tutorials-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1200px) {
+  .tutorials-section {
+    padding: 5rem 2rem;
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .main-title {
+    font-size: 2.5rem;
+  }
+  
+  .section-title {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 992px) {
+  .hero-section {
+    padding: 80px 20px;
+  }
+  
+  .main-title {
+    font-size: 2.25rem;
+  }
+  
+  .subtitle {
+    font-size: 1.1rem;
+  }
+  
+  .section-title {
+    font-size: 1.75rem;
+  }
+  
+  .feature-title {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-section {
+    padding: 60px 15px;
+  }
+  
+  .main-title {
+    font-size: 2rem;
+  }
+  
+  .subtitle {
+    font-size: 1rem;
+  }
+  
+  section {
+    padding: 3rem 0;
+  }
+  
+  .section-title {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .hero-section {
+    padding: 50px 15px;
+  }
+  
+  .main-title {
+    font-size: 1.75rem;
+  }
+  
+  .subtitle {
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .hero-button {
+    padding: 0.5rem 1.5rem !important;
+    font-size: 1rem !important;
+  }
+  
+  .section-title {
+    font-size: 1.35rem;
+  }
+  
+  .section-subtitle {
+    font-size: 0.9rem;
+  }
+  
+  .feature-card {
+    padding: 1.5rem;
+  }
+  
+  .feature-icon-wrapper {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .feature-title {
+    font-size: 1.15rem;
+  }
+}
+
+/* 常见问题区域样式 */
+.faq-section {
+  background-color: var(--bg-light);
+  padding: 3rem 1.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.faq-container {
+  margin-top: 2rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+  gap: 1.5rem;
+}
+
+.faq-item {
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  padding: 1.5rem;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.faq-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.faq-question {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.question-icon {
+  color: var(--primary-color, #667eea);
+  font-size: 1.5rem;
+  margin-right: 1rem;
+}
+
+.faq-question h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-primary, #1F2937);
+  margin: 0;
+}
+
+.faq-answer p {
+  color: var(--text-secondary, #4B5563);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* CTA 区域样式 */
+.cta-section {
+  padding: 3rem 1.5rem;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.cta-card {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 16px;
+  padding: 3rem 2rem;
+  text-align: center;
+  color: white;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.cta-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.cta-description {
+  font-size: 1.1rem;
+  max-width: 600px;
+  margin: 0 auto 2rem;
+  opacity: 0.9;
+}
+
+.cta-button {
+  font-size: 1.1rem;
+  padding: 0.75rem 2rem;
+  font-weight: 600;
+  border-radius: 8px;
+  background-color: white;
+  color: var(--primary-color, #667eea);
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.cta-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* 页脚样式 */
+.footer-section {
+  background-color: #1F2937;
+  color: white;
+  padding: 4rem 1.5rem 2rem;
+}
+
+.footer-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.5fr;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.footer-logo {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.footer-logo i {
+  font-size: 1.75rem;
+  margin-right: 0.75rem;
+  color: var(--primary-color, #667eea);
+}
+
+.footer-logo h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.footer-description {
+  color: #D1D5DB;
+  line-height: 1.6;
+  margin-top: 1rem;
+}
+
+.footer-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.footer-title::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -0.5rem;
+  width: 40px;
+  height: 3px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 3px;
+}
+
+.footer-links ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footer-links li {
+  margin-bottom: 0.75rem;
+}
+
+.footer-links a {
+  color: #D1D5DB;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.footer-links a:hover {
+  color: white;
+}
+
+.footer-contact ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.footer-contact li {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+  color: #D1D5DB;
+}
+
+.footer-contact li i {
+  margin-right: 0.75rem;
+  color: var(--primary-color, #667eea);
+}
+
+.footer-social {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.footer-social a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  color: white;
+  transition: all 0.3s ease;
+}
+
+.footer-social a:hover {
+  background-color: var(--primary-color, #667eea);
+  transform: translateY(-3px);
+}
+
+.footer-bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 1.5rem;
+  text-align: center;
+  color: #9CA3AF;
+}
+
+/* Toast 通知组件样式 */
+.toast-notification {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #4F46E5;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transform: translateY(100px);
+  opacity: 0;
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+.toast-notification.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+@media (max-width: 1024px) {
+  .faq-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .cta-title {
+    font-size: 1.75rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  
+  .cta-card {
+    padding: 2rem 1.5rem;
+  }
+  
+  .cta-title {
+    font-size: 1.5rem;
+  }
+  
+  .cta-description {
+    font-size: 1rem;
   }
 }
 </style>
-

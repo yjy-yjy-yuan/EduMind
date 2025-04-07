@@ -1,12 +1,5 @@
 import os
 import traceback
-from flask import Blueprint, request, jsonify, current_app, send_file, make_response, Response
-from ..models.video import Video
-import hashlib
-
-bp = Blueprint('video', __name__, url_prefix='/api/videos')
-
-import os
 import re
 import json
 import uuid
@@ -14,7 +7,7 @@ import time
 import shutil
 import logging
 import subprocess
-import traceback
+import hashlib
 import requests
 from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app, send_from_directory, send_file, make_response, Response
@@ -23,6 +16,11 @@ import yt_dlp
 from ..models.video import Video, VideoStatus
 from ..extensions import db
 from ..tasks.test import add  # 暂时使用测试任务
+# 导入视频摘要生成器
+import sys
+import os.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from services.summary_generator import generate_video_summary
 
 ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv', 'webm'}
 
@@ -903,8 +901,10 @@ def get_subtitle(video_id):
         
         # 构建可能的字幕文件路径
         possible_subtitle_files = [
-            os.path.join(current_app.config['SUBTITLE_FOLDER'], f"{video.filename}.srt"),
-            os.path.join(current_app.config['SUBTITLE_FOLDER'], f"{filename}.srt")
+            video.subtitle_filepath,  # 直接使用存储的路径
+            os.path.join(current_app.config['UPLOAD_FOLDER'], 'subtitles', os.path.basename(video.subtitle_filepath)),  # 在subtitles目录下
+            os.path.join(current_app.config['UPLOAD_FOLDER'], os.path.basename(video.subtitle_filepath)),  # 在上传目录下
+            os.path.join(os.path.dirname(video.filepath), os.path.basename(video.subtitle_filepath))  # 在视频文件同目录下
         ]
         current_app.logger.info(f'可能的字幕文件路径: {possible_subtitle_files}')
         
@@ -915,12 +915,13 @@ def get_subtitle(video_id):
         subtitle_path = None
         for path in possible_subtitle_files:
             current_app.logger.info(f'检查文件: {path}')
-            if os.path.exists(path):
+            if path and os.path.exists(path):
                 subtitle_path = path
                 current_app.logger.info(f'找到字幕文件: {path}')
                 break
         
         if not subtitle_path:
+            current_app.logger.error(f'尝试了所有可能的路径，但字幕文件不存在')
             return jsonify({'error': '字幕文件不存在'}), 404
             
         current_app.logger.info(f'读取字幕文件: {subtitle_path}')
@@ -960,6 +961,75 @@ def get_subtitle(video_id):
     except Exception as e:
         current_app.logger.error(f"获取字幕失败: {str(e)}")
         return jsonify({'error': f'获取字幕失败: {str(e)}'}), 500
+
+@bp.route('/<int:video_id>/generate-summary', methods=['POST'])
+def generate_summary(video_id):
+    """为视频生成内容摘要"""
+    try:
+        # 获取视频信息
+        video = Video.query.get(video_id)
+        if not video:
+            current_app.logger.error(f'视频不存在: {video_id}')
+            return jsonify({'error': '视频不存在'}), 404
+            
+        # 检查视频是否已处理完成
+        if video.status != VideoStatus.COMPLETED:
+            current_app.logger.error(f'视频尚未处理完成，无法生成摘要: {video_id}')
+            return jsonify({'error': '视频尚未处理完成，请先处理视频'}), 400
+            
+        # 获取字幕文件路径
+        subtitle_path = None
+        if video.subtitle_filepath:
+            # 尝试多种可能的路径
+            possible_paths = [
+                video.subtitle_filepath,  # 直接使用存储的路径
+                os.path.join(current_app.config['UPLOAD_FOLDER'], 'subtitles', os.path.basename(video.subtitle_filepath)),  # 在subtitles目录下
+                os.path.join(current_app.config['UPLOAD_FOLDER'], os.path.basename(video.subtitle_filepath)),  # 在上传目录下
+                os.path.join(os.path.dirname(video.filepath), os.path.basename(video.subtitle_filepath))  # 在视频文件同目录下
+            ]
+            
+            current_app.logger.info(f'尝试查找字幕文件，可能的路径: {possible_paths}')
+            
+            # 检查所有可能的路径
+            for path in possible_paths:
+                if path and os.path.exists(path):
+                    subtitle_path = path
+                    current_app.logger.info(f'找到字幕文件: {path}')
+                    break
+            
+            if not subtitle_path:
+                current_app.logger.error(f'尝试了所有可能的路径，但字幕文件不存在')
+                return jsonify({'error': '字幕文件不存在'}), 404
+        else:
+            current_app.logger.error(f'视频没有字幕文件: {video_id}')
+            return jsonify({'error': '视频没有字幕文件，无法生成摘要'}), 400
+            
+        # 调用摘要生成服务
+        current_app.logger.info(f'开始为视频 {video_id} 生成摘要')
+        result = generate_video_summary(video_id, subtitle_path)
+        
+        if not result['success']:
+            current_app.logger.error(f'生成摘要失败: {result["error"]}')
+            return jsonify({'error': f'生成摘要失败: {result["error"]}'}), 500
+            
+        # 更新视频摘要
+        try:
+            video.summary = result['summary']
+            db.session.commit()
+            current_app.logger.info(f'成功为视频 {video_id} 生成摘要并保存')
+        except Exception as e:
+            current_app.logger.error(f'保存摘要到数据库失败: {str(e)}')
+            return jsonify({'error': '保存摘要失败'}), 500
+            
+        return jsonify({
+            'success': True,
+            'summary': result['summary']
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'生成摘要时发生错误: {str(e)}')
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({'error': f'生成摘要时发生错误: {str(e)}'}), 500
 
 @bp.route('/<int:video_id>', methods=['GET'])
 def get_video_detail(video_id):

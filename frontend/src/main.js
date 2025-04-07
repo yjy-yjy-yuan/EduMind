@@ -5,6 +5,12 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import App from './App.vue'
 import router from './router'
 import store from './store'
+import axios from 'axios'
+import '@fortawesome/fontawesome-free/css/all.min.css'
+
+// 配置axios
+axios.defaults.baseURL = 'http://localhost:5001'
+axios.defaults.withCredentials = true
 
 const app = createApp(App)
 

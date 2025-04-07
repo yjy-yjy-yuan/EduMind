@@ -4,6 +4,7 @@ import sys
 import os
 import logging
 from migrations.add_title_column import add_title_column
+from migrations.add_summary_column import add_summary_column
 
 # 配置日志记录
 logging.basicConfig(
@@ -20,6 +21,12 @@ def run_migrations():
     success = add_title_column()
     if not success:
         logging.error("添加title列失败")
+        return False
+    
+    # 运行添加summary列的迁移
+    success = add_summary_column()
+    if not success:
+        logging.error("添加summary列失败")
         return False
     
     logging.info("所有迁移已成功完成")

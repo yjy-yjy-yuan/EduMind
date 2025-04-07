@@ -39,14 +39,14 @@ def create_app(config_name='default'):
         cors = CORS()
         cors.init_app(app, resources={r"/*": {"origins": "http://localhost:5173", "supports_credentials": True}})
         
-        # 添加CORS响应头处理
-        @app.after_request
-        def after_request(response):
-            response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
-            response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-            response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-            response.headers.add('Access-Control-Allow-Credentials', 'true')
-            return response
+        # # 添加CORS响应头处理
+        # @app.after_request
+        # def after_request(response):
+        #     response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        #     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        #     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+        #     response.headers.add('Access-Control-Allow-Credentials', 'true')
+        #     return response
         
         # 初始化数据库
         db.init_app(app)
@@ -94,17 +94,17 @@ def create_app(config_name='default'):
                 raise
             
             # 注册蓝图
-            from .routes import video_bp, qa_bp, chat_bp, subtitle_bp, note_bp
-            if 'video_bp' not in app.blueprints:
-                app.register_blueprint(video_bp, url_prefix='/api/videos')
-            if 'qa_bp' not in app.blueprints:
-                app.register_blueprint(qa_bp, url_prefix='/api/qa')
-            if 'chat_bp' not in app.blueprints:
-                app.register_blueprint(chat_bp, url_prefix='/api/chat')
-            if 'subtitle_bp' not in app.blueprints:
-                app.register_blueprint(subtitle_bp)
-            if 'note_bp' not in app.blueprints:
-                app.register_blueprint(note_bp)
+            from .routes.video import bp as video_bp
+            from .routes.subtitle import subtitle_bp
+            from .routes.note import note_bp
+            from .routes.auth import auth_bp
+            from .routes.qa import qa_bp
+            
+            app.register_blueprint(video_bp, url_prefix='/api/videos')
+            app.register_blueprint(subtitle_bp, url_prefix='/api/subtitles')
+            app.register_blueprint(note_bp, url_prefix='/api/notes')
+            app.register_blueprint(auth_bp, url_prefix='/api/auth')
+            app.register_blueprint(qa_bp, url_prefix='/api/qa')
         
         # 添加根路由
         @app.route('/')

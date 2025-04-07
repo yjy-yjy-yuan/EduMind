@@ -1,18 +1,33 @@
 <template>
   <div class="upload-container">
-    <div class="page-title">
-      <h1>视频管理中心</h1>
-      <p class="subtitle">上传、管理和处理您的教育视频</p>
-    </div>
+    <section class="video-hero-section">
+      <div class="hero-overlay"></div>
+      <div class="hero-container">
+        <div class="hero-content-wrapper">
+          <div class="hero-text">
+            <h1 class="main-title">视频管理中心</h1>
+            <p class="subtitle">上传、管理和处理您的教育视频</p>
+            <div class="hero-description-container">
+              <p class="hero-description">🎉 添加教学视频,我们辅助你进行更加高效地学习。😊</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
     
     <el-card class="upload-card">
       <template #header>
         <div class="card-header">
-          <h2>视频上传</h2>
+          <div class="title-wrapper">
+            <i class="title-icon">
+              <el-icon><Upload /></el-icon>
+            </i>
+            <h2>视频上传</h2>
+          </div>
         </div>
       </template>
       
-      <el-form ref="uploadForm" :model="formData" label-width="120px">
+      <el-form ref="uploadForm" :model="formData" label-width="100px" class="upload-form">
         <!-- 本地视频上传 -->
         <el-form-item label="本地视频">
           <div class="upload-flex-container">
@@ -25,14 +40,14 @@
               :show-file-list="false"
               accept=".mp4,.avi,.mov,.mkv,.webm"
             >
-              <el-icon class="el-icon--upload"><upload-filled /></el-icon>
+              <el-icon><Upload /></el-icon>
               <div class="el-upload__text">
                 拖拽文件到此处或 <em>点击上传</em>
               </div>
             </el-upload>
             
             <div class="upload-format-tip">
-              <el-icon><info-filled /></el-icon>
+              <el-icon><InfoFilled /></el-icon>
               <span>支持的格式：MP4, AVI, MOV, MKV, WEBM</span>
             </div>
           </div>
@@ -54,16 +69,23 @@
         <el-form-item label="视频链接">
           <el-input 
             v-model="formData.videoUrl" 
-            placeholder="请输入B站、YouTube或中国大学慕课视频链接"
+            placeholder="请输入B站、YouTube视频链接"
+            class="video-url-input"
+            size="large"
           >
             <template #append>
-              <el-button @click="handleUrlUpload" :loading="urlUploading">
+              <el-button 
+                @click="handleUrlUpload" 
+                :loading="urlUploading"
+                type="primary"
+                class="submit-url-button"
+              >
                 {{ urlUploading ? '提交中...' : '提交链接' }}
               </el-button>
             </template>
           </el-input>
           <div class="el-upload__tip">
-            支持B站、YouTube和中国大学慕课视频链接
+            支持B站、YouTube视频链接
           </div>
         </el-form-item>
       </el-form>
@@ -73,15 +95,32 @@
     <el-card class="video-list-card" v-loading="loading">
       <template #header>
         <div class="card-header">
-          <h3>已上传视频</h3>
+          <div class="title-wrapper">
+            <i class="title-icon">
+              <el-icon><VideoCamera /></el-icon>
+            </i>
+            <h3>已上传视频</h3>
+          </div>
           <div>
             <el-button 
-              type="danger" 
-              :disabled="selectedVideos.length === 0"
-              @click="handleBatchDelete"
+              v-if="!batchDeleteMode"
+              type="primary" 
+              @click="enterBatchDeleteMode"
             >
               批量删除
             </el-button>
+            <template v-else>
+              <el-button 
+                type="danger" 
+                :disabled="selectedVideos.length === 0"
+                @click="handleBatchDelete"
+              >
+                删除选中({{ selectedVideos.length }})
+              </el-button>
+              <el-button @click="exitBatchDeleteMode">
+                取消
+              </el-button>
+            </template>
             <el-button @click="refreshList" :icon="Refresh" circle />
           </div>
         </div>
@@ -89,20 +128,20 @@
       
       <el-table 
         ref="videoTable"
-        :data="videoList" 
+        :data="paginatedVideoList" 
         style="width: 100%"
         @selection-change="handleSelectionChange"
       >
-        <el-table-column type="selection" width="55" />
-        <el-table-column prop="filename" label="文件名" />
-        <el-table-column prop="status" label="状态">
+        <el-table-column v-if="batchDeleteMode" type="selection" width="55" />
+        <el-table-column prop="filename" label="视频名称" width="250"/>
+        <el-table-column prop="status" label="处理状态" width="100">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.status)">
               {{ getStatusText(scope.row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="预览图" width="120">
+        <el-table-column label="封面" width="120">
           <template #default="scope">
             <el-image 
               v-if="scope.row.preview_filename"
@@ -114,19 +153,26 @@
             <span v-else>无预览图</span>
           </template>
         </el-table-column>
-        <el-table-column label="视频信息">
+        <el-table-column label="视频摘要">
           <template #default="scope">
-            <div v-if="scope.row.duration" class="video-info-box">
-              <div><i class="el-icon-time"></i> 时长: {{ formatDuration(scope.row.duration) }}</div>
-              <div><i class="el-icon-picture"></i> 分辨率: {{ scope.row.width }}x{{ scope.row.height }}</div>
-              <div><i class="el-icon-video-play"></i> 帧率: {{ scope.row.fps ? scope.row.fps.toFixed(2) : '未知' }} FPS</div>
+            <div class="video-summary-box">
+              <div v-if="scope.row.summary" class="summary-content">
+                {{ scope.row.summary }}
+              </div>
+              <div v-else-if="scope.row.status === 'completed'" class="summary-actions">
+                <el-button 
+                  size="small" 
+                  type="primary" 
+                  @click="generateSummary(scope.row)"
+                  :loading="scope.row.generatingSummary"
+                >
+                  {{ scope.row.generatingSummary ? '生成中...' : '生成摘要' }}
+                </el-button>
+              </div>
+              <div v-else class="summary-placeholder">
+                <span>{{ getSummaryPlaceholder(scope.row.status) }}</span>
+              </div>
             </div>
-            <span v-else>暂无信息</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="upload_time" label="上传时间">
-          <template #default="scope">
-            {{ formatDate(scope.row.upload_time) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200">
@@ -161,6 +207,33 @@
         </el-table-column>
       </el-table>
       
+      <!-- 分页 -->
+      <div class="pagination-container" v-if="videoList.length > 0">
+        <div class="custom-pagination">
+          <button 
+            class="pagination-btn prev" 
+            :disabled="currentPage === 1"
+            @click="changePage(currentPage - 1)"
+            title="上一页"
+          >
+            <el-icon><ArrowLeft /></el-icon>
+          </button>
+          
+          <div class="page-info">
+            {{ currentPage }}/{{ totalPages }}
+          </div>
+          
+          <button 
+            class="pagination-btn next" 
+            :disabled="currentPage === totalPages"
+            @click="changePage(currentPage + 1)"
+            title="下一页"
+          >
+            <el-icon><ArrowRight /></el-icon>
+          </button>
+        </div>
+      </div>
+      
       <!-- 空状态提示 -->
       <div v-if="videoList.length === 0 && !loading" class="empty-state">
         <div class="empty-icon">
@@ -171,126 +244,29 @@
       </div>
     </el-card>
 
-    <!-- 上传指南卡片 -->
-    <el-row :gutter="20" class="guide-row">
-      <el-col :span="8">
-        <div class="guide-card" style="animation: fadeInLeft 0.5s ease-out;">
-          <div class="guide-icon">
-            <el-icon><upload-filled /></el-icon>
-          </div>
-          <h3>上传指南</h3>
-          <ul>
-            <li>支持多种视频格式</li>
-            <li>单个文件大小不超过2GB</li>
-            <li>视频时长建议在5-120分钟</li>
-            <li>高清视频效果更佳</li>
-          </ul>
-        </div>
-      </el-col>
-      <el-col :span="8">
-        <div class="guide-card" style="animation: fadeInLeft 0.5s ease-out 0.2s; animation-fill-mode: both;">
-          <div class="guide-icon">
-            <el-icon><video-camera /></el-icon>
-          </div>
-          <h3>处理流程</h3>
-          <div class="process-steps">
-            <div class="process-step">
-              <div class="step-number">1</div>
-              <div class="step-text">上传视频</div>
-            </div>
-            <div class="process-arrow">→</div>
-            <div class="process-step">
-              <div class="step-number">2</div>
-              <div class="step-text">AI处理</div>
-            </div>
-            <div class="process-arrow">→</div>
-            <div class="process-step">
-              <div class="step-number">3</div>
-              <div class="step-text">分析完成</div>
-            </div>
-          </div>
-        </div>
-      </el-col>
-      <el-col :span="8">
-        <div class="guide-card" style="animation: fadeInLeft 0.5s ease-out 0.4s; animation-fill-mode: both;">
-          <div class="guide-icon">
-            <el-icon><connection /></el-icon>
-          </div>
-          <h3>视频分析</h3>
-          <p>AI-EdVision 将自动分析您的视频内容，提取关键信息，生成字幕和摘要，并支持智能问答功能。</p>
-          <div class="feature-tags">
-            <span class="feature-tag">自动字幕</span>
-            <span class="feature-tag">内容摘要</span>
-            <span class="feature-tag">智能问答</span>
-            <span class="feature-tag">知识图谱</span>
-          </div>
-        </div>
-      </el-col>
-    </el-row>
-
-    <!-- 底部信息卡片 -->
-    <div class="bottom-info-section">
-      <el-row :gutter="20">
-        <el-col :span="12">
-          <div class="info-card" style="animation: slideUp 0.5s ease-out;">
-            <h3><el-icon><info-filled /></el-icon> 使用提示</h3>
-            <div class="info-content">
-              <p>1. 上传完成后，需要点击"处理视频"按钮进行AI分析</p>
-              <p>2. 处理完成后，可以点击"播放视频"按钮查看视频和AI分析结果</p>
-              <p>3. 视频处理时间取决于视频长度，请耐心等待</p>
-              <p>4. 如有任何问题，请联系系统管理员获取帮助</p>
-            </div>
-          </div>
-        </el-col>
-        <el-col :span="12">
-          <div class="info-card stats-card" style="animation: slideUp 0.5s ease-out 0.2s; animation-fill-mode: both;">
-            <h3><el-icon><data-analysis /></el-icon> 系统状态</h3>
-            <div class="stats-content">
-              <div class="stat-item">
-                <div class="stat-label">处理引擎</div>
-                <div class="stat-value"><span class="status-dot active"></span> 运行中</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-label">AI模型</div>
-                <div class="stat-value"><span class="status-dot active"></span> 已加载</div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-label">存储空间</div>
-                <div class="stat-value">
-                  <el-progress :percentage="65" :show-text="false" style="width: 100px;"></el-progress>
-                  <span>65%</span>
-                </div>
-              </div>
-              <div class="stat-item">
-                <div class="stat-label">系统版本</div>
-                <div class="stat-value">v2.5.3</div>
-              </div>
-            </div>
-          </div>
-        </el-col>
-      </el-row>
-    </div>
-    
     <!-- 页脚 -->
     <div class="page-footer">
-      <p>&copy; 2025 AI-EdVision 智能教育视频分析系统</p>
+      <div class="footer-content">
+        <p>&copy; 2025 AI-EdVision 智能教育视频分析系统</p>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { 
-  UploadFilled, 
-  VideoCamera,
-  VideoPlay,
   Delete, 
-  Refresh,
-  InfoFilled,
-  DataAnalysis,
-  Connection 
+  Upload, 
+  VideoPlay, 
+  View, 
+  Refresh, 
+  ArrowLeft,
+  ArrowRight,
+  VideoCamera,
+  InfoFilled
 } from '@element-plus/icons-vue'
 import { 
   uploadLocalVideo, 
@@ -315,9 +291,76 @@ const loading = ref(false)
 const videoList = ref([])
 const selectedVideos = ref([])
 const videoTable = ref(null)
+const batchDeleteMode = ref(false)
 
 const pollingTimers = ref({})
 const processingTimers = ref({})
+
+// 分页相关变量
+const currentPage = ref(1)
+const pageSize = 4
+
+// 计算总页数
+const totalPages = computed(() => {
+  return Math.max(1, Math.ceil(videoList.value.length / pageSize))
+})
+
+// 计算要显示的页码
+const displayPages = computed(() => {
+  // 创建从1到totalPages的数组
+  const pages = []
+  for (let i = 1; i <= totalPages.value; i++) {
+    pages.push(i)
+  }
+  return pages
+})
+
+// 计算当前页应该显示的视频列表
+const paginatedVideoList = computed(() => {
+  // 确保currentPage在有效范围内
+  if (currentPage.value < 1) {
+    currentPage.value = 1
+  } else if (currentPage.value > totalPages.value && totalPages.value > 0) {
+    currentPage.value = totalPages.value
+  }
+  
+  const startIndex = (currentPage.value - 1) * pageSize
+  const endIndex = startIndex + pageSize
+  return videoList.value.slice(startIndex, endIndex)
+})
+
+// 切换页面的函数
+const changePage = (page) => {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+  clearSelection()
+  console.log('切换到页码:', page)
+}
+
+// 监听视频列表变化
+watch(videoList, () => {
+  console.log('视频列表变化，总数:', videoList.value.length)
+  console.log('当前页码:', currentPage.value, '总页数:', totalPages.value)
+  
+  // 如果当前页超出范围，重置到第一页
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = Math.max(1, totalPages.value)
+  }
+  
+  // 如果没有视频，重置到第一页
+  if (videoList.value.length === 0) {
+    currentPage.value = 1
+  }
+}, { deep: true })
+
+// 在组件挂载后获取视频列表
+onMounted(async () => {
+  await refreshList()
+  // 确保初始页码为1
+  nextTick(() => {
+    currentPage.value = 1
+  })
+})
 
 // 上传前检查
 const beforeUpload = (file) => {
@@ -521,112 +564,106 @@ const startPollingVideoStatus = (videoId, isYoutube = false) => {
 const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
   try {
     console.log(`正在检查视频${videoId}的状态，第${attempts+1}次尝试`)
-    const response = await getVideoStatus(videoId)
-    const status = response.status
-    const progress = response.progress || 0
-    const currentStep = response.current_step || ''
     
-    console.log(`视频${videoId}状态: ${status}, 进度: ${progress}%, 步骤: ${currentStep}, 尝试次数: ${attempts+1}`)
-    
-    // 更新UI显示进度
-    if (status === 'processing') {
-      uploadStatus.value = 'processing'
-      uploadProgress.value = Math.round(progress)
-      uploadStepInfo.value = currentStep || '处理中...'
-    }
-    
-    // 如果视频下载完成或失败，停止轮询
-    if (status === 'uploaded') {
-      if (pollingTimers.value[videoId]) {
-        clearInterval(pollingTimers.value[videoId])
-        delete pollingTimers.value[videoId]
+    // 获取视频状态
+    const { data: statusResponse } = await getVideoStatus(videoId)
+    if (statusResponse) {
+      const status = statusResponse.status
+      const progress = statusResponse.progress || 0
+      const currentStep = statusResponse.current_step || ''
+      
+      console.log(`视频${videoId}状态: ${status}, 进度: ${progress}%, 步骤: ${currentStep}, 尝试次数: ${attempts+1}`)
+      
+      // 更新UI显示进度
+      if (status === 'processing') {
+        uploadStatus.value = 'processing'
+        uploadProgress.value = Math.round(progress)
+        uploadStepInfo.value = currentStep || '处理中...'
+        
+        // 添加这里：当进度首次达到60%时刷新列表
+        if (progress >= 60 && !window.hasRefreshedAt60) {
+          window.hasRefreshedAt60 = true
+          console.log('进度达到60%，刷新视频列表')
+          refreshList()
+        }
       }
       
-      console.log(`视频${videoId}下载完成，停止轮询`)
-      uploadStatus.value = 'success'
-      uploadProgress.value = 100
-      uploadStepInfo.value = '下载完成'
-      ElMessage({
-        message: 'YouTube视频下载成功',
-        type: 'success',
-        duration: 3000
-      })
-      
-      // 清空输入框并刷新列表
-      formData.value.videoUrl = ''
-      refreshList()
-    } else if (status === 'completed') {
-      if (pollingTimers.value[videoId]) {
-        clearInterval(pollingTimers.value[videoId])
-        delete pollingTimers.value[videoId]
+      // 如果视频下载完成或失败，停止轮询
+      if (status === 'uploaded') {
+        if (pollingTimers.value[videoId]) {
+          clearInterval(pollingTimers.value[videoId])
+          delete pollingTimers.value[videoId]
+        }
+        
+        console.log(`视频${videoId}下载完成，停止轮询`)
+        uploadStatus.value = 'success'
+        uploadProgress.value = 100
+        uploadStepInfo.value = '下载完成'
+        ElMessage({
+          message: 'YouTube视频下载成功',
+          type: 'success',
+          duration: 3000
+        })
+        
+        // 刷新列表
+        refreshList()
+      } else if (status === 'completed') {
+        if (pollingTimers.value[videoId]) {
+          clearInterval(pollingTimers.value[videoId])
+          delete pollingTimers.value[videoId]
+        }
+        
+        console.log(`视频${videoId}处理完成，停止轮询`)
+        uploadStatus.value = 'success'
+        uploadProgress.value = 100
+        uploadStepInfo.value = '处理完成'
+        ElMessage({
+          message: '视频处理成功',
+          type: 'success',
+          duration: 3000
+        })
+        
+        // 刷新列表
+        refreshList()
+      } else if (status === 'failed') {
+        if (pollingTimers.value[videoId]) {
+          clearInterval(pollingTimers.value[videoId])
+          delete pollingTimers.value[videoId]
+        }
+        
+        console.log(`视频${videoId}处理失败，停止轮询`)
+        uploadStatus.value = 'exception'
+        uploadProgress.value = 0
+        uploadStepInfo.value = currentStep || '处理失败'
+        ElMessage.error('视频处理失败')
+        
+        // 刷新列表
+        refreshList()
+      } else {
+        console.log(`视频${videoId}仍在处理中，继续轮询`)
       }
       
-      console.log(`视频${videoId}处理完成，停止轮询`)
-      uploadStatus.value = 'success'
-      uploadProgress.value = 100
-      uploadStepInfo.value = '处理完成'
-      ElMessage({
-        message: '视频处理成功',
-        type: 'success',
-        duration: 3000
-      })
-      
-      // 刷新列表
-      refreshList()
-    } else if (status === 'failed') {
-      if (pollingTimers.value[videoId]) {
-        clearInterval(pollingTimers.value[videoId])
-        delete pollingTimers.value[videoId]
+      // 达到最大尝试次数，停止轮询
+      if (attempts >= maxAttempts) {
+        if (pollingTimers.value[videoId]) {
+          clearInterval(pollingTimers.value[videoId])
+          delete pollingTimers.value[videoId]
+        }
+        
+        console.log(`视频${videoId}轮询达到最大次数，停止轮询`)
+        ElMessage({
+          message: '视频可能仍在处理中，请稍后刷新列表查看',
+          type: 'info',
+          duration: 5000
+        })
+        
+        // 最后一次刷新列表
+        refreshList()
       }
-      
-      console.log(`视频${videoId}处理失败，停止轮询`)
-      uploadStatus.value = 'exception'
-      uploadProgress.value = 0
-      uploadStepInfo.value = currentStep || '处理失败'
-      ElMessage.error('视频处理失败')
-    } else {
-      console.log(`视频${videoId}仍在处理中，状态: ${status}，继续轮询`)
-    }
-    
-    // 达到最大尝试次数，停止轮询
-    if (attempts >= maxAttempts) {
-      if (pollingTimers.value[videoId]) {
-        clearInterval(pollingTimers.value[videoId])
-        delete pollingTimers.value[videoId]
-      }
-      
-      console.log(`视频${videoId}轮询达到最大次数，停止轮询`)
-      // 不显示错误，因为视频可能仍在处理中
-      ElMessage({
-        message: '视频可能仍在处理中，请稍后刷新列表查看',
-        type: 'info',
-        duration: 5000
-      })
     }
   } catch (error) {
     console.error('轮询视频状态失败:', error)
     // 出错时不停止轮询，继续尝试
-  }
-}
-
-// 获取视频列表
-const refreshList = async () => {
-  try {
-    loading.value = true
-    const { data } = await getVideoList()
-    if (data && data.videos) {
-      videoList.value = data.videos
-      // 清空选中的视频
-      selectedVideos.value = []
-    } else {
-      videoList.value = []
-    }
-  } catch (error) {
-    console.error('获取视频列表失败:', error)
-    ElMessage.error('获取视频列表失败')
-    videoList.value = []
-  } finally {
-    loading.value = false
   }
 }
 
@@ -689,11 +726,11 @@ const handleProcess = async (video) => {
           <div style="font-size: 14px; color: #606266;">
             <p style="margin: 0 0 8px; display: flex; align-items: center;">
               <span style="display: inline-block; width: 20px; height: 20px; background-color: #67C23A; border-radius: 50%; margin-right: 8px;"></span>
-              处理速度：<span style="color: #67C23A; font-weight: 600; margin-left: 5px;">极快</span>
+              处理速度：<span style="color: #67C23A; font-weight: 500;">极快</span>
             </p>
             <p style="margin: 0 0 8px; display: flex; align-items: center;">
               <span style="display: inline-block; width: 20px; height: 20px; background-color: #409EFF; border-radius: 50%; margin-right: 8px;"></span>
-              准确度：<span style="color: #409EFF; font-weight: 600; margin-left: 5px;">良好</span>
+              准确度：<span style="color: #409EFF; font-weight: 500;">良好</span>
             </p>
             <p style="margin: 0;">适用场景：<span style="color: #606266;">一般视频转录，对速度要求高</span></p>
           </div>
@@ -910,7 +947,7 @@ const handleProcess = async (video) => {
               option.classList.add('selected');
               option.style.transform = 'scale(1.05)';
               option.style.zIndex = '2';
-              option.style.boxShadow = '0 0 10px rgba(0,0,0,0.2)';
+              option.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.2)';
             }
             
             option.innerHTML = `
@@ -932,7 +969,7 @@ const handleProcess = async (video) => {
               option.classList.add('selected');
               option.style.transform = 'scale(1.05)';
               option.style.zIndex = '2';
-              option.style.boxShadow = '0 0 10px rgba(0,0,0,0.2)';
+              option.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.2)';
               
               // 更新隐藏输入值
               modelInput.value = model.value;
@@ -953,10 +990,16 @@ const handleProcess = async (video) => {
         if (modelDescriptionContainer && model) {
           modelDescriptionContainer.innerHTML = `
             <div style="font-weight: 500; color: #303133; margin-bottom: 5px;">${model.text} 模型 ${model.selected ? '(推荐)' : ''}</div>
-            <div style="font-size: 13px; color: #606266;">
-              <p style="margin: 0 0 5px;">• 处理速度：<span style="color: ${model.speedColor}; font-weight: 500;">${model.speed}</span></p>
-              <p style="margin: 0 0 5px;">• 准确度：<span style="color: ${model.accuracyColor}; font-weight: 500;">${model.accuracy}</span></p>
-              <p style="margin: 0;">• 适用场景：<span style="color: #606266;">${model.useCase}</span></p>
+            <div style="font-size: 14px; color: #606266;">
+              <p style="margin: 0 0 8px; display: flex; align-items: center;">
+                <span style="display: inline-block; width: 20px; height: 20px; background-color: #67C23A; border-radius: 50%; margin-right: 8px;"></span>
+                处理速度：<span style="color: #67C23A; font-weight: 500;">${model.speed}</span>
+              </p>
+              <p style="margin: 0 0 8px; display: flex; align-items: center;">
+                <span style="display: inline-block; width: 20px; height: 20px; background-color: #409EFF; border-radius: 50%; margin-right: 8px;"></span>
+                准确度：<span style="color: #409EFF; font-weight: 500;">${model.accuracy}</span>
+              </p>
+              <p style="margin: 0;">适用场景：<span style="color: #606266;">${model.useCase}</span></p>
             </div>
           `;
           
@@ -1012,7 +1055,7 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
       
       // 更新UI显示进度
       if (status === 'processing') {
-        uploadStatus.value = ''  // 修改这里，使用空字符串代替'processing'
+        uploadStatus.value = ''  
         uploadProgress.value = Math.round(progress)
         uploadStepInfo.value = currentStep || '处理中...'
         
@@ -1091,18 +1134,25 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
 const handleDelete = async (video) => {
   try {
     await ElMessageBox.confirm(
-      '确定要删除这个视频吗？此操作不可恢复。',
-      '警告',
+      `确定要删除视频 "${video.filename}" 吗？此操作不可恢复。`,
+      '删除确认',
       {
-        confirmButtonText: '确定',
+        confirmButtonText: '确定删除',
         cancelButtonText: '取消',
         type: 'warning'
       }
     )
     
+    loading.value = true
     await deleteVideo(video.id)
-    ElMessage.success('视频删除任务已启动')
-    refreshList()
+    ElMessage.success('删除成功')
+    
+    // 刷新列表
+    await refreshList()
+    // 如果当前页没有数据且不是第一页，则回到上一页
+    if (paginatedVideoList.value.length === 0 && currentPage.value > 1) {
+      currentPage.value--
+    }
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除视频失败:', error)
@@ -1122,34 +1172,49 @@ const handleBatchDelete = async () => {
   try {
     await ElMessageBox.confirm(
       `确定要删除选中的 ${selectedVideos.value.length} 个视频吗？此操作不可恢复。`,
-      '警告',
+      '批量删除确认',
       {
-        confirmButtonText: '确定',
+        confirmButtonText: '确定删除',
         cancelButtonText: '取消',
         type: 'warning'
       }
     )
     
-    const videoIds = selectedVideos.value.map(video => video.id)
-    console.log('要删除的视频ID:', videoIds)
+    loading.value = true
+    const deletePromises = selectedVideos.value.map(video => deleteVideo(video.id))
+    await Promise.all(deletePromises)
     
-    // 逐个删除视频
-    for (const id of videoIds) {
-      await deleteVideo(id)
-    }
-    
-    ElMessage.success(`成功删除 ${videoIds.length} 个视频`)
-    
-    // 清空选中的视频
-    clearSelection()
-    
+    ElMessage.success('批量删除成功')
     // 刷新列表
-    refreshList()
+    await refreshList()
+    // 如果当前页没有数据且不是第一页，则回到上一页
+    if (paginatedVideoList.value.length === 0 && currentPage.value > 1) {
+      currentPage.value--
+    }
+    // 退出批量删除模式
+    exitBatchDeleteMode()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('批量删除视频失败:', error)
-      ElMessage.error(error.response?.error || '批量删除视频失败')
+      ElMessage.error('批量删除视频失败')
     }
+  } finally {
+    loading.value = false
+  }
+}
+
+// 进入批量删除模式
+const enterBatchDeleteMode = () => {
+  batchDeleteMode.value = true
+  selectedVideos.value = []
+}
+
+// 退出批量删除模式
+const exitBatchDeleteMode = () => {
+  batchDeleteMode.value = false
+  selectedVideos.value = []
+  if (videoTable.value) {
+    videoTable.value.clearSelection()
   }
 }
 
@@ -1210,7 +1275,7 @@ const formatDuration = (seconds) => {
 // 获取预览图URL
 const getPreviewUrl = (video) => {
   if (!video.preview_filename) return ''
-  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000'
+  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001'
   return `${baseURL}/api/videos/${video.id}/preview`
 }
 
@@ -1231,8 +1296,12 @@ const handlePlay = (video) => {
 
 const router = useRouter()
 
-onMounted(() => {
-  refreshList()
+onMounted(async () => {
+  await refreshList()
+  // 确保初始页码为1
+  nextTick(() => {
+    currentPage.value = 1
+  })
 })
 
 onUnmounted(() => {
@@ -1243,171 +1312,184 @@ onUnmounted(() => {
     clearInterval(timer)
   })
 })
+
+// 获取视频列表
+const refreshList = async () => {
+  try {
+    loading.value = true
+    const { data } = await getVideoList()
+    if (data && data.videos) {
+      // 按照上传时间排序，最早上传的排在最前面
+      videoList.value = data.videos.sort((a, b) => {
+        // 如果有创建时间字段，按照创建时间排序
+        if (a.created_at && b.created_at) {
+          return new Date(a.created_at) - new Date(b.created_at)
+        }
+        // 如果没有创建时间字段，则按照ID排序（假设ID是按照创建顺序递增的）
+        return a.id - b.id
+      })
+      
+      // 清空选中的视频
+      selectedVideos.value = []
+      
+      // 重置到第一页
+      currentPage.value = 1
+    } else {
+      videoList.value = []
+    }
+  } catch (error) {
+    console.error('获取视频列表失败:', error)
+    ElMessage.error('获取视频列表失败')
+    videoList.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+// 获取摘要占位符文本
+const getSummaryPlaceholder = (status) => {
+  const statusMap = {
+    'uploaded': '视频尚未处理，请先处理视频',
+    'pending': '视频等待处理中',
+    'processing': '视频正在处理中',
+    'downloading': '视频正在下载中',
+    'failed': '视频处理失败',
+    'completed': '可生成视频摘要'
+  }
+  return statusMap[status] || '未知状态'
+}
+
+// 生成视频摘要
+const generateSummary = async (video) => {
+  try {
+    // 设置生成中状态
+    video.generatingSummary = true
+    
+    // 调用后端API生成摘要
+    const response = await fetch(`/api/videos/${video.id}/generate-summary`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error('生成摘要失败')
+    }
+    
+    const data = await response.json()
+    
+    // 更新视频对象的摘要
+    video.summary = data.summary
+    
+    ElMessage.success('摘要生成成功')
+  } catch (error) {
+    console.error('生成摘要错误:', error)
+    ElMessage.error(`生成摘要失败: ${error.message}`)
+  } finally {
+    // 清除生成中状态
+    video.generatingSummary = false
+  }
+}
 </script>
 
 <style scoped>
-.upload-container {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-.upload-container {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-  background-color: #f5f7fa;
-  min-height: calc(100vh - 60px);
-  position: relative;
-  overflow: hidden;
+/* 基本变量定义 */
+:root {
+  --primary-color: #3CAEA3;
+  --primary-light: rgba(60, 174, 163, 0.2);
+  --text-primary: #2C3E50;
+  --text-secondary: #8492A6;
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F8FA;
+  --border-color: #E5E9F2;
+  --transition-default: all 0.3s ease;
+  --indigo-600: #4F46E5;
+  --indigo-400: #818CF8;
+  --indigo-100: #E0E7FF;
+  --primary-gradient: linear-gradient(135deg, #667eea, #764ba2);
 }
 
-/* 添加背景点缀效果 */
-.upload-container::before {
-  content: "";
+.upload-container {
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  color: var(--text-primary);
+  overflow-x: hidden;
+  padding-bottom: 50px;
+}
+
+/* 英雄区域样式 */
+.video-hero-section {
+  position: relative;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%);
+  color: #333;
+  padding: 2.5rem 0;
+  margin-bottom: 2rem;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  height: 180px;
+}
+
+.hero-overlay {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="none"/><circle cx="10" cy="10" r="1" fill="rgba(30,60,114,0.05)"/></svg>');
-  pointer-events: none;
-  z-index: 0;
-}
-
-.page-title {
-  text-align: center;
-  margin-bottom: 30px;
-  position: relative;
+  background: linear-gradient(135deg, #3CAEA3, #4F46E5);
+  opacity: 0.85;
   z-index: 1;
 }
 
-.page-title h1 {
+.hero-container {
+  position: relative;
+  z-index: 2;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem;
+  height: 100%;
+}
+
+.hero-content-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  height: 100%;
+}
+
+.hero-text {
+  max-width: 800px;
+}
+
+.main-title {
   font-size: 2.2rem;
-  color: #1e3c72;
-  margin-bottom: 10px;
-  font-weight: 600;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: fadeIn 1s ease-out;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  animation: fadeInUp 0.6s ease-out;
 }
 
 .subtitle {
   font-size: 1.1rem;
-  color: #606266;
-  opacity: 0.8;
-  animation: slideUp 1s ease-out;
-}
-
-
-.upload-card, .video-list-card {
-  margin-bottom: 30px;
-  border-radius: 12px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-  transition: box-shadow 0.3s;
-  overflow: hidden;
-  position: relative;
-  z-index: 1;
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  animation: fadeIn 0.8s ease-out;
-}
-
-.upload-card:hover, .video-list-card:hover {
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
-  color: #fff;
-  padding: 15px 20px;
-  position: relative;
-  overflow: hidden;
-}
-
-/* 添加卡片标题背景效果 */
-.card-header::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(45deg, rgba(255,255,255,0.1) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.1) 75%, transparent 75%, transparent);
-  background-size: 10px 10px;
-  opacity: 0.2;
-  pointer-events: none;
-}
-
-.card-header h2, .card-header h3 {
-  margin: 0;
-  font-weight: 600;
+  font-weight: 400;
+  margin-bottom: 0;
+  opacity: 0.9;
+  line-height: 1.6;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  position: relative;
+  animation: fadeInUp 0.8s ease-out;
 }
 
-.progress-container {
-  margin-top: 15px;
-  padding: 20px;
-  border-radius: 10px;
-  background-color: #f8f9fa;
-  border: 1px solid #ebeef5;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s ease;
-  animation: pulse 2s infinite;
-}
-
-.video-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.video-actions .el-button {
-  margin-left: 10px;
-}
-
-.video-process-dialog .el-message-box__content {
-  max-height: 500px;
-  overflow-y: auto;
-  padding: 0 !important;
-  background: #f5f7fa;
-}
-
-.language-option {
-  cursor: pointer;
-  transition: all 0.3s;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.language-option:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-}
-
-.model-option.selected {
-  transform: scale(1.05);
-  z-index: 2;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
-  border: 2px solid #409EFF;
-}
-
-.processing-step {
-  font-size: 14px;
-  color: #409EFF;
-  font-weight: 500;
-  margin-top: 12px;
-  padding: 12px 15px;
-  background-color: #ecf5ff;
-  border-radius: 8px;
-  border-left: 4px solid #409EFF;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
-  animation: fadeInLeft 0.5s ease-out;
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 美化上传区域 */
@@ -1421,53 +1503,46 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+:deep(.el-upload-dragger):hover {
+  border-color: var(--indigo-600);
+  transform: scale(1.01);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.el-upload-dragger) .el-icon--upload {
+  transition: transform 0.3s ease;
+}
+
+:deep(.el-upload-dragger):hover .el-icon--upload {
+  transform: scale(1.2) translateY(-5px);
+  color: var(--indigo-600);
+}
+
 :deep(.el-upload-dragger)::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: 100%;
   background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
   z-index: 0;
 }
 
-:deep(.el-upload-dragger:hover) {
-  border-color: #409EFF;
-  background: linear-gradient(to bottom, #f0f7ff, #e6f1fc);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-}
-
-:deep(.el-icon--upload) {
-  font-size: 48px;
-  color: #409EFF;
-  margin-bottom: 15px;
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.1));
-  animation: bounce 2s infinite;
-}
-
 :deep(.el-upload__text) {
-  color: #606266;
+  color: var(--text-primary);
   font-size: 16px;
   margin-top: 15px;
   position: relative;
   z-index: 1;
 }
 
-:deep(.el-upload__text em) {
-  color: #409EFF;
-  font-style: normal;
-  font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
 :deep(.el-upload__tip) {
-  color: #909399;
+  color: var(--text-secondary);
   font-size: 13px;
   margin-top: 10px;
   padding: 8px 12px;
-  background-color: rgba(64, 158, 255, 0.08);
+  background-color: var(--indigo-100);
   border-radius: 6px;
   display: inline-block;
 }
@@ -1487,7 +1562,7 @@ onUnmounted(() => {
 :deep(.el-table__header-wrapper th) {
   background-color: transparent;
   font-weight: 600;
-  color: #1e3c72;
+  color: var(--indigo-600);
   padding: 12px 0;
 }
 
@@ -1496,7 +1571,7 @@ onUnmounted(() => {
 }
 
 :deep(.el-table__row:hover) {
-  background-color: #f0f7ff;
+  background-color: var(--indigo-100);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
 }
 
@@ -1506,6 +1581,7 @@ onUnmounted(() => {
 
 :deep(.el-button:hover) {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-3px);
 }
 
 :deep(.el-tag) {
@@ -1526,13 +1602,13 @@ onUnmounted(() => {
 
 :deep(.el-image:hover) {
   transform: scale(1.08);
-  border-color: #409EFF;
+  border-color: var(--indigo-600);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
 :deep(.el-form-item__label) {
   font-weight: 500;
-  color: #1e3c72;
+  color: var(--indigo-600);
   font-size: 15px;
 }
 
@@ -1543,7 +1619,7 @@ onUnmounted(() => {
 }
 
 :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px #409EFF inset, 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 0 1px var(--indigo-600) inset, 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 :deep(.el-progress) {
@@ -1552,7 +1628,7 @@ onUnmounted(() => {
 
 :deep(.el-progress__text) {
   font-weight: 600;
-  color: #1e3c72;
+  color: var(--indigo-600);
 }
 
 :deep(.el-progress-bar__outer) {
@@ -1563,24 +1639,24 @@ onUnmounted(() => {
 
 :deep(.el-progress-bar__inner) {
   border-radius: 10px;
-  background: linear-gradient(to right, #1e3c72, #2a5298);
-  box-shadow: 0 2px 6px rgba(30, 60, 114, 0.3);
+  background: var(--primary-gradient);
+  box-shadow: 0 2px 6px rgba(118, 75, 162, 0.3);
   transition: width 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 /* 视频信息样式 */
 .video-info-box {
-  background: rgba(240, 247, 255, 0.5);
+  background: var(--indigo-100);
   border-radius: 8px;
   padding: 8px 12px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-  border-left: 3px solid #409EFF;
+  border-left: 3px solid var(--indigo-600);
 }
 
 .video-info-box div {
   margin: 5px 0;
   font-size: 13px;
-  color: #606266;
+  color: var(--text-primary);
 }
 
 /* 操作按钮样式 */
@@ -1619,12 +1695,12 @@ onUnmounted(() => {
 }
 
 .process-button:not(:disabled):hover {
-  background-color: #409EFF;
-  border-color: #409EFF;
+  background-color: var(--indigo-600);
+  border-color: var(--indigo-600);
 }
 
 .delete-button:hover {
-  transform: rotate(5deg);
+  transform: rotate(5deg) translateY(-3px);
 }
 
 /* 动画效果 */
@@ -1633,9 +1709,19 @@ onUnmounted(() => {
   to { opacity: 1; }
 }
 
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInLeft {
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes pulse {
@@ -1649,456 +1735,381 @@ onUnmounted(() => {
   50% { transform: translateY(-10px); }
 }
 
-@keyframes fadeInLeft {
-  from { transform: translateX(-20px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
-/* 指南卡片样式 */
-.guide-row {
-  margin: 20px 0 80px 0;
-}
-
-.guide-card {
-  background: white;
-  border-radius: 12px;
-  padding: 20px;
-  height: 100%;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  animation: fadeIn 0.8s ease-out;
-}
-
-.guide-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 5px;
-  background: linear-gradient(90deg, #1e3c72, #2a5298);
-}
-
-.guide-card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-}
-
-.guide-icon {
-  font-size: 36px;
-  color: #1e3c72;
-  margin-bottom: 15px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 70px;
-  height: 70px;
-  border-radius: 50%;
-  background: rgba(30, 60, 114, 0.1);
-  margin: 0 auto 15px;
-}
-
-.guide-card h3 {
-  text-align: center;
-  color: #1e3c72;
-  margin-bottom: 15px;
-  font-size: 18px;
-}
-
-.guide-card ul {
-  padding-left: 20px;
-  margin: 0;
-}
-
-.guide-card li {
-  margin-bottom: 8px;
-  color: #606266;
-  position: relative;
-}
-
-.guide-card li::before {
-  content: "✓";
-  color: #409EFF;
-  position: absolute;
-  left: -18px;
-}
-
-.guide-card p {
-  color: #606266;
-  line-height: 1.6;
-}
-
-.process-steps {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 20px;
-}
-
-.process-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.step-number {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  margin-bottom: 8px;
-}
-
-.step-text {
-  font-size: 14px;
-  color: #606266;
-}
-
-.process-arrow {
-  margin: 0 15px;
-  color: #909399;
-  font-size: 20px;
-}
-
-.feature-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 15px;
-}
-
-.feature-tag {
-  background: rgba(64, 158, 255, 0.1);
-  color: #409EFF;
-  padding: 4px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-/* 空状态样式 */
-.empty-state {
-  padding: 40px 0;
-  text-align: center;
-  color: #909399;
-}
-
-.empty-icon {
-  font-size: 60px;
+/* 卡片样式 */
+.upload-card, .video-list-card {
   margin-bottom: 20px;
-  color: #dcdfe6;
-}
-
-.empty-state p {
-  margin: 5px 0;
-}
-
-.empty-tip {
-  font-size: 14px;
-  opacity: 0.7;
-}
-
-/* 底部信息卡片 */
-.bottom-info-section {
-  margin-top: 80px;
-  margin-bottom: 30px;
-  clear: both;
-  position: relative;
-}
-
-.info-card {
-  background: white;
   border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  height: 100%;
-}
-
-.info-card h3 {
-  color: #1e3c72;
-  margin-top: 0;
-  margin-bottom: 15px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 18px;
-}
-
-.info-content p {
-  margin: 8px 0;
-  color: #606266;
-}
-
-.stats-content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.stat-label {
-  font-size: 14px;
-  color: #909399;
-}
-
-.stat-value {
-  font-size: 16px;
-  color: #303133;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.status-dot.active {
-  background-color: #67C23A;
-  box-shadow: 0 0 5px rgba(103, 194, 58, 0.5);
-}
-
-.status-dot.inactive {
-  background-color: #F56C6C;
-  box-shadow: 0 0 5px rgba(245, 108, 108, 0.5);
-}
-
-/* 页脚 */
-.page-footer {
-  text-align: center;
-  padding: 20px 0;
-  color: #909399;
-  font-size: 14px;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-  margin-top: 30px;
-}
-
-/* 视频信息盒子样式 */
-.video-info-box {
-  background: rgba(64, 158, 255, 0.05);
-  border-left: 3px solid #409EFF;
-  padding: 8px 12px;
-  border-radius: 0 4px 4px 0;
-}
-
-.video-info-box div {
-  margin: 4px 0;
-  color: #606266;
-}
-
-/* 动画效果 */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(64, 158, 255, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(64, 158, 255, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(64, 158, 255, 0); }
-}
-
-@keyframes fadeInLeft {
-  from { transform: translateX(-20px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
-.upload-flex-container {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-}
-
-.upload-format-tip {
-  background: rgba(30, 60, 114, 0.05);
-  border-left: 3px solid #1e3c72;
-  padding: 15px;
-  border-radius: 0 4px 4px 0;
-  color: #606266;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: fit-content;
-  margin-top: 10px;
-}
-
-.upload-format-tip .el-icon {
-  color: #1e3c72;
-  font-size: 18px;
-}
-</style>
-
-
-<style>
-/* 对话框样式 */
-.video-process-dialog {
-  width: 800px !important;
-  max-width: 90vw !important;
-}
-
-.video-process-dialog .el-message-box__header {
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
-  padding: 15px 20px !important;
-  border-bottom: none !important;
-}
-
-.video-process-dialog .el-message-box__title {
-  color: white !important;
-}
-
-.video-process-dialog .el-message-box__content {
-  max-height: 80vh;
-  overflow-y: auto;
-  padding: 0 !important;
-  background: #f5f7fa;
-}
-
-.video-process-dialog .el-message-box__message {
-  padding: 0 !important;
-  width: 100% !important;
-}
-
-.video-process-dialog .el-message-box__message p {
-  margin: 0 !important;
-}
-
-/* 处理对话框内容布局 */
-.process-dialog-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: 20px;
-  width: 100%;
-  background: #f5f7fa;
-}
-
-/* 标题区域样式 */
-.dialog-header {
-  border-radius: 12px;
-  padding: 25px;
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
-  color: white;
-  box-shadow: 0 8px 20px rgba(30, 60, 114, 0.15);
-  transform: translateY(0);
-  transition: all 0.3s ease;
-}
-
-.dialog-header:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 25px rgba(30, 60, 114, 0.2);
-}
-
-/* 内容卡片样式 */
-.content-card {
-  background: white;
-  border-radius: 12px;
-  padding: 25px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.content-card:hover {
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-  transform: translateY(-2px);
-}
-
-/* 语言选择器样式 */
-.language-option {
-  position: relative;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  background-color: #fff;
+  position: relative;
+  padding: 0;
 }
 
-.language-option:hover {
-  transform: scale(1.02);
+.upload-card:hover, .video-list-card:hover {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  transform: translateY(-10px);
 }
 
-.language-option.selected::before {
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  position: relative;
+  z-index: 1;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.card-header h2, .card-header h3 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #4338ca;
+  position: relative;
+  padding-bottom: 5px;
+}
+
+.card-header h2::after, .card-header h3::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
   bottom: 0;
-  background: linear-gradient(45deg, rgba(64, 158, 255, 0.1), rgba(64, 158, 255, 0.2));
-  z-index: 0;
+  left: 0;
+  width: 40px;
+  height: 3px;
+  background: linear-gradient(to right, #6366f1, #a5b4fc);
+  border-radius: 3px;
 }
 
-/* 模型选择器样式 */
-.model-size-slider {
-  position: relative;
-  overflow: hidden;
-  border-radius: 12px;
-  transition: all 0.3s ease;
-}
-
-.model-size-slider:hover {
-  transform: scale(1.01);
-}
-
-#model-description {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-}
-
-#model-description:hover {
-  transform: translateX(5px);
-}
-
-/* 信息提示样式 */
-.info-tip {
-  background: rgba(64, 158, 255, 0.1);
-  border-radius: 8px;
-  padding: 12px;
+/* 标题样式优化 */
+.title-wrapper {
   display: flex;
   align-items: center;
   gap: 10px;
-  transition: all 0.3s ease;
 }
 
-.info-tip:hover {
-  background: rgba(64, 158, 255, 0.15);
-  transform: translateX(5px);
-}
-
-/* 按钮样式 */
-.el-message-box__btns {
-  padding: 20px !important;
-  background: #f5f7fa;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-.el-message-box__btns button {
-  padding: 12px 25px;
+.title-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
   border-radius: 8px;
-  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
-.el-message-box__btns button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+.title-icon .el-icon {
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.card-header h2, .card-header h3 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #4338ca;
+  position: relative;
+  padding-bottom: 5px;
+}
+
+.card-header h2::after, .card-header h3::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 40px;
+  height: 3px;
+  background: linear-gradient(to right, #6366f1, #a5b4fc);
+  border-radius: 3px;
+}
+
+/* 上传表单样式 */
+.upload-form {
+  padding: 15px;
+}
+
+/* 上传区域样式 */
+.upload-flex-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+:deep(.el-upload-dragger) {
+  width: 100%;
+  height: auto;
+  padding: 20px;
+  background: linear-gradient(to bottom, #f9f9f9, #f0f0f0);
+  border: 2px dashed #c0c4cc;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+:deep(.el-upload-dragger:hover) {
+  border-color: #4f46e5;
+  transform: scale(1.01);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.el-icon) {
+  font-size: 28px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+
+:deep(.el-upload-dragger:hover .el-icon) {
+  color: #4f46e5;
+}
+
+:deep(.el-upload__text) {
+  color: var(--text-primary);
+  font-size: 16px;
+  margin-top: 8px;
+}
+
+.upload-format-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #4f46e5;
+  padding: 8px 12px;
+  background-color: #ecf5ff;
+  border-radius: 6px;
+  border-left: 3px solid #4f46e5;
+  margin-top: 5px;
+}
+
+/* 进度条容器 */
+.progress-container {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
+}
+
+.processing-step {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #4f46e5;
+  text-align: center;
+}
+
+/* 分页容器样式 */
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  padding: 10px 0;
+}
+
+.custom-pagination {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pagination-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  border: 1px solid #dcdfe6;
+  background-color: #fff;
+  color: #606266;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.pagination-btn:disabled {
+  cursor: not-allowed;
+  color: #c0c4cc;
+  background-color: #f4f4f5;
+}
+
+.page-info {
+  min-width: 50px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #606266;
+  background-color: #f4f4f5;
+  border-radius: 4px;
+  padding: 0 10px;
+}
+
+/* 英雄区域样式 */
+.video-hero-section {
+  position: relative;
+  height: 200px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7eb 100%);
+  margin-bottom: 30px;
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.8), rgba(79, 70, 229, 0.8));
+}
+
+.hero-container {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  padding: 0 20px;
+}
+
+.hero-content-wrapper {
+  text-align: center;
+  color: white;
+}
+
+.main-title {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.subtitle {
+  font-size: 1.2rem;
+  font-weight: 400;
+  margin-bottom: 15px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.hero-description {
+  font-size: 1rem;
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.5;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 8px 15px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* 页脚样式 */
+.page-footer {
+  margin-top: 40px;
+  background-color: #333;
+  padding: 15px 0;
+  width: 100%;
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.page-footer p {
+  margin: 0;
+  color: white;
+  font-size: 14px;
+}
+
+.hero-description-container {
+  margin-top: 15px;
+}
+
+.hero-description {
+  font-size: 1rem;
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.5;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(255, 255, 255, 0.15);
+  padding: 8px 15px;
+  border-radius: 20px;
+  display: inline-block;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* 视频链接输入框样式 */
+.video-url-input:deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px #dcdfe6;
+  transition: all 0.3s;
+}
+
+.video-url-input:deep(.el-input__wrapper):hover {
+  box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.video-url-input:deep(.el-input__wrapper):focus-within {
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+}
+
+.submit-url-button {
+  font-weight: 500;
+  padding: 0 20px;
+}
+
+/* 视频摘要样式 */
+.video-summary-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 80px;
+}
+
+.summary-content {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #333;
+  max-height: 120px;
+  overflow-y: auto;
+  background-color: #f9f9f9;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border-left: 3px solid var(--primary-color);
+}
+
+.summary-actions {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.summary-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60px;
+  color: #909399;
+  font-size: 14px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
 }
 </style>

@@ -1,283 +1,281 @@
 <template>
-  <div class="home">
-    <!-- 英雄区域 -->
-    <section class="hero-section">
-      <div class="hero-overlay"></div>
-      <div class="hero-container">
-        <div class="hero-content-wrapper">
-          <div class="hero-text">
-            <h1 class="main-title">AI-EdVision<br><span class="highlight">智能教育视频分析系统</span></h1>
-            <p class="subtitle">通过 AI 技术赋能教育视频，提供智能字幕、知识问答、笔记管理等功能，让学习更高效、更智能、更个性化</p>
-            <el-button type="primary" size="large" class="hero-button" @click="navigateToUpload" :loading="isLoading">
-              <span v-if="!isLoading">开始上传视频</span>
-              <span v-else>正在准备...</span>
-            </el-button>
-          </div>
-          <div class="hero-image-container">
-            <img :src="heroImage" alt="AI 教育视频分析系统" class="hero-image" />
-          </div>
+  <!-- 英雄区域 -->
+  <section class="hero-section">
+    <div class="hero-overlay"></div>
+    <div class="hero-container">
+      <div class="hero-content-wrapper">
+        <div class="hero-text">
+          <h1 class="main-title">AI-EdVision<br><span class="highlight">智能教育视频分析系统</span></h1>
+          <p class="subtitle">通过 AI 技术赋能教育视频，提供智能字幕、知识问答、笔记管理等功能，让学习更高效、更智能、更个性化</p>
+          <el-button type="primary" size="large" class="hero-button" @click="navigateToUpload" :loading="isLoading">
+            <span v-if="!isLoading">开始上传视频</span>
+            <span v-else>正在准备...</span>
+          </el-button>
+        </div>
+        <div class="hero-image-container">
+          <img :src="heroImage" alt="AI 教育视频分析系统" class="hero-image" />
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- 核心功能区域 -->
-    <section class="features-section">
-      <div class="container">
-        <div class="section-header">
-          <h2 class="section-title">强大功能，智能学习</h2>
-          <p class="section-subtitle">AI-EdVision 集成多种智能功能，为您的学习体验带来革命性变化</p>
-        </div>
-
-        <div class="features-grid">
-          <div class="feature-card">
-            <div class="feature-icon-wrapper">
-              <i class="fas fa-cloud-upload-alt feature-icon"></i>
-            </div>
-            <h3 class="feature-title">智能视频上传</h3>
-            <p class="feature-description">
-              支持本地视频上传和哔哩哔哩/YouTube 链接导入，轻松获取学习资源
-            </p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-icon-wrapper">
-              <i class="fas fa-closed-captioning feature-icon"></i>
-            </div>
-            <h3 class="feature-title">智能字幕生成</h3>
-            <p class="feature-description">
-              使用 Whisper 语音识别模型，实时生成精准字幕，支持分段和语义合并显示
-            </p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-icon-wrapper">
-              <i class="fas fa-robot feature-icon"></i>
-            </div>
-            <h3 class="feature-title">智能问答系统</h3>
-            <p class="feature-description">
-              基于 RAG 系统的智能问答，支持深度思考模式，在线/离线模式任意切换
-            </p>
-          </div>
-
-          <div class="feature-card">
-            <div class="feature-icon-wrapper">
-              <i class="fas fa-sticky-note feature-icon"></i>
-            </div>
-            <h3 class="feature-title">智能笔记管理</h3>
-            <p class="feature-description">
-              记录、导出、批量管理笔记，基于相似性推荐，帮助掌握核心知识点
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 工作流程区域 -->
-    <section class="workflow-section">
+  <!-- 核心功能区域 -->
+  <section class="features-section">
+    <div class="container">
       <div class="section-header">
-        <h2 class="section-title">简单高效的学习流程</h2>
-        <p class="section-subtitle">只需几个简单步骤，即可开启 AI 辅助学习之旅</p>
+        <h2 class="section-title">强大功能，智能学习</h2>
+        <p class="section-subtitle">AI-EdVision 集成多种智能功能，为您的学习体验带来革命性变化</p>
       </div>
 
-      <div class="workflow-container">
-        <el-row :gutter="30">
-          <el-col :xs="24" :sm="24" :md="8" v-for="(workflow, index) in workflows" :key="index">
-            <div class="workflow-card">
-              <div class="step-number">{{ workflow.step }}</div>
-              <img :src="workflow.image" alt="workflow image" class="workflow-image">
-              <h3 class="workflow-title">{{ workflow.title }}</h3>
-              <p class="workflow-description">{{ workflow.description }}</p>
-            </div>
-          </el-col>
-        </el-row>
-      </div>
-    </section>
-
-    <!-- 核心优势区域 -->
-    <section class="advantages-section">
-      <div class="container">
-        <div class="section-header">
-          <h2 class="section-title">AI-EdVision 核心优势</h2>
-          <p class="section-subtitle">我们的系统具备多项独特优势，为您的学习提供全方位支持</p>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <i class="fas fa-cloud-upload-alt feature-icon"></i>
+          </div>
+          <h3 class="feature-title">智能视频上传</h3>
+          <p class="feature-description">
+            支持本地视频上传和哔哩哔哩/YouTube 链接导入，轻松获取学习资源
+          </p>
         </div>
 
-        <div class="advantages-grid">
-          <div class="advantage-item">
-            <div class="advantage-icon-wrapper">
-              <i class="fas fa-brain advantage-icon"></i>
-            </div>
-            <div class="advantage-content">
-              <h3 class="advantage-title">AI 驱动的智能分析</h3>
-              <p class="advantage-description">
-                采用先进的 AI 技术，对视频内容进行深度分析，提取关键知识点，生成精准字幕
-              </p>
-            </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <i class="fas fa-closed-captioning feature-icon"></i>
           </div>
+          <h3 class="feature-title">智能字幕生成</h3>
+          <p class="feature-description">
+            使用 Whisper 语音识别模型，实时生成精准字幕，支持分段和语义合并显示
+          </p>
+        </div>
 
-          <div class="advantage-item">
-            <div class="advantage-icon-wrapper">
-              <i class="fas fa-wifi advantage-icon"></i>
-            </div>
-            <div class="advantage-content">
-              <h3 class="advantage-title">在线/离线双模式</h3>
-              <p class="advantage-description">
-                支持在线和离线两种模式，即使没有网络连接，也能继续学习和提问
-              </p>
-            </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <i class="fas fa-robot feature-icon"></i>
           </div>
+          <h3 class="feature-title">智能问答系统</h3>
+          <p class="feature-description">
+            基于 RAG 系统的智能问答，支持深度思考模式，在线/离线模式任意切换
+          </p>
+        </div>
 
-          <div class="advantage-item">
-            <div class="advantage-icon-wrapper">
-              <i class="fas fa-project-diagram advantage-icon"></i>
-            </div>
-            <div class="advantage-content">
-              <h3 class="advantage-title">知识图谱可视化</h3>
-              <p class="advantage-description">
-                基于知识图谱技术，直观展示知识点之间的关联，帮助构建完整知识体系
-              </p>
-            </div>
+        <div class="feature-card">
+          <div class="feature-icon-wrapper">
+            <i class="fas fa-sticky-note feature-icon"></i>
           </div>
-
-          <div class="advantage-item">
-            <div class="advantage-icon-wrapper">
-              <i class="fas fa-user-graduate advantage-icon"></i>
-            </div>
-            <div class="advantage-content">
-              <h3 class="advantage-title">个性化学习体验</h3>
-              <p class="advantage-description">
-                根据学习行为和笔记内容，智能推荐相关知识点，打造个性化学习路径
-              </p>
-            </div>
-          </div>
+          <h3 class="feature-title">智能笔记管理</h3>
+          <p class="feature-description">
+            记录、导出、批量管理笔记，基于相似性推荐，帮助掌握核心知识点
+          </p>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- 数据统计区域 -->
-    <section class="stats-section">
-      <div class="stats-container">
-        <div class="stat-item" v-for="(stat, index) in stats" :key="index">
-          <div class="stat-number">{{ stat.number }}</div>
-          <div class="stat-label">{{ stat.label }}</div>
+  <!-- 工作流程区域 -->
+  <section class="workflow-section">
+    <div class="section-header">
+      <h2 class="section-title">简单高效的学习流程</h2>
+      <p class="section-subtitle">只需几个简单步骤，即可开启 AI 辅助学习之旅</p>
+    </div>
+
+    <div class="workflow-container">
+      <el-row :gutter="30">
+        <el-col :xs="24" :sm="24" :md="8" v-for="(workflow, index) in workflows" :key="index">
+          <div class="workflow-card">
+            <div class="step-number">{{ workflow.step }}</div>
+            <img :src="workflow.image" alt="workflow image" class="workflow-image">
+            <h3 class="workflow-title">{{ workflow.title }}</h3>
+            <p class="workflow-description">{{ workflow.description }}</p>
+          </div>
+        </el-col>
+      </el-row>
+    </div>
+  </section>
+
+  <!-- 核心优势区域 -->
+  <section class="advantages-section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">AI-EdVision 核心优势</h2>
+        <p class="section-subtitle">我们的系统具备多项独特优势，为您的学习提供全方位支持</p>
+      </div>
+
+      <div class="advantages-grid">
+        <div class="advantage-item">
+          <div class="advantage-icon-wrapper">
+            <i class="fas fa-brain advantage-icon"></i>
+          </div>
+          <div class="advantage-content">
+            <h3 class="advantage-title">AI 驱动的智能分析</h3>
+            <p class="advantage-description">
+              采用先进的 AI 技术，对视频内容进行深度分析，提取关键知识点，生成精准字幕
+            </p>
+          </div>
+        </div>
+
+        <div class="advantage-item">
+          <div class="advantage-icon-wrapper">
+            <i class="fas fa-wifi advantage-icon"></i>
+          </div>
+          <div class="advantage-content">
+            <h3 class="advantage-title">在线/离线双模式</h3>
+            <p class="advantage-description">
+              支持在线和离线两种模式，即使没有网络连接，也能继续学习和提问
+            </p>
+          </div>
+        </div>
+
+        <div class="advantage-item">
+          <div class="advantage-icon-wrapper">
+            <i class="fas fa-project-diagram advantage-icon"></i>
+          </div>
+          <div class="advantage-content">
+            <h3 class="advantage-title">知识图谱可视化</h3>
+            <p class="advantage-description">
+              基于知识图谱技术，直观展示知识点之间的关联，帮助构建完整知识体系
+            </p>
+          </div>
+        </div>
+
+        <div class="advantage-item">
+          <div class="advantage-icon-wrapper">
+            <i class="fas fa-user-graduate advantage-icon"></i>
+          </div>
+          <div class="advantage-content">
+            <h3 class="advantage-title">个性化学习体验</h3>
+            <p class="advantage-description">
+              根据学习行为和笔记内容，智能推荐相关知识点，打造个性化学习路径
+            </p>
+          </div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- 用户评价区域 -->
-    <section class="testimonials-section">
-      <div class="container">
-        <div class="section-header">
-          <h2 class="section-title">用户的声音</h2>
-          <p class="section-subtitle">听听我们的用户如何评价 AI-EdVision</p>
-        </div>
+  <!-- 数据统计区域 -->
+  <section class="stats-section">
+    <div class="stats-container">
+      <div class="stat-item" v-for="(stat, index) in stats" :key="index">
+        <div class="stat-number">{{ stat.number }}</div>
+        <div class="stat-label">{{ stat.label }}</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 用户评价区域 -->
+  <section class="testimonials-section">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title">用户的声音</h2>
+        <p class="section-subtitle">听听我们的用户如何评价 AI-EdVision</p>
+      </div>
     
-        <div class="testimonials-container">
-          <swiper
-            :modules="swiperModules"
-            :slides-per-view="1"
-            :space-between="30"
-            :pagination="{ clickable: true }"
-            :breakpoints="{
-              '640': { slidesPerView: 1 },
-              '768': { slidesPerView: 2 },
-              '1024': { slidesPerView: 3 }
-            }"
-            :autoplay="{ delay: 5000, disableOnInteraction: false }"
-            class="testimonial-swiper"
-          >
-            <swiper-slide v-for="(testimonial, index) in testimonials" :key="index">
-              <div class="testimonial-card">
-                <div class="testimonial-header">
-                  <div class="testimonial-avatar">
-                    <i :class="testimonial.icon"></i>
-                  </div>
-                  <div class="testimonial-user">
-                    <h4 class="testimonial-name">{{ testimonial.name }}</h4>
-                    <p class="testimonial-role">{{ testimonial.role }}</p>
-                  </div>
+      <div class="testimonials-container">
+        <swiper
+          :modules="swiperModules"
+          :slides-per-view="1"
+          :space-between="30"
+          :pagination="{ clickable: true }"
+          :breakpoints="{
+            '640': { slidesPerView: 1 },
+            '768': { slidesPerView: 2 },
+            '1024': { slidesPerView: 3 }
+          }"
+          :autoplay="{ delay: 5000, disableOnInteraction: false }"
+          class="testimonial-swiper"
+        >
+          <swiper-slide v-for="(testimonial, index) in testimonials" :key="index">
+            <div class="testimonial-card">
+              <div class="testimonial-header">
+                <div class="testimonial-avatar">
+                  <i :class="testimonial.icon"></i>
                 </div>
-                <p class="testimonial-content">{{ testimonial.content }}</p>
-                <div class="testimonial-rating">
-                  <i class="fas fa-star" v-for="star in 5" :key="star"></i>
+                <div class="testimonial-user">
+                  <h4 class="testimonial-name">{{ testimonial.name }}</h4>
+                  <p class="testimonial-role">{{ testimonial.role }}</p>
                 </div>
               </div>
-            </swiper-slide>
-          </swiper>
-        </div>
+              <p class="testimonial-content">{{ testimonial.content }}</p>
+              <div class="testimonial-rating">
+                <i class="fas fa-star" v-for="star in 5" :key="star"></i>
+              </div>
+            </div>
+          </swiper-slide>
+        </swiper>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- CTA 区域 -->
-    <section class="cta-section">
-      <div class="cta-card">
-        <h2 class="cta-title">准备好开始智能学习之旅了吗？</h2>
-        <p class="cta-description">立即体验 AI-EdVision，让 AI 技术为您的学习提供全方位支持</p>
-        <el-button type="primary" size="large" class="cta-button" @click="navigateToUpload">
-          免费开始使用
-        </el-button>
-      </div>
-    </section>
+  <!-- CTA 区域 -->
+  <section class="cta-section">
+    <div class="cta-card">
+      <h2 class="cta-title">准备好开始智能学习之旅了吗？</h2>
+      <p class="cta-description">立即体验 AI-EdVision，让 AI 技术为您的学习提供全方位支持</p>
+      <el-button type="primary" size="large" class="cta-button" @click="navigateToUpload">
+        免费开始使用
+      </el-button>
+    </div>
+  </section>
     
-    <!-- 页脚 -->
-    <footer class="footer-section">
-      <div class="container">
-        <div class="footer-grid">
-          <div class="footer-info">
-            <div class="footer-logo">
-              <i class="fas fa-brain"></i>
-              <h3>AI-EdVision</h3>
-            </div>
-            <p class="footer-description">
-              智能教育视频分析系统，让学习更高效、更智能、更个性化
-            </p>
+  <!-- 页脚 -->
+  <footer class="footer-section">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-info">
+          <div class="footer-logo">
+            <i class="fas fa-brain"></i>
+            <h3>AI-EdVision</h3>
           </div>
-          
-          <div class="footer-links">
-            <h4 class="footer-title">功能</h4>
-            <ul>
-              <li><a href="#">视频上传</a></li>
-              <li><a href="#">智能字幕</a></li>
-              <li><a href="#">智能问答</a></li>
-              <li><a href="#">笔记管理</a></li>
-            </ul>
-          </div>
-          
-          <div class="footer-links">
-            <h4 class="footer-title">资源</h4>
-            <ul>
-              <li><a href="#">使用指南</a></li>
-              <li><a href="#">API 文档</a></li>
-              <li><a href="#">常见问题</a></li>
-              <li><a href="#">博客</a></li>
-            </ul>
-          </div>
-          
-          <div class="footer-contact">
-            <h4 class="footer-title">联系我们</h4>
-            <ul>
-              <li><i class="fas fa-envelope"></i> contact@ai-edvision.com</li>
-              <li><i class="fas fa-phone"></i> +86 123 4567 8910</li>
-              <li><i class="fas fa-map-marker-alt"></i> 郑州市经济技术开发区</li>
-            </ul>
-            <div class="footer-social">
-              <a href="#"><i class="fab fa-weixin"></i></a>
-              <a href="#"><i class="fab fa-weibo"></i></a>
-              <a href="#"><i class="fab fa-github"></i></a>
-              <a href="#"><i class="fab fa-linkedin"></i></a>
-            </div>
-          </div>
+          <p class="footer-description">
+            智能教育视频分析系统，让学习更高效、更智能、更个性化
+          </p>
         </div>
         
-        <div class="footer-bottom">
-          <p>&copy; 2025 AI-EdVision. 保留所有权利。</p>
+        <div class="footer-links">
+          <h4 class="footer-title">功能</h4>
+          <ul>
+            <li><a href="#">视频上传</a></li>
+            <li><a href="#">智能字幕</a></li>
+            <li><a href="#">智能问答</a></li>
+            <li><a href="#">笔记管理</a></li>
+          </ul>
+        </div>
+        
+        <div class="footer-links">
+          <h4 class="footer-title">资源</h4>
+          <ul>
+            <li><a href="#">使用指南</a></li>
+            <li><a href="#">API 文档</a></li>
+            <li><a href="#">常见问题</a></li>
+            <li><a href="#">博客</a></li>
+          </ul>
+        </div>
+        
+        <div class="footer-contact">
+          <h4 class="footer-title">联系我们</h4>
+          <ul>
+            <li><i class="fas fa-envelope"></i> contact@ai-edvision.com</li>
+            <li><i class="fas fa-phone"></i> +86 123 4567 8910</li>
+            <li><i class="fas fa-map-marker-alt"></i> 郑州市经济技术开发区</li>
+          </ul>
+          <div class="footer-social">
+            <a href="#"><i class="fab fa-weixin"></i></a>
+            <a href="#"><i class="fab fa-weibo"></i></a>
+            <a href="#"><i class="fab fa-github"></i></a>
+            <a href="#"><i class="fab fa-linkedin"></i></a>
+          </div>
         </div>
       </div>
-    </footer>
-    
-    <!-- Toast 通知组件 -->
-    <div class="toast-notification" :class="{ show: showToast }">
-      {{ toastMessage }}
+      
+      <div class="footer-bottom">
+        <p>&copy; 2025 AI-EdVision. 保留所有权利。</p>
+      </div>
     </div>
+  </footer>
+  
+  <!-- Toast 通知组件 -->
+  <div class="toast-notification" :class="{ show: showToast }">
+    {{ toastMessage }}
   </div>
 </template>
 
@@ -467,7 +465,6 @@ export default {
 }
 </script>
 
-
 <style scoped>
 /* 基本变量定义 */
 :root {
@@ -578,21 +575,21 @@ export default {
 }
 
 .hero-button {
-  padding: 1rem 2.5rem !important; /* 增大内边距，使按钮更大 */
-  font-size: 1.5rem !important;  /* 增大字体大小 */
+  padding: 0.75rem 2.5rem !important; /* 增大内边距，使按钮更大 */
+  font-size: 1.1rem !important;  /* 增大字体大小 */
   font-weight: 600 !important;  /* 适当加粗 */
-  border-radius: 14px !important;  /* 调整圆角 */
+  border-radius: 8px !important;  /* 调整圆角与CTA按钮一致 */
   background-color: #fff !important;
-  color: #8c12cd !important;
+  color: #764ba2 !important; /* 与CTA按钮颜色一致 */
   border: none !important;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12) !important; /* 适当增加阴影，使按钮更突出 */
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1) !important; /* 与CTA按钮阴影一致 */
   transition: all 0.3s ease !important;
   animation: fadeInUp 1s ease-out 0.6s both;
 }
 
 .hero-button:hover {
   transform: translateY(-5px) !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
 }
 
 .hero-button:active {
@@ -1406,6 +1403,4 @@ section {
     font-size: 1rem !important;
   }
 }
-
-
 </style>

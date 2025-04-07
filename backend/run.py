@@ -2,6 +2,7 @@
 import os
 import logging
 from app import create_app
+from config import config
 
 # 配置日志
 logging.basicConfig(
@@ -15,9 +16,10 @@ try:
     app = create_app()
     
     if __name__ == '__main__':
-        # 设置主机和端口
-        host = os.environ.get('FLASK_HOST', '127.0.0.1')
-        port = int(os.environ.get('FLASK_PORT', 5000))
+        # 从配置文件获取主机和端口
+        config_name = os.getenv('FLASK_CONFIG', 'default')
+        host = config[config_name].FLASK_HOST
+        port = config[config_name].FLASK_PORT
         
         # 启动应用
         logger.info(f'启动Flask应用，监听 {host}:{port}')

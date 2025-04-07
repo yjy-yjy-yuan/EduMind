@@ -658,9 +658,10 @@ const convertSRTTimeToSeconds = (timeString) => {
 // 在data部分添加新的状态变量
 const loadMergedSubtitles = async (retryCount = 0, maxRetries = 3, force = false) => {
   console.log('开始加载合并字幕，视频ID:', videoId.value, '强制刷新:', force);
+  mergeSubtitlesLoading.value = true;
   try {
     // 构建API URL，添加force_refresh参数
-    const apiUrl = `/api/videos/${videoId.value}/subtitles/semantic-merged${force ? '?force_refresh=true' : ''}`;
+    const apiUrl = `/api/subtitles/videos/${videoId.value}/subtitles/semantic-merged${force ? '?force_refresh=true' : ''}`;
     console.log('请求API:', apiUrl);
     
     // 显示加载提示
@@ -699,20 +700,28 @@ const loadMergedSubtitles = async (retryCount = 0, maxRetries = 3, force = false
   } catch (error) {
     console.error('加载合并字幕失败:', error);
     
-    // 如果是超时错误且未超过最大重试次数，则重试
-    if (error.code === 'ECONNABORTED' && retryCount < maxRetries) {
-      ElMessage.info(`字幕处理超时，正在进行第 ${retryCount + 1} 次重试...`);
-      console.log(`字幕处理超时，正在进行第 ${retryCount + 1} 次重试...`);
+    // 检查是否是404错误（语义合并字幕不存在）
+    if (error.response && error.response.status === 404) {
+      console.log('语义合并字幕不存在，自动触发语义合并处理');
       
-      // 等待3秒后重试
-      setTimeout(() => {
-        loadMergedSubtitles(retryCount + 1, maxRetries, force);
-      }, 3000);
-      return;
+      // 显示单一提示信息
+      ElMessage.info('语义合并字幕生成中，请稍候...');
+      
+      // 自动触发语义合并
+      try {
+        await triggerSemanticMerge();
+        return; // 提前返回，避免设置 mergedSubtitles.value = []
+      } catch (mergeError) {
+        console.error('自动触发语义合并失败:', mergeError);
+        // 失败时才显示错误信息
+        ElMessage.error('语义合并处理失败，请稍后再试');
+      }
     }
     
     mergedSubtitles.value = [];
     ElMessage.error(`加载合并字幕失败: ${error.message || '未知错误'}`);
+  } finally {
+    mergeSubtitlesLoading.value = false;
   }
 };
 
@@ -889,11 +898,38 @@ const navigateToVideo = (videoId) => {
   }
 };
 
+// 触发语义合并操作
+const triggerSemanticMerge = async () => {
+  try {
+    ElMessage.info('正在启动语义合并处理，这可能需要几分钟时间...');
+    
+    // 发送POST请求触发语义合并
+    const response = await request({
+      url: `/api/subtitles/videos/${videoId.value}/subtitles/semantic-merge`,
+      method: 'post'
+    });
+    
+    if (response && response.data && response.data.success) {
+      ElMessage.success('语义合并操作已启动，请稍候...');
+      // 等待几秒后尝试加载合并字幕
+      setTimeout(() => {
+        loadMergedSubtitles();
+      }, 5000);
+    } else {
+      ElMessage.error('启动语义合并操作失败');
+    }
+  } catch (error) {
+    console.error('启动语义合并操作失败:', error);
+    ElMessage.error(`启动语义合并操作失败: ${error.message || '未知错误'}`);
+  }
+};
+
 // 重新合并字幕
 const refreshMergedSubtitles = async () => {
   mergeSubtitlesLoading.value = true;
   try {
-    await loadMergedSubtitles(0, 3, true); // 传入force=true参数，强制刷新
+    // 直接调用触发语义合并的函数
+    await triggerSemanticMerge();
   } finally {
     mergeSubtitlesLoading.value = false;
   }

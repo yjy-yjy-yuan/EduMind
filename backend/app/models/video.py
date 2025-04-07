@@ -47,6 +47,9 @@ class Video(db.Model):
     frame_count = db.Column(db.Integer, nullable=True) # 总帧数
     md5 = db.Column(db.String(32), nullable=True)  # 添加MD5字段
     
+    # 视频摘要
+    summary = db.Column(db.Text, nullable=True)  # 视频内容摘要
+    
     # 字幕关联
     subtitles = db.relationship('Subtitle', back_populates='video', lazy=True)
     
@@ -67,5 +70,6 @@ class Video(db.Model):
             'width': self.width,
             'height': self.height,
             'frame_count': self.frame_count,
-            'md5': self.md5
+            'md5': self.md5,
+            'summary': self.summary  # 添加摘要字段
         }

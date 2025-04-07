@@ -5,6 +5,10 @@ import VideoDetail from '../views/VideoDetail.vue'
 import VideoPlayer from '../views/VideoPlayer.vue'
 import Note from '../views/Note.vue'
 import LearningPath from '../views/LearningPath.vue'
+import UserGuide from '../views/AI-EdVision新手使用指南.vue'
+import Login from '../views/Login.vue'
+import Register from '../views/Register.vue'
+import Profile from '../views/Profile.vue'
 
 const routes = [
   {
@@ -53,6 +57,39 @@ const routes = [
     component: Note,
     meta: {
       title: '笔记系统'
+    }
+  },
+  {
+    path: '/guide',
+    name: 'UserGuide',
+    component: UserGuide,
+    meta: {
+      title: '使用指南'
+    }
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: Login,
+    meta: {
+      title: '登录'
+    }
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: Register,
+    meta: {
+      title: '注册'
+    }
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: Profile,
+    meta: {
+      title: '个人资料',
+      requiresAuth: true
     }
   }
 ]

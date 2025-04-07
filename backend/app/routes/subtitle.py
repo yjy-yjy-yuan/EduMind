@@ -14,8 +14,7 @@ import io
 import os
 import json
 
-subtitle_bp = Blueprint('subtitle', __name__, url_prefix='/api')
-
+subtitle_bp = Blueprint('subtitle', __name__)
 def check_redis_connection():
     try:
         r = redis.Redis(host='localhost', port=6379, db=0)
@@ -510,3 +509,100 @@ def merge_subtitle_segments(video_id):
             'status': 'error',
             'message': f'合并字幕失败: {str(e)}'
         }), 500
+
+# 触发字幕的语义合并处理
+@subtitle_bp.route('/videos/<int:video_id>/subtitles/semantic-merge', methods=['POST'])
+def trigger_semantic_merge(video_id):
+    """触发字幕的语义合并处理"""
+    try:
+        # 获取视频信息
+        video = Video.query.get_or_404(video_id)
+        
+        # 检查字幕文件是否存在
+        if not video.subtitle_filepath or not os.path.exists(video.subtitle_filepath):
+            return jsonify({"error": "字幕文件不存在"}), 404
+        
+        # 读取字幕文件
+        try:
+            with open(video.subtitle_filepath, 'r', encoding='utf-8') as f:
+                subtitle_content = f.read()
+        except Exception as e:
+            current_app.logger.error(f"读取字幕文件时出错: {str(e)}")
+            return jsonify({"error": f"读取字幕文件时出错: {str(e)}"}), 500
+        
+        # 解析.srt文件内容
+        subtitle_blocks = subtitle_content.strip().split('\n\n')
+        current_app.logger.info(f"分割出的字幕块数量: {len(subtitle_blocks)}")
+        
+        subtitles = []
+        for block in subtitle_blocks:
+            lines = block.strip().split('\n')
+            if len(lines) >= 3:  # 确保至少有索引、时间和文本
+                # 解析时间行
+                time_line = lines[1]
+                if '-->' in time_line:
+                    start_time_str, end_time_str = time_line.split('-->')
+                    
+                    # 转换时间格式为秒
+                    start_time_parts = start_time_str.strip().split(':')
+                    if len(start_time_parts) == 2:  # MM:SS 格式
+                        start_minutes = int(start_time_parts[0])
+                        start_seconds = float(start_time_parts[1].replace(',', '.'))
+                        start_time = start_minutes * 60 + start_seconds
+                    else:  # HH:MM:SS 格式
+                        start_hours = int(start_time_parts[0])
+                        start_minutes = int(start_time_parts[1])
+                        start_seconds = float(start_time_parts[2].replace(',', '.'))
+                        start_time = start_hours * 3600 + start_minutes * 60 + start_seconds
+                    
+                    end_time_parts = end_time_str.strip().split(':')
+                    if len(end_time_parts) == 2:  # MM:SS 格式
+                        end_minutes = int(end_time_parts[0])
+                        end_seconds = float(end_time_parts[1].replace(',', '.'))
+                        end_time = end_minutes * 60 + end_seconds
+                    else:  # HH:MM:SS 格式
+                        end_hours = int(end_time_parts[0])
+                        end_minutes = int(end_time_parts[1])
+                        end_seconds = float(end_time_parts[2].replace(',', '.'))
+                        end_time = end_hours * 3600 + end_minutes * 60 + end_seconds
+                    
+                    # 获取文本（可能有多行）
+                    text = '\n'.join(lines[2:])
+                    
+                    subtitles.append({
+                        'start_time': start_time,
+                        'end_time': end_time,
+                        'text': text
+                    })
+        
+        current_app.logger.info(f"从文件中解析出{len(subtitles)}条字幕")
+        
+        if not subtitles:
+            current_app.logger.warning("没有解析出有效的字幕")
+            return jsonify({"error": "没有解析出有效的字幕"}), 400
+        
+        # 构建缓存文件路径
+        cache_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'cache')
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_file = os.path.join(cache_dir, f'semantic_merged_{video_id}.json')
+        
+        # 调用基于Ollama的语义合并和标题生成函数
+        merged_subtitles = merge_subtitles_by_semantics_ollama(subtitles)
+        
+        current_app.logger.info(f"合并后的字幕数量: {len(merged_subtitles)}")
+        
+        # 将结果保存到缓存文件
+        try:
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(merged_subtitles, f, ensure_ascii=False, indent=2)
+            current_app.logger.info(f"语义合并字幕已缓存到: {cache_file}")
+        except Exception as e:
+            current_app.logger.error(f"保存缓存文件时出错: {str(e)}")
+            # 保存缓存失败不影响返回结果
+        
+        return jsonify({"success": True, "message": "语义合并处理完成", "count": len(merged_subtitles)}), 200
+    except Exception as e:
+        current_app.logger.error(f"语义合并处理时出错: {str(e)}")
+        import traceback
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({"error": "语义合并处理时发生错误"}), 500

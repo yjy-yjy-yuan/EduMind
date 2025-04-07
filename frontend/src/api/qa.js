@@ -50,7 +50,7 @@ export async function askQuestionStream(data, { onData, onError, onComplete }) {
     console.log('处理后的deep_thinking:', requestData.deep_thinking, typeof requestData.deep_thinking)
     
     // 使用正确的API基础URL
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
     console.log('使用的API基础URL:', apiBaseUrl);
     
     const response = await fetch(`${apiBaseUrl}/api/qa/ask`, {

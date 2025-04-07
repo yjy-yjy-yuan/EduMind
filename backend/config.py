@@ -10,9 +10,11 @@ load_dotenv(os.path.join(basedir, '.env'))
 class Config:
     # Flask配置
     SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key')
+    FLASK_HOST = os.getenv('FLASK_HOST', '127.0.0.1')
+    FLASK_PORT = int(os.getenv('FLASK_PORT', 5001))  # 默认端口设置为5001
     
     # 数据库配置
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///' + os.path.join(basedir, 'app.db'))
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'mysql+pymysql://root:Qw242015@localhost/ai_edvision')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Neo4j配置
