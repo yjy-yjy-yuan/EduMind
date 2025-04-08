@@ -95,3 +95,14 @@ export function deleteVideo(videoId) {
     method: 'delete'
   })
 }
+
+// 保存视频摘要
+export function saveVideoSummary(videoId, summary) {
+  return request({
+    url: `/api/videos/${videoId}/summary`,
+    method: 'post',
+    data: {
+      summary
+    }
+  })
+}

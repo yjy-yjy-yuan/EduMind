@@ -616,7 +616,8 @@ def get_video_list():
                     'duration': video.duration if hasattr(video, 'duration') else None,
                     'width': video.width if hasattr(video, 'width') else None,
                     'height': video.height if hasattr(video, 'height') else None,
-                    'fps': video.fps if hasattr(video, 'fps') else None
+                    'fps': video.fps if hasattr(video, 'fps') else None,
+                    'summary': video.summary if hasattr(video, 'summary') else None
                 }
                 result.append(video_data)
             except Exception as e:
@@ -1035,7 +1036,7 @@ def generate_summary(video_id):
 def get_video_detail(video_id):
     """获取视频详情"""
     try:
-        video = Video.query.get_or_404(video_id)
+        video = Video.query.get(video_id)
         return jsonify(video.to_dict()), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500

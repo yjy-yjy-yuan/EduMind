@@ -2,12 +2,12 @@
 视频摘要生成服务
 使用ollama模型或在线API处理视频字幕，生成内容摘要
 """
-
 import os
 import json
 import requests
 import logging
 import traceback
+import re
 from typing import Dict, Any, Optional
 
 # 配置日志
@@ -59,23 +59,23 @@ class SummaryGenerator:
             格式化后的提示词
         """
         # 这里可以根据需要调整提示词模板
-        prompt = f"""你是一个专业的教育视频内容分析助手。请根据以下视频字幕内容，提供一个简洁的摘要（200字以内），概括视频的主要内容、关键知识点和教学目标。
-        
+        prompt = f"""你是一个专业的教育视频内容分析助手。请根据以下视频字幕内容，提供一个简洁明了的摘要，让用户能够直接了解这个视频的学习领域和主要内容。
+
 字幕内容:
 ```
 {subtitle_text}
 ```
 
-请提供一个结构化的摘要，包括：
-1. 视频主题
-2. 核心知识点（3-5点）
-3. 适合的学习人群
+请生成一个简洁的摘要，内容应当：
+1. 直接说明这是哪个领域的学习视频（如计算机科学、心理学、历史等）
+2. 清晰描述视频主要讲解的具体内容和知识点
+3. 使用简洁直接的语言，避免过于抽象的描述
+4. 总字数控制在100字以内
 
-格式要求：
-- 总字数控制在200字以内
-- 使用简洁、专业的语言
-- 不要重复字幕原文
-- 直接输出摘要内容，不要包含"摘要："等前缀
+摘要格式示例：
+"这是一个关于[具体学科/领域]的教学视频，主要讲解了[具体内容/技术/概念]。视频详细介绍了[关键知识点1]、[关键知识点2]和[关键知识点3]等核心内容，适合[目标学习人群]学习使用。"
+
+请直接输出摘要内容，不要包含"摘要："等前缀，也不要使用"视频主题："、"核心知识点："这样的标签格式。
 """
         return prompt
     
@@ -248,6 +248,32 @@ class SummaryGenerator:
                 
             return text_cleaned
     
+    def _filter_thinking_process(self, summary: str) -> str:
+        """
+        过滤掉思考过程
+        
+        Args:
+            summary: 摘要文本
+            
+        Returns:
+            过滤后的摘要文本
+        """
+        # 使用正则表达式移除<think>...</think>标签及其内容
+        filtered_summary = re.sub(r'<think>.*?</think>', '', summary, flags=re.DOTALL)
+        
+        # 如果上面的正则没有匹配到，尝试其他可能的格式
+        if '<think>' in summary or '</think>' in summary:
+            # 尝试不同的正则模式
+            filtered_summary = re.sub(r'<think>[^<]*</think>', '', filtered_summary, flags=re.DOTALL)
+            filtered_summary = re.sub(r'<think>[\s\S]*?</think>', '', filtered_summary, flags=re.DOTALL)
+        
+        # 清理可能出现的多余空格
+        filtered_summary = re.sub(r'\s+', ' ', filtered_summary).strip()
+        
+        logger.info(f"过滤前摘要长度: {len(summary)}，过滤后: {len(filtered_summary)}")
+        
+        return filtered_summary
+    
     def generate_summary(self, subtitle_path: str) -> Dict[str, Any]:
         """
         从字幕文件生成视频摘要
@@ -326,6 +352,9 @@ class SummaryGenerator:
             
             if not summary:
                 return {"success": False, "error": "生成摘要失败", "summary": None}
+            
+            # 过滤掉思考过程
+            summary = self._filter_thinking_process(summary)
             
             return {"success": True, "error": None, "summary": summary}
             

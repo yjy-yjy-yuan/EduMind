@@ -26,7 +26,7 @@
           <!-- 已分析视频列表 -->
           <div class="menu-section">
             <h4>已分析视频</h4>
-            <div class="video-list" v-if="processedVideos.length > 0">
+            <div class="video-list custom-scrollbar" v-if="processedVideos.length > 0">
               <div class="video-item" 
                    v-for="video in processedVideos" 
                    :key="video.id"
@@ -44,9 +44,9 @@
             </div>
           </div>
           
-          <div class="menu-item" @click="showHelpDialog">
+          <div class="menu-item" @click="navigateToGuide">
             <el-icon><document /></el-icon>
-            <span>帮助文档</span>
+            <span>使用指南</span>
           </div>
           <div class="menu-item" @click="navigateToNoteSystem">
             <el-icon><edit /></el-icon>
@@ -307,6 +307,7 @@
       title="AI-EdVision 使用帮助"
       width="60%"
       :before-close="closeHelpDialog"
+      v-if="false"
     >
       <div class="help-content">
         <h3>欢迎使用 AI-EdVision 智能教育视频分析系统</h3>
@@ -1243,6 +1244,14 @@ const navigateToNoteSystem = () => {
   });
 };
 
+// 导航到使用指南
+const navigateToGuide = () => {
+  router.push({
+    path: '/guide',
+    query: { videoId: videoId.value }
+  });
+};
+
 // 功能引导提示弹窗相关状态
 const showGuideDialog = ref(false);
 const dontShowGuideAgain = ref(false);
@@ -1808,26 +1817,6 @@ const closeGuideDialog = () => {
   margin-top: 15px;
 }
 
-/*帮助对话框*/
-.help-dialog .el-dialog__body {
-  padding: 20px;
-}
-
-.help-content h3 {
-  margin-top: 20px;
-  margin-bottom: 10px;
-  color: #409EFF;
-}
-
-.help-content p, .help-content li {
-  line-height: 1.6;
-  margin-bottom: 10px;
-}
-
-.help-content ul {
-  padding-left: 20px;
-}
-
 /*侧边栏*/
 .sidebar {
   position: fixed;
@@ -1917,21 +1906,41 @@ const closeGuideDialog = () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 300px;
+  max-height: 280px; /* 限制高度，约显示4个视频项 */
   overflow-y: auto;
-  padding-right: 5px; /* 添加右侧内边距，避免滚动条挤压内容 */
+  padding-right: 5px;
+}
+
+/* 自定义滚动条样式 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .video-item {
   display: flex;
   align-items: center;
-  padding: 12px;
+  padding: 10px;
   border-radius: 8px;
-  background-color: rgba(0, 0, 0, 0.2); /* 使用深色背景，而不是白色透明背景 */
+  background-color: rgba(0, 0, 0, 0.2);
   cursor: pointer;
   transition: all 0.3s ease;
   width: 100%;
   box-sizing: border-box;
+  height: 65px; /* 固定高度，确保每个视频项大小一致 */
 }
 
 .video-item:hover {

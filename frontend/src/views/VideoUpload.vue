@@ -8,7 +8,7 @@
             <h1 class="main-title">视频管理中心</h1>
             <p class="subtitle">上传、管理和处理您的教育视频</p>
             <div class="hero-description-container">
-              <p class="hero-description">🎉 添加教学视频,我们辅助你进行更加高效地学习。😊</p>
+              <p class="hero-description">🎉 添加教学视频,我们将辅助您进行更加高效地学习。😊</p>
             </div>
           </div>
         </div>
@@ -175,33 +175,32 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200">
+        <el-table-column label="操作" width="220">
           <template #default="scope">
             <div class="action-buttons">
-              <el-button 
-                :icon="VideoPlay"
-                circle
-                @click="handlePlay(scope.row)"
-                :disabled="!['completed'].includes(scope.row.status)"
+              <el-icon 
+                class="action-icon play-icon" 
+                :class="{ disabled: !['completed'].includes(scope.row.status) }"
+                @click="['completed'].includes(scope.row.status) ? handlePlay(scope.row) : null"
                 title="播放视频"
-                class="action-button play-button"
-              />
-              <el-button 
-                :icon="VideoCamera"
-                circle
-                @click="handleProcess(scope.row)"
-                :disabled="!['uploaded', 'pending'].includes(scope.row.status) || scope.row.status === 'downloading'"
+              >
+                <VideoPlay />
+              </el-icon>
+              <el-icon 
+                class="action-icon process-icon" 
+                :class="{ disabled: !['uploaded', 'pending'].includes(scope.row.status) || scope.row.status === 'downloading' }"
+                @click="['uploaded', 'pending'].includes(scope.row.status) && scope.row.status !== 'downloading' ? handleProcess(scope.row) : null"
                 title="处理视频"
-                class="action-button process-button"
-              />
-              <el-button 
-                type="danger" 
-                :icon="Delete"
-                circle
+              >
+                <VideoCamera />
+              </el-icon>
+              <el-icon 
+                class="action-icon delete-icon" 
                 @click="handleDelete(scope.row)"
                 title="删除视频"
-                class="action-button delete-button"
-              />
+              >
+                <Delete />
+              </el-icon>
             </div>
           </template>
         </el-table-column>
@@ -259,9 +258,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { 
   Delete, 
+  VideoPlay,
   Upload, 
-  VideoPlay, 
-  View, 
   Refresh, 
   ArrowLeft,
   ArrowRight,
@@ -276,7 +274,8 @@ import {
   getVideoPreview,
   deleteVideo,
   getVideoStatus,
-  getVideo
+  getVideo,
+  saveVideoSummary
 } from '@/api/video'
 
 const formData = ref({
@@ -617,6 +616,7 @@ const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
         uploadStatus.value = 'success'
         uploadProgress.value = 100
         uploadStepInfo.value = '处理完成'
+        
         ElMessage({
           message: '视频处理成功',
           type: 'success',
@@ -735,11 +735,11 @@ const handleProcess = async (video) => {
             <p style="margin: 0;">适用场景：<span style="color: #606266;">一般视频转录，对速度要求高</span></p>
           </div>
         </div>
-      </div>
-      <input type="hidden" id="model-select" value="turbo">
-      <div class="info-tip">
-        <i class="el-icon-info-circle" style="color: #409EFF;"></i>
-        <span>从左到右：模型越大，转录准确度越高，但处理时间也越长</span>
+        <input type="hidden" id="model-select" value="turbo">
+        <div class="info-tip">
+          <i class="el-icon-info-circle" style="color: #409EFF;"></i>
+          <span>从左到右：模型越大，转录准确度越高，但处理时间也越长</span>
+        </div>
       </div>
     </div>
   </div>
@@ -1078,6 +1078,63 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
         uploadStatus.value = 'success'
         uploadProgress.value = 100
         uploadStepInfo.value = '处理完成'
+        // 自动生成摘要
+        try {
+          console.log(`视频${videoId}处理完成，自动生成摘要`)
+          
+          // 显示正在生成摘要的提示
+          ElMessage({
+            message: '正在自动生成视频摘要，请稍候...',
+            type: 'info',
+            duration: 3000,
+            customClass: 'custom-message info-message',
+            showClose: true,
+            offset: 80
+          })
+          
+          // 调用后端API生成摘要
+          const response = await fetch(`/api/videos/${videoId}/generate-summary`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          if (response.ok) {
+            console.log(`视频${videoId}摘要自动生成成功`)
+            
+            // 显示摘要生成成功的提示
+            ElMessage({
+              message: '视频摘要生成成功',
+              type: 'success',
+              duration: 3000,
+              customClass: 'custom-message success-message',
+              showClose: true,
+              offset: 80
+            })
+          } else {
+            console.error('自动生成摘要失败:', await response.text())
+            
+            // 显示摘要生成失败的提示
+            ElMessage({
+              message: '视频摘要生成失败',
+              type: 'error',
+              duration: 3000,
+              customClass: 'custom-message error-message',
+              showClose: true,
+              offset: 80
+            })
+          }
+        } catch (error) {
+          console.error('自动生成摘要过程中出错:', error)
+          
+          // 显示摘要生成出错的提示
+          ElMessage({
+            message: `视频摘要生成出错: ${error.message}`,
+            type: 'error',
+            duration: 3000
+          })
+        }
         ElMessage({
           message: '视频处理完成',
           type: 'success',
@@ -1365,6 +1422,13 @@ const generateSummary = async (video) => {
     // 设置生成中状态
     video.generatingSummary = true
     
+    // 显示正在生成摘要的提示
+    ElMessage({
+      message: '正在生成视频摘要，请稍候...',
+      type: 'info',
+      duration: 3000
+    })
+    
     // 调用后端API生成摘要
     const response = await fetch(`/api/videos/${video.id}/generate-summary`, {
       method: 'POST',
@@ -1379,13 +1443,33 @@ const generateSummary = async (video) => {
     
     const data = await response.json()
     
-    // 更新视频对象的摘要
-    video.summary = data.summary
+    // 过滤掉思考过程
+    let summary = data.summary
+    if (summary) {
+      // 使用正则表达式移除<think>...</think>标签及其内容
+      summary = summary.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+      // 清理可能出现的多余空格
+      summary = summary.replace(/\s+/g, ' ').trim()
+    }
     
-    ElMessage.success('摘要生成成功')
+    // 更新视频对象的摘要
+    video.summary = summary
+    
+    // 显示摘要生成成功的提示
+    ElMessage({
+      message: '视频摘要生成成功',
+      type: 'success',
+      duration: 3000
+    })
   } catch (error) {
     console.error('生成摘要错误:', error)
-    ElMessage.error(`生成摘要失败: ${error.message}`)
+    
+    // 显示摘要生成失败的提示
+    ElMessage({
+      message: '视频摘要生成失败',
+      type: 'error',
+      duration: 3000
+    })
   } finally {
     // 清除生成中状态
     video.generatingSummary = false
@@ -1495,27 +1579,13 @@ const generateSummary = async (video) => {
 /* 美化上传区域 */
 :deep(.el-upload-dragger) {
   background: linear-gradient(to bottom, #f9f9f9, #f0f0f0);
-  border: 2px dashed #c0c4cc;
+  border: 2px dashed #3CAEA3;
   border-radius: 12px;
   transition: all 0.4s;
-  padding: 30px 20px;
+  padding: 40px 20px;
   position: relative;
   overflow: hidden;
-}
-
-:deep(.el-upload-dragger):hover {
-  border-color: var(--indigo-600);
-  transform: scale(1.01);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-}
-
-:deep(.el-upload-dragger) .el-icon--upload {
-  transition: transform 0.3s ease;
-}
-
-:deep(.el-upload-dragger):hover .el-icon--upload {
-  transform: scale(1.2) translateY(-5px);
-  color: var(--indigo-600);
+  box-shadow: inset 0 0 15px rgba(60, 174, 163, 0.1);
 }
 
 :deep(.el-upload-dragger)::before {
@@ -1523,383 +1593,117 @@ const generateSummary = async (video) => {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20px 20px, rgba(60, 174, 163, 0.05) 0, rgba(60, 174, 163, 0.05) 2px, transparent 2px),
+    radial-gradient(circle at 40px 40px, rgba(79, 70, 229, 0.05) 0, rgba(79, 70, 229, 0.05) 2px, transparent 2px);
+  background-size: 60px 60px;
   z-index: 0;
 }
 
-:deep(.el-upload__text) {
-  color: var(--text-primary);
-  font-size: 16px;
-  margin-top: 15px;
-  position: relative;
-  z-index: 1;
-}
-
-:deep(.el-upload__tip) {
-  color: var(--text-secondary);
-  font-size: 13px;
-  margin-top: 10px;
-  padding: 8px 12px;
-  background-color: var(--indigo-100);
-  border-radius: 6px;
-  display: inline-block;
-}
-
-/* 美化表格 */
-:deep(.el-table) {
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-:deep(.el-table__header) {
-  background: linear-gradient(to right, #f0f2f5, #e4e7ed);
-}
-
-:deep(.el-table__header-wrapper th) {
-  background-color: transparent;
-  font-weight: 600;
-  color: var(--indigo-600);
-  padding: 12px 0;
-}
-
-:deep(.el-table__row) {
-  transition: all 0.3s;
-}
-
-:deep(.el-table__row:hover) {
-  background-color: var(--indigo-100);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-}
-
-:deep(.el-button) {
-  transition: all 0.3s;
-}
-
-:deep(.el-button:hover) {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transform: translateY(-3px);
-}
-
-:deep(.el-tag) {
-  border-radius: 6px;
-  font-weight: 500;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-  padding: 4px 8px;
-  letter-spacing: 0.5px;
-}
-
-:deep(.el-image) {
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-  transition: all 0.4s;
-  border: 2px solid transparent;
-}
-
-:deep(.el-image:hover) {
-  transform: scale(1.08);
-  border-color: var(--indigo-600);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-}
-
-:deep(.el-form-item__label) {
-  font-weight: 500;
-  color: var(--indigo-600);
-  font-size: 15px;
-}
-
-:deep(.el-input__wrapper) {
-  border-radius: 8px;
-  transition: all 0.3s;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-:deep(.el-input__wrapper:hover) {
-  box-shadow: 0 0 0 1px var(--indigo-600) inset, 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-:deep(.el-progress) {
-  margin: 10px 0;
-}
-
-:deep(.el-progress__text) {
-  font-weight: 600;
-  color: var(--indigo-600);
-}
-
-:deep(.el-progress-bar__outer) {
-  border-radius: 10px;
-  background-color: #e6e6e6;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-:deep(.el-progress-bar__inner) {
-  border-radius: 10px;
-  background: var(--primary-gradient);
-  box-shadow: 0 2px 6px rgba(118, 75, 162, 0.3);
-  transition: width 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-/* 视频信息样式 */
-.video-info-box {
-  background: var(--indigo-100);
-  border-radius: 8px;
-  padding: 8px 12px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-  border-left: 3px solid var(--indigo-600);
-}
-
-.video-info-box div {
-  margin: 5px 0;
-  font-size: 13px;
-  color: var(--text-primary);
-}
-
-/* 操作按钮样式 */
-.action-buttons {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-}
-
-.action-button {
-  position: relative;
-  overflow: hidden;
-}
-
-.action-button::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
-  transform: scale(0);
-  opacity: 0;
-  transition: transform 0.5s, opacity 0.3s;
-}
-
-.action-button:hover::before {
-  transform: scale(2);
-  opacity: 1;
-}
-
-.play-button:not(:disabled):hover {
-  background-color: #67C23A;
-  border-color: #67C23A;
-}
-
-.process-button:not(:disabled):hover {
-  background-color: var(--indigo-600);
-  border-color: var(--indigo-600);
-}
-
-.delete-button:hover {
-  transform: rotate(5deg) translateY(-3px);
-}
-
-/* 动画效果 */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeInLeft {
-  from { transform: translateX(-20px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
-}
-
-@keyframes pulse {
-  0% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
-  50% { box-shadow: 0 4px 20px rgba(64, 158, 255, 0.2); }
-  100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08); }
-}
-
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-
-/* 卡片样式 */
-.upload-card, .video-list-card {
-  margin-bottom: 20px;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
-  max-width: 1200px;
-  margin-left: auto;
-  margin-right: auto;
-  background-color: #fff;
-  position: relative;
-  padding: 0;
-}
-
-.upload-card:hover, .video-list-card:hover {
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-  transform: translateY(-10px);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 20px;
-  position: relative;
-  z-index: 1;
-  background-color: #f8f9fa;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.card-header h2, .card-header h3 {
-  margin: 0;
-  font-size: 1.4rem;
-  font-weight: 600;
-  color: #4338ca;
-  position: relative;
-  padding-bottom: 5px;
-}
-
-.card-header h2::after, .card-header h3::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 40px;
-  height: 3px;
-  background: linear-gradient(to right, #6366f1, #a5b4fc);
-  border-radius: 3px;
-}
-
-/* 标题样式优化 */
-.title-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.title-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #6366f1, #4f46e5);
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-}
-
-.title-icon .el-icon {
-  font-size: 18px;
-  color: #ffffff;
-}
-
-.card-header h2, .card-header h3 {
-  margin: 0;
-  font-size: 1.4rem;
-  font-weight: 600;
-  color: #4338ca;
-  position: relative;
-  padding-bottom: 5px;
-}
-
-.card-header h2::after, .card-header h3::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 40px;
-  height: 3px;
-  background: linear-gradient(to right, #6366f1, #a5b4fc);
-  border-radius: 3px;
-}
-
-/* 上传表单样式 */
-.upload-form {
-  padding: 15px;
-}
-
-/* 上传区域样式 */
-.upload-flex-container {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-:deep(.el-upload-dragger) {
-  width: 100%;
-  height: auto;
-  padding: 20px;
-  background: linear-gradient(to bottom, #f9f9f9, #f0f0f0);
-  border: 2px dashed #c0c4cc;
-  border-radius: 8px;
-  transition: all 0.3s;
-}
-
-:deep(.el-upload-dragger:hover) {
-  border-color: #4f46e5;
+:deep(.el-upload-dragger):hover {
+  border-color: #4F46E5;
   transform: scale(1.01);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1), inset 0 0 20px rgba(79, 70, 229, 0.15);
 }
 
-:deep(.el-icon) {
-  font-size: 28px;
-  color: #909399;
-  margin-bottom: 8px;
+:deep(.el-icon--upload) {
+  font-size: 36px;
+  color: #3CAEA3;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
-:deep(.el-upload-dragger:hover .el-icon) {
-  color: #4f46e5;
+:deep(.el-upload-dragger:hover .el-icon--upload) {
+  color: #4F46E5;
+  transform: scale(1.1);
 }
 
 :deep(.el-upload__text) {
   color: var(--text-primary);
   font-size: 16px;
-  margin-top: 8px;
-}
-
-.upload-format-tip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #4f46e5;
-  padding: 8px 12px;
-  background-color: #ecf5ff;
-  border-radius: 6px;
-  border-left: 3px solid #4f46e5;
-  margin-top: 5px;
-}
-
-/* 进度条容器 */
-.progress-container {
   margin-top: 15px;
-  padding: 10px;
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  border: 1px solid #ebeef5;
+  position: relative;
+  z-index: 1;
+  font-weight: 500;
 }
 
-.processing-step {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #4f46e5;
-  text-align: center;
+:deep(.el-upload__text em) {
+  color: #4F46E5;
+  font-style: normal;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+/* 视频链接输入框样式 */
+.video-url-input:deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px #3CAEA3;
+  transition: all 0.3s;
+  background-color: rgba(60, 174, 163, 0.05);
+  background-image: 
+    linear-gradient(45deg, rgba(60, 174, 163, 0.03) 25%, transparent 25%, transparent 50%, 
+    rgba(60, 174, 163, 0.03) 50%, rgba(60, 174, 163, 0.03) 75%, transparent 75%, transparent);
+  background-size: 20px 20px;
+  border-radius: 8px;
+}
+
+.video-url-input:deep(.el-input__wrapper):hover {
+  box-shadow: 0 0 0 1px #4F46E5;
+}
+
+.video-url-input:deep(.el-input__wrapper):focus-within {
+  box-shadow: 0 0 0 2px rgba(60, 174, 163, 0.3);
+  background-color: white;
+  background-image: none;
+}
+
+/* 确保按钮在输入框中正确显示 */
+.video-url-input:deep(.el-input-group__append) {
+  padding: 0;
+  background-color: transparent;
+  border-color: #3CAEA3;
+}
+
+.video-url-input:deep(.el-input-group__append .el-button) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin: 0;
+}
+
+/* 修改提交链接按钮样式 */
+.video-url-input:deep(.el-input-group__append .el-button.el-button--primary) {
+  background-color: #0d86e2 !important;  /* 靛蓝色背景 */
+  border-color: #3b77ef !important;      /* 靛蓝色边框 */
+  color: white !important;               /* 白色文字 */
+  font-weight: 500;
+  padding: 0 20px;
+  border-radius: 8px !important;         /* 加入圆角 */
+}
+
+
+.video-url-input:deep(.el-input-group__append .el-button.el-button--primary:hover) {
+  background-color: #4338CA !important;  /* 悬停时颜色加深 */
+  border-color: #4338CA !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3) !important;  /* 添加阴影效果 */
+  transform: translateY(-2px);  /* 轻微上移效果 */
+}
+
+.submit-url-button {
+  font-weight: 500;
+  padding: 0 20px;
+  background-color: #4F46E5;  /* 靛蓝色背景 */
+  border-color: #4F46E5;      /* 靛蓝色边框 */
+  color: white;               /* 白色文字 */
+}
+
+.submit-url-button:hover {
+  background-color: #4338CA;  /* 悬停时颜色加深 */
+  border-color: #4338CA;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);  /* 添加阴影效果 */
+  transform: translateY(-2px);  /* 轻微上移效果 */
 }
 
 /* 分页容器样式 */
@@ -2059,57 +1863,265 @@ const generateSummary = async (video) => {
 
 /* 视频链接输入框样式 */
 .video-url-input:deep(.el-input__wrapper) {
-  box-shadow: 0 0 0 1px #dcdfe6;
+  box-shadow: 0 0 0 1px #3CAEA3;
   transition: all 0.3s;
+  background-color: rgba(60, 174, 163, 0.05);
+  background-image: 
+    linear-gradient(45deg, rgba(60, 174, 163, 0.03) 25%, transparent 25%, transparent 50%, 
+    rgba(60, 174, 163, 0.03) 50%, rgba(60, 174, 163, 0.03) 75%, transparent 75%, transparent);
+  background-size: 20px 20px;
+  border-radius: 8px;
 }
 
 .video-url-input:deep(.el-input__wrapper):hover {
-  box-shadow: 0 0 0 1px var(--primary-color);
+  box-shadow: 0 0 0 1px #4F46E5;
 }
 
 .video-url-input:deep(.el-input__wrapper):focus-within {
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 0 0 2px rgba(60, 174, 163, 0.3);
+  background-color: white;
+  background-image: none;
 }
 
 .submit-url-button {
   font-weight: 500;
   padding: 0 20px;
+  background-color: #4F46E5;
+  border-color: #4F46E5;
+  color: white;
 }
 
-/* 视频摘要样式 */
-.video-summary-box {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 80px;
+.submit-url-button:hover {
+  background-color: #4338CA;
+  border-color: #4338CA;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  transform: translateY(-2px);
 }
 
-.summary-content {
-  font-size: 14px;
-  line-height: 1.5;
-  color: #333;
-  max-height: 120px;
-  overflow-y: auto;
-  background-color: #f9f9f9;
+/* 卡片样式 */
+.upload-card, .video-list-card {
+  margin-bottom: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  background-color: #fff;
+  position: relative;
+  padding: 0;
+  border: 3px solid transparent;
+  background-image: linear-gradient(white, white), linear-gradient(135deg, #3CAEA3, #4F46E5);
+  background-origin: border-box;
+  background-clip: content-box, border-box;
+}
+
+/* 移除悬停特效 */
+/* .upload-card:hover, .video-list-card:hover {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  transform: translateY(-10px);
+} */
+
+/* 美化表格 */
+:deep(.el-table) {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+:deep(.el-table__header) {
+  background: linear-gradient(to right, #f0f2f5, #e4e7ed);
+}
+
+:deep(.el-table__header-wrapper th) {
+  background-color: transparent;
+  font-weight: 600;
+  color: var(--indigo-600);
+  padding: 12px 0;
+}
+
+:deep(.el-table__row) {
+  transition: all 0.3s;
+}
+
+:deep(.el-table__row:hover) {
+  background-color: var(--indigo-100);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+:deep(.el-button) {
+  transition: all 0.3s;
+}
+
+:deep(.el-button:hover) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-3px);
+}
+
+:deep(.el-tag) {
+  border-radius: 6px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  padding: 4px 8px;
+  letter-spacing: 0.5px;
+}
+
+:deep(.el-image) {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.4s;
+  border: 2px solid transparent;
+}
+
+:deep(.el-image:hover) {
+  transform: scale(1.08);
+  border-color: var(--indigo-600);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+:deep(.el-form-item__label) {
+  font-weight: 500;
+  color: var(--indigo-600);
+  font-size: 15px;
+}
+
+:deep(.el-input__wrapper) {
+  border-radius: 8px;
+  transition: all 0.3s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 0 0 1px var(--indigo-600) inset, 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.el-progress) {
+  margin: 10px 0;
+}
+
+:deep(.el-progress__text) {
+  font-weight: 600;
+  color: var(--indigo-600);
+}
+
+:deep(.el-progress-bar__outer) {
+  border-radius: 10px;
+  background-color: #e6e6e6;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.el-progress-bar__inner) {
+  border-radius: 10px;
+  background: #67C23A; /* 修改为Element Plus的成功绿色 */
+  box-shadow: 0 2px 6px rgba(103, 194, 58, 0.3); /* 调整阴影颜色匹配绿色 */
+  transition: width 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 视频信息样式 */
+.video-info-box {
+  background: var(--indigo-100);
+  border-radius: 8px;
   padding: 8px 12px;
-  border-radius: 4px;
-  border-left: 3px solid var(--primary-color);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  border-left: 3px solid var(--indigo-600);
 }
 
-.summary-actions {
+.video-info-box div {
+  margin: 5px 0;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+/* 操作按钮样式 */
+.action-buttons {
   display: flex;
-  justify-content: center;
-  padding: 10px 0;
+  justify-content: space-between; /* 改为两端对齐 */
+  align-items: center;
+  width: 100%; /* 确保占满整个单元格宽度 */
+  padding: 0 20px; /* 添加左右内边距，防止图标贴边 */
 }
 
-.summary-placeholder {
+.action-icon {
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  background-color:  rgb(167, 212, 220); /* 使用主色调 */
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 60px;
-  color: #909399;
-  font-size: 14px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
+  transition: all 0.3s;
+  border: none;
+  box-shadow: 0 2px 6px rgba(60, 174, 163, 0.3);
+}
+
+.action-icon:hover:not(.disabled) {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+  transform: scale(1.05);
+}
+
+.action-icon.disabled {
+  cursor: not-allowed;
+  color: #c0c4cc;
+  background-color: #f4f4f5;
+  opacity: 0.7;
+}
+
+/* 卡片标题样式 */
+.title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.title-icon .el-icon {
+  font-size: 18px;
+  color: #ffffff;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  position: relative;
+  z-index: 1;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.card-header h2, .card-header h3 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #4338ca;
+  position: relative;
+  padding-bottom: 5px;
+}
+
+.card-header h2::after, .card-header h3::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 40px;
+  height: 3px;
+  background: linear-gradient(to right, #6366f1, #a5b4fc);
+  border-radius: 3px;
 }
 </style>

@@ -238,6 +238,7 @@
             <li><a href="#">智能字幕</a></li>
             <li><a href="#">智能问答</a></li>
             <li><a href="#">笔记管理</a></li>
+            <li><a href="#">知识点总览与扩展</a></li>
           </ul>
         </div>
         

@@ -498,8 +498,6 @@
         </div>
       </div>
     </div>
-
-    
   </div>
 </template>
 
@@ -2194,6 +2192,7 @@ const handleSyncTags = async () => {
   background-color: #fff;
   border-radius: 8px;
   padding: 10px;
+  padding-bottom: 20px; /* 增加底部内边距确保最后一项完全显示 */
   height: calc(50vh - 80px);
   min-height: 300px;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -2230,7 +2229,7 @@ const handleSyncTags = async () => {
 
 /* 确保最后一个字幕项有足够的底部边距 */
 .subtitle-item:last-child {
-  margin-bottom: 20px;
+  margin-bottom: 60px;
 }
 
 .subtitle-item.active {
