@@ -25,65 +25,6 @@
       <div class="workflow-container">
         <div class="workflow-diagram">
           <img src="../assets/workflow.svg" alt="AI-EdVision使用流程图" class="workflow-image" />
-          <div class="workflow-description">
-            <div class="workflow-step-card">
-              <div class="step-number">1</div>
-              <div class="step-content">
-                <h3 class="step-title">登录/注册</h3>
-                <p class="step-desc">创建账号或登录系统，开始您的学习之旅</p>
-              </div>
-            </div>
-            
-            <div class="workflow-step-card">
-              <div class="step-number">2</div>
-              <div class="step-content">
-                <h3 class="step-title">上传视频并分析</h3>
-                <p class="step-desc">上传教学视频，系统自动分析内容</p>
-              </div>
-            </div>
-            
-            <div class="workflow-step-card">
-              <div class="step-number">3</div>
-              <div class="step-content">
-                <h3 class="step-title">视频学习功能</h3>
-                <p class="step-desc">系统提供多种学习辅助功能</p>
-                
-                <div class="substeps-container">
-                  <div class="substep-item">
-                    <div class="substep-dot"></div>
-                    <div class="substep-content">
-                      <h4 class="substep-title">视频播放</h4>
-                      <p class="substep-desc">观看处理完成的视频</p>
-                    </div>
-                  </div>
-                  
-                  <div class="substep-item">
-                    <div class="substep-dot"></div>
-                    <div class="substep-content">
-                      <h4 class="substep-title">智能问答与字幕查看</h4>
-                      <p class="substep-desc">使用AI助手解答疑问</p>
-                    </div>
-                  </div>
-                  
-                  <div class="substep-item">
-                    <div class="substep-dot"></div>
-                    <div class="substep-content">
-                      <h4 class="substep-title">笔记系统辅助学习</h4>
-                      <p class="substep-desc">创建和管理学习笔记</p>
-                    </div>
-                  </div>
-                  
-                  <div class="substep-item">
-                    <div class="substep-dot"></div>
-                    <div class="substep-content">
-                      <h4 class="substep-title">知识点总览与扩展</h4>
-                      <p class="substep-desc">查看知识点并拓展学习</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -99,14 +40,20 @@
         <!-- 1. 登录/注册教程 -->
         <div class="tutorial-card">
           <div class="tutorial-header">
-            <div class="tutorial-icon-wrapper">
-              <i class="el-icon-user"></i>
+            <div class="tutorial-header-left">
+              <div class="tutorial-icon-wrapper">
+                <i class="el-icon-user"></i>
+              </div>
+              <div class="tutorial-title-container">
+                <div class="tutorial-order">01</div>
+                <h3 class="tutorial-title">登录/注册</h3>
+              </div>
             </div>
-            <div class="tutorial-title-container">
-              <div class="tutorial-order">01</div>
-              <h3 class="tutorial-title">登录/注册</h3>
+            <div class="tutorial-action">
+              <el-button type="primary" @click="navigateToLogin">前往登录/注册</el-button>
             </div>
           </div>
+          
           <div class="tutorial-content full-width">
             <div class="tutorial-steps">
               <div class="step">
@@ -130,21 +77,23 @@
                 <p>首次注册用户将获得更多免费分析时长</p>
               </div>
             </div>
-            <div class="tutorial-action">
-              <el-button type="primary" @click="navigateToLogin">前往登录/注册</el-button>
-            </div>
           </div>
         </div>
 
         <!-- 2. 视频上传教程 -->
         <div class="tutorial-card">
           <div class="tutorial-header">
-            <div class="tutorial-icon-wrapper">
-              <i class="el-icon-upload"></i>
+            <div class="tutorial-header-left">
+              <div class="tutorial-icon-wrapper">
+                <i class="el-icon-upload"></i>
+              </div>
+              <div class="tutorial-title-container">
+                <div class="tutorial-order">02</div>
+                <h3 class="tutorial-title">视频上传与分析</h3>
+              </div>
             </div>
-            <div class="tutorial-title-container">
-              <div class="tutorial-order">02</div>
-              <h3 class="tutorial-title">视频上传与分析</h3>
+            <div class="tutorial-action">
+              <el-button type="primary" @click="navigateToUpload">前往视频上传</el-button>
             </div>
           </div>
           <div class="tutorial-content full-width">
@@ -170,21 +119,23 @@
                 <p>支持的格式：MP4、AVI、MOV等主流视频格式，最大支持1GB</p>
               </div>
             </div>
-            <div class="tutorial-action">
-              <el-button type="primary" @click="navigateToUpload">前往视频上传</el-button>
-            </div>
           </div>
         </div>
 
         <!-- 3. 视频播放教程 -->
         <div class="tutorial-card">
           <div class="tutorial-header">
-            <div class="tutorial-icon-wrapper">
-              <i class="el-icon-video-play"></i>
+            <div class="tutorial-header-left">
+              <div class="tutorial-icon-wrapper">
+                <i class="el-icon-video-play"></i>
+              </div>
+              <div class="tutorial-title-container">
+                <div class="tutorial-order">03</div>
+                <h3 class="tutorial-title">视频播放</h3>
+              </div>
             </div>
-            <div class="tutorial-title-container">
-              <div class="tutorial-order">03</div>
-              <h3 class="tutorial-title">视频播放</h3>
+            <div class="tutorial-action">
+              <el-button type="primary" @click="navigateToVideos">浏览视频列表</el-button>
             </div>
           </div>
           <div class="tutorial-content full-width">
@@ -210,21 +161,20 @@
                 <p>支持快捷键控制：空格（播放/暂停）、方向键（快进/快退）</p>
               </div>
             </div>
-            <div class="tutorial-action">
-              <el-button type="primary" @click="navigateToVideos">浏览视频列表</el-button>
-            </div>
           </div>
         </div>
 
         <!-- 4. 智能问答教程 -->
         <div class="tutorial-card">
           <div class="tutorial-header">
-            <div class="tutorial-icon-wrapper">
-              <i class="el-icon-chat-dot-round"></i>
-            </div>
-            <div class="tutorial-title-container">
-              <div class="tutorial-order">04</div>
-              <h3 class="tutorial-title">智能问答与字幕查看</h3>
+            <div class="tutorial-header-left">
+              <div class="tutorial-icon-wrapper">
+                <i class="el-icon-chat-dot-round"></i>
+              </div>
+              <div class="tutorial-title-container">
+                <div class="tutorial-order">04</div>
+                <h3 class="tutorial-title">智能问答与字幕查看</h3>
+              </div>
             </div>
           </div>
           <div class="tutorial-content full-width">
@@ -250,21 +200,23 @@
                 <p>提问越具体，回答质量越高。可以连续提问深入探讨</p>
               </div>
             </div>
-            <div class="tutorial-action">
-              <el-button type="primary" @click="navigateToVideos">体验智能问答</el-button>
-            </div>
           </div>
         </div>
 
         <!-- 5. 笔记管理教程 -->
         <div class="tutorial-card">
           <div class="tutorial-header">
-            <div class="tutorial-icon-wrapper">
-              <i class="el-icon-notebook-1"></i>
+            <div class="tutorial-header-left">
+              <div class="tutorial-icon-wrapper">
+                <i class="el-icon-notebook-1"></i>
+              </div>
+              <div class="tutorial-title-container">
+                <div class="tutorial-order">05</div>
+                <h3 class="tutorial-title">笔记系统辅助学习</h3>
+              </div>
             </div>
-            <div class="tutorial-title-container">
-              <div class="tutorial-order">05</div>
-              <h3 class="tutorial-title">笔记系统辅助学习</h3>
+            <div class="tutorial-action">
+              <el-button type="primary" @click="navigateToNotes">前往笔记管理</el-button>
             </div>
           </div>
           <div class="tutorial-content full-width">
@@ -290,21 +242,23 @@
                 <p>系统会智能推荐相似笔记，帮助您建立知识连接</p>
               </div>
             </div>
-            <div class="tutorial-action">
-              <el-button type="primary" @click="navigateToNotes">前往笔记管理</el-button>
-            </div>
           </div>
         </div>
 
         <!-- 6. 知识点总览教程 -->
         <div class="tutorial-card">
           <div class="tutorial-header">
-            <div class="tutorial-icon-wrapper">
-              <i class="el-icon-data-line"></i>
+            <div class="tutorial-header-left">
+              <div class="tutorial-icon-wrapper">
+                <i class="el-icon-data-line"></i>
+              </div>
+              <div class="tutorial-title-container">
+                <div class="tutorial-order">06</div>
+                <h3 class="tutorial-title">知识点总览与扩展</h3>
+              </div>
             </div>
-            <div class="tutorial-title-container">
-              <div class="tutorial-order">06</div>
-              <h3 class="tutorial-title">知识点总览与扩展</h3>
+            <div class="tutorial-action">
+              <el-button type="primary" @click="navigateToVideos">探索知识点</el-button>
             </div>
           </div>
           <div class="tutorial-content full-width">
@@ -329,9 +283,6 @@
                 <i class="el-icon-info-filled tip-icon"></i>
                 <p>知识点支持导出，方便复习和分享</p>
               </div>
-            </div>
-            <div class="tutorial-action">
-              <el-button type="primary" @click="navigateToVideos">探索知识点</el-button>
             </div>
           </div>
         </div>
@@ -482,14 +433,12 @@ export default {
     const navigateToUpload = () => {
       isLoading.value = true
       showToast.value = true
-      toastMessage.value = '正在准备上传页面...'
-      
+      toastMessage.value = '正在准备上传页面...'  
       // 模拟加载过程
       setTimeout(() => {
         isLoading.value = false
         router.push('/video/upload')
-      }, 800)
-      
+      }, 800) 
       // 2秒后隐藏提示
       setTimeout(() => {
         showToast.value = false
@@ -499,12 +448,10 @@ export default {
     // 导航到登录页面或个人中心
     const navigateToLogin = () => {
       isLoading.value = true
-      
       // 根据登录状态决定跳转目标
       if (authState.value.isAuthenticated) {
         showToast.value = true
         toastMessage.value = '正在前往个人中心...'
-        
         // 模拟加载过程
         setTimeout(() => {
           isLoading.value = false
@@ -526,12 +473,46 @@ export default {
         showToast.value = false
       }, 2000)
     }
+
+    // 在setup函数内添加navigateToVideos函数
+    const navigateToVideos = () => {
+      isLoading.value = true
+      showToast.value = true
+      toastMessage.value = '正在前往视频列表...'
+      // 模拟加载过程
+      setTimeout(() => {
+        isLoading.value = false
+        router.push('/video/upload') // 修改为与navigateToUpload相同的路由
+      }, 800)
+      // 2秒后隐藏提示
+      setTimeout(() => {
+        showToast.value = false
+      }, 2000)
+    }
+
+    const navigateToNotes = () => {
+      isLoading.value = true
+      showToast.value = true
+      toastMessage.value = '正在前往笔记管理...'
+      // 模拟加载过程
+      setTimeout(() => {
+        isLoading.value = false
+        router.push('/notes') // 修改为指定的笔记管理路由
+      }, 800)
+  
+      // 2秒后隐藏提示
+      setTimeout(() => {
+        showToast.value = false
+      }, 2000)
+    }
     
     return {
       navigateToUpload,
       navigateToLogin,
       isLoading,
       showToast,
+      navigateToVideos,
+      navigateToNotes,
       toastMessage
     }
   }
@@ -644,7 +625,7 @@ section {
 /* 工作流程区域样式 */
 .workflow-section {
   background-color: var(--bg-light);
-  padding: 2.5rem 1.5rem;
+  padding: 2.5rem 1.5rem 0rem 1.5rem;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -804,7 +785,7 @@ section {
 
 /* 详细教程区域样式 */
 .tutorials-section {
-  padding: 5rem 1.5rem;
+  padding: 1rem 1.5rem;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -836,9 +817,15 @@ section {
 .tutorial-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 1.5rem;
   background: linear-gradient(to right, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.tutorial-header-left {
+  display: flex;
+  align-items: center;
 }
 
 .tutorial-icon-wrapper {

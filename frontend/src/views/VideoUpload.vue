@@ -147,7 +147,8 @@
               v-if="scope.row.preview_filename"
               style="width: 100px; height: 60px"
               :src="getPreviewUrl(scope.row)"
-              :preview-src-list="[getPreviewUrl(scope.row)]"
+              :preview-src-list="scope.row.preview_filename ? [getPreviewUrl(scope.row)] : []"
+              :preview-teleported="true"
               fit="cover"
             />
             <span v-else>无预览图</span>
@@ -1548,9 +1549,8 @@ const generateSummary = async (video) => {
 
 .main-title {
   font-size: 2.2rem;
-  font-weight: 700;
   margin-bottom: 1rem;
-  letter-spacing: 1px;
+  font-weight: 700;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   animation: fadeInUp 0.6s ease-out;
 }
@@ -1687,7 +1687,7 @@ const generateSummary = async (video) => {
 .video-url-input:deep(.el-input-group__append .el-button.el-button--primary:hover) {
   background-color: #4338CA !important;  /* 悬停时颜色加深 */
   border-color: #4338CA !important;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3) !important;  /* 添加阴影效果 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;  /* 添加阴影效果 */
   transform: translateY(-2px);  /* 轻微上移效果 */
 }
 

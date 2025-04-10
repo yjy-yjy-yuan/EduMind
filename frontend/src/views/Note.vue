@@ -3,9 +3,6 @@
     <!-- 顶部工具栏 -->
     <div class="note-toolbar">
       <div class="left-actions">
-        <el-button type="primary" round @click="createNewNote">
-          <el-icon><Plus /></el-icon>新建笔记
-        </el-button>
         
         <!-- 集成的笔记管理面板 -->
         <el-popover
@@ -224,8 +221,13 @@
           </div>
         </div>
       </div>
+      <div class="right-actions">
+        <el-button type="primary" round @click="createNewNote">
+          <el-icon><Plus /></el-icon>新建笔记
+        </el-button>
+      </div>
     </div>
-
+  
     <!-- 主要内容区域 -->
     <div class="note-content-container">
       <!-- 左侧区域：视频播放和字幕 -->
@@ -374,60 +376,45 @@
               <!-- 智能笔记编辑器 -->
               <div class="smart-note-editor">
                 <div class="editor-toolbar">
-                  <div class="toolbar-group">
-                    <el-tooltip content="标题" placement="top">
-                      <el-button size="small" @click="insertHeading">
-                        <el-icon><Document /></el-icon>
-                      </el-button>
-                    </el-tooltip>
-                    <el-tooltip content="粗体" placement="top">
-                      <el-button size="small" @click="formatText('bold')">
-                        <el-icon><Edit /></el-icon>
-                      </el-button>
-                    </el-tooltip>
-                    <el-tooltip content="斜体" placement="top">
-                      <el-button size="small" @click="formatText('italic')">
-                        <el-icon><Promotion /></el-icon>
-                      </el-button>
-                    </el-tooltip>
+                  <el-dropdown trigger="click" placement="bottom-start">
+                    <el-button type="primary" size="small" class="toolbar-dropdown-button">
+                      编辑选项 <el-icon><arrow-down /></el-icon>
+                    </el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item @click="insertHeading">
+                          <el-icon><Document /></el-icon> 标题
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="formatText('bold')">
+                          <el-icon><Edit /></el-icon> 粗体
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="formatText('italic')">
+                          <el-icon><Promotion /></el-icon> 斜体
+                        </el-dropdown-item>
+                        <el-dropdown-item divided @click="insertList('bullet')">
+                          <el-icon><List /></el-icon> 无序列表
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="insertList('number')">
+                          <el-icon><SortUp /></el-icon> 有序列表
+                        </el-dropdown-item>
+                        <el-dropdown-item divided @click="insertCodeBlock">
+                          <el-icon><Operation /></el-icon> 代码块
+                        </el-dropdown-item>
+                        <el-dropdown-item @click="insertQuote">
+                          <el-icon><ChatDotSquare /></el-icon> 引用
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                  <!-- 保留预览切换按钮 -->
+                  <div class="preview-toggle-toolbar">
+                    <el-switch
+                      v-model="showPreview"
+                      active-text="预览"
+                      inactive-text="编辑"
+                      @change="handlePreviewToggle"
+                    />
                   </div>
-                  <div class="toolbar-group">
-                    <el-tooltip content="无序列表" placement="top">
-                      <el-button size="small" @click="insertList('bullet')">
-                        <el-icon><List /></el-icon>
-                      </el-button>
-                    </el-tooltip>
-                    <el-tooltip content="有序列表" placement="top">
-                      <el-button size="small" @click="insertList('number')">
-                        <el-icon><SortUp /></el-icon>
-                      </el-button>
-                    </el-tooltip>
-                  </div>
-                  <div class="toolbar-group">
-                    <el-tooltip content="代码块" placement="top">
-                      <el-button size="small" @click="insertCodeBlock">
-                        <el-icon><Operation /></el-icon>
-                      </el-button>
-                    </el-tooltip>
-                    <el-tooltip content="引用" placement="top">
-                      <el-button size="small" @click="insertQuote">
-                        <el-icon><ChatDotSquare /></el-icon>
-                      </el-button>
-                    </el-tooltip>
-                  </div>
-                  <div class="toolbar-group">
-                    <el-tooltip content="编辑/预览切换" placement="top">
-                      <div class="preview-toggle-toolbar">
-                        <el-switch
-                          v-model="showPreview"
-                          active-text="预览"
-                          inactive-text="编辑"
-                          @change="handlePreviewToggle"
-                        />
-                      </div>
-                    </el-tooltip>
-                  </div>
-
                 </div>
                 
                 <div class="editor-content-area">
@@ -453,7 +440,7 @@
                 <div class="editor-mask" v-if="!currentNote && !isCreatingNote">
                   <div class="mask-content">
                     <el-icon><Document /></el-icon>
-                    <p>请选择或创建笔记以开始编辑</p>
+                    <h3>请选择笔记管理中的笔记或创建笔记以开始编辑</h3>
                   </div>
                 </div>
               </div>
@@ -582,7 +569,13 @@ const showPreview = ref(false);
 // 渲染Markdown
 const renderedContent = computed(() => {
   try {
-    // 先使用marked解析Markdown
+    // 配置marked选项，启用breaks选项以支持单行换行
+    marked.setOptions({
+      breaks: true,  // 将单个换行符转换为<br>
+      gfm: true      // 启用GitHub风格的Markdown
+    });
+    
+    // 使用marked解析Markdown
     let html = marked.parse(noteContent.value || '');
     
     // 处理新的时间戳标记格式 [MM:SS]{{timestamp:秒数}}
@@ -868,28 +861,35 @@ const handleContentChange = debounce(() => {
   // 当内容变化时，触发自动保存
   autoSaveToLocalStorage();
   // 检查是否需要获取相似笔记
-  if (noteContent.value.length > 50 && !isFetchingSimilarNotes.value) {
+  if (noteContent.value.length > 5 && !isFetchingSimilarNotes.value) {
     fetchSimilarNotes();
   }
 }, 500);
 
-// 获取相似笔记推荐
 const fetchSimilarNotes = async () => {
+  // 在函数开始处添加日志
+  console.log('开始获取相似笔记，内容长度:', noteContent.value.length);
+  
   if (isFetchingSimilarNotes.value) return;
   
   isFetchingSimilarNotes.value = true;
   
   try {
-    const response = await axios.post('/api/notes/similar', {
+    const response = await getSimilarNotes({
       content: noteContent.value,
       limit: 5
     });
     
-    if (response.data && response.data.status === 'success') {
-      // 过滤掉当前笔记
+    // 在获取响应后添加日志
+    console.log('相似笔记API响应:', response);
+    
+    if (response && response.data && response.data.status === 'success') {
       similarNotes.value = response.data.data.filter(note => 
         !currentNote.value || note.id !== currentNote.value.id
       );
+      
+      // 在处理完数据后添加日志
+      console.log('过滤后的相似笔记:', similarNotes.value);
     }
   } catch (error) {
     console.error('获取相似笔记失败:', error);
@@ -1015,6 +1015,11 @@ const restoreFromLocalStorage = () => {
     
     // 更新编辑器状态
     updateEditorEditableState();
+    
+    // 如果笔记内容不为空，获取相似笔记
+    if (noteContent.value && noteContent.value.length > 5) {
+      fetchSimilarNotes();
+    }
     
     ElMessage.info('已恢复未保存的笔记');
     return true;
@@ -1960,18 +1965,6 @@ const handleSyncTags = async () => {
   position: relative;
 }
 
-/* 添加页脚波浪效果 */
-.note-page-container::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 15px;
-  background: linear-gradient(90deg, #ff9a9e, #fad0c4, #a1c4fd, #c2e9fb);
-  z-index: 100;
-}
-
 /* 顶部工具栏 */
 .note-toolbar {
   height: 60px;
@@ -1996,6 +1989,21 @@ const handleSyncTags = async () => {
 }
 
 .left-actions .el-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.right-actions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.right-actions .el-button {
+  transition: all 0.3s ease;
+}
+
+.right-actions .el-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
@@ -2071,6 +2079,9 @@ const handleSyncTags = async () => {
   max-height: 60%;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   background: linear-gradient(to bottom, #ffffff, #f8f9fa);
+  border: 1px solid #9d84d8; /* 添加浅紫色边框 */
+  border-radius: 8px;
+  margin: 5px;
 }
 
 .video-header {
@@ -2154,15 +2165,18 @@ const handleSyncTags = async () => {
   padding: 15px;
   overflow: hidden;
   background: linear-gradient(to bottom, #f8f9fa, #ffffff);
+  border: 1px solid #9674ee; /* 添加浅紫色边框 */
+  border-radius: 8px;
+  margin: 5px; 
 }
 
 .subtitle-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-  padding: 5px 0;
-  height: 30px;
+  margin-bottom: 5px;
+  padding: 3px 0;
+  height: 25px;
   position: relative;
 }
 
@@ -2180,7 +2194,7 @@ const handleSyncTags = async () => {
 
 .subtitle-header h3 {
   margin-left: 12px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #333;
 }
@@ -2192,7 +2206,7 @@ const handleSyncTags = async () => {
   background-color: #fff;
   border-radius: 8px;
   padding: 10px;
-  padding-bottom: 20px; /* 增加底部内边距确保最后一项完全显示 */
+  padding-bottom: 20px; /* 增加底部内边距，确保最后一项完全显示 */
   height: calc(50vh - 80px);
   min-height: 300px;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -2229,7 +2243,7 @@ const handleSyncTags = async () => {
 
 /* 确保最后一个字幕项有足够的底部边距 */
 .subtitle-item:last-child {
-  margin-bottom: 60px;
+  margin-bottom: 20px;
 }
 
 .subtitle-item.active {
@@ -2305,19 +2319,48 @@ const handleSyncTags = async () => {
   margin-right: 15px;
 }
 
-.editor-title .el-input__inner {
-  border: none;
-  border-bottom: 1px solid #dcdfe6;
-  border-radius: 0;
-  padding-left: 0;
-  font-size: 16px;
-  font-weight: 600;
-  transition: all 0.3s ease;
+.editor-title :deep(.el-input) {
+  box-shadow: none !important;
+  border: none !important;
 }
 
-.editor-title .el-input__inner:focus {
-  border-color: #409eff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+.editor-title :deep(.el-input__wrapper) {
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.editor-title :deep(.el-input__inner) {
+  border: 2px solid #ffb6c1 !important;
+  border-radius: 4px !important;
+  padding-left: 20px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 0 5px rgba(255, 182, 193, 0.3) !important;
+  background-color: #fff !important;
+}
+
+.editor-title :deep(.el-input__inner:focus) {
+  border-color: #ff69b4 !important;
+  box-shadow: 0 0 8px rgba(255, 105, 180, 0.5) !important;
+}
+
+.editor-title :deep(.el-input__inner) {
+  border: 2px solid #ffb6c1 !important;
+  border-radius: 12px !important;
+  padding-left: 30px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important; 
+  box-shadow: 0 0 5px rgba(255, 182, 193, 0.3) !important; 
+  background-color: #fff !important;
+}
+
+.editor-title :deep(.el-input__inner:focus) {
+  border-color: #ff69b4 !important;
+  box-shadow: 0 0 8px rgba(255, 105, 180, 0.5) !important;
 }
 
 .note-tags-and-actions {
@@ -2502,13 +2545,21 @@ const handleSyncTags = async () => {
   background-color: #f9f9f9;
   padding: 15px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  max-height: 30%; /* 设置最大高度为右侧区域的40% */
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #30a1de; /* 添加浅紫色边框 */
+  border-radius: 8px;
+  margin: 8px;
 }
 
 .similar-notes-header {
   display: flex;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 5px;
   position: relative;
+  flex-shrink: 0; /* 防止头部被压缩 */
+  height: 30px; /* 添加固定高度 */
 }
 
 .similar-notes-header::before {
@@ -2525,7 +2576,7 @@ const handleSyncTags = async () => {
 
 .similar-notes-header h4 {
   margin-left: 12px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #333;
 }
@@ -2534,6 +2585,9 @@ const handleSyncTags = async () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  overflow-y: auto; /* 添加垂直滚动条 */
+  flex: 1; /* 占用剩余空间 */
+  padding-right: 5px; /* 为滚动条留出空间 */
 }
 
 .similar-note-item {
@@ -2550,7 +2604,6 @@ const handleSyncTags = async () => {
   background-color: #f0f0f0;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-left: 3px solid #a6c1ee;
 }
 
 .similar-note-item:last-child {
@@ -2564,12 +2617,16 @@ const handleSyncTags = async () => {
 }
 
 .similar-note-preview {
-  font-size: 12px;
+  font-size: 13px;
   color: #606266;
   margin-bottom: 4px;
-  white-space: nowrap;
+  line-height: 1.5;
+  max-height: 60px;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 .similar-note-meta {
@@ -2585,8 +2642,9 @@ const handleSyncTags = async () => {
 
 .similar-note-tags {
   display: flex;
-  gap: 4px;
-  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
 }
 
 /* 笔记列表下拉菜单 */
@@ -2702,14 +2760,16 @@ const handleSyncTags = async () => {
 }
 
 .selected-tags {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed #e6e6e6;
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #f0f9ff;
+  border-radius: 4px;
+  border: 1px solid #e1f3ff;
 }
 
 .selected-tags-header {
-  font-size: 14px;
-  margin-bottom: 5px;
+  font-weight: bold;
+  margin-bottom: 8px;
   color: #606266;
 }
 
@@ -2717,8 +2777,8 @@ const handleSyncTags = async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
 }
-
 /* 笔记管理弹出框 */
 .note-manager-popover {
   padding: 0 !important;
@@ -2776,13 +2836,25 @@ const handleSyncTags = async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 15px;
+  margin-top: 10px;
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 5px;
+  border-radius: 4px;
+  background-color: #f9f9f9;
 }
 
 .clickable-tag {
   cursor: pointer;
-  transition: all 0.3s ease;
+  margin-right: 0 !important;
+  transition: all 0.2s ease;
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .clickable-tag:hover {
@@ -2792,25 +2864,46 @@ const handleSyncTags = async () => {
 
 .tag-count {
   margin-left: 5px;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  padding: 0 6px;
   font-size: 12px;
-  opacity: 0.8;
+}
+
+.notes-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 15px;
 }
 
 .notes-list {
   flex: 1;
   overflow-y: auto;
-  padding: 10px;
+  padding: 5px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .note-item {
-  padding: 15px;
+  display: flex;
+  align-items: flex-start;
+  padding: 12px 12px;
+  min-height: 98px;
   border-radius: 8px;
-  margin-bottom: 10px;
   background-color: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
-  border-left: 3px solid transparent;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
   position: relative;
+  border: 1px solid #ebeef5;
+}
+
+.note-item-content {
+  flex: 1;
+  min-width: 0; /* 防止子元素溢出 */
 }
 
 .note-item:hover {
@@ -2825,29 +2918,23 @@ const handleSyncTags = async () => {
 }
 
 .note-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
-  padding-right: 25px;
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: #303133;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .note-preview {
-  font-size: 13px;
   color: #606266;
-  margin-bottom: 10px;
-  line-height: 1.5;
-  max-height: 60px;
+  font-size: 13px;
+  margin-bottom: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-}
-
-.note-item-content {
-  flex: 1;
-  margin: 0 8px;
 }
 
 .note-meta {
@@ -2855,9 +2942,6 @@ const handleSyncTags = async () => {
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
-}
-
-.note-date {
   color: #909399;
 }
 
@@ -2865,7 +2949,12 @@ const handleSyncTags = async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin-top: 8px;
+  align-items: center;
+  max-width: 70%;
+}
+
+.note-date {
+  color: #909399;
 }
 
 .note-tag {
@@ -3016,5 +3105,72 @@ const handleSyncTags = async () => {
 
 .search-result-more:hover {
   background-color: #f5f7fa;
+}
+
+.toolbar-dropdown-button {
+  background-color: #ffb6c1;
+  border-color: #ff69b4;
+  color: #fff;
+  padding: 8px 15px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.toolbar-dropdown-button:hover,
+.toolbar-dropdown-button:focus {
+  background-color: #ff69b4;
+  border-color: #ff1493;
+}
+
+.editor-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border-bottom: 1px solid #eee;
+}
+
+.el-dropdown-menu__item .el-icon {
+  margin-right: 5px;
+  color: #ff69b4;
+}
+
+.markdown-preview {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  line-height: 1.6;
+}
+
+.markdown-preview p {
+  margin-bottom: 16px;
+}
+
+.markdown-preview br {
+  display: block;
+  content: "";
+  margin-top: 0.5em;
+}
+
+.note-app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.note-header {
+  flex-shrink: 0; /* 防止头部被压缩 */
+}
+
+.note-content-container {
+  flex: 1;
+  min-height: 0; /* 防止内容区域溢出 */
+}
+
+.left-section, .right-section {
+  min-height: 0; /* 防止内容区域溢出 */
+  overflow: hidden;
 }
 </style>

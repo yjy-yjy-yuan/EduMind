@@ -4,7 +4,6 @@
     <div class="sidebar-toggle" @click="toggleSidebar">
       <el-icon><arrow-right v-if="!sidebarVisible" /><arrow-left v-else /></el-icon>
     </div>
-    
     <!-- 侧边栏 -->
     <div class="sidebar" :class="{ 'sidebar-visible': sidebarVisible }">
       <div class="sidebar-header">
@@ -400,6 +399,7 @@
       </template>
     </el-dialog>
   </div>
+  
   <!-- 底部美化区域 -->
   <div class="page-footer">
     <div class="footer-wave"></div>
@@ -811,7 +811,7 @@ const downloadSubtitle = async (format, showMessage = false) => {
 const downloadMergedSubtitle = async (format, showMessage = false) => {
   try {
     const response = await request({
-      url: `/api/videos/${videoId.value}/subtitles/semantic-merged?format=${format}`,
+      url: `/api/subtitles/videos/${videoId.value}/subtitles/semantic-merged?format=${format}`,
       method: 'get',
       responseType: 'blob'
     });
@@ -2063,7 +2063,7 @@ const closeGuideDialog = () => {
   width: 100%;
   height: 50px; /* 增加高度 */
   position: relative;
-  background: var(--primary-gradient);
+  background: #3c3838;
   margin-top: auto;
   overflow: hidden;
   display: flex;

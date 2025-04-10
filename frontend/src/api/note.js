@@ -99,7 +99,7 @@ export function getTags() {
 // 获取相似笔记
 export function getSimilarNotes(data) {
   return request({
-    url: '/api/notes/notes/similar',
+    url: '/api/notes/notes/similar',  // 或者尝试 '/api/notes/similar'
     method: 'post',
     data
   })
