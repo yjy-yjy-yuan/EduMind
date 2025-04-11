@@ -14,6 +14,7 @@
       <div class="nav-items">
         <router-link to="/" class="nav-item" :class="{ active: activeRoute === '/' }">首页</router-link>
         <router-link to="/video/upload" class="nav-item" :class="{ active: activeRoute === '/video/upload' }">视频管理</router-link>
+        <router-link to="/notes" class="nav-item" :class="{ active: activeRoute === '/notes' }">笔记管理</router-link>
         <router-link to="/guide" class="nav-item" :class="{ active: activeRoute === '/guide' }">使用指南</router-link>
         
         <!-- 护眼模式切换按钮 -->

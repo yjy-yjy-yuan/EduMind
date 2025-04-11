@@ -99,7 +99,6 @@ conda install -c conda-forge faiss-cpu=1.8.0 -y
 
 ```
 
-
 ### 前端(可能需要管理员身份)
 ```bash
 cd ....../IVS-Flask-Vue/frontend # 切换为自己的frontend文件路径

@@ -1,9 +1,82 @@
 <template>
   <div class="note-page-container">
+    <!-- 笔记功能提示弹窗 -->
+    <el-dialog
+      v-model="showNoteGuideDialog"
+      title="智能笔记使用指南"
+      width="550px"
+      :show-close="true"
+      :close-on-click-modal="true"
+      class="note-guide-dialog"
+    >
+      <div class="note-guide-content">
+        <div class="guide-header">
+          <el-icon class="header-icon"><Document /></el-icon>
+          <h2>欢迎使用 AI-EdVision 智能笔记系统！</h2>
+        </div>
+        
+        <div class="guide-description">
+          <p>当前页面可以进行普通笔记的创建、编辑和管理。</p>
+          <p>如果您想要<span class="highlight">结合学习视频进行笔记</span>，请按照以下步骤操作：</p>
+        </div>
+        
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <h4>上传分析视频</h4>
+              <p>首先前往<strong class="highlight">“视频管理”</strong>页面上传并分析您的学习视频</p>
+              <el-icon class="step-icon"><VideoCamera /></el-icon>
+            </div>
+          </div>
+          
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <h4>返回笔记页面</h4>
+              <p>分析完成后，返回本笔记页面</p>
+              <el-icon class="step-icon"><Back /></el-icon>
+            </div>
+          </div>
+          
+          <div class="step-item">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <h4>选择学习视频</h4>
+              <p>点击页面中的<strong class="highlight">“切换学习视频”</strong>按钮选择您要学习的视频</p>
+              <el-icon class="step-icon"><ArrowDown /></el-icon>
+            </div>
+          </div>
+          
+          <div class="step-item">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <h4>记录学习笔记</h4>
+              <p>选择视频后，您可以进行视频学习的同时记录笔记</p>
+              <el-icon class="step-icon"><Edit /></el-icon>
+            </div>
+          </div>
+        </div>
+        
+        <div class="guide-footer">
+          <el-icon class="footer-icon"><InfoFilled /></el-icon>
+          <p>系统支持从视频中提取字幕内容到笔记中，并自动添加时间戳记录，方便您后续复习。</p>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-checkbox v-model="dontShowNoteGuideAgain">不再显示</el-checkbox>
+          <el-button type="primary" @click="closeNoteGuideDialog" class="know-button">
+            <el-icon><Check /></el-icon>
+            我知道了
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
     <!-- 顶部工具栏 -->
     <div class="note-toolbar">
       <div class="left-actions">
-        
         <!-- 集成的笔记管理面板 -->
         <el-popover
           placement="bottom-start"
@@ -221,15 +294,69 @@
           </div>
         </div>
       </div>
+
+      <!-- 添加中间区域 -->
+      <div class="center-actions">
+        <!-- 这里放置视频管理按钮 -->
+        <el-popover
+          placement="bottom"
+          :width="300"
+          trigger="click"
+          popper-class="video-manager-popover"
+        >
+          <template #reference>
+            <el-button type="primary" plain>
+              <span>切换学习视频</span>
+              <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+            </el-button>
+          </template>
+      
+          <div class="video-manager-container">
+            <div class="panel-header">
+              <h4>已分析视频</h4>
+            </div>
+        
+            <div class="video-list custom-scrollbar" v-if="processedVideos.length > 0">
+              <div class="video-item" 
+                v-for="video in processedVideos" 
+                :key="video.id"
+                @click="navigateToVideo(video.id)">
+                <div class="video-thumbnail" :style="video.thumbnail ? `background-image: url(${video.thumbnail})` : ''"></div>
+                <div class="video-info">
+                  <div class="video-title" :title="video.title || '未命名视频'">{{ video.title || '未命名视频' }}</div>
+                  <div class="video-duration">{{ formatDuration(video.duration) }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="empty-list" v-else>
+              <el-icon><VideoCamera /></el-icon>
+              <span>暂无已处理视频</span>
+            </div>
+        
+            <div class="video-manager-actions">
+              <el-button type="primary" size="small" @click="navigateToVideoUpload">
+                分析新视频
+              </el-button>
+            </div>
+          </div>
+        </el-popover>
+      </div>
+
       <div class="right-actions">
         <el-button type="primary" round @click="createNewNote">
           <el-icon><Plus /></el-icon>新建笔记
+        </el-button>
+        
+        <!-- 添加侧边栏切换按钮 -->
+        <el-button type="primary" round @click="toggleSimilarNotesSidebar" class="pink-button">
+          <el-icon><Document /></el-icon>相似笔记
+          <el-badge :value="similarNotes.length" :hidden="similarNotes.length === 0" class="similar-notes-badge" />
         </el-button>
       </div>
     </div>
   
     <!-- 主要内容区域 -->
-    <div class="note-content-container">
+    <div class="note-content-container" :class="{ 'main-content-with-sidebar': showSimilarNotesSidebar }">
       <!-- 左侧区域：视频播放和字幕 -->
       <div class="left-section">
         <!-- 视频播放区域 -->
@@ -303,6 +430,14 @@
                   :disabled="!currentNote && !isCreatingNote"
                 />
               </div>
+              <el-button
+                  type="info"
+                  @click="exportCurrentNote"
+                  :disabled="!currentNote && !isCreatingNote"
+                  round
+                >
+                  <el-icon><Download /></el-icon> 导出
+                </el-button>
             </div>
 
             <!-- 标签编辑和操作按钮 -->
@@ -333,40 +468,39 @@
                   size="small"
                   @click="showTagInput"
                   :disabled="!currentNote && !isCreatingNote"
+                  type="success"
+                  plain
+                  round
                 >
-                  + 添加标签
+                  <el-icon><Plus /></el-icon> 添加标签
                 </el-button>
               </div>
-              
+
               <!-- 操作按钮 -->
               <div class="editor-actions">
-                <el-button-group>
-                  <el-button
-                    type="primary"
-                    @click="saveNote"
-                    :disabled="!currentNote && !isCreatingNote"
-                  >
-                    保存
-                  </el-button>
-                  <el-button
-                    @click="exportCurrentNote"
-                    :disabled="!currentNote && !isCreatingNote"
-                  >
-                    导出
-                  </el-button>
-                  <el-button
-                    type="danger"
-                    @click="deleteCurrentNote"
-                    :disabled="!currentNote"
-                  >
-                    删除
-                  </el-button>
-                </el-button-group>
+                <el-button
+                  type="primary"
+                  @click="saveNote"
+                  :disabled="!currentNote && !isCreatingNote"
+                  round
+                >
+                  <el-icon><Check /></el-icon> 保存
+                </el-button>
+                
+                <el-button
+                  type="danger"
+                  @click="deleteCurrentNote"
+                  :disabled="!currentNote"
+                  round
+                >
+                  <el-icon><Delete /></el-icon> 删除
+                </el-button>
                 <el-button
                   v-if="isCreatingNote"
                   @click="cancelCreate"
+                  round
                 >
-                  取消
+                  <el-icon><Close /></el-icon> 取消
                 </el-button>
               </div>
             </div>
@@ -376,36 +510,6 @@
               <!-- 智能笔记编辑器 -->
               <div class="smart-note-editor">
                 <div class="editor-toolbar">
-                  <el-dropdown trigger="click" placement="bottom-start">
-                    <el-button type="primary" size="small" class="toolbar-dropdown-button">
-                      编辑选项 <el-icon><arrow-down /></el-icon>
-                    </el-button>
-                    <template #dropdown>
-                      <el-dropdown-menu>
-                        <el-dropdown-item @click="insertHeading">
-                          <el-icon><Document /></el-icon> 标题
-                        </el-dropdown-item>
-                        <el-dropdown-item @click="formatText('bold')">
-                          <el-icon><Edit /></el-icon> 粗体
-                        </el-dropdown-item>
-                        <el-dropdown-item @click="formatText('italic')">
-                          <el-icon><Promotion /></el-icon> 斜体
-                        </el-dropdown-item>
-                        <el-dropdown-item divided @click="insertList('bullet')">
-                          <el-icon><List /></el-icon> 无序列表
-                        </el-dropdown-item>
-                        <el-dropdown-item @click="insertList('number')">
-                          <el-icon><SortUp /></el-icon> 有序列表
-                        </el-dropdown-item>
-                        <el-dropdown-item divided @click="insertCodeBlock">
-                          <el-icon><Operation /></el-icon> 代码块
-                        </el-dropdown-item>
-                        <el-dropdown-item @click="insertQuote">
-                          <el-icon><ChatDotSquare /></el-icon> 引用
-                        </el-dropdown-item>
-                      </el-dropdown-menu>
-                    </template>
-                  </el-dropdown>
                   <!-- 保留预览切换按钮 -->
                   <div class="preview-toggle-toolbar">
                     <el-switch
@@ -417,23 +521,28 @@
                   </div>
                 </div>
                 
-                <div class="editor-content-area">
-                  <textarea 
-                    ref="noteEditor" 
-                    v-model="noteContent" 
-                    class="note-textarea"
-                    placeholder="在此输入笔记内容..."
-                    @input="handleContentChange"
-                    @click="handleEditorClick"
-                    v-show="!showPreview"
-                  ></textarea>
-                  
+                <div class="editor-content-area">              
+                <div 
+                  id="note-editor-container" 
+                  v-show="vditorInstance"
+                  class="note-editor-container"
+                ></div>
                   <!-- Markdown预览区域 -->
                   <div 
                     v-show="showPreview" 
-                    class="markdown-preview" 
-                    v-html="renderedContent"
-                  ></div>
+                    class="markdown-preview"
+                  >
+                    <!-- 添加时间戳点击提示 -->
+                    <div v-if="currentVideo" class="timestamp-tip">
+                      <el-alert
+                        title="提示：点击预览模式下的时间戳可以跳转到视频对应位置"
+                        type="info"
+                        :closable="false"
+                        show-icon
+                      />
+                    </div>
+                    <div v-html="renderedContent"></div>
+                  </div>
                 </div>
                 
                 <!-- 编辑器禁用遮罩 -->
@@ -446,44 +555,110 @@
               </div>
             </div>
 
-            <!-- 相似笔记推荐区域 -->
-            <div class="similar-notes-section" v-if="similarNotes.length > 0">
-              <div class="similar-notes-header">
-                <h4>相似笔记推荐</h4>
-                <el-tooltip content="基于您当前编写的内容，系统为您推荐了以下相似的笔记" placement="top">
-                  <el-icon><QuestionFilled /></el-icon>
-                </el-tooltip>
-              </div>
-              <div class="similar-notes-list">
-                <div 
-                  v-for="note in similarNotes" 
-                  :key="note.id" 
-                  class="similar-note-item"
-                  @click="viewSimilarNote(note)"
-                >
-                  <div class="similar-note-title">{{ note.title }}</div>
-                  <div class="similar-note-preview">{{ getContentPreview(note.content) }}</div>
-                  <div class="similar-note-meta">
-                    <span class="similar-note-date">{{ formatDateTime(note.created_at) }}</span>
-                    <div class="similar-note-tags">
-                      <el-tag 
-                        v-for="tag in note.tags.slice(0, 2)" 
-                        :key="tag" 
-                        size="small"
-                        effect="plain"
-                      >
-                        {{ tag }}
-                      </el-tag>
-                      <span v-if="note.tags.length > 2">+{{ note.tags.length - 2 }}</span>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
+    </div>
+  </div>
+  <!-- 添加侧边栏，用于笔记的相似性推荐 -->
+  <div class="note-sidebar" :class="{ 'sidebar-open': showSimilarNotesSidebar }">
+    <!-- 侧边栏标题 -->
+    <div class="sidebar-header">
+      <h3 v-if="!showNoteDetailInSidebar">相似笔记推荐</h3>
+      <h3 v-else>笔记详情</h3>
+      <el-tooltip v-if="!showNoteDetailInSidebar" content="基于您当前编写的内容，系统为您推荐了以下相似的笔记" placement="top">
+        <el-icon><QuestionFilled /></el-icon>
+      </el-tooltip>
+      
+      <!-- 返回按钮，仅在查看笔记详情时显示 -->
+      <el-button v-if="showNoteDetailInSidebar" type="text" @click="backToSimilarNotesList" class="back-button">
+        <el-icon><Back /></el-icon>
+      </el-button>
+      
+      <!-- 设置按钮，仅在笔记列表时显示 -->
+      <el-dropdown v-if="!showNoteDetailInSidebar" trigger="click" @command="handleSidebarSetting">
+        <el-button type="text" class="sidebar-setting">
+          <el-icon><Setting /></el-icon>
+        </el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="toggleAutoOpen">
+              {{ autoOpenSidebar ? '关闭自动打开' : '开启自动打开' }}
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      
+      <el-button type="text" @click="showSimilarNotesSidebar = false" class="close-sidebar">
+        <el-icon><Close /></el-icon>
+      </el-button>
+    </div>
+  
+    <!-- 侧边栏内容 -->
+    <div class="sidebar-content">
+      <!-- 相似笔记列表，仅在未查看笔记详情时显示 -->
+      <template v-if="!showNoteDetailInSidebar">
+        <div 
+          v-for="note in similarNotes" 
+          :key="note.id" 
+          class="similar-note-card"
+          @click="viewSimilarNote(note)"
+        >
+          <div class="similar-note-card-title">{{ note.title }}</div>
+          <div class="similar-note-card-preview">{{ getContentPreview(note.content) }}</div>
+          <div class="similar-note-card-meta">
+            <span class="similar-note-card-date">{{ formatDateTime(note.created_at) }}</span>
+            <div class="similar-note-card-tags">
+              <el-tag 
+                v-for="tag in note.tags.slice(0, 2)" 
+                :key="tag" 
+                size="small"
+                effect="plain"
+              >
+                {{ tag }}
+              </el-tag>
+              <span v-if="note.tags.length > 2">+{{ note.tags.length - 2 }}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div v-if="similarNotes.length === 0" class="no-similar-notes">
+          暂无相似笔记
+        </div>
+        
+        <!-- 提示信息 -->
+        <div class="sidebar-tip">
+          不想显示相似性笔记？点击上方"相似笔记"或按下"ESC"退出
+        </div>
+      </template>
+      
+      <!-- 笔记详情视图，仅在查看笔记详情时显示 -->
+      <template v-else>
+        <div class="note-detail-view">
+          <div class="note-detail-title">{{ sidebarViewingNote.title }}</div>
+          <div class="note-detail-meta">
+            <span class="note-detail-date">{{ formatDateTime(sidebarViewingNote.created_at) }}</span>
+            <div class="note-detail-tags">
+              <el-tag 
+                v-for="tag in sidebarViewingNote.tags" 
+                :key="tag" 
+                size="small"
+                effect="plain"
+              >
+                {{ tag }}
+              </el-tag>
+            </div>
+          </div>
+          <div class="note-detail-content markdown-body" v-html="renderMarkdown(sidebarViewingNote.content)"></div>
+          
+          <!-- 操作按钮 -->
+          <div class="note-detail-actions">
+            <el-button type="primary" size="small" @click="selectNote(sidebarViewingNote)">
+              在编辑器中打开
+            </el-button>
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -491,11 +666,13 @@
 <script setup>
 // 自动保存定时器
 let autoSaveInterval = null;
+import Vditor from 'vditor';
+import 'vditor/dist/index.css';
 // 导入Element Plus图标
 import {
   Plus,Search,ArrowLeft,ArrowRight,ArrowDown,VideoCamera,InfoFilled,Document,Delete,
   Edit,Promotion,List,SortUp,Operation,ChatDotSquare,QuestionFilled,Filter,Check,Download,
-  MoreFilled
+  MoreFilled,Back,Close,Setting,Grid
 } from '@element-plus/icons-vue';
 import { ref, onMounted, computed, watch, nextTick, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -506,13 +683,102 @@ import {
   addTimestamp, deleteTimestamp, getTags, getSimilarNotes, 
   batchDeleteNotes, batchExportNotes, exportNote, syncTags
 } from '@/api/note';
-import { getVideo, getSubtitle } from '@/api/video';
+import { getVideo, getSubtitle, getVideoList, getVideoPreview } from '@/api/video';
 import * as marked from 'marked';
 import axios from 'axios';
 import DOMPurify from 'dompurify';
 import request from '@/utils/request';
 
 const isFetchingSimilarNotes = ref(false);
+
+// 在setup函数中添加以下代码
+const processedVideos = ref([]);
+
+// 笔记指南弹窗相关
+const showNoteGuideDialog = ref(false);
+const dontShowNoteGuideAgain = ref(false);
+
+// 关闭笔记指南弹窗
+const closeNoteGuideDialog = () => {
+  showNoteGuideDialog.value = false;
+  
+  // 如果用户选择不再显示，则保存到本地存储
+  if (dontShowNoteGuideAgain.value) {
+    localStorage.setItem('dontShowNoteGuide', 'true');
+  }
+};
+
+// 获取已处理视频列表
+const fetchProcessedVideos = async () => {
+  try {
+    const response = await getVideoList();
+    console.log('视频列表响应:', response);
+    
+    // 处理不同的数据结构
+    let videoList = [];
+    
+    if (response && response.data) {
+      if (Array.isArray(response.data)) {
+        // 如果是数组，直接使用
+        videoList = response.data;
+      } else if (response.data.videos && Array.isArray(response.data.videos)) {
+        // 如果数据在videos字段中
+        videoList = response.data.videos;
+      } else if (typeof response.data === 'object') {
+        // 尝试将对象转换为数组
+        videoList = Object.values(response.data);
+      }
+    }
+    
+    // 过滤已处理的视频
+    const filteredVideos = videoList.filter(video => 
+      video && (video.status === 'completed' || video.status === 'processed')
+    );
+    
+    // 为每个视频加载预览图
+    processedVideos.value = await Promise.all(filteredVideos.map(async (video) => {
+      try {
+        // 获取预览图
+        const previewResponse = await getVideoPreview(video.id);
+        // 确保响应是一个有效的Blob对象
+        if (previewResponse && previewResponse.data instanceof Blob) {
+          // 创建预览图URL
+          const previewUrl = URL.createObjectURL(previewResponse.data);
+          // 添加预览图URL到视频对象
+          return { ...video, thumbnail: previewUrl };
+        } else {
+          console.warn(`视频 ${video.id} 预览图响应不是有效的Blob:`, previewResponse);
+          return video;
+        }
+      } catch (error) {
+        console.error(`获取视频 ${video.id} 预览图失败:`, error);
+        return video;
+      }
+    }));
+  } catch (error) {
+    console.error('获取视频列表失败:', error);
+    processedVideos.value = [];
+  }
+};
+
+// 格式化视频时长
+const formatDuration = (seconds) => {
+  if (!seconds) return '未知';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? '0' + secs : secs}`;
+};
+
+// 导航到视频播放页面
+const navigateToVideo = (videoId) => {
+  router.push(`/notes?videoId=${videoId}`);
+};
+
+// 导航到视频上传页面
+const navigateToVideoUpload = () => {
+  router.push('/video/upload');
+};
+
 
 // 路由相关
 const route = useRoute();
@@ -533,9 +799,6 @@ const timestamps = ref([]);
 const similarNotes = ref([]);
 
 // 编辑器相关
-const quillEditor = ref(null);
-const markdownEditor = ref(null);
-const quillInstance = ref(null);
 const vditorInstance = ref(null);
 const noteEditor = ref(null);
 
@@ -593,6 +856,13 @@ const renderedContent = computed(() => {
     return `<p>渲染错误: ${error.message}</p>`;
   }
 });
+
+// 渲染Markdown内容
+const renderMarkdown = (content) => {
+  // 如果你已经有Markdown渲染库，可以直接使用
+  // 这里假设使用marked库
+  if (!content) return '';  
+};
 
 // 批量操作相关状态
 const showBatchOperations = ref(false);
@@ -669,6 +939,14 @@ const fetchNotes = async () => {
   }
 };
 
+// 控制侧边栏的显示和隐藏
+const showSimilarNotesSidebar = ref(false);
+
+// 在侧边栏中查看的笔记
+const sidebarViewingNote = ref(null);
+// 是否在侧边栏中查看笔记详情
+const showNoteDetailInSidebar = ref(false);
+
 // 防抖搜索
 const debounceSearch = debounce(() => {
   fetchNotes();
@@ -684,6 +962,13 @@ onMounted(async () => {
   console.log('笔记页面加载，视频ID:', videoId.value);
   await fetchNotes();
   await fetchTags(); // 确保标签列表被加载
+  await fetchProcessedVideos();
+  
+  // 检查是否需要显示笔记指南弹窗
+  const dontShow = localStorage.getItem('dontShowNoteGuide');
+  if (!dontShow) {
+    showNoteGuideDialog.value = true;
+  }
   
   if (videoId.value) {
     console.log('准备加载视频:', videoId.value);
@@ -704,16 +989,30 @@ onMounted(async () => {
     localStorage.removeItem('draft_note');
   }
 
-  // 设置自动保存定时器（每分钟保存一次）
-  const autoSaveInterval = setInterval(() => {
+  // 设置自动保存定时器（每3秒保存一次）
+  autoSaveInterval = setInterval(() => {
     autoSaveToLocalStorage();
-  }, 60000);
+  }, 30000);
 
   window.handleTimestampClick = (timeSeconds) => {
     if (typeof timeSeconds === 'number') {
       seekToTime(timeSeconds);
     }
   };
+
+  // 从本地存储加载侧边栏设置
+  const savedAutoOpen = localStorage.getItem('autoOpenSidebar');
+  if (savedAutoOpen !== null) {
+    autoOpenSidebar.value = savedAutoOpen === 'true';
+  }
+
+  // 添加键盘事件监听，支持按 ESC 键关闭侧边栏
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && showSimilarNotesSidebar.value) {
+      showSimilarNotesSidebar.value = false;
+    }
+  });
+
 });
 
 // 清理资源
@@ -727,13 +1026,32 @@ onUnmounted(() => {
     videoPlayer.value.removeEventListener('timeupdate', onVideoTimeUpdate);
   }
   
-  // 清理自动保存定时器
+  // 清除自动保存定时器
   if (autoSaveInterval) {
     clearInterval(autoSaveInterval);
+    autoSaveInterval = null;
   }
   
+  // 在组件卸载前保存一次笔记
+  autoSaveToLocalStorage();
+  
   window.handleTimestampClick = undefined;
+
+  // 移除键盘事件监听
+  window.removeEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && showSimilarNotesSidebar.value) {
+      showSimilarNotesSidebar.value = false;
+    }
+  });
+
+  // 移除键盘事件监听
+  const editorElement = document.querySelector('.vditor');
+  if (editorElement) {
+    editorElement.removeEventListener('keydown', handleEditorKeyDown);
+  }
+
 });
+
 // 监听笔记变化，更新编辑器内容
 watch(currentNote, (newNote) => {
   if (newNote) {
@@ -820,10 +1138,75 @@ const onVideoSeeked = () => {
 // 初始化笔记编辑器
 const initNoteEditor = () => {
   nextTick(() => {
-    if (noteEditor.value) {
-      // 设置编辑器初始状态
-      updateEditorEditableState();
+    // 如果已经初始化了编辑器，先销毁它
+    if (vditorInstance.value) {
+      vditorInstance.value.destroy();
+      vditorInstance.value = null;
     }
+    
+    // 获取编辑器容器
+    const editorContainer = document.getElementById('note-editor-container');
+    if (!editorContainer) {
+      console.error('找不到编辑器容器');
+      return;
+    }
+    
+    // 初始化 Vditor
+    vditorInstance.value = new Vditor('note-editor-container', {
+      height: '100%',
+      mode: 'wysiwyg', // 所见即所得模式
+      value: noteContent.value || '',
+      placeholder: '在此输入笔记内容...',
+      theme: 'classic',
+      cache: {
+        enable: false
+      },
+      toolbar: [
+        'emoji', 'headings', 'bold', 'italic', 'strike', 'link', 
+        '|', 'list', 'ordered-list', 'check', 'outdent', 'indent', 
+        '|', 'quote', 'line', 'code', 'inline-code', 'insert-before', 'insert-after', 
+        '|', 'upload', 'table', 
+        '|', 'undo', 'redo', 
+        '|', 'fullscreen'
+      ],
+      upload: {
+        accept: 'image/*',
+        token: '', // 如果需要上传图片，这里需要设置token
+        url: '', // 设置上传URL
+        linkToImgUrl: '', // 设置粘贴URL时的上传地址
+        filename: (name) => name // 设置上传文件名
+      },
+      after: () => {
+        // 编辑器初始化完成后的回调
+        console.log('Vditor 初始化完成');
+        
+        // 设置编辑器内容
+        if (noteContent.value) {
+          vditorInstance.value.setValue(noteContent.value);
+        }
+        
+        // 设置编辑器状态
+        updateEditorEditableState();
+      },
+      input: (value) => {
+        // 当编辑器内容变化时更新 noteContent
+        noteContent.value = value;
+        // 调用handleContentChange函数来触发相似笔记推荐
+        handleContentChange();
+      },
+      focus: () => {
+        // 当编辑器获得焦点时
+        console.log('编辑器获得焦点');
+      },
+      blur: () => {
+        // 当编辑器失去焦点时
+        console.log('编辑器失去焦点');
+      }
+    });
+    
+    // 调试信息
+    console.log('noteEditor:', noteEditor.value);
+    console.log('vditorInstance:', vditorInstance.value);
   });
 };
 
@@ -888,6 +1271,15 @@ const fetchSimilarNotes = async () => {
         !currentNote.value || note.id !== currentNote.value.id
       );
       
+      // 如果有相似笔记，自动打开侧边栏
+      if (similarNotes.value.length > 0 && autoOpenSidebar.value) {
+        showSimilarNotesSidebar.value = true;
+      } 
+      // 如果没有相似笔记，且侧边栏是打开的，自动关闭侧边栏
+      else if (similarNotes.value.length === 0 && showSimilarNotesSidebar.value) {
+        showSimilarNotesSidebar.value = false;
+      }
+      
       // 在处理完数据后添加日志
       console.log('过滤后的相似笔记:', similarNotes.value);
     }
@@ -900,28 +1292,32 @@ const fetchSimilarNotes = async () => {
 
 // 查看相似笔记
 const viewSimilarNote = (note) => {
-  // 如果当前正在编辑，提示保存
-  if (isCreatingNote.value || (currentNote.value && noteContent.value !== currentNote.value.content)) {
-    ElMessageBox.confirm('当前笔记未保存，是否保存后查看相似笔记？', '保存确认', {
-      confirmButtonText: '保存',
-      cancelButtonText: '不保存',
-      distinguishCancelAndClose: true,
-      closeOnClickModal: false
-    }).then(() => {
-      // 保存当前笔记
-      saveNote().then(() => {
-        // 选择相似笔记
-        selectNote(note);
-      });
-    }).catch((action) => {
-      if (action === 'cancel') {
-        // 不保存，直接查看相似笔记
-        selectNote(note);
-      }
-    });
-  } else {
-    // 直接查看相似笔记
-    selectNote(note);
+  // 设置当前在侧边栏中查看的笔记
+  sidebarViewingNote.value = note;
+  // 显示笔记详情
+  showNoteDetailInSidebar.value = true;
+};
+
+// 返回相似笔记列表
+const backToSimilarNotesList = () => {
+  showNoteDetailInSidebar.value = false;
+  sidebarViewingNote.value = null;
+};
+
+// 切换侧边栏显示状态
+const toggleSimilarNotesSidebar = () => {
+  showSimilarNotesSidebar.value = !showSimilarNotesSidebar.value;
+};
+
+// 是否在有新的相似笔记时自动打开侧边栏
+const autoOpenSidebar = ref(true);
+
+// 处理侧边栏设置
+const handleSidebarSetting = (command) => {
+  if (command === 'toggleAutoOpen') {
+    autoOpenSidebar.value = !autoOpenSidebar.value;
+    // 可以将设置保存到本地存储，以便下次打开页面时记住用户的偏好
+    localStorage.setItem('autoOpenSidebar', autoOpenSidebar.value);
   }
 };
 
@@ -955,11 +1351,22 @@ const formatDateTime = (dateString) => {
 
 // 自动保存笔记到本地存储
 const autoSaveToLocalStorage = () => {
-  if (!noteEditor.value || (!currentNote.value && !isCreatingNote.value)) return;
+  if ((!currentNote.value && !isCreatingNote.value)) return;
+  
+  // 从Vditor编辑器获取内容，添加更严格的检查
+  let content = noteContent.value;
+  try {
+    if (vditorInstance.value && typeof vditorInstance.value.getValue === 'function') {
+      content = vditorInstance.value.getValue();
+    }
+  } catch (error) {
+    console.error('获取Vditor内容时出错:', error);
+    // 出错时使用noteContent.value作为备选
+  }
   
   const noteData = {
     title: noteTitle.value,
-    content: noteContent.value,
+    content: content,
     tags: noteTags.value,
     timestamps: timestamps.value,
     video_id: videoId.value || null,
@@ -996,6 +1403,15 @@ const restoreFromLocalStorage = () => {
     noteContent.value = noteData.content || '';
     noteTags.value = noteData.tags || [];
     timestamps.value = noteData.timestamps || [];
+
+    // 在恢复内容后，将内容设置到Vditor编辑器
+    try {
+      if (vditorInstance.value && typeof vditorInstance.value.setValue === 'function' && noteData.content) {
+        vditorInstance.value.setValue(noteData.content);
+      }
+    } catch (error) {
+      console.error('设置Vditor内容时出错:', error);
+    }
     
     // 恢复笔记状态
     if (noteData.isCreating) {
@@ -1198,7 +1614,13 @@ const saveNote = async () => {
     ElMessage.warning('标题和内容不能为空');
     return;
   }
-  
+
+  // 获取笔记内容
+  let content = noteContent.value;
+  if (vditorInstance.value) {
+    content = vditorInstance.value.getValue();
+  }
+
   try {
     const noteData = {
       title: noteTitle.value,
@@ -1288,6 +1710,11 @@ const initNewNote = () => {
   noteContent.value = '';
   noteTags.value = [];
   timestamps.value = [];
+  
+  // 添加这段代码来清空 Vditor 编辑器的内容
+  if (vditorInstance.value) {
+    vditorInstance.value.setValue('');
+  }
   
   // 更新编辑器状态
   updateEditorEditableState();
@@ -1398,21 +1825,6 @@ const loadMergedSubtitles = async (id, force = false) => {
     subtitles.value = [];
     ElMessage.error('加载合并字幕失败');
   }
-};
-
-
-// 将SRT时间格式转换为秒
-const convertSRTTimeToSeconds = (timeString) => {
-  const match = timeString.match(/(\d{2}):(\d{2}):(\d{2}),(\d{3})/);
-  if (match) {
-    const hours = parseInt(match[1]);
-    const minutes = parseInt(match[2]);
-    const seconds = parseInt(match[3]);
-    const milliseconds = parseInt(match[4]);
-    
-    return hours * 3600 + minutes * 60 + seconds + milliseconds / 1000;
-  }
-  return 0;
 };
 
 // 重置编辑器
@@ -1638,21 +2050,6 @@ const getPreviewText = (note) => {
   return text.length > 100 ? text.substring(0, 100) + '...' : text;
 };
 
-// 切换视频显示
-// 删除toggleVideo函数，因为不再需要
-
-// 切换笔记列表显示
-const toggleNoteList = () => {
-  showNoteList.value = !showNoteList.value;
-};
-
-// 切换Markdown预览
-const togglePreview = () => {
-  showPreview.value = !showPreview.value;
-  console.log('预览模式状态:', showPreview.value);
-  handlePreviewToggle(showPreview.value);
-};
-
 // 处理预览切换
 const handlePreviewToggle = (isPreview) => {
   // 强制DOM更新
@@ -1785,7 +2182,8 @@ const isCurrentSubtitle = (subtitle) => {
 
 // 添加字幕到笔记
 const addSubtitleToNote = (subtitle) => {
-  if (!noteEditor.value || (!currentNote.value && !isCreatingNote.value)) return;
+  // 只检查是否有正在编辑的笔记或者是否正在创建新笔记
+  if (!currentNote.value && !isCreatingNote.value) return;
   
   // 获取字幕文本和时间
   const subtitleContent = subtitle.text || subtitle.content || '';
@@ -1804,10 +2202,14 @@ const addSubtitleToNote = (subtitle) => {
   if (vditorInstance.value) {
     const currentContent = vditorInstance.value.getValue();
     vditorInstance.value.setValue(currentContent + subtitleText);
+    // 添加：触发内容变化事件，更新相似笔记
+    handleContentChange();
   } else {
     // 使用普通文本编辑器
     // 获取当前光标位置
     const textarea = noteEditor.value;
+    if (!textarea) return; // 添加：如果没有文本编辑器，直接返回
+    
     const cursorPosition = textarea.selectionStart;
     
     // 在光标位置插入字幕文本
@@ -1839,8 +2241,6 @@ const addSubtitleToNote = (subtitle) => {
   // 自动保存笔记
   if (currentNote.value) {
     saveNote();
-  } else { // 即使没有当前笔记，也保存到本地存储
-    autoSaveToLocalStorage();
   }
 };
 
@@ -1978,6 +2378,99 @@ const handleSyncTags = async () => {
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
+/* 中间区域样式 */
+.center-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+/* 视频管理弹出面板样式 */
+.video-manager-popover {
+  padding: 0;
+  overflow: hidden;
+}
+
+.video-manager-container {
+  display: flex;
+  flex-direction: column;
+  max-height: 500px;
+}
+
+.video-list {
+  overflow-y: auto;
+  max-height: 350px;
+  padding: 10px;
+}
+
+.video-item {
+  display: flex;
+  padding: 10px;
+  border-bottom: 1px solid #ebeef5;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.video-item:hover {
+  background-color: #f5f7fa;
+}
+
+.video-thumbnail {
+  width: 80px;
+  height: 45px;
+  background-color: #eee;
+  border-radius: 4px;
+  margin-right: 10px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  flex-shrink: 0;
+}
+
+.video-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.video-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.video-duration {
+  font-size: 12px;
+  color: #909399;
+}
+
+.empty-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 0;
+  color: #909399;
+}
+
+.empty-list .el-icon {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+.video-manager-actions {
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  border-top: 1px solid #ebeef5;
+}
+
 .left-actions {
   display: flex;
   align-items: center;
@@ -2055,18 +2548,33 @@ const handleSyncTags = async () => {
   flex: 1;
   overflow: hidden;
   position: relative;
+  min-height: 0; /* 防止在某些浏览器中溢出 */
+  max-width: 90%; /* 设置最大宽度，两侧留白 */
+  margin: 0 auto; /* 水平居中 */
+  justify-content: center; /* 内容居中 */
+  transition: width 0.3s ease, margin-right 0.3s ease; /* 添加过渡效果 */
+}
+
+/* 当侧边栏打开时，主容器的样式 */
+.main-content-with-sidebar {
+  width: calc(100% - 300px);
+  transition: width 0.3s ease;
+  margin-right: 280px; /* 为侧边栏留出空间 */
 }
 
 /* 左侧区域 */
 .left-section {
   width: 45%;
+  min-width: 300px; /* 设置最小宽度 */
+  max-width: 800px; /* 设置最大宽度 */
   display: flex;
   flex-direction: column;
   border-right: 1px solid rgba(0, 0, 0, 0.08);
   overflow: hidden;
-  background-color: #fff;
+  margin-right: 10px; /* 添加右边距 */
+  background-color: transparent; /* 改为透明背景 */
   box-shadow: 4px 0 12px rgba(0, 0, 0, 0.05);
-  z-index: 5;
+  z-index: 5; /* 保证在其他元素上方 */
 }
 
 /* 视频播放区域 */
@@ -2077,11 +2585,16 @@ const handleSyncTags = async () => {
   padding: 15px;
   min-height: 40%;
   max-height: 60%;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  background: linear-gradient(to bottom, #ffffff, #f8f9fa);
-  border: 1px solid #9d84d8; /* 添加浅紫色边框 */
-  border-radius: 8px;
-  margin: 5px;
+  background: #ffffff;
+  border-radius: 12px;
+  margin: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.video-section:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
 }
 
 .video-header {
@@ -2090,7 +2603,7 @@ const handleSyncTags = async () => {
   align-items: center;
   margin-bottom: 10px;
   padding: 5px 0;
-  height: 30px;
+  height: 5px;
   position: relative;
 }
 
@@ -2106,11 +2619,13 @@ const handleSyncTags = async () => {
   border-radius: 2px;
 }
 
-.video-header h3 {
-  margin-left: 12px;
+.video-header h3 , .subtitle-header h3,.note-editor-header h3{
   font-size: 16px;
   font-weight: 600;
   color: #333;
+  margin: 0;
+  padding-left: 15px;
+  position: relative;
 }
 
 .video-player-wrapper {
@@ -2118,11 +2633,12 @@ const handleSyncTags = async () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: #000;
+  background-color: #f9f9f9;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   transition: all 0.3s ease;
+  margin: 5px;
 }
 
 .video-player-wrapper:hover {
@@ -2164,10 +2680,16 @@ const handleSyncTags = async () => {
   flex-direction: column;
   padding: 15px;
   overflow: hidden;
-  background: linear-gradient(to bottom, #f8f9fa, #ffffff);
-  border: 1px solid #9674ee; /* 添加浅紫色边框 */
-  border-radius: 8px;
-  margin: 5px; 
+  background: #ffffff;
+  border-radius: 12px;
+  margin: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.subtitle-section:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
 }
 
 .subtitle-header {
@@ -2176,7 +2698,7 @@ const handleSyncTags = async () => {
   align-items: center;
   margin-bottom: 5px;
   padding: 3px 0;
-  height: 25px;
+  height: 15px;
   position: relative;
 }
 
@@ -2192,13 +2714,6 @@ const handleSyncTags = async () => {
   border-radius: 2px;
 }
 
-.subtitle-header h3 {
-  margin-left: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-}
-
 /* 调整字幕列表容器 */
 .subtitle-list-wrapper {
   flex: 1; 
@@ -2208,7 +2723,7 @@ const handleSyncTags = async () => {
   padding: 10px;
   padding-bottom: 20px; /* 增加底部内边距，确保最后一项完全显示 */
   height: calc(50vh - 80px);
-  min-height: 300px;
+  min-height: 280px;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
@@ -2243,7 +2758,7 @@ const handleSyncTags = async () => {
 
 /* 确保最后一个字幕项有足够的底部边距 */
 .subtitle-item:last-child {
-  margin-bottom: 20px;
+  margin-bottom: 35px;
 }
 
 .subtitle-item.active {
@@ -2279,30 +2794,41 @@ const handleSyncTags = async () => {
 
 /* 右侧区域 */
 .right-section {
-  flex: 1;
+  flex: 1; /* 自动占用剩余空间 */
+  min-width: 300px; /* 设置最小宽度 */
   display: flex;
   flex-direction: column;
   overflow: hidden;
   background-color: #fff;
-  position: relative;
+  margin-left: 15px; /* 添加左边距 */
+  position: relative; 
+  padding: 0; /* 移除内边距 */
 }
 
 .note-editor-container {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 15px;
+  padding: 0px;
   overflow: hidden;
 }
 
+/* 笔记编辑区 */
 .note-editor-section {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: 12px;
   background-color: #fff;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  margin: 10px;
+  transition: all 0.3s ease;
+}
+
+.note-editor-section:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
 }
 
 .note-editor-header {
@@ -2398,6 +2924,7 @@ const handleSyncTags = async () => {
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  padding-top: 10px; /* 添加顶部内边距 */
 }
 
 .editor-wrapper.disabled {
@@ -2459,19 +2986,11 @@ const handleSyncTags = async () => {
 
 .editor-content-area {
   flex: 1;
-  overflow: auto;
   position: relative;
-}
-
-/* 提示用户时间戳是可点击的 */
-.editor-content-area::after {
-  content: "提示：在编辑模式下点击时间戳 [[timestamp:...]] 可跳转到对应视频位置";
-  position: absolute;
-  bottom: 5px;
-  right: 10px;
-  font-size: 12px;
-  color: #909399;
-  opacity: 0.8;
+  display: flex;
+  overflow: hidden; /* 修改：从auto改为hidden，防止出现双滚动条 */
+  min-height: 300px; /* 确保最小高度 */
+  height: 100%; /* 占满容器高度 */
 }
 
 .note-textarea {
@@ -2479,15 +2998,40 @@ const handleSyncTags = async () => {
   width: 100%;
   height: 100%;
   min-height: 300px;
-  padding: 12px;
+  padding: 40px 12px 12px 12px; /* 增加顶部内边距 */
   border: none;
   resize: none;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 16px; /* 增大编辑笔记时的字体大小 */
+  line-height: 1.8;  /* 增大行间距 */
   color: #303133;
   background-color: #fff;
   outline: none;
   font-family: 'Source Code Pro', monospace,'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+  overflow-y: auto; /* 修改：只保留垂直滚动条 */
+  overflow-x: hidden; /* 修改：隐藏水平滚动条 */
+  scrollbar-width: thin; /* 修改：使滚动条变细（Firefox） */
+  font-weight: 500; /* 添加：稍微加粗字体 */
+  -webkit-font-smoothing: antialiased; /* 添加：字体平滑渲染（Mac/iOS） */
+  -moz-osx-font-smoothing: grayscale; /* 添加：字体平滑渲染（Firefox） */
+}
+
+/* 自定义滚动条样式（Webkit浏览器） */
+.note-textarea::-webkit-scrollbar {
+  width: 6px;
+}
+
+.note-textarea::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.note-textarea::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+}
+
+.note-textarea::-webkit-scrollbar-thumb:hover {
+  background: #909399;
 }
 
 /* 移除原来的预览切换按钮样式 */
@@ -2505,13 +3049,36 @@ const handleSyncTags = async () => {
   padding: 12px;
   background-color: #f9f9f9;
   border-radius: 4px;
-  overflow: auto;
   height: 100%;
   width: 100%;
   position: absolute;
   top: 0;
   left: 0;
   z-index: 20; /* 确保在文本框上方 */
+  overflow-y: auto; /* 修改：只保留垂直滚动条 */
+  overflow-x: hidden; /* 修改：隐藏水平滚动条 */
+  scrollbar-width: thin; /* 修改：使滚动条变细（Firefox） */
+  font-size: 18px; /* 添加：与编辑区域保持一致的字体大小 */
+  line-height: 2.0; /* 添加：与编辑区域保持一致的行高 */
+}
+
+/* 自定义预览区域滚动条样式（Webkit浏览器） */
+.markdown-preview::-webkit-scrollbar {
+  width: 6px;
+}
+
+.markdown-preview::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.markdown-preview::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+}
+
+.markdown-preview::-webkit-scrollbar-thumb:hover {
+  background: #909399;
 }
 
 /* 编辑器禁用遮罩 */
@@ -2890,15 +3457,16 @@ const handleSyncTags = async () => {
 .note-item {
   display: flex;
   align-items: flex-start;
-  padding: 12px 12px;
-  min-height: 98px;
-  border-radius: 8px;
+  padding: 12px 12px; 
+  height: 120px; 
+  border-radius: 12px;
   background-color: #fff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
   cursor: pointer;
   position: relative;
   border: 1px solid #ebeef5;
+  overflow: hidden; /* 添加：防止内容溢出 */
 }
 
 .note-item-content {
@@ -2931,10 +3499,12 @@ const handleSyncTags = async () => {
   font-size: 13px;
   margin-bottom: 8px;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 2; /* 可以保持为2行 */
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.5; /* 添加：确保行高一致 */
+  max-height: 40px; /* 添加：限制最大高度 */
 }
 
 .note-meta {
@@ -3172,5 +3742,483 @@ const handleSyncTags = async () => {
 .left-section, .right-section {
   min-height: 0; /* 防止内容区域溢出 */
   overflow: hidden;
+}
+
+/* 标签按钮样式 */
+.button-new-tag {
+  margin-left: 10px;
+  margin-top: 10px;
+  transition: all 0.3s;
+  width: 100px; 
+  height: 30px;    
+}
+
+.button-new-tag:hover {
+  transform: scale(1.05);
+}
+
+/* 操作按钮样式 */
+.editor-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.editor-actions .el-button {
+  transition: all 0.3s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.editor-actions .el-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 响应式布局 */
+@media (max-width: 1400px) {
+  .note-content-container {
+    max-width: 95%; /* 在较小屏幕上减少留白 */
+  }
+}
+
+@media (max-width: 1200px) {
+  .note-content-container {
+    max-width: 100%; /* 在更小屏幕上不留白 */
+  }
+  
+  .left-section, .right-section {
+    width: 48%; /* 调整宽度比例 */
+    margin: 0 5px; /* 减小间距 */
+  }
+}
+
+@media (max-width: 992px) {
+  .note-content-container {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .left-section, .right-section {
+    width: 90%;
+    max-width: none;
+    margin: 10px 0;
+  }
+}
+
+/*  侧边栏样式 */
+.note-sidebar {
+  position: fixed;
+  top: 165px;  /* 根据顶部导航栏高度调整 */
+  right: -350px; /* 初始位置在屏幕外 */
+  width: 280px;
+  height: 550px;
+  background-color: #fff;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  transition: right 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  border-left: 4px solid #409EFF;
+  overflow-y: auto; /* 添加滚动条 */
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-right: 35px;
+}
+
+.sidebar-open {
+  right: 0; /* 显示侧边栏 */
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid #ebeef5;
+  background-color: #f0f9ff;
+  position: sticky; /* 使头部固定 */
+  top: 0; /* 固定在顶部 */
+  z-index: 10; /* 确保在内容之上 */
+}
+.sidebar-header h3 {
+  margin: 0;
+  flex: 1;
+  font-size: 16px;
+  color: #409EFF;
+}
+
+.close-sidebar {
+  padding: 2px;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.similar-note-card {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid #ebeef5;
+}
+
+.similar-note-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background-color: #f9f9f9;
+}
+
+.similar-note-card-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  color: #303133;
+  font-size: 15px;
+}
+
+.similar-note-card-preview {
+  color: #606266;
+  font-size: 13px;
+  margin-bottom: 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.5;
+}
+
+.similar-note-card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #909399;
+}
+
+.similar-note-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.no-similar-notes {
+  text-align: center;
+  color: #909399;
+  padding: 20px 0;
+}
+
+/* 添加徽章样式 */
+.similar-notes-badge {
+  margin-left: 5px;
+}
+
+/* 相似笔记按钮样式 */
+.pink-button {
+  background-color: #ffb6c1 !important; /* 浅粉色 */
+  border-color: #ffb6c1 !important;
+  color: #ffffff !important;
+}
+
+.pink-button:hover {
+  background-color: #ff9aa2 !important; /* 深一点的粉色 */
+  border-color: #ff9aa2 !important;
+}
+
+/* 侧边栏提示信息样式 */
+.sidebar-tip {
+  padding: 10px 15px;
+  background-color: #f8f9fa;
+  border-top: 1px dashed #e0e0e0;
+  color: #c447bc;
+  font-size: 12px;
+  text-align: center;
+  margin-top: auto; /* 将提示信息推到底部 */
+}
+
+/* 笔记详情视图样式 */
+.note-detail-view {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  height: 100%;
+}
+
+.note-detail-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: #303133;
+  border-bottom: 1px solid #ebeef5;
+  padding-bottom: 10px;
+}
+
+.note-detail-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #909399;
+}
+
+.note-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.note-detail-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.note-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 0;
+}
+
+/* 返回按钮样式 */
+.back-button {
+  margin-right: 10px;
+}
+
+/* Markdown样式 */
+.markdown-body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  color: #24292e;
+}
+
+.markdown-body h1, .markdown-body h2, .markdown-body h3 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-body h1 {
+  font-size: 2em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+
+.markdown-body h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+
+.markdown-body h3 {
+  font-size: 1.25em;
+}
+
+.markdown-body code {
+  padding: 0.2em 0.4em;
+  margin: 0;
+  font-size: 85%;
+  background-color: rgba(27, 31, 35, 0.05);
+  border-radius: 3px;
+}
+
+.markdown-body pre {
+  padding: 16px;
+  overflow: auto;
+  font-size: 85%;
+  line-height: 1.45;
+  background-color: #f6f8fa;
+  border-radius: 3px;
+}
+
+.markdown-body pre code {
+  padding: 0;
+  margin: 0;
+  font-size: 100%;
+  background-color: transparent;
+  border: 0;
+}
+
+/* 确保 Vditor 与现有布局兼容 */
+.note-editor-wrapper {
+  height: 100%;
+  width: 100%;
+  position: relative;
+}
+
+.note-editor-container {
+  height: 100%;
+  width: 100%;
+}
+
+/* 确保 Vditor 的样式与你的应用一致 */
+.vditor {
+  border: none;
+  height: 100%;
+}
+
+.vditor-reset {
+  font-family: var(--font-family);
+}
+
+.timestamp-tip {
+  margin-bottom: 10px;
+}
+
+
+/* 笔记指南弹窗样式 */
+.note-guide-dialog :deep(.el-dialog__header) {
+  background: linear-gradient(135deg, #a1c4fd, #c2e9fb);
+  padding: 15px 20px;
+  border-radius: 8px 8px 0 0;
+  color: #333;
+  text-align: center;
+  font-weight: bold;
+}
+
+.note-guide-dialog :deep(.el-dialog__body) {
+  padding: 20px;
+  background-color: #f9fafc;
+}
+
+.note-guide-dialog :deep(.el-dialog__footer) {
+  border-top: 1px solid #ebeef5;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.guide-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  color: #409EFF;
+}
+
+.header-icon {
+  font-size: 28px;
+  margin-right: 10px;
+  color: #409EFF;
+}
+
+.guide-header h2 {
+  margin: 0;
+  font-size: 22px;
+  background: linear-gradient(45deg, #4361ee, #3a0ca3);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.guide-description {
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.highlight {
+  color: #4361ee;
+  font-weight: bold;
+  padding: 0 3px;
+}
+
+.steps-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.step-item {
+  display: flex;
+  background-color: white;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.step-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a1c4fd, #c2e9fb);
+  color: #333;
+  font-weight: bold;
+  margin-right: 15px;
+  flex-shrink: 0;
+}
+
+.step-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.step-content h4 {
+  margin: 0 0 5px 0;
+  color: #333;
+}
+
+.step-content p {
+  margin: 0;
+  color: #606266;
+}
+
+.step-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 24px;
+  color: #c2e9fb;
+}
+
+.guide-footer {
+  display: flex;
+  align-items: center;
+  background-color: #f0f9ff;
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #409EFF;
+}
+
+.footer-icon {
+  font-size: 20px;
+  margin-right: 10px;
+  color: #409EFF;
+}
+
+.guide-footer p {
+  margin: 0;
+  color: #606266;
+  font-size: 14px;
+}
+
+.know-button {
+  transition: all 0.3s ease;
+}
+
+.know-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
 }
 </style>

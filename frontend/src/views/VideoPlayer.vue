@@ -151,17 +151,6 @@
                   </template>
                 </el-dropdown>
               </div>
-              <div class="subtitle-control-item">
-                <span class="control-label">语义合并</span>
-                <el-button 
-                  type="primary" 
-                  size="small" 
-                  @click="refreshMergedSubtitles" 
-                  :loading="mergeSubtitlesLoading"
-                >
-                  重新合并字幕
-                </el-button>
-              </div>
             </div>
           </div>
         </div>
@@ -184,10 +173,16 @@
                 </el-tag>
               </h3>
               <div class="qa-mode-switch">
-                <el-radio-group v-model="qaMode" size="small">
-                  <el-radio-button label="video">基于视频内容</el-radio-button>
-                  <el-radio-button label="free">自由问答</el-radio-button>
-                </el-radio-group>
+                <div class="qa-mode-buttons">
+                  <el-button 
+                    size="small" 
+                    :type="qaMode === 'video' ? 'primary' : 'default'"
+                    round
+                    @click="toggleQaMode"
+                  >
+                    与视频对话
+                  </el-button>
+                </div>
               </div>
               <div class="qa-header-actions">
                 <el-switch
@@ -235,12 +230,16 @@
               </div>
               <div class="qa-input">
                 <div class="qa-input-options">
-                  <el-switch
-                    v-model="deepThinking"
-                    active-text="深度思考模式"
-                    inactive-text="普通模式"
-                    style="margin-bottom: 10px;"
-                  />
+                  <div class="thinking-mode-button" @click="toggleDeepThinking">
+                    <el-button 
+                      size="small" 
+                      :type="deepThinking ? 'primary' : 'default'"
+                      :icon="deepThinking ? 'Brain' : ''"
+                      round
+                    >
+                      深度思考
+                    </el-button>
+                  </div>
                 </div>
                 <el-input 
                   v-model="question" 
@@ -260,10 +259,20 @@
     <div class="subtitle-section">
       <div class="subtitle-display-container">
         <div class="subtitle-mode-switch">
-          <el-radio-group v-model="subtitleMode" size="small">
-            <el-radio-button label="merged">语义合并字幕</el-radio-button>
-            <el-radio-button label="full">标准分段字幕</el-radio-button>
-          </el-radio-group>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <el-radio-group v-model="subtitleMode" size="small">
+              <el-radio-button label="merged">语义合并字幕</el-radio-button>
+              <el-radio-button label="full">标准分段字幕</el-radio-button>
+            </el-radio-group>
+            <el-button 
+              type="primary" 
+              size="small" 
+              @click="refreshMergedSubtitles" 
+              :loading="mergeSubtitlesLoading"
+            >
+              重新合并字幕
+            </el-button>
+          </div>
         </div>
       
         <div class="subtitle-display">
@@ -399,14 +408,6 @@
       </template>
     </el-dialog>
   </div>
-  
-  <!-- 底部美化区域 -->
-  <div class="page-footer">
-    <div class="footer-wave"></div>
-    <div class="footer-content">
-      <div class="footer-text">AI-EdVision · 智能教育视频分析平台</div>
-    </div>
-  </div>
 </template>
 
 <script setup>
@@ -495,7 +496,8 @@ watch(videoId, (newVideoId) => {
 // 监听问答模式变化
 watch(qaMode, (newMode) => {
   console.log(`问答模式切换为: ${newMode}`);
-  // 模式切换时可以在这里添加其他逻辑
+  // 显示切换模式的提示
+  ElMessage.info(`已切换到${newMode === 'video' ? '基于视频内容的问答模式' : '自由问答模式'}`);
 });
 
 // 监听模式切换
@@ -724,6 +726,16 @@ const loadMergedSubtitles = async (retryCount = 0, maxRetries = 3, force = false
   } finally {
     mergeSubtitlesLoading.value = false;
   }
+};
+
+// 切换深度思考模式
+const toggleDeepThinking = () => {
+  deepThinking.value = !deepThinking.value;
+};
+
+// 切换问答模式
+const toggleQaMode = () => {
+  qaMode.value = qaMode.value === 'video' ? 'free' : 'video';
 };
 
 // 视频事件处理
@@ -1178,26 +1190,25 @@ const getPlaceholderByMode = computed(() => {
   if (qaMode.value === 'video') {
     if (deepThinking.value) {
       return useOllama.value 
-        ? "深度思考模式（离线）：可以提问视频中的复杂问题，AI将展示详细思考过程（响应较慢）" 
-        : "深度思考模式（在线）：可以提问视频中的复杂问题，AI将展示详细思考过程";
+        ? "请输入关于视频内容的问题（深度思考模式）..." 
+        : "请输入关于视频内容的问题（深度思考模式）...";
     } else {
       return useOllama.value 
-        ? "基于视频内容模式（离线）：可以提问与视频内容相关的问题，例如：'视频中讲了哪些主要内容？'" 
-        : "基于视频内容模式（在线）：可以提问与视频内容相关的问题，例如：'视频中讲了哪些主要内容？'";
+        ? "请输入关于视频内容的问题..." 
+        : "请输入关于视频内容的问题...";
     }
   } else {
     if (deepThinking.value) {
       return useOllama.value 
-        ? "自由问答深度思考模式（离线）：可以提问任何问题，AI将展示详细思考过程（响应较慢）" 
-        : "自由问答深度思考模式（在线）：可以提问任何问题，AI将展示详细思考过程";
+        ? "请输入任何问题（深度思考模式）..." 
+        : "请输入任何问题（深度思考模式）...";
     } else {
       return useOllama.value 
-        ? "自由问答模式（离线）：可以提问任何问题，不限于视频内容" 
-        : "自由问答模式（在线）：可以提问任何问题，不限于视频内容";
+        ? "请输入任何问题..." 
+        : "请输入任何问题...";
     }
   }
 });
-
 // 获取模式标题
 const getModeTitle = computed(() => {
   if (qaMode.value === 'video') {
@@ -1216,22 +1227,22 @@ const getModeDescription = computed(() => {
   if (qaMode.value === 'video') {
     if (deepThinking.value) {
       return useOllama.value 
-        ? "可以提问视频中的复杂问题，AI将展示详细思考过程（离线模式，响应较慢）" 
-        : "可以提问视频中的复杂问题，AI将展示详细思考过程（在线模式）";
+        ? "AI将分析视频内容并展示详细思考过程（离线模式）" 
+        : "AI将分析视频内容并展示详细思考过程（在线模式）";
     } else {
       return useOllama.value 
-        ? "可以提问与视频内容相关的问题，例如：'视频中讲了哪些主要内容？'（离线模式）" 
-        : "可以提问与视频内容相关的问题，例如：'视频中讲了哪些主要内容？'（在线模式）";
+        ? "可提问：视频主要讲了什么？关键概念是什么？（离线模式）" 
+        : "可提问：视频主要讲了什么？关键概念是什么？（在线模式）";
     }
   } else {
     if (deepThinking.value) {
       return useOllama.value 
-        ? "可以提问任何问题，AI将展示详细思考过程（离线模式，响应较慢）" 
-        : "可以提问任何问题，AI将展示详细思考过程（在线模式）";
+        ? "可提问任何问题，AI将展示详细思考过程（离线模式）" 
+        : "可提问任何问题，AI将展示详细思考过程（在线模式）";
     } else {
       return useOllama.value 
-        ? "可以提问任何问题，不限于视频内容（离线模式）" 
-        : "可以提问任何问题，不限于视频内容（在线模式）";
+        ? "自由提问模式，不限于视频内容（离线模式）" 
+        : "自由提问模式，不限于视频内容（在线模式）";
     }
   }
 });
@@ -1279,31 +1290,33 @@ const closeGuideDialog = () => {
   --indigo-600: #4F46E5;
   --indigo-400: #818CF8;
   --indigo-100: #E0E7FF;
-  --primary-gradient: linear-gradient(135deg, #667eea, #764ba2);
+  --primary-gradient: linear-gradient(135deg, #f5f7fa, #ffffff);
   display: flex;
   height: 100vh;
-  width: 100%;
+  width: 90% !important;
+  margin: 0 auto !important;
   overflow: hidden;
   position: relative;
-  background: var(--primary-gradient);
+  background: #f8f9fa;
   color: #333;
 }
 
 
 /*左侧区域*/
 .left-section {
-  flex: 1;
+  flex: 0.98;
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
-  width: 60%; /* 初始宽度为60%，与右侧栏40%对应 */
+  width: 58%; /* 略微减小宽度，为间隔留出空间 */
   height: 100%;
   overflow: hidden;
+  background-color: transparent;
 }
 
 .left-section.with-sidebar {
-  width: 50%; /* 侧边栏打开时宽度变为50% */
-  margin-left: 20%; /* 左边距为侧边栏宽度 */
+  width: 48%; /* 侧边栏打开时宽度变为48% */
+  margin-left: 17%; /* 左边距为侧边栏宽度 */
 }
 
 /*上方区域*/
@@ -1325,17 +1338,20 @@ const closeGuideDialog = () => {
   width: 100%;
   height: 100%;
   position: relative;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  background: #ffffff;
+  transition: all 0.3s ease;
+  border: 3px solid #ff9a9e; /* 添加粉色边框 */
 }
 
 .video-section {
   width: 100%;
   height: 100%;
   position: relative;
-  background: var(--primary-gradient);
-  border-radius: 8px;
+  background: #ffffff;
+  border-radius: 12px;
   overflow: hidden;
 }
 
@@ -1349,31 +1365,48 @@ const closeGuideDialog = () => {
 
 /*视频播放区域*/
 .video-player-area {
-  flex: 0.45; /* 从0.4增加到0.45 */
+  flex: 0.43; 
   padding: 15px;
-  overflow: auto; /* 保持滚动功能 */
+  overflow: hidden;
 }
 
 .video-info-section {
   height: 100%;
   background-color: #fff;
-  border-radius: 8px;
-  padding: 10px; /* 减少内边距 */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 240px; /* 添加最大高度限制 */
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  overflow-y: auto; /* 添加垂直滚动 */
+  overflow-y: hidden;
+  transition: all 0.3s ease;
+  border: 3px solid #ff9a9e; /* 添加粉色边框 */
 }
 
 .video-info h3 {
   margin-top: 0;
-  margin-bottom: 10px; /* 减少下边距 */
-  color: #409EFF;
+  margin-bottom: 5px;
+  color: #333;
   font-weight: 600;
-  font-size: 18px; /* 进一步减小字体大小 */
+  font-size: 16px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  position: relative;
+  padding-left: 15px;
+}
+
+.video-info h3::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 18px;
+  background: linear-gradient(to bottom, #3CAEA3, #2a9d8f);
+  border-radius: 2px;
 }
 
 .video-details-card {
@@ -1381,15 +1414,15 @@ const closeGuideDialog = () => {
   border-radius: 8px;
   padding: 8px; /* 减少内边距 */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  margin-bottom: 10px; /* 减少下边距 */
+  margin-bottom: 5px; /* 减少下边距 */
 }
 
 .video-detail-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 5px; /* 减少每个项目之间的间距 */
-  font-size: 13px; /* 减小字体大小 */
+  margin-bottom: 3px; /* 减少每个项目之间的间距 */
+  font-size: 14px; /* 减小字体大小 */
 }
 
 .video-detail-item:last-child {
@@ -1411,7 +1444,7 @@ const closeGuideDialog = () => {
 /*字幕控制*/
 .subtitle-controls-card {
   background: linear-gradient(135deg, #f5f7fa, #e4e7eb);
-  border-radius: 8px;
+  border-radius: 7px;
   padding: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
@@ -1420,7 +1453,7 @@ const closeGuideDialog = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 7px 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
@@ -1438,7 +1471,7 @@ const closeGuideDialog = () => {
 }
 
 .download-button {
-  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  background: var(--indigo-400);
   border: none;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
@@ -1459,11 +1492,7 @@ const closeGuideDialog = () => {
   transition: all 0.3s ease;
 }
 
-.merged-item:hover {
-  background: rgba(60, 174, 163, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
+/* 移除合并字幕项悬停效果 */
 
 .subtitle-header {
   display: flex;
@@ -1485,27 +1514,32 @@ const closeGuideDialog = () => {
 .lower-section {
   flex: 1;
   padding: 0 15px 15px;
-  overflow-y: auto; /* 从 overflow: hidden 改为 overflow-y: auto */
+  overflow-y: auto;
 }
 
 /*问答容器*/
 .qa-container {
-  height: 100%;
-  width: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  height: 98%;
+  width: 98%;
+  border-radius: 12px;
+  overflow: hidden; 
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
+  background: #ffffff;
+  transition: all 0.3s ease;
+  border: 2px solid #ff9a9e; /* 添加粉色边框 */
 }
+
+/* 移除智能问答区域卡片悬停效果 */
 
 .qa-section {
   flex: 1;
   display: flex;
   flex-direction: column;
   background: #fff;
-  border-radius: 8px;
-  overflow-y: auto;
+  border-radius: 12px;
+  overflow-y: hidden;
   height: 100%;
 }
 
@@ -1514,13 +1548,29 @@ const closeGuideDialog = () => {
   align-items: center;
   justify-content: space-between;
   padding: 15px;
-  background: var(--primary-gradient);
-  color: #fff;
+  background: #f5f7fa;
+  color: #333;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  position: relative;
 }
 
 .qa-header h3 {
   margin: 0;
   font-weight: 600;
+  padding-left: 15px;
+  position: relative;
+}
+
+.qa-header h3::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 18px;
+  background: linear-gradient(to bottom, #a1c4fd, #c2e9fb);
+  border-radius: 2px;
 }
 
 .qa-mode-switch {
@@ -1692,66 +1742,70 @@ const closeGuideDialog = () => {
   border-radius: 4px;
   white-space: pre-wrap;
 }
+
 /*字幕区域*/
 .subtitle-section {
-  width: 40%; /* 初始宽度为40% */
+  width: 40%; /* 略微减小宽度，为间隔留出空间 */
   height: 100%;
   padding: 15px;
   overflow: hidden;
-  background: var(--primary-gradient);
-  transition: all 0.3s ease; /* 添加过渡效果 */
+  background: transparent;
+  transition: all 0.3s ease;
 }
 
 /* 当侧边栏可见时，调整右侧栏的宽度 */
 .video-player-container.with-sidebar .subtitle-section {
-  width: 30%; /* 侧边栏打开时减小宽度 */
+  width: 32%; /* 侧边栏打开时减小宽度 */
 }
 
 .subtitle-display-container {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: rgba(255, 255, 255, 0.9);
-  border-radius: 8px;
+  background-color: #fff;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  border: 3px solid #ff9a9e; /* 添加粉色边框 */
 }
+
+/* 移除字幕区域卡片悬停效果 */
 
 .subtitle-mode-switch {
   padding: 15px;
-  background: var(--primary-gradient);
-  color: #fff;
+  background: #f5f7fa;
+  color: #333;
   text-align: center;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .subtitle-display {
   flex: 1;
   padding: 15px;
   overflow-y: auto;
+  background-color: #fff;
 }
 
 .subtitle-item {
   margin-bottom: 15px;
-  padding: 10px;
+  padding: 12px 15px;
   border-radius: 8px;
-  background: var(--primary-light); /* 添加与merged-item相同的背景色 */
+  background: #f9f9f9;
   transition: all 0.3s ease;
-  cursor: pointer;
+  border-left: 3px solid transparent;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
-.subtitle-item:hover {
-  background: rgba(60, 174, 163, 0.3); /* 与merged-item的hover状态相同 */
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 添加阴影效果 */
-}
+/* 移除字幕项悬停效果 */
 
 .subtitle-item.current, 
 .merged-item.current {
-  background-color: rgba(60, 174, 163, 0.6); /* 增加背景色透明度，使颜色更深 */
-  border-left: 4px solid var(--primary-color); /* 增加边框宽度 */
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3); /* 增强阴影效果 */
-  transform: translateY(-3px); /* 添加轻微上浮效果 */
-  position: relative; /* 为伪元素定位做准备 */
+  background-color: rgba(60, 174, 163, 0.2);
+  border-left: 3px solid #3CAEA3;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  position: relative;
 }
 
 /* 添加左侧标记，增强视觉效果 */
@@ -1821,20 +1875,19 @@ const closeGuideDialog = () => {
 .sidebar {
   position: fixed;
   top: 0;
-  left: -25%; /* 初始位置在屏幕外 */
-  width: 20%;
+  left: -22%; /* 调整初始位置 */
+  width: 21%;
   height: 100%;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: #ffffff;
   transition: all 0.3s ease;
-  z-index: 1000; /* 确保侧边栏在内容之上 */
-  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
   overflow-y: auto;
-  color: #fff;
+  color: #0c2430;
 }
 
 .sidebar-visible {
-  background-color: #667eea; /* 使用与渐变色起始颜色相同的颜色 */
-  color: white;
+  background-color: #ffffff;
+  color: #333333;
   left: 0;
 }
 
@@ -1843,7 +1896,8 @@ const closeGuideDialog = () => {
   justify-content: space-between;
   align-items: center;
   padding: 15px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  background: #f5f7fa;
 }
 
 .sidebar-header h3 {
@@ -1878,17 +1932,17 @@ const closeGuideDialog = () => {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
-  color: #fff;
-  background-color: rgba(0, 0, 0, 0.2); /* 使用深色背景，而不是白色透明背景 */
+  color: #333; /* 修改文字颜色为深色，以便在浅色背景上更易读 */
+  background-color: #ffcdd2; /* 修改为浅粉色背景 */
 }
 
 .menu-item:hover {
-  background-color: rgba(0, 0, 0, 0.3); /* 悬停时使用更深的颜色 */
+  background-color: #ffb6c1; /* 悬停时使用稍深的粉色 */
   transform: translateY(-2px);
 }
 
 .menu-item .el-icon {
-  color: #fff;
+  color: #333; /* 修改图标颜色为深色 */
   margin-right: 10px;
 }
 
@@ -1896,10 +1950,12 @@ const closeGuideDialog = () => {
   margin-top: 20px;
 }
 
+/* 侧边栏菜单标题 */
 .menu-section h4 {
   margin-bottom: 10px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 20px;
+  color: #ff9a9e;
 }
 
 .video-list {
@@ -1930,13 +1986,12 @@ const closeGuideDialog = () => {
   background: rgba(255, 255, 255, 0.5);
 }
 
-.video-item {
+.video-item { /* 已分析视频列表的卡片 */
   display: flex;
   align-items: center;
   padding: 10px;
   border-radius: 8px;
-  background-color: rgba(0, 0, 0, 0.2);
-  cursor: pointer;
+  background-color: #ffcdd2; /* 修改为浅粉色背景 */  cursor: pointer;
   transition: all 0.3s ease;
   width: 100%;
   box-sizing: border-box;
@@ -1944,7 +1999,7 @@ const closeGuideDialog = () => {
 }
 
 .video-item:hover {
-  background-color: rgba(0, 0, 0, 0.3); /* 悬停时使用更深的颜色 */
+  background-color: #ffb6c1; /* 悬停时使用稍深的粉色 */
   transform: translateY(-2px);
 }
 
@@ -1966,20 +2021,20 @@ const closeGuideDialog = () => {
   overflow: hidden; /* 确保溢出内容被隐藏 */
 }
 
-.video-title {
+.video-title {  /* 侧边栏已分析视频标题 */
   font-weight: 600;
   margin-bottom: 5px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%; /* 确保标题不会超出父容器 */
-  color: #fff; /* 增加对比度 */
+  color: #333; /* 增加对比度 */
 }
 
 .video-duration {
   font-size: 12px;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.2); /* 添加背景色使时长更加醒目 */
+  color: #333;
+  background: rgba(255, 255, 255, 0.5); /* 修改背景为半透明白色 */
   padding: 2px 6px;
   border-radius: 10px;
   display: inline-block;
@@ -1991,15 +2046,14 @@ const closeGuideDialog = () => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  color: rgba(255, 255, 255, 0.7);
+  color: #ff9a9e; 
 }
 
 .empty-list .el-icon {
+  color: #ff9a9e; /* 修改图标颜色为粉色 */
   font-size: 24px;
   margin-bottom: 10px;
 }
-
-
 
 /*侧边栏开关按钮*/
 .sidebar-toggle {
@@ -2032,94 +2086,6 @@ const closeGuideDialog = () => {
   to { opacity: 1; }
 }
 
-.video-player-container {
-  animation: fadeIn 0.5s ease;
-  display: flex;
-  height: 100vh;
-  width: 100%;
-  overflow: hidden;
-  position: relative;
-  background: var(--primary-gradient);
-  color: #333;
-}
-
-/* 添加粒子背景效果 */
-.video-player-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image: radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.2) 1px, transparent 1px),
-                    radial-gradient(circle at 75% 75%, rgba(255, 255, 255, 0.2) 1px, transparent 1px);
-  background-size: 50px 50px;
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-/* 页脚样式 - 增强版 */
-.page-footer {
-  width: 100%;
-  height: 50px; /* 增加高度 */
-  position: relative;
-  background: #3c3838;
-  margin-top: auto;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
-}
-
-.footer-wave {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 200%;
-  height: 100%;
-  background: url('data:image/svg+xml;utf8,<svg viewBox="0 0 1200 120" xmlns="http://www.w3.org/2000/svg"><path d="M0 0v46.29c47.79 22.2 103.59 32.17 158 28 70.36-5.37 136.33-33.31 206.8-37.5 73.84-4.36 147.54 16.88 218.2 35.26 69.27 18 138.3 24.88 209.4 13.08 36.15-6 69.85-17.84 104.45-29.34C989.49 25 1113-14.29 1200 52.47V0z" opacity=".25" fill="%23FFFFFF" /></svg>');
-  background-size: 1200px 100%;
-  animation: wave-animation 12s linear infinite;
-  opacity: 0.3;
-}
-
-@keyframes wave-animation {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
-}
-
-.footer-content {
-  color: white;
-  font-size: 15px;
-  text-align: center;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
-
-.footer-text {
-  opacity: 0.95;
-  letter-spacing: 1px;
-  font-weight: 500;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-/* 添加装饰点 */
-.footer-content::before,
-.footer-content::after {
-  content: "•";
-  font-size: 20px;
-  color: rgba(255, 255, 255, 0.7);
-  margin: 0 10px;
-}
-
 /* 模式标签样式 */
 .mode-tag {
   margin-left: 8px;
@@ -2141,55 +2107,71 @@ const closeGuideDialog = () => {
   }
 }
 
-/* 添加模式提示信息区域样式 */
+/* 优化问答模式提示信息样式 */
 .qa-mode-info {
   margin-bottom: 15px;
 }
 
 .qa-mode-info .el-alert {
-  border-radius: 8px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 154, 158, 0.3);
+  background: linear-gradient(135deg, #fff5f5, #fff);
 }
 
-/* 功能引导弹窗样式 */
-.guide-content {
-  padding: 10px;
+.qa-mode-info .el-alert__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #ff9a9e;
 }
 
-.guide-content h3 {
-  text-align: center;
-  margin-bottom: 15px;
-  color: #409EFF;
+.qa-mode-info .el-alert__description {
+  font-size: 14px;
+  color: #606266;
+  margin-top: 5px;
+  line-height: 1.5;
 }
 
-.guide-section {
-  margin-bottom: 15px;
-  padding: 10px;
-  border-radius: 8px;
-  background-color: #f5f7fa;
+.qa-mode-info .el-alert__icon {
+  color: #ff9a9e;
 }
 
-.guide-section h4 {
+/* 深度思考模式按钮样式 */
+.thinking-mode-button {
+  margin-bottom: 10px;
   display: flex;
-  align-items: center;
-  gap: 5px;
-  color: #303133;
-  margin-bottom: 8px;
+  justify-content: flex-end;
 }
 
-.guide-section ul {
-  padding-left: 20px;
-}
-
-.guide-section li {
-  margin-bottom: 5px;
+/* 问答模式按钮样式 */
+.qa-mode-buttons {
   display: flex;
-  align-items: center;
-  gap: 5px;
+  gap: 10px;
 }
 
-.dialog-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+/* 共享按钮样式 */
+.thinking-mode-button .el-button,
+.qa-mode-buttons .el-button {
+  transition: all 0.3s ease;
+  border-radius: 20px;
+  padding: 6px 15px;
+}
+
+.thinking-mode-button .el-button--primary,
+.qa-mode-buttons .el-button--primary {
+  border-color: #80b3e6;
+}
+
+.thinking-mode-button .el-button--default,
+.qa-mode-buttons .el-button--default {
+  border: 1px solid #dcdfe6;
+  background: #f5f7fa;
+  color: #606266;
+}
+
+.thinking-mode-button .el-button:hover,
+.qa-mode-buttons .el-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 </style>
