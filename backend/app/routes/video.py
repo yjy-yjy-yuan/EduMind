@@ -21,6 +21,7 @@ import sys
 import os.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from services.summary_generator import generate_video_summary
+from services.tag_generator import generate_video_tags
 
 ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv', 'webm'}
 
@@ -606,6 +607,14 @@ def get_video_list():
                 else:
                     status = 'unknown'
                 
+                # 尝试解析标签数据
+                tags = []
+                if hasattr(video, 'tags') and video.tags:
+                    try:
+                        tags = json.loads(video.tags)
+                    except Exception as e:
+                        current_app.logger.error(f'解析视频标签时出错: {str(e)}')
+                
                 video_data = {
                     'id': video.id,
                     'title': video.title,
@@ -617,7 +626,8 @@ def get_video_list():
                     'width': video.width if hasattr(video, 'width') else None,
                     'height': video.height if hasattr(video, 'height') else None,
                     'fps': video.fps if hasattr(video, 'fps') else None,
-                    'summary': video.summary if hasattr(video, 'summary') else None
+                    'summary': video.summary if hasattr(video, 'summary') else None,
+                    'tags': tags  # 添加标签数据
                 }
                 result.append(video_data)
             except Exception as e:
@@ -1031,6 +1041,54 @@ def generate_summary(video_id):
         current_app.logger.error(f'生成摘要时发生错误: {str(e)}')
         current_app.logger.error(traceback.format_exc())
         return jsonify({'error': f'生成摘要时发生错误: {str(e)}'}), 500
+
+@bp.route('/<int:video_id>/generate-tags', methods=['POST'])
+def generate_tags(video_id):
+    """为视频生成标签"""
+    try:
+        # 获取视频信息
+        video = Video.query.get(video_id)
+        if not video:
+            current_app.logger.error(f'视频不存在: {video_id}')
+            return jsonify({'error': '视频不存在'}), 404
+            
+        # 检查视频是否已处理完成
+        if video.status != VideoStatus.COMPLETED:
+            current_app.logger.error(f'视频尚未处理完成，无法生成标签: {video_id}')
+            return jsonify({'error': '视频尚未处理完成，请先处理视频'}), 400
+            
+        # 检查视频是否有摘要
+        if not video.summary:
+            current_app.logger.error(f'视频没有摘要，无法生成标签: {video_id}')
+            return jsonify({'error': '视频没有摘要，请先生成摘要'}), 400
+            
+        # 调用标签生成服务
+        current_app.logger.info(f'开始为视频 {video_id} 生成标签')
+        result = generate_video_tags(video_id, video.summary)
+        
+        if not result['success']:
+            current_app.logger.error(f'生成标签失败: {result["error"]}')
+            return jsonify({'error': f'生成标签失败: {result["error"]}'}), 500
+            
+        # 更新视频标签
+        try:
+            # 将标签列表转换为JSON字符串存储
+            video.tags = json.dumps(result['tags'], ensure_ascii=False)
+            db.session.commit()
+            current_app.logger.info(f'成功为视频 {video_id} 生成标签并保存: {result["tags"]}')
+        except Exception as e:
+            current_app.logger.error(f'保存标签到数据库失败: {str(e)}')
+            return jsonify({'error': '保存标签失败'}), 500
+            
+        return jsonify({
+            'success': True,
+            'tags': result['tags']
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f'生成标签时发生错误: {str(e)}')
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({'error': f'生成标签时发生错误: {str(e)}'}), 500
 
 @bp.route('/<int:video_id>', methods=['GET'])
 def get_video_detail(video_id):

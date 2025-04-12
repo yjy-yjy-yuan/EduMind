@@ -1641,12 +1641,12 @@ const closeGuideDialog = () => {
   border-top-right-radius: 15px;
   border-bottom-left-radius: 15px;
   border-bottom-right-radius: 15px;
-  background: linear-gradient(135deg, #1e3c72, #2a5298); /* 使用深蓝色渐变 */
-  color: #fff; /* 白色文字 */
+  background: #fef9d2; /* 修改为浅黄色背景 */
+  color: #333; /* 深色文字，提高可读性 */
 }
 
 .answer .qa-icon {
-  color: #fff; /* 图标颜色 */
+  color: #333; /* 图标颜色改为深色，与文字匹配 */
 }
 
 .answer-header {
@@ -1688,10 +1688,10 @@ const closeGuideDialog = () => {
   border-top-right-radius: 5px;
   border-bottom-left-radius: 15px;
   border-bottom-right-radius: 15px;
-  background: linear-gradient(135deg, #1c92d2, #f2fcfe); /* 使用与主题相符的渐变色 */
-  color: #333; /* 改为深色文字，提高可读性 */
+  background: #e6f7ff; /* 修改为浅蓝色背景 */
+  color: #333; /* 深色文字，提高可读性 */
   font-weight: 500; /* 加粗文字 */
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5); /* 添加文字阴影增强可读性 */
+  text-shadow: none; /* 移除文字阴影，提高可读性 */
 }
 
 .question .qa-icon {
@@ -1703,9 +1703,9 @@ const closeGuideDialog = () => {
 
 .question .qa-text {
   text-align: right; /* 文本右对齐 */
-  color: #151414; /* 确保文本为白色 */
+  color: #151414; /* 深色文字 */
   font-weight: 600; /* 加粗文字 */
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); /* 添加文字阴影增强可读性 */
+  text-shadow: none; /* 移除文字阴影 */
 }
 
 .qa-icon {

@@ -133,7 +133,7 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column v-if="batchDeleteMode" type="selection" width="55" />
-        <el-table-column prop="filename" label="视频名称" width="250"/>
+        <el-table-column prop="filename" label="视频名称" width="200"/>
         <el-table-column prop="status" label="处理状态" width="100">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.status)">
@@ -141,6 +141,28 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="标签" width="150">
+          <template #default="scope">
+            <div class="video-tags">
+              <template v-if="scope.row.tags && scope.row.tags.length > 0">
+                <el-tag 
+                  v-for="(tag, index) in scope.row.tags" 
+                  :key="index"
+                  size="small"
+                  :type="getTagType(index)"
+                  class="video-tag"
+                  effect="light"
+                >
+                  {{ tag }}
+                </el-tag>
+              </template>
+              <span v-else-if="scope.row.autoGeneratingTags" class="generating-tags">标签生成中...</span>
+              <span v-else-if="scope.row.status === 'completed'" class="no-tags">无标签</span>
+              <span v-else class="no-tags">处理完成后生成</span>
+            </div>
+          </template>
+        </el-table-column>
+        
         <el-table-column label="封面" width="120">
           <template #default="scope">
             <el-image 
@@ -159,6 +181,9 @@
             <div class="video-summary-box">
               <div v-if="scope.row.summary" class="summary-content">
                 {{ scope.row.summary }}
+              </div>
+              <div v-else-if="scope.row.autoGeneratingSummary" class="summary-placeholder summary-generating">
+                <span>摘要正在生成中...</span>
               </div>
               <div v-else-if="scope.row.status === 'completed'" class="summary-actions">
                 <el-button 
@@ -255,6 +280,17 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
+
+// 导入视频处理管理器
+import { 
+  checkProcessingVideos, 
+  saveProcessingState, 
+  removeProcessingState,
+  checkVideoProcessStatus
+} from '@/components/VideoProcessingManager'
+
+// 添加一个标志变量，用于标识是否正在生成摘要
+const isGeneratingSummary = ref(false)
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { 
@@ -359,6 +395,14 @@ onMounted(async () => {
   // 确保初始页码为1
   nextTick(() => {
     currentPage.value = 1
+    
+    // 检查是否有正在处理的视频，并恢复轮询
+    checkProcessingVideos(
+      videoList.value, 
+      startPollingVideoStatus, 
+      startPollingProcessStatus,
+      refreshList
+    )
   })
 })
 
@@ -567,6 +611,15 @@ const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
     
     // 获取视频状态
     const { data: statusResponse } = await getVideoStatus(videoId)
+    
+    // 每次轮询都刷新视频列表，但在生成摘要时不刷新
+    if (!isGeneratingSummary.value) {
+      await refreshList()
+      console.log(`第${attempts+1}次轮询，刷新视频列表`)
+    } else {
+      console.log(`第${attempts+1}次轮询，正在生成摘要，跳过刷新视频列表`)
+    }
+    
     if (statusResponse) {
       const status = statusResponse.status
       const progress = statusResponse.progress || 0
@@ -579,13 +632,6 @@ const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
         uploadStatus.value = 'processing'
         uploadProgress.value = Math.round(progress)
         uploadStepInfo.value = currentStep || '处理中...'
-        
-        // 添加这里：当进度首次达到60%时刷新列表
-        if (progress >= 60 && !window.hasRefreshedAt60) {
-          window.hasRefreshedAt60 = true
-          console.log('进度达到60%，刷新视频列表')
-          refreshList()
-        }
       }
       
       // 如果视频下载完成或失败，停止轮询
@@ -604,9 +650,6 @@ const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
           type: 'success',
           duration: 3000
         })
-        
-        // 刷新列表
-        refreshList()
       } else if (status === 'completed') {
         if (pollingTimers.value[videoId]) {
           clearInterval(pollingTimers.value[videoId])
@@ -623,9 +666,6 @@ const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
           type: 'success',
           duration: 3000
         })
-        
-        // 刷新列表
-        refreshList()
       } else if (status === 'failed') {
         if (pollingTimers.value[videoId]) {
           clearInterval(pollingTimers.value[videoId])
@@ -637,9 +677,6 @@ const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
         uploadProgress.value = 0
         uploadStepInfo.value = currentStep || '处理失败'
         ElMessage.error('视频处理失败')
-        
-        // 刷新列表
-        refreshList()
       } else {
         console.log(`视频${videoId}仍在处理中，继续轮询`)
       }
@@ -657,9 +694,6 @@ const checkVideoStatus = async (videoId, attempts, maxAttempts, isYoutube) => {
           type: 'info',
           duration: 5000
         })
-        
-        // 最后一次刷新列表
-        refreshList()
       }
     }
   } catch (error) {
@@ -1047,6 +1081,20 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
     
     // 获取视频状态
     const { data: statusResponse } = await getVideoStatus(videoId)
+    
+    // 保存处理状态到localStorage，用于页面刷新后恢复
+    if (statusResponse && (statusResponse.status === 'processing' || statusResponse.status === 'pending')) {
+      saveProcessingState(videoId, statusResponse.status)
+    }
+    
+    // 每次轮询都刷新视频列表，但在生成摘要时不刷新
+    if (!isGeneratingSummary.value) {
+      await refreshList()
+      console.log(`第${attempts+1}次轮询，刷新视频列表`)
+    } else {
+      console.log(`第${attempts+1}次轮询，正在生成摘要，跳过刷新视频列表`)
+    }
+    
     if (statusResponse) {
       const status = statusResponse.status
       const progress = statusResponse.progress || 0
@@ -1059,13 +1107,6 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
         uploadStatus.value = ''  
         uploadProgress.value = Math.round(progress)
         uploadStepInfo.value = currentStep || '处理中...'
-        
-        // 添加这里：当进度首次达到60%时刷新列表
-        if (progress >= 60 && !window.hasRefreshedAt60) {
-          window.hasRefreshedAt60 = true
-          console.log('进度达到60%，刷新视频列表')
-          refreshList()
-        }
       }
       
       // 如果视频处理完成或失败，停止轮询
@@ -1075,6 +1116,9 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
           delete processingTimers.value[videoId]
         }
         
+        // 移除处理状态
+        removeProcessingState(videoId)
+        
         console.log(`视频${videoId}处理完成，停止轮询`)
         uploadStatus.value = 'success'
         uploadProgress.value = 100
@@ -1082,6 +1126,16 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
         // 自动生成摘要
         try {
           console.log(`视频${videoId}处理完成，自动生成摘要`)
+          
+          // 设置正在生成摘要标志
+          isGeneratingSummary.value = true
+          
+          // 在视频列表中找到对应的视频对象，设置自动生成摘要标志
+          const videoObj = videoList.value.find(v => v.id === videoId)
+          if (videoObj) {
+            videoObj.autoGeneratingSummary = true
+            console.log(`设置视频${videoId}的自动生成摘要标志`)
+          }
           
           // 显示正在生成摘要的提示
           ElMessage({
@@ -1113,6 +1167,59 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
               showClose: true,
               offset: 80
             })
+            
+            // 自动生成标签
+            try {
+              console.log(`视频${videoId}开始自动生成标签`)
+              
+              // 在视频列表中找到对应的视频对象，设置自动生成标签标志
+              const videoObj = videoList.value.find(v => v.id === videoId)
+              if (videoObj) {
+                videoObj.autoGeneratingTags = true
+                console.log(`设置视频${videoId}的自动生成标签标志`)
+              }
+              
+              // 调用后端API生成标签
+              const tagsResponse = await fetch(`/api/videos/${videoId}/generate-tags`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              })
+              
+              if (tagsResponse.ok) {
+                const tagsData = await tagsResponse.json()
+                console.log(`视频${videoId}标签自动生成成功:`, tagsData.tags)
+                
+                // 更新视频对象的标签
+                const videoObj = videoList.value.find(v => v.id === videoId)
+                if (videoObj && tagsData.tags) {
+                  videoObj.tags = tagsData.tags
+                  console.log(`更新视频${videoId}的标签:`, videoObj.tags)
+                }
+                
+                // 显示标签生成成功的提示
+                ElMessage({
+                  message: '视频标签生成成功',
+                  type: 'success',
+                  duration: 3000,
+                  customClass: 'custom-message success-message',
+                  showClose: true,
+                  offset: 80
+                })
+              } else {
+                console.error('自动生成标签失败:', await tagsResponse.text())
+              }
+            } catch (tagError) {
+              console.error('自动生成标签过程中出错:', tagError)
+            } finally {
+              // 清除自动生成标签标志
+              const videoObj = videoList.value.find(v => v.id === videoId)
+              if (videoObj) {
+                videoObj.autoGeneratingTags = false
+                console.log(`清除视频${videoId}的自动生成标签标志`)
+              }
+            }
           } else {
             console.error('自动生成摘要失败:', await response.text())
             
@@ -1135,29 +1242,40 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
             type: 'error',
             duration: 3000
           })
+        } finally {
+          // 重置生成摘要标志
+          isGeneratingSummary.value = false
+          
+          // 在视频列表中找到对应的视频对象，清除自动生成摘要标志
+          const videoObj = videoList.value.find(v => v.id === videoId)
+          if (videoObj) {
+            videoObj.autoGeneratingSummary = false
+            console.log(`清除视频${videoId}的自动生成摘要标志`)
+          }
+          
+          // 摘要生成完成后，手动刷新一次列表
+          await refreshList()
+          console.log('摘要生成完成，刷新视频列表')
         }
         ElMessage({
           message: '视频处理完成',
           type: 'success',
           duration: 3000
         })
-        
-        // 刷新列表
-        refreshList()
       } else if (status === 'failed') {
         if (processingTimers.value[videoId]) {
           clearInterval(processingTimers.value[videoId])
           delete processingTimers.value[videoId]
         }
         
+        // 移除处理状态
+        removeProcessingState(videoId)
+        
         console.log(`视频${videoId}处理失败，停止轮询`)
         uploadStatus.value = 'exception'
         uploadProgress.value = 0
         uploadStepInfo.value = currentStep || '处理失败'
         ElMessage.error('视频处理失败')
-        
-        // 刷新列表
-        refreshList()
       } else if (status === 'processing') {
         console.log(`视频${videoId}仍在处理中，继续轮询`)
       } else {
@@ -1177,9 +1295,6 @@ const checkProcessStatus = async (videoId, attempts, maxAttempts) => {
           type: 'info',
           duration: 5000
         })
-        
-        // 最后一次刷新列表
-        refreshList()
       }
     }
   } catch (error) {
@@ -1406,15 +1521,21 @@ const refreshList = async () => {
 
 // 获取摘要占位符文本
 const getSummaryPlaceholder = (status) => {
-  const statusMap = {
-    'uploaded': '视频尚未处理，请先处理视频',
-    'pending': '视频等待处理中',
-    'processing': '视频正在处理中',
-    'downloading': '视频正在下载中',
-    'failed': '视频处理失败',
-    'completed': '可生成视频摘要'
+  if (status === 'processing') {
+    return '视频正在处理中，完成后可生成摘要'
+  } else if (status === 'uploaded') {
+    return '视频已上传，等待处理'
+  } else if (status === 'failed') {
+    return '视频处理失败，无法生成摘要'
+  } else {
+    return '当前状态不支持生成摘要'
   }
-  return statusMap[status] || '未知状态'
+}
+
+// 根据标签索引返回不同的标签类型
+const getTagType = (index) => {
+  const types = ['primary', 'success', 'warning', 'info', 'danger']
+  return types[index % types.length]
 }
 
 // 生成视频摘要
@@ -1422,6 +1543,8 @@ const generateSummary = async (video) => {
   try {
     // 设置生成中状态
     video.generatingSummary = true
+    // 设置全局生成摘要标志
+    isGeneratingSummary.value = true
     
     // 显示正在生成摘要的提示
     ElMessage({
@@ -1474,6 +1597,12 @@ const generateSummary = async (video) => {
   } finally {
     // 清除生成中状态
     video.generatingSummary = false
+    // 清除全局生成摘要标志
+    isGeneratingSummary.value = false
+    
+    // 手动刷新一次列表，确保显示最新状态
+    await refreshList()
+    console.log('手动生成摘要完成，刷新视频列表')
   }
 }
 </script>
@@ -2033,6 +2162,52 @@ const generateSummary = async (video) => {
   margin: 5px 0;
   font-size: 13px;
   color: var(--text-primary);
+}
+
+/* 空状态提示区域样式 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  text-align: center;
+  background: linear-gradient(135deg, #fafaf8, #e9ecef);
+  border-radius: 12px;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.03);
+  border: 1px dashed #ced4da;
+  margin: 10px 0;
+}
+
+.empty-icon {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 15px rgba(99, 102, 241, 0.3);
+}
+
+.empty-icon .el-icon {
+  font-size: 32px;
+  color: white;
+}
+
+.empty-state p {
+  font-size: 20px;
+  font-weight: 600;
+  color: #4338ca;
+  margin: 0 0 10px 0;
+}
+
+.empty-tip {
+  font-size: 16px;
+  color: #6b7280;
+  max-width: 80%;
+  line-height: 1.6;
 }
 
 /* 操作按钮样式 */

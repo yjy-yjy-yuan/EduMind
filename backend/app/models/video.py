@@ -1,5 +1,6 @@
 """视频模型"""
 from datetime import datetime
+import json
 from ..extensions import db
 from enum import Enum
 
@@ -47,8 +48,9 @@ class Video(db.Model):
     frame_count = db.Column(db.Integer, nullable=True) # 总帧数
     md5 = db.Column(db.String(32), nullable=True)  # 添加MD5字段
     
-    # 视频摘要
+    # 视频摘要和标签
     summary = db.Column(db.Text, nullable=True)  # 视频内容摘要
+    tags = db.Column(db.Text, nullable=True)  # 视频标签，存储为JSON字符串
     
     # 字幕关联
     subtitles = db.relationship('Subtitle', back_populates='video', lazy=True)
@@ -71,5 +73,6 @@ class Video(db.Model):
             'height': self.height,
             'frame_count': self.frame_count,
             'md5': self.md5,
-            'summary': self.summary  # 添加摘要字段
+            'summary': self.summary,  # 添加摘要字段
+            'tags': json.loads(self.tags) if self.tags else []  # 添加标签字段，并转换为列表
         }
