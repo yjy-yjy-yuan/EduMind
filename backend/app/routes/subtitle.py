@@ -62,7 +62,10 @@ def get_merged_subtitles(video_id):
         # 构建缓存文件路径
         cache_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'cache')
         os.makedirs(cache_dir, exist_ok=True)
-        cache_file = os.path.join(cache_dir, f'semantic_merged_{video_id}.json')
+        
+        # 使用视频文件名作为缓存文件名，保持与其他字幕格式一致
+        video_name = video.filename.rsplit('.', 1)[0] if video.filename else f'video_{video_id}'
+        cache_file = os.path.join(cache_dir, f'{video_name}_semantic.json')
         
         # 获取合并字幕（从缓存或重新生成）
         merged_subtitles = None
@@ -584,7 +587,10 @@ def trigger_semantic_merge(video_id):
         # 构建缓存文件路径
         cache_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'cache')
         os.makedirs(cache_dir, exist_ok=True)
-        cache_file = os.path.join(cache_dir, f'semantic_merged_{video_id}.json')
+        
+        # 使用视频文件名作为缓存文件名，保持与其他字幕格式一致
+        video_name = video.filename.rsplit('.', 1)[0] if video.filename else f'video_{video_id}'
+        cache_file = os.path.join(cache_dir, f'{video_name}_semantic.json')
         
         # 调用基于Ollama的语义合并和标题生成函数
         merged_subtitles = merge_subtitles_by_semantics_ollama(subtitles)

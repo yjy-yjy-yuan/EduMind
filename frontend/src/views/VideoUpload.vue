@@ -132,16 +132,16 @@
         style="width: 100%"
         @selection-change="handleSelectionChange"
       >
-        <el-table-column v-if="batchDeleteMode" type="selection" width="55" />
-        <el-table-column prop="filename" label="视频名称" width="200"/>
-        <el-table-column prop="status" label="处理状态" width="100">
+        <el-table-column v-if="batchDeleteMode" type="selection" width="55" align="center" />
+        <el-table-column prop="filename" label="视频名称" width="200" align="center"/>
+        <el-table-column prop="status" label="处理状态" width="80" align="center">
           <template #default="scope">
             <el-tag :type="getStatusType(scope.row.status)">
               {{ getStatusText(scope.row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="标签" width="150">
+        <el-table-column label="标签" width="80" align="center">
           <template #default="scope">
             <div class="video-tags">
               <template v-if="scope.row.tags && scope.row.tags.length > 0">
@@ -163,7 +163,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="封面" width="120">
+        <el-table-column label="封面" width="120" align="center">
           <template #default="scope">
             <el-image 
               v-if="scope.row.preview_filename"
@@ -176,7 +176,7 @@
             <span v-else>无预览图</span>
           </template>
         </el-table-column>
-        <el-table-column label="视频摘要">
+        <el-table-column label="视频摘要" align="center">
           <template #default="scope">
             <div class="video-summary-box">
               <div v-if="scope.row.summary" class="summary-content">
@@ -201,7 +201,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220">
+        <el-table-column label="操作" width="220" align="center">
           <template #default="scope">
             <div class="action-buttons">
               <el-icon 
@@ -222,7 +222,8 @@
               </el-icon>
               <el-icon 
                 class="action-icon delete-icon" 
-                @click="handleDelete(scope.row)"
+                :class="{ disabled: ['processing', 'downloading'].includes(scope.row.status) }"
+                @click="!['processing', 'downloading'].includes(scope.row.status) ? handleDelete(scope.row) : null"
                 title="删除视频"
               >
                 <Delete />
@@ -2069,6 +2070,7 @@ const generateSummary = async (video) => {
   font-weight: 600;
   color: var(--indigo-600);
   padding: 12px 0;
+  text-align: center !important;
 }
 
 :deep(.el-table__row) {
@@ -2208,6 +2210,17 @@ const generateSummary = async (video) => {
   color: #6b7280;
   max-width: 80%;
   line-height: 1.6;
+}
+
+/* 视频标签样式 */
+.video-tags {
+  display: flex;
+  flex-direction: column; 
+  gap: 3px; /* 调整间距 */
+}
+
+.video-tag {
+  margin-bottom: 5px;
 }
 
 /* 操作按钮样式 */

@@ -44,8 +44,14 @@ def process_long_video_subtitles(subtitles):
     logger = logging.getLogger(__name__)
     logger.info("开始分块处理长视频字幕")
     
-    # 分块大小
-    chunk_size = 100
+    # 根据字幕总数动态确定分块大小
+    total_subtitles = len(subtitles)
+    if total_subtitles < 200:
+        chunk_size = 80  # 较小的块，适合短视频
+    elif total_subtitles < 500:
+        chunk_size = 120  # 中等大小的块，适合中等长度视频
+    else:
+        chunk_size = 150  # 较大的块，适合长视频
     
     # 存储所有处理结果
     all_results = []
@@ -270,8 +276,26 @@ def merge_subtitles_by_semantics_ollama(subtitles):
             full_text += f"[{i}] {sub['text']}\n"
 
         logger.info(f"提取了{len(subtitles)}条字幕文本")
-        
-        # 构建提示词 - 一次性请求分段、添加标点和生成标题
+                # 构建提示词 - 一次性请求分段、添加标点和生成标题
+        # 根据字幕总数量确定分段策略
+        subtitle_count = len(subtitles)
+        if subtitle_count < 20:  # 字幕很少
+            segment_guidance = "应该生成2-3个段落，不要过度分段"
+        elif subtitle_count < 50:  # 字幕较少
+            segment_guidance = "应该生成4-5个段落，确保每个段落内容连贯"
+        elif subtitle_count < 100:  # 字幕中等
+            segment_guidance = "应该生成8-9个段落，合理划分主题"
+        elif subtitle_count < 150:  # 字幕较多
+            segment_guidance = "应该生成11-12个段落，确保主题清晰划分"
+        elif subtitle_count < 200:  # 字幕很多
+            segment_guidance = "应该生成14-15个段落，确保主题清晰划分"
+        elif subtitle_count < 300:  # 字幕非常多
+            segment_guidance = "应该生成17-18个段落，确保主题清晰划分"
+        elif subtitle_count < 400:  # 字幕极多
+            segment_guidance = "应该生成19-20个段落，确保主题清晰划分"
+        else:  # 字幕数量巨大
+            segment_guidance = "应该生成20-22个段落，确保主题清晰划分"
+            
         prompt_template = """请分析以下视频字幕文本，并完成三个任务：
 1. 根据内容的语义连贯性将其分成若干个有意义的段落
 2. 为每个段落添加适当的标点符号，使其更易于阅读（注意：返回的文本中不要包含索引标记[0]、[1]等）
@@ -284,7 +308,7 @@ def merge_subtitles_by_semantics_ollama(subtitles):
 1. 根据内容的语义连贯性和主题变化进行分段，而不是简单地按固定间隔分段
 2. 每个段落应该表达一个相对完整的意思或主题
 3. 返回JSON格式的结果，包含每个段落的开始和结束字幕索引
-4. 对于短视频（不到5分钟），应该生成2-5个段落，不要过度分段
+4. 根据字幕总数（共{{ subtitle_count }}条），{{ segment_guidance }}
 5. 确保分段是连续的，不要有重叠或遗漏
 6. 返回的文本中不要包含索引标记[0]、[1]等
 7. 为每个段落生成一个简短、具体的标题，反映其主要内容
@@ -311,6 +335,8 @@ def merge_subtitles_by_semantics_ollama(subtitles):
         
         # 使用安全的方式替换变量
         prompt = prompt_template.replace("{{ text }}", full_text)
+        prompt = prompt.replace("{{ subtitle_count }}", str(subtitle_count))
+        prompt = prompt.replace("{{ segment_guidance }}", segment_guidance)
         
         # 调用Ollama API - 只调用一次
         logger.info("开始调用Ollama API进行分段、添加标点和生成标题")
@@ -370,12 +396,41 @@ def merge_subtitles_by_semantics_ollama(subtitles):
             logger.error(f"解析的JSON不是列表类型: {segments_info}")
             return merge_subtitles_by_semantics(subtitles)
         
-        # 合并字幕 - 直接使用Ollama返回的格式化文本和标题
+        # 确定目标段落数量
+        target_segments_count = 0
+        subtitle_count = len(subtitles)
+        if subtitle_count < 20:  # 字幕很少
+            target_segments_count = 3  # 目标为2-3个段落
+        elif subtitle_count < 50:  # 字幕较少
+            target_segments_count = 5  # 目标为4-5个段落
+        elif subtitle_count < 100:  # 字幕中等
+            target_segments_count = 8  # 目标为8-9个段落
+        elif subtitle_count < 150:  # 字幕较多
+            target_segments_count = 10  # 目标为11-12个段落
+        elif subtitle_count < 200:  # 字幕很多
+            target_segments_count = 15  # 目标为14-15个段落
+        elif subtitle_count < 300:  # 字幕非常多
+            target_segments_count = 18  # 目标为17-19个段落
+        elif subtitle_count < 400:  # 字幕极多
+            target_segments_count = 22  # 目标为21-23个段落
+        elif subtitle_count < 500:  # 字幕极多
+            target_segments_count = 25  # 目标为24-26个段落
+        elif subtitle_count < 600:  # 字幕极多
+            target_segments_count = 28  # 目标为27-29个段落
+        elif subtitle_count < 700:  # 字幕极多
+            target_segments_count = 31  # 目标为30-32个段落
+        elif subtitle_count < 800:  # 字幕极多
+            target_segments_count = 35  # 目标为34-36个段落
+        elif subtitle_count < 900:  # 字幕极多
+            target_segments_count = 38  # 目标为37-39个段落
+        else:  # 字幕数量巨大
+            target_segments_count = 42  # 目标为40-43个段落
+        
+        # 合并字幕 - 直接使用Ollama返回的标题，但使用原始文本
         merged_subtitles = []
         for segment in segments_info:
             start_index = segment.get("start_index")
             end_index = segment.get("end_index")
-            formatted_text = segment.get("formatted_text", "")
             title = segment.get("title", "")
             
             if start_index is None or end_index is None:
@@ -386,33 +441,77 @@ def merge_subtitles_by_semantics_ollama(subtitles):
             start_index = max(0, min(start_index, len(subtitles) - 1))
             end_index = max(start_index, min(end_index, len(subtitles) - 1))
             
-            # 移除文本中的索引标记 [0], [1], [2] 等
-            if formatted_text:
-                formatted_text = re.sub(r'\[\d+\]\s*', '', formatted_text)
-            
-            # 如果没有格式化文本，使用原始合并文本
-            if not formatted_text:
-                formatted_text = " ".join([subtitles[i]["text"] for i in range(start_index, end_index + 1)])
+            # 始终使用原始字幕文本，而不是模型生成的格式化文本
+            original_text = " ".join([subtitles[i]["text"] for i in range(start_index, end_index + 1)])
             
             # 如果没有标题，生成一个简单的标题
             if not title:
                 title = f"第{len(merged_subtitles) + 1}部分"
             
-            # 创建合并后的字幕
+            # 创建合并后的字幕，使用原始文本
             merged_subtitle = {
                 "start_time": subtitles[start_index]["start_time"],
                 "end_time": subtitles[end_index]["end_time"],
-                "text": formatted_text,
+                "text": original_text,
                 "title": title,
                 "original_indices": list(range(start_index, end_index + 1))
             }
             
             merged_subtitles.append(merged_subtitle)
         
+        # 检查段落数量是否符合要求
+        actual_segments_count = len(merged_subtitles)
+        logger.info(f"模型生成的段落数量: {actual_segments_count}, 目标段落数量: {target_segments_count}")
+        
+        # 如果没有段落，使用方案二
         if not merged_subtitles:
             logger.warning("Ollama没有返回有效的段落，使用方案二")
             return merge_subtitles_by_semantics(subtitles)
+        
+        # 如果段落数量远小于目标数量，强制分段
+        if actual_segments_count < target_segments_count * 0.7:  # 如果实际段落数量小于目标的70%
+            logger.warning(f"段落数量({actual_segments_count})远小于目标数量({target_segments_count})，强制分段")
             
+            # 强制分段策略：将现有段落分割成更多段落
+            new_merged_subtitles = []
+            for segment in merged_subtitles:
+                original_indices = segment["original_indices"]
+                segment_size = len(original_indices)
+                
+                # 计算每个段落应该分成几个子段落
+                sub_segments_count = max(2, round(segment_size / (subtitle_count / target_segments_count)))
+                
+                if sub_segments_count <= 1 or segment_size < 6:  # 如果段落太小，不再分割
+                    new_merged_subtitles.append(segment)
+                    continue
+                
+                # 将当前段落分成多个子段落
+                sub_segment_size = segment_size // sub_segments_count
+                for i in range(sub_segments_count):
+                    start_pos = i * sub_segment_size
+                    end_pos = (i + 1) * sub_segment_size if i < sub_segments_count - 1 else segment_size
+                    
+                    if start_pos >= end_pos:
+                        continue
+                    
+                    sub_indices = original_indices[start_pos:end_pos]
+                    if not sub_indices:
+                        continue
+                    
+                    # 创建新的子段落
+                    sub_segment = {
+                        "start_time": subtitles[sub_indices[0]]["start_time"],
+                        "end_time": subtitles[sub_indices[-1]]["end_time"],
+                        "text": " ".join([subtitles[i]["text"] for i in sub_indices]),
+                        "title": f"{segment['title']}-第{i+1}部分",
+                        "original_indices": sub_indices
+                    }
+                    
+                    new_merged_subtitles.append(sub_segment)
+            
+            merged_subtitles = new_merged_subtitles
+            logger.info(f"强制分段后的段落数量: {len(merged_subtitles)}")
+        
         logger.info(f"Ollama语义分段完成，共{len(merged_subtitles)}个语义段落")
         return merged_subtitles
             
@@ -467,7 +566,20 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
             
             # 构建提示词 - 根据视频长度调整提示词
             if is_long_video:
-                # 长视频提示词 - 鼓励生成更多段落
+                # 长视频提示词 - 根据字幕数量确定分段数量
+                subtitle_count = len(subtitles)
+                
+                # 根据字幕数量确定段落数量和每段字幕数量
+                if subtitle_count < 200:
+                    segment_count = "8-12个段落"
+                    segment_size = "10-20条之间"
+                elif subtitle_count < 400:
+                    segment_count = "12-18个段落"
+                    segment_size = "15-30条之间"
+                else:
+                    segment_count = "15-25个段落"
+                    segment_size = "20-40条之间"
+                
                 prompt_template = """请分析以下视频字幕文本，并根据内容的语义连贯性将其分成若干个有意义的段落。
                 
 字幕文本（每行前面的数字是字幕的索引）：
@@ -477,8 +589,8 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
 1. 根据内容的语义连贯性和主题变化进行分段，而不是简单地按固定间隔分段
 2. 每个段落应该表达一个相对完整的意思或主题
 3. 返回JSON格式的结果，包含每个段落的开始和结束字幕索引
-4. 由于这是一个长视频，请尽量细致地分段，建议生成8-15个段落
-5. 每个段落不要太长，建议每个段落包含的字幕数量在10-30条之间
+4. 由于这个视频有{subtitle_count}条字幕，请尽量细致地分段，建议生成{segment_count}
+5. 每个段落不要太长，建议每个段落包含的字幕数量在{segment_size}
 6. 确保分段是连续的，不要有重叠或遗漏
 
 返回格式示例：
@@ -492,7 +604,17 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
 
 请直接返回JSON格式的结果，不要有任何解释或其他内容。"""
             else:
-                # 短视频提示词 - 保持原有逻辑
+                # 短视频提示词 - 根据字幕数量确定分段
+                subtitle_count = len(subtitles)
+                
+                # 根据字幕数量确定段落数量
+                if subtitle_count < 30:
+                    segment_guidance = "2-3个段落"
+                elif subtitle_count < 80:
+                    segment_guidance = "3-5个段落"
+                else:
+                    segment_guidance = "5-8个段落"
+                
                 prompt_template = """请分析以下视频字幕文本，并根据内容的语义连贯性将其分成若干个有意义的段落。
                 
 字幕文本（每行前面的数字是字幕的索引）：
@@ -502,7 +624,7 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
 1. 根据内容的语义连贯性和主题变化进行分段，而不是简单地按固定间隔分段
 2. 每个段落应该表达一个相对完整的意思或主题
 3. 返回JSON格式的结果，包含每个段落的开始和结束字幕索引
-4. 对于短视频（不到5分钟），应该生成2-5个段落，不要过度分段
+4. 根据字幕总数（共{subtitle_count}条），应该生成{segment_guidance}，确保每个段落内容连贯
 5. 确保分段是连续的，不要有重叠或遗漏
 
 返回格式示例：
@@ -518,6 +640,9 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
             
             # 使用安全的方式替换变量
             prompt = prompt_template.replace("{text}", full_text)
+            prompt = prompt.replace("{subtitle_count}", str(subtitle_count))
+            prompt = prompt.replace("{segment_count}", segment_count)
+            prompt = prompt.replace("{segment_size}", segment_size) if is_long_video else prompt.replace("{segment_guidance}", segment_guidance)
             
             # 调用API
             response = client.chat.completions.create(

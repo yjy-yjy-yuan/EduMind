@@ -5,6 +5,7 @@ import VideoDetail from '../views/VideoDetail.vue'
 import VideoPlayer from '../views/VideoPlayer.vue'
 import Note from '../views/Note.vue'
 import LearningPath from '../views/LearningPath.vue'
+import KnowledgeGraph from '../views/KnowledgeGraph.vue'
 import UserGuide from '../views/AI-EdVision新手使用指南.vue'
 import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
@@ -49,6 +50,14 @@ const routes = [
     component: LearningPath,
     meta: {
       title: '学习路径'
+    }
+  },
+  {
+    path: '/knowledge',
+    name: 'KnowledgeGraph',
+    component: KnowledgeGraph,
+    meta: {
+      title: '知识点总览'
     }
   },
   {

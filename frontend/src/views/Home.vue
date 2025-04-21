@@ -381,29 +381,29 @@ export default {
         content: '智能问答功能太棒了！即使是复杂的专业问题，系统也能给出清晰的解答，帮我节省了大量查阅资料的时间。'
       },
       {
-        name: '李同学',
-        role: '研究生',
-        icon: 'fas fa-user-graduate',
-        content: '智能问答功能太棒了！即使是复杂的专业问题，系统也能给出清晰的解答，帮我节省了大量查阅资料的时间。'
+        name: '王女士',
+        role: '职场进修',
+        icon: 'fas fa-briefcase',
+        content: 'AI智能笔记同步功能太实用！视频看到哪里笔记就记到哪里，复习时图文并茂效率翻倍。'
       },
       {
-        name: '李同学',
-        role: '研究生',
+        name: '李晓萌',
+        role: '医学研究生',
         icon: 'fas fa-user-graduate',
-        content: '智能问答功能太棒了！即使是复杂的专业问题，系统也能给出清晰的解答，帮我节省了大量查阅资料的时间。'
-      },
-      {
-        name: '李同学',
-        role: '研究生',
-        icon: 'fas fa-user-graduate',
-        content: '智能问答功能太棒了！即使是复杂的专业问题，系统也能给出清晰的解答，帮我节省了大量查阅资料的时间。'
+        content: '手术视频的智能标注功能太惊艳！关键步骤自动标记时间戳，写论文时能快速定位参考资料。'
       },
       {
         name: '王经理',
         role: '企业培训师',
         icon: 'fas fa-briefcase',
         content: '我们公司将所有培训视频都上传到了 AI-EdVision，员工培训效率提高了 50%，满意度也大幅提升。'
-      }
+      },
+      {
+        name: '山田健太',
+        role: '留学生',
+        icon: 'fas fa-globe-asia',
+        content: 'AI实时学术翻译精准度惊人！专业文献中的复杂术语都能即时解析，语言障碍不再是问题。'
+      },
     ])
     
     // 统计数据
@@ -589,7 +589,7 @@ export default {
 }
 
 .hero-button:hover {
-  transform: translateY(-5px) !important;
+  transform: scale(1.1) !important;
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
 }
 

@@ -99,12 +99,16 @@ def create_app(config_name='default'):
             from .routes.note import note_bp
             from .routes.auth import auth_bp
             from .routes.qa import qa_bp
+            from .routes.knowledge_graph import router as knowledge_graph_router
+            from .routes.knowledge_graph_integration import integration_bp
             
             app.register_blueprint(video_bp, url_prefix='/api/videos')
             app.register_blueprint(subtitle_bp, url_prefix='/api/subtitles')
             app.register_blueprint(note_bp, url_prefix='/api/notes')
             app.register_blueprint(auth_bp, url_prefix='/api/auth')
             app.register_blueprint(qa_bp, url_prefix='/api/qa')
+            app.register_blueprint(knowledge_graph_router, url_prefix='/api/knowledge-graph')
+            app.register_blueprint(integration_bp, url_prefix='/api/knowledge-graph-integration')
         
         # 添加根路由
         @app.route('/')

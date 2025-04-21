@@ -68,4 +68,5 @@ tzlocal==5.3
 urllib3==2.3.0
 Werkzeug==3.0.1
 yarl==1.9.11
-gensim==4.3.3 
+gensim==4.3.3
+neo4j==5.17.0

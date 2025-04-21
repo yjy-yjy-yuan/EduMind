@@ -15,6 +15,7 @@
         <router-link to="/" class="nav-item" :class="{ active: activeRoute === '/' }">首页</router-link>
         <router-link to="/video/upload" class="nav-item" :class="{ active: activeRoute === '/video/upload' }">视频管理</router-link>
         <router-link to="/notes" class="nav-item" :class="{ active: activeRoute === '/notes' }">笔记管理</router-link>
+        <router-link to="/knowledge" class="nav-item" :class="{ active: activeRoute === '/knowledge' }">知识点总览</router-link>
         <router-link to="/guide" class="nav-item" :class="{ active: activeRoute === '/guide' }">使用指南</router-link>
         
         <!-- 护眼模式切换按钮 -->
@@ -38,6 +39,8 @@
             </template>
           </el-dropdown>
         </template>
+        
+        <!-- 未登录状态 -->
         <template v-else>
           <router-link to="/login" class="nav-item login-item">
             <i class="fas fa-sign-in-alt"></i>

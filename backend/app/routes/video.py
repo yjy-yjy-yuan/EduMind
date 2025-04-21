@@ -593,34 +593,61 @@ def get_video_list():
         start_time = time.time()
         current_app.logger.info("🔍 开始获取视频列表")
         
+        # 获取分页参数
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 5, type=int)
+        current_app.logger.info(f"分页参数: page={page}, per_page={per_page}")
+        
         # 限制返回最近100条记录以提高性能
-        videos = Video.query.order_by(Video.upload_time.desc()).limit(100).all()
+        try:
+            videos = Video.query.order_by(Video.upload_time.desc()).limit(100).all()
+            current_app.logger.info(f"成功查询数据库，获取到 {len(videos)} 条视频记录")
+        except Exception as db_error:
+            current_app.logger.error(f"数据库查询失败: {str(db_error)}")
+            current_app.logger.error(traceback.format_exc())
+            return jsonify({'error': f'数据库查询失败: {str(db_error)}'}), 500
+        
         result = []
         
         for video in videos:
             try:
+                current_app.logger.debug(f"处理视频记录: ID={video.id}, 文件名={video.filename}")
+                
                 # 安全获取状态值
                 if hasattr(video.status, 'value'):
                     status = video.status.value
+                    current_app.logger.debug(f"视频状态为枚举值: {status}")
                 elif isinstance(video.status, str):
                     status = video.status
+                    current_app.logger.debug(f"视频状态为字符串: {status}")
                 else:
                     status = 'unknown'
+                    current_app.logger.warning(f"未知的视频状态类型: {type(video.status)}")
                 
                 # 尝试解析标签数据
                 tags = []
                 if hasattr(video, 'tags') and video.tags:
                     try:
                         tags = json.loads(video.tags)
+                        current_app.logger.debug(f"成功解析视频标签: {tags}")
                     except Exception as e:
                         current_app.logger.error(f'解析视频标签时出错: {str(e)}')
+                        current_app.logger.error(f'标签原始数据: {video.tags}')
                 
+                # 安全获取各个属性
+                try:
+                    upload_time = video.upload_time.isoformat() if video.upload_time else None
+                except Exception as e:
+                    current_app.logger.error(f"处理upload_time时出错: {str(e)}")
+                    upload_time = None
+                
+                # 构建视频数据字典
                 video_data = {
                     'id': video.id,
-                    'title': video.title,
-                    'filename': video.filename,
+                    'title': video.title if hasattr(video, 'title') and video.title else '',
+                    'filename': video.filename if hasattr(video, 'filename') and video.filename else '',
                     'status': status,
-                    'upload_time': video.upload_time.isoformat() if video.upload_time else None,
+                    'upload_time': upload_time,
                     'preview_filename': video.preview_filename if hasattr(video, 'preview_filename') else None,
                     'duration': video.duration if hasattr(video, 'duration') else None,
                     'width': video.width if hasattr(video, 'width') else None,
@@ -630,21 +657,34 @@ def get_video_list():
                     'tags': tags  # 添加标签数据
                 }
                 result.append(video_data)
+                current_app.logger.debug(f"成功处理视频记录: ID={video.id}")
             except Exception as e:
                 current_app.logger.error(f'处理视频记录时出错: {str(e)}')
+                current_app.logger.error(traceback.format_exc())
                 # 跳过有问题的记录，继续处理其他记录
                 continue
         
+        # 手动实现分页
+        total = len(result)
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_result = result[start_idx:end_idx] if start_idx < total else []
+        
         elapsed_time = time.time() - start_time
-        current_app.logger.info(f"✅ 获取视频列表完成 | 耗时: {elapsed_time:.2f}秒 | 记录数: {len(result)}")
+        current_app.logger.info(f"✅ 获取视频列表完成 | 耗时: {elapsed_time:.2f}秒 | 总记录数: {total} | 当前页记录数: {len(paginated_result)}")
         
         return jsonify({
             'message': '获取成功',
-            'videos': result
+            'videos': paginated_result,
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'total_pages': (total + per_page - 1) // per_page
         })
     except Exception as e:
         current_app.logger.error(f'❌ 获取视频列表失败: {str(e)}')
-        return jsonify({'error': '获取视频列表失败'}), 500
+        current_app.logger.error(traceback.format_exc())
+        return jsonify({'error': f'获取视频列表失败: {str(e)}'}), 500
 
 @bp.route('/<int:video_id>/status', methods=['GET'])
 def get_video_status(video_id):

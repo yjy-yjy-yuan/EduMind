@@ -541,7 +541,7 @@
                         show-icon
                       />
                     </div>
-                    <div v-html="renderedContent"></div>
+                    <div v-html="renderedContent" class="rendered-markdown-content"></div>
                   </div>
                 </div>
                 
@@ -847,9 +847,14 @@ const renderedContent = computed(() => {
       return `<a href="javascript:void(0)" class="timestamp-link" data-time="${timeSeconds}" onclick="window.handleTimestampClick(${timeSeconds})">${text}</a>`;
     });
     
-    // 使用DOMPurify清理HTML以防止XSS攻击，但保留onclick和data-time属性
+    // 处理段落间距问题，将过大的段落间距减小
+    html = html.replace(/<\/p><p>/g, '</p><p style="margin: 2px 0; line-height: 1.5;">'); 
+    // 更彻底地替换所有段落标签，但保留原有的class和其他属性
+    html = html.replace(/<p(?![^>]*style=)([^>]*)>/g, '<p$1 style="margin: 2px 0; line-height: 1.5;">');
+    
+    // 使用DOMPurify清理HTML以防止XSS攻击，但保留onclick和data-time属性和样式
     return DOMPurify.sanitize(html, {
-      ADD_ATTR: ['onclick', 'data-time']
+      ADD_ATTR: ['onclick', 'data-time', 'style']
     });
   } catch (error) {
     console.error('Markdown渲染错误:', error);
@@ -1151,7 +1156,7 @@ const initNoteEditor = () => {
       return;
     }
     
-    // 初始化 Vditor
+    // 初始化 Vditor - 使用最简化的配置
     vditorInstance.value = new Vditor('note-editor-container', {
       height: '100%',
       mode: 'wysiwyg', // 所见即所得模式
@@ -1161,14 +1166,36 @@ const initNoteEditor = () => {
       cache: {
         enable: false
       },
+      // 配置回车键行为和预览样式
+      preview: {
+        markdown: {
+          lineNumber: false
+        },
+        theme: {
+          current: 'light'
+        },
+        hljs: {
+          lineNumber: false,
+          style: 'github'
+        }
+      },
       toolbar: [
-        'emoji', 'headings', 'bold', 'italic', 'strike', 'link', 
-        '|', 'list', 'ordered-list', 'check', 'outdent', 'indent', 
+        'emoji', '|', 'bold', 'italic', 'strike', 
+        '|', 'list', 'ordered-list', 'check', 
         '|', 'quote', 'line', 'code', 'inline-code', 'insert-before', 'insert-after', 
         '|', 'upload', 'table', 
         '|', 'undo', 'redo', 
         '|', 'fullscreen'
       ],
+      // 启用表情面板
+      hint: {
+        emoji: {
+          '+1': '👍',
+          '-1': '👎',
+          'smile': '😄',
+          'heart': '❤️'
+        }
+      },
       upload: {
         accept: 'image/*',
         token: '', // 如果需要上传图片，这里需要设置token
@@ -1185,6 +1212,117 @@ const initNoteEditor = () => {
           vditorInstance.value.setValue(noteContent.value);
         }
         
+        console.log('编辑器初始化完成，使用简化配置');
+        
+        // 手动创建表情面板
+        setTimeout(() => {
+          const emojiButton = document.querySelector('.vditor-toolbar .vditor-tooltipped[data-type="emoji"]');
+          if (emojiButton) {
+            emojiButton.addEventListener('click', function(event) {
+              event.stopPropagation();
+              
+              // 如果已存在表情面板，则切换其显示状态
+              let emojiPanel = document.querySelector('.custom-emoji-panel');
+              
+              if (emojiPanel) {
+                // 如果面板已存在，则切换显示/隐藏状态
+                if (emojiPanel.style.display === 'none') {
+                  emojiPanel.style.display = 'grid'; // 注意这里用grid而不是block
+                  // 确保网格布局保持不变
+                  emojiPanel.style.gridTemplateColumns = 'repeat(6, 1fr)';
+                  emojiPanel.style.gridGap = '5px';
+                  emojiPanel.style.width = '180px';
+                } else {
+                  emojiPanel.style.display = 'none';
+                }
+                return;
+              }
+              
+              // 创建自定义表情面板
+              emojiPanel = document.createElement('div');
+              emojiPanel.className = 'custom-emoji-panel';
+              emojiPanel.style.cssText = `
+                position: absolute;
+                top: ${emojiButton.getBoundingClientRect().bottom + 5}px;
+                left: ${emojiButton.getBoundingClientRect().left}px;
+                background: white;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                padding: 8px;
+                display: grid;
+                grid-template-columns: repeat(6, 1fr);
+                grid-gap: 5px;
+                width: 180px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                z-index: 9999;
+              `;
+              
+              // 添加表情 - 精选常用表情
+              const emojis = [
+                '😀', '😄', '😁', '😆', '😉', '😊',
+                '😍', '😘', '🤗', '😋', '😎', '🤔',
+                '🙂', '😌', '😏', '😒', '😔', '😜',
+                '😭', '😱', '😨', '👍', '👎', '❤️'
+              ];
+              
+              emojis.forEach(emoji => {
+                const emojiElement = document.createElement('div');
+                emojiElement.textContent = emoji;
+                emojiElement.style.cssText = `
+                  font-size: 18px;
+                  padding: 3px;
+                  cursor: pointer;
+                  transition: transform 0.1s;
+                  text-align: center;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                `;
+                emojiElement.addEventListener('click', function() {
+                  // 插入表情到编辑器
+                  if (vditorInstance.value) {
+                    vditorInstance.value.insertValue(emoji);
+                  }
+                  emojiPanel.style.display = 'none';
+                });
+                emojiElement.addEventListener('mouseover', function() {
+                  this.style.transform = 'scale(1.2)';
+                });
+                emojiElement.addEventListener('mouseout', function() {
+                  this.style.transform = 'scale(1)';
+                });
+                emojiPanel.appendChild(emojiElement);
+              });
+              
+              // 添加到文档中
+              document.body.appendChild(emojiPanel);
+              
+              // 点击其他地方关闭表情面板
+              // 点击其他地方关闭表情面板
+              document.addEventListener('click', function closePanel(e) {
+                if (!emojiPanel.contains(e.target) && e.target !== emojiButton) {
+                  emojiPanel.style.display = 'none';
+                }
+              });
+              
+              // 添加样式表以确保表情面板始终保持网格布局
+              const styleElement = document.createElement('style');
+              styleElement.textContent = `
+                .custom-emoji-panel {
+                  display: grid !important;
+                  grid-template-columns: repeat(6, 1fr) !important;
+                  grid-gap: 5px !important;
+                  width: 180px !important;
+                }
+                .custom-emoji-panel[style*="display: none"] {
+                  display: none !important;
+                }
+              `;
+              document.head.appendChild(styleElement);
+            });
+          }
+        }, 500);
+        
         // 设置编辑器状态
         updateEditorEditableState();
       },
@@ -1193,6 +1331,11 @@ const initNoteEditor = () => {
         noteContent.value = value;
         // 调用handleContentChange函数来触发相似笔记推荐
         handleContentChange();
+        // 实时更新预览内容
+        if (showPreview.value) {
+          // 这里不需要额外操作，因为noteContent的变化会自动触发renderedContent的更新
+          // renderedContent是一个计算属性，会自动响应noteContent的变化
+        }
       },
       focus: () => {
         // 当编辑器获得焦点时
@@ -1232,6 +1375,12 @@ watch(showPreview, (newValue) => {
   handlePreviewToggle(newValue);
 });
 
+// 监听笔记内容变化，实时更新预览
+watch(noteContent, (newValue) => {
+  console.log('笔记内容变化，更新预览');
+  // 内容变化时自动更新预览，不需要切换预览开关
+});
+
 // 监听标题、内容和标签的变化，自动保存
 watch([noteTitle, noteContent, noteTags, timestamps], () => {
   if (isCreatingNote.value || currentNote.value) {
@@ -1247,7 +1396,7 @@ const handleContentChange = debounce(() => {
   if (noteContent.value.length > 5 && !isFetchingSimilarNotes.value) {
     fetchSimilarNotes();
   }
-}, 500);
+}, 300); // 减少延迟时间，使响应更快
 
 const fetchSimilarNotes = async () => {
   // 在函数开始处添加日志
@@ -2052,6 +2201,12 @@ const getPreviewText = (note) => {
 
 // 处理预览切换
 const handlePreviewToggle = (isPreview) => {
+  // 这里可以添加预览切换的逻辑
+  console.log('预览模式切换:', isPreview);
+  if (isPreview && vditorInstance.value) {
+    // 确保在切换到预览模式时，预览内容是最新的
+    noteContent.value = vditorInstance.value.getValue();
+  }
   // 强制DOM更新
   nextTick(() => {
     if (isPreview) {
@@ -2478,12 +2633,12 @@ const handleSyncTags = async () => {
 }
 
 .left-actions .el-button {
-  transition: all 0.3s ease;
+  transition: none;
 }
 
 .left-actions .el-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transform: none;
+  box-shadow: none;
 }
 
 .right-actions {
@@ -2493,12 +2648,12 @@ const handleSyncTags = async () => {
 }
 
 .right-actions .el-button {
-  transition: all 0.3s ease;
+  transition: none;
 }
 
 .right-actions .el-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transform: none;
+  box-shadow: none;
 }
 
 .search-container {
@@ -2589,12 +2744,13 @@ const handleSyncTags = async () => {
   border-radius: 12px;
   margin: 10px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  transition: none;
+  border: 3px solid #72cde9; /* 添加浅蓝色边框 */
 }
 
 .video-section:hover {
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transform: none;
 }
 
 .video-header {
@@ -2684,12 +2840,13 @@ const handleSyncTags = async () => {
   border-radius: 12px;
   margin: 10px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  transition: none;
+  border: 3px solid #72cde9; /* 添加浅蓝色边框 */
 }
 
 .subtitle-section:hover {
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transform: none;
 }
 
 .subtitle-header {
@@ -2758,7 +2915,7 @@ const handleSyncTags = async () => {
 
 /* 确保最后一个字幕项有足够的底部边距 */
 .subtitle-item:last-child {
-  margin-bottom: 35px;
+  margin-bottom: 55px;
 }
 
 .subtitle-item.active {
@@ -2822,13 +2979,13 @@ const handleSyncTags = async () => {
   border-radius: 12px;
   background-color: #fff;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  margin: 10px;
-  transition: all 0.3s ease;
+  margin: 5px; 
+  transition: none;
 }
 
 .note-editor-section:hover {
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transform: none;
 }
 
 .note-editor-header {
@@ -2965,12 +3122,13 @@ const handleSyncTags = async () => {
 .toolbar-button {
   padding: 6px;
   border-radius: 4px;
-  transition: all 0.3s ease;
+  transition: none;
 }
 
 .toolbar-button:hover {
   background-color: #ecf5ff;
   color: #409eff;
+  transform: none;
 }
 
 .toolbar-button.active {
@@ -3742,19 +3900,22 @@ const handleSyncTags = async () => {
 .left-section, .right-section {
   min-height: 0; /* 防止内容区域溢出 */
   overflow: hidden;
+  transition: none;
+  animation: none;
+  transform: none;
 }
 
 /* 标签按钮样式 */
 .button-new-tag {
   margin-left: 10px;
   margin-top: 10px;
-  transition: all 0.3s;
+  transition: none;
   width: 100px; 
   height: 30px;    
 }
 
 .button-new-tag:hover {
-  transform: scale(1.05);
+  transform: none;
 }
 
 /* 操作按钮样式 */
@@ -3765,13 +3926,13 @@ const handleSyncTags = async () => {
 }
 
 .editor-actions .el-button {
-  transition: all 0.3s;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: none;
+  box-shadow: none;
 }
 
 .editor-actions .el-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: none;
+  box-shadow: none;
 }
 
 /* 响应式布局 */
@@ -4056,6 +4217,9 @@ const handleSyncTags = async () => {
 .note-editor-container {
   height: 100%;
   width: 100%;
+  transition: none;
+  animation: none;
+  transform: none;
 }
 
 /* 确保 Vditor 的样式与你的应用一致 */
@@ -4220,5 +4384,82 @@ const handleSyncTags = async () => {
 .know-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+}
+/* 通过CSS强制隐藏浮动工具栏 */
+:deep(.vditor-panel--arrow),
+:deep(.vditor-hint),
+:deep(.vditor-panel) {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* 隐藏文字选中时的工具栏 */
+:deep(.vditor-wysiwyg .vditor-panel--move) {
+  display: none !important;
+}
+
+/* 隐藏文本选中时的上下移动按钮 */
+:deep(.vditor-wysiwyg [data-type="up"]),
+:deep(.vditor-wysiwyg [data-type="down"]),
+:deep(.vditor-wysiwyg [data-type="remove"]) {
+  display: none !important;
+}
+/* 修复Enter键产生的段落间距过大问题 */
+:deep(.vditor-reset p) {
+  margin: 5px 0 !important;
+  line-height: 1.5 !important;
+}
+
+:deep(.vditor-wysiwyg p) {
+  margin: 5px 0 !important;
+  line-height: 1.5 !important;
+}
+
+/* 修复预览模式下的段落间距 */
+.markdown-preview p {
+  margin: 5px 0 !important;
+  line-height: 1.5 !important;
+}
+
+/* 更强力的预览模式段落间距控制 */
+.markdown-preview div[v-html] p {
+  margin: 2px 0 !important;
+  line-height: 1.5 !important;
+  padding: 0 !important;
+}
+
+/* 控制所有可能的段落元素 */
+.markdown-preview div {
+  margin-bottom: 2px !important;
+}
+
+.markdown-preview > div > * {
+  margin-top: 2px !important;
+  margin-bottom: 2px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* 特别针对渲染后的内容容器 */
+.rendered-markdown-content {
+  line-height: 1.5 !important;
+}
+
+.rendered-markdown-content p {
+  margin: 2px 0 !important;
+  padding: 0 !important;
+}
+
+/* 控制标题元素的间距 */
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+  margin-top: 10px !important;
+  margin-bottom: 10px !important;
 }
 </style>
