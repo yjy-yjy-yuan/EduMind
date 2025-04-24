@@ -57,8 +57,21 @@
     
     <!-- 左侧区域 -->
     <div class="left-section" :class="{ 'with-sidebar': sidebarVisible }">
-      <!-- 左侧上方区域：视频播放区域(70%)和视频播放器(30%)的左右布局 -->
+      <!-- 左侧上方区域：视频名称和视频播放区域的上下布局 -->
       <div class="upper-section">
+        <!-- 视频名称和显示字幕按钮 -->
+        <div class="video-title-area">
+          <h3 class="video-title" :title="videoTitle">{{ videoTitle }}</h3>
+          <el-switch
+            v-model="showSubtitles"
+            active-text="显示字幕"
+            inactive-text="隐藏字幕"
+            size="small"
+            @change="toggleSubtitles"
+            class="subtitle-toggle-switch"
+          />
+        </div>
+        
         <!-- 视频播放区域 -->
         <div class="video-main-area">
           <div class="video-wrapper">
@@ -100,57 +113,6 @@
                 />
                 您的浏览器不支持 HTML5 视频播放
               </video>
-            </div>
-          </div>
-        </div>
-        
-        <!-- 视频信息区域 -->
-        <div class="video-player-area">
-          <div class="video-info-section">
-            <div class="video-info">
-              <h3 :title="videoTitle">{{ videoTitle }}</h3>
-              <div class="video-details-card" v-if="video">
-                <div class="video-detail-item">
-                  <span class="detail-label">时长</span>
-                  <span class="detail-value">{{ formatDuration(video?.duration) }}</span>
-                </div>
-                <div class="video-detail-item">
-                  <span class="detail-label">分辨率</span>
-                  <span class="detail-value">{{ video?.width }} x {{ video?.height }}</span>
-                </div>
-                <div class="video-detail-item">
-                  <span class="detail-label">帧率</span>
-                  <span class="detail-value">{{ video?.fps }} FPS</span>
-                </div>
-              </div>
-            </div>
-            <div class="subtitle-controls-card">
-              <div class="subtitle-control-item">
-                <span class="control-label">字幕显示</span>
-                <el-switch
-                  v-model="showSubtitles"
-                  active-text="显示"
-                  inactive-text="隐藏"
-                  @change="toggleSubtitles"
-                  class="custom-switch"
-                />
-              </div>
-              <div class="subtitle-control-item">
-                <span class="control-label">字幕下载</span>
-                <el-dropdown>
-                  <el-button type="primary" class="download-button">
-                    下载字幕<el-icon class="el-icon--right"><arrow-down /></el-icon>
-                  </el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item @click="downloadSubtitle('srt', true)">下载SRT字幕</el-dropdown-item>
-                      <el-dropdown-item @click="downloadSubtitle('vtt', true)">下载VTT字幕</el-dropdown-item>
-                      <el-dropdown-item @click="downloadSubtitle('txt', true)">下载TXT字幕</el-dropdown-item>
-                      <el-dropdown-item @click="downloadMergedSubtitle('txt', true)">语义合并字幕</el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
-              </div>
             </div>
           </div>
         </div>
@@ -259,19 +221,49 @@
     <div class="subtitle-section">
       <div class="subtitle-display-container">
         <div class="subtitle-mode-switch">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <el-radio-group v-model="subtitleMode" size="small">
-              <el-radio-button label="merged">语义合并字幕</el-radio-button>
-              <el-radio-button label="full">标准分段字幕</el-radio-button>
-            </el-radio-group>
-            <el-button 
-              type="primary" 
-              size="small" 
-              @click="refreshMergedSubtitles" 
-              :loading="mergeSubtitlesLoading"
-            >
-              重新合并字幕
-            </el-button>
+          <div class="subtitle-controls">
+            <!-- 字幕控制按钮区域 -->
+            <div class="subtitle-buttons-row">
+              <!-- 左侧：字幕模式选择 -->
+              <div class="subtitle-left-buttons">
+                <el-button 
+                  :type="subtitleMode === 'merged' ? 'primary' : 'purple'" 
+                  size="small" 
+                  @click="toggleSubtitleMode"
+                  :class="{'subtitle-mode-button': true, 'purple-button': subtitleMode !== 'merged'}"
+                >
+                  {{ subtitleMode === 'merged' ? '语义合并字幕' : '标准分段字幕' }}
+                </el-button>
+              </div>
+              
+              <!-- 右侧：字幕下载和重新合并按钮 -->
+              <div class="subtitle-right-buttons">
+                <!-- 字幕下载 -->
+                <el-dropdown>
+                  <el-button type="primary" size="small" class="download-button">
+                    下载字幕<el-icon class="el-icon--right"><arrow-down /></el-icon>
+                  </el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item @click="downloadSubtitle('srt', true)">下载SRT字幕</el-dropdown-item>
+                      <el-dropdown-item @click="downloadSubtitle('vtt', true)">下载VTT字幕</el-dropdown-item>
+                      <el-dropdown-item @click="downloadSubtitle('txt', true)">下载TXT字幕</el-dropdown-item>
+                      <el-dropdown-item @click="downloadMergedSubtitle('txt', true)">语义合并字幕</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
+                
+                <!-- 重新合并字幕 -->
+                <el-button 
+                  type="primary" 
+                  size="small" 
+                  @click="refreshMergedSubtitles" 
+                  :loading="mergeSubtitlesLoading"
+                >
+                  重新合并字幕
+                </el-button>
+              </div>
+            </div>
           </div>
         </div>
       
@@ -298,7 +290,7 @@
                   <span class="subtitle-time">{{ formatTimeMMSS(section.start_time) }} - {{ formatTimeMMSS(section.end_time) }}</span>
                   <h4 class="subtitle-title">{{ section.title }}</h4>
                 </div>
-                <p class="subtitle-text">{{ section.text }}</p>
+                <p class="subtitle-text" style="white-space: pre-line">{{ section.text }}</p>
               </div>
             </div>
             <div class="subtitle-placeholder" v-else>
@@ -414,7 +406,7 @@
 import DOMPurify from 'dompurify';
 import { ref, onMounted, computed, watch, onUnmounted , nextTick  } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessage, ElLoading } from 'element-plus';
+import { ElMessage, ElLoading, ElMessageBox } from 'element-plus';
 import { 
   Loading, Warning, FullScreen, Close, User, Monitor, 
   QuestionFilled, ChatLineSquare, ArrowDown as ArrowDown,
@@ -523,6 +515,12 @@ watch(subtitleMode, (newMode) => {
   console.log('字幕模式切换为:', newMode);
   // 不再自动加载合并字幕，避免重复请求
 });
+
+// 切换字幕模式的方法
+const toggleSubtitleMode = () => {
+  subtitleMode.value = subtitleMode.value === 'merged' ? 'full' : 'merged';
+  ElMessage.info(`已切换到${subtitleMode.value === 'merged' ? '语义合并字幕' : '标准分段字幕'}模式`);
+};
 
 // 清理事件监听器
 const cleanupEventListeners = () => {
@@ -780,6 +778,9 @@ const toggleSubtitles = () => {
   }
 };
 
+// 注意：现在使用el-switch的@change事件直接调用toggleSubtitles方法
+// 不再需要toggleSubtitlesDisplay方法
+
 // 检查是否为当前字幕
 const isCurrentSubtitle = (subtitle) => {
   if (!videoPlayer.value) return false;
@@ -946,13 +947,29 @@ const triggerSemanticMerge = async () => {
 
 // 重新合并字幕
 const refreshMergedSubtitles = async () => {
-  mergeSubtitlesLoading.value = true;
-  try {
-    // 直接调用触发语义合并的函数
-    await triggerSemanticMerge();
-  } finally {
-    mergeSubtitlesLoading.value = false;
-  }
+  // 显示确认对话框
+  ElMessageBox.confirm(
+    '确定要重新合并字幕吗？这将重新处理视频字幕，可能需要几分钟时间。',
+    '确认操作',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  )
+    .then(async () => {
+      mergeSubtitlesLoading.value = true;
+      try {
+        // 用户确认后调用触发语义合并的函数
+        await triggerSemanticMerge();
+      } finally {
+        mergeSubtitlesLoading.value = false;
+      }
+    })
+    .catch(() => {
+      // 用户取消操作
+      ElMessage.info('已取消重新合并字幕操作');
+    });
 };
 
 // 问答功能
@@ -1322,15 +1339,55 @@ const closeGuideDialog = () => {
 /*上方区域*/
 .upper-section {
   display: flex;
-  height: 40%;
-  width: 100%;
-  margin-bottom: 10px;
+  flex-direction: column;
+  height: 45%;
+  width: 98%;
+  margin-bottom: 5px;
+}
+
+/* 视频标题区域 */
+.video-title-area {
+  padding: 5px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 30px;
+}
+
+.video-title {
+  margin: 0;
+  color: #333;
+  font-weight: 600;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  position: relative;
+  padding-left: 12px;
+  flex: 1;
+}
+
+.subtitle-toggle-switch {
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+
+.video-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 15px;
+  background: linear-gradient(to bottom, #3CAEA3, #2a9d8f);
+  border-radius: 2px;
 }
 
 /*视频主区域*/
 .video-main-area {
-  flex: 0.55;
-  padding: 15px;
+  flex: 1;
+  padding: 15px; 
   overflow: hidden;
 }
 
@@ -1773,11 +1830,52 @@ const closeGuideDialog = () => {
 /* 移除字幕区域卡片悬停效果 */
 
 .subtitle-mode-switch {
-  padding: 15px;
+  padding: 10px;
   background: #f5f7fa;
   color: #333;
-  text-align: center;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.subtitle-controls {
+  width: 100%;
+}
+
+.subtitle-buttons-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.subtitle-left-buttons {
+  display: flex;
+  align-items: center;
+}
+
+.subtitle-right-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.subtitle-mode-button.purple-button {
+  background-color: #818cf8;
+  border-color: #818cf8;
+  color: white;
+}
+
+.subtitle-mode-button.purple-button:hover {
+  background-color: #818cf8;
+  border-color: #818cf8;
+}
+
+.subtitle-buttons-row .el-button {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 8px 12px;
+  font-size: 12px;
 }
 
 .subtitle-display {

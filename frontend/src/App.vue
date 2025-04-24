@@ -25,7 +25,9 @@
 
     <!-- 路由视图 -->
     <div class="main-content">
-      <router-view></router-view>
+      <keep-alive>
+        <router-view></router-view>
+      </keep-alive>
     </div>
   </div>
 </template>

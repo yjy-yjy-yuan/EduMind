@@ -73,6 +73,10 @@ class LLMSimilarityService:
         Returns:
             相似度分数，范围0-1
         """
+        # 处理None值
+        if tag1 is None or tag2 is None:
+            return 0.0
+            
         # 如果标签完全相同，直接返回1.0
         if tag1.lower() == tag2.lower():
             return 1.0
@@ -204,9 +208,91 @@ class LLMSimilarityService:
         
         return intersection / union if union > 0 else 0.0
     
-    def calculate_tag_sets_similarity(self, tags1: List[str], tags2: List[str]) -> float:
+    def calculate_tag_sets_similarity_direct(self, tags1: List[str], tags2: List[str]) -> float:
         """
-        计算两组标签之间的相似度
+        使用LLM直接计算两组标签之间的整体相似度
+        
+        Args:
+            tags1: 第一组标签
+            tags2: 第二组标签
+            
+        Returns:
+            相似度分数，范围0-1
+        """
+        if not tags1 or not tags2:
+            return 0.0
+            
+        # 如果标签组完全相同，直接返回1.0
+        if set(tags1) == set(tags2):
+            return 1.0
+            
+        # 准备提示词
+        prompt = f"""请分析以下两组视频标签的相似度，返回一个0到1之间的数字，其中1表示完全相同，0表示完全不相关。
+
+第一组标签: {', '.join(tags1)}
+第二组标签: {', '.join(tags2)}
+
+只返回一个数字，不要解释。"""
+        
+        # 尝试使用Ollama（如果可用）
+        if self.use_ollama:
+            try:
+                logger.info(f"使用Ollama计算标签组直接相似度: {tags1} vs {tags2}")
+                response = requests.post(
+                    f"{OLLAMA_BASE_URL}/generate",
+                    json={
+                        "model": OLLAMA_MODEL,
+                        "prompt": prompt,
+                        "stream": False
+                    },
+                    timeout=30
+                )
+                
+                if response.status_code == 200:
+                    result = response.json().get('response', '').strip()
+                    # 提取数字
+                    match = re.search(r'\d+(\.\d+)?', result)
+                    if match:
+                        similarity = float(match.group(0))
+                        # 确保相似度在[0,1]范围内
+                        similarity = max(0.0, min(1.0, similarity))
+                        logger.info(f"标签组直接相似度结果: {similarity}")
+                        return similarity
+            except Exception as e:
+                logger.error(f"使用Ollama计算标签组直接相似度失败: {str(e)}")
+        
+        # 如果Ollama不可用或失败，尝试使用OpenAI（如果可用）
+        if self.use_openai:
+            try:
+                logger.info(f"使用OpenAI计算标签组直接相似度: {tags1} vs {tags2}")
+                response = self.openai_client.chat.completions.create(
+                    model="qwen-max",
+                    messages=[
+                        {"role": "system", "content": "你是一个专门分析视频标签相似度的助手。请只返回一个0到1之间的数字。"},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=10
+                )
+                
+                result = response.choices[0].message.content.strip()
+                # 提取数字
+                match = re.search(r'\d+(\.\d+)?', result)
+                if match:
+                    similarity = float(match.group(0))
+                    # 确保相似度在[0,1]范围内
+                    similarity = max(0.0, min(1.0, similarity))
+                    logger.info(f"标签组直接相似度结果: {similarity}")
+                    return similarity
+            except Exception as e:
+                logger.error(f"使用OpenAI计算标签组直接相似度失败: {str(e)}")
+        
+        # 如果直接计算失败，回退到原来的逻辑
+        logger.info("直接计算标签组相似度失败，回退到逻辑计算方式")
+        return self.calculate_tag_sets_similarity_logic(tags1, tags2)
+        
+    def calculate_tag_sets_similarity_logic(self, tags1: List[str], tags2: List[str]) -> float:
+        """
+        使用逻辑计算两组标签之间的相似度（原方法）
         
         Args:
             tags1: 第一组标签
@@ -233,6 +319,20 @@ class LLMSimilarityService:
         
         # 计算平均相似度
         return sum(similarities) / len(similarities) if similarities else 0.0
+        
+    def calculate_tag_sets_similarity(self, tags1: List[str], tags2: List[str]) -> float:
+        """
+        计算两组标签之间的相似度
+        
+        Args:
+            tags1: 第一组标签
+            tags2: 第二组标签
+            
+        Returns:
+            相似度分数，范围0-1
+        """
+        # 首先尝试直接计算整体相似度，这样更快
+        return self.calculate_tag_sets_similarity_direct(tags1, tags2)
     
     def can_combine_knowledge_graphs(self, tags1: List[str], tags2: List[str], threshold: float = 0.7) -> bool:
         """

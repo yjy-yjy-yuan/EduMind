@@ -1479,11 +1479,33 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  Object.values(pollingTimers.value).forEach(timer => {
-    clearInterval(timer)
+  // 只清除非摘要和标签生成相关的轮询定时器
+  // 检查每个视频是否正在生成摘要或标签
+  Object.keys(pollingTimers.value).forEach(videoId => {
+    const video = videoList.value.find(v => v.id.toString() === videoId.toString())
+    // 如果视频不存在或者没有正在生成摘要/标签，才清除定时器
+    if (!video || (!video.autoGeneratingSummary && !video.autoGeneratingTags)) {
+      clearInterval(pollingTimers.value[videoId])
+      console.log(`组件卸载：清除视频${videoId}的状态轮询定时器`)
+    } else {
+      console.log(`组件卸载：保留视频${videoId}的状态轮询定时器，因为正在生成摘要或标签`)
+      // 保存到localStorage，以便在页面刷新后恢复
+      saveProcessingState(videoId, 'generating_summary_tags')
+    }
   })
-  Object.values(processingTimers.value).forEach(timer => {
-    clearInterval(timer)
+  
+  // 同样处理处理状态轮询定时器
+  Object.keys(processingTimers.value).forEach(videoId => {
+    const video = videoList.value.find(v => v.id.toString() === videoId.toString())
+    // 如果视频不存在或者没有正在生成摘要/标签，才清除定时器
+    if (!video || (!video.autoGeneratingSummary && !video.autoGeneratingTags)) {
+      clearInterval(processingTimers.value[videoId])
+      console.log(`组件卸载：清除视频${videoId}的处理轮询定时器`)
+    } else {
+      console.log(`组件卸载：保留视频${videoId}的处理轮询定时器，因为正在生成摘要或标签`)
+      // 保存到localStorage，以便在页面刷新后恢复
+      saveProcessingState(videoId, 'generating_summary_tags')
+    }
   })
 })
 

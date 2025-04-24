@@ -59,8 +59,8 @@ def process_long_video_subtitles(subtitles):
     # 导入并行处理模块
     import concurrent.futures
     
-    # 使用线程池并行处理字幕块
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+    # 使用线程池并行处理字幕块，减少并发数量以减载Ollama服务
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         # 准备任务列表
         future_to_chunk = {}
         
@@ -70,7 +70,8 @@ def process_long_video_subtitles(subtitles):
             chunk = subtitles[i:end_idx]
             
             logger.info(f"提交字幕块 {i}-{end_idx-1} 到线程池，共{len(chunk)}条字幕")
-            future = executor.submit(process_subtitle_chunk, chunk, i)
+            # 使用标准的字幕处理函数处理每个字幕块，而不是使用专门为分块设计的函数
+            future = executor.submit(merge_subtitles_by_semantics_ollama, chunk)
             future_to_chunk[future] = (i, end_idx-1)
         
         # 收集结果
@@ -79,18 +80,150 @@ def process_long_video_subtitles(subtitles):
             try:
                 chunk_results = future.result()
                 if chunk_results:
+                    # 调整每个段落的索引以反映其在原始字幕中的位置
+                    for segment in chunk_results:
+                        if 'original_indices' in segment:
+                            # 将块内索引转换为全局索引
+                            segment['original_indices'] = [idx + chunk_range[0] for idx in segment['original_indices']]
+                    
                     all_results.extend(chunk_results)
                     logger.info(f"字幕块 {chunk_range[0]}-{chunk_range[1]} 处理完成，生成了 {len(chunk_results)} 个段落")
+                else:
+                    logger.warning(f"字幕块 {chunk_range[0]}-{chunk_range[1]} 处理结果为空，使用备用方法处理")
+                    # 如果块处理结果为空，使用备用方法处理该块
+                    start_idx = chunk_range[0]
+                    end_idx = chunk_range[1] + 1  # 范围是闭区间
+                    chunk = subtitles[start_idx:end_idx]
+                    backup_results = process_subtitle_chunk_backup(chunk, start_idx)
+                    
+                    # 调整每个段落的索引以反映其在原始字幕中的位置
+                    for segment in backup_results:
+                        if 'original_indices' in segment:
+                            # 将块内索引转换为全局索引
+                            segment['original_indices'] = [idx + start_idx for idx in segment['original_indices']]
+                    if backup_results:
+                        all_results.extend(backup_results)
+                        logger.info(f"字幕块 {chunk_range[0]}-{chunk_range[1]} 使用备用方法处理完成，生成了 {len(backup_results)} 个段落")
             except Exception as e:
                 logger.error(f"处理字幕块 {chunk_range[0]}-{chunk_range[1]} 时出错: {str(e)}")
-                # 记录错误但继续处理其他块
                 logger.error(traceback.format_exc())
+                
+                # 当处理出错时，使用备用方法处理该块
+                try:
+                    start_idx = chunk_range[0]
+                    end_idx = chunk_range[1] + 1  # 范围是闭区间
+                    chunk = subtitles[start_idx:end_idx]
+                    backup_results = process_subtitle_chunk_backup(chunk, start_idx)
+                    if backup_results:
+                        all_results.extend(backup_results)
+                        logger.info(f"字幕块 {chunk_range[0]}-{chunk_range[1]} 使用备用方法处理完成，生成了 {len(backup_results)} 个段落")
+                except Exception as backup_error:
+                    logger.error(f"备用方法处理字幕块 {chunk_range[0]}-{chunk_range[1]} 也失败: {str(backup_error)}")
     
     # 按照开始时间排序结果
     all_results.sort(key=lambda x: x["start_time"])
     
     logger.info(f"长视频分块处理完成，共生成{len(all_results)}个语义段落")
     return all_results
+
+def process_subtitle_chunk_backup(chunk, start_offset):
+    """备用方法处理单个字幕块，使用更简单的方式确保不会失败"""
+    logger = logging.getLogger(__name__)
+    logger.info(f"使用备用方法处理字幕块，共{len(chunk)}条字幕")
+    
+    try:
+        # 使用更简单的分段策略，按固定数量分段
+        chunk_size = len(chunk)
+        
+        # 根据块大小确定段落数，与主处理方法保持一致
+        if chunk_size < 20:
+            num_segments = 3  # 2-3个段落，取中间值
+        elif chunk_size < 50:
+            num_segments = 5  # 4-6个段落，取中间值
+        elif chunk_size < 100:
+            num_segments = 10  # 10-11个段落，取中间值
+        elif chunk_size < 150:
+            num_segments = 15  # 15-16个段落，取中间值
+        else:
+            num_segments = 20  # 20-21个段落，取中间值
+        
+        # 计算每个段落包含的字幕数量
+        subtitles_per_segment = max(1, chunk_size // num_segments)
+        
+        # 存储结果
+        results = []
+        
+        # 按固定间隔分段
+        for i in range(0, chunk_size, subtitles_per_segment):
+            end_idx = min(i + subtitles_per_segment - 1, chunk_size - 1)
+            
+            # 收集该段落内的所有原始字幕
+            original_subtitles_texts = [chunk[j]["text"] for j in range(i, end_idx + 1)]
+            # 合并文本，确保包含所有内容
+            segment_text = " ".join(original_subtitles_texts)
+            
+            # 格式化文本，提高可读性
+            formatted_text = segment_text
+            try:
+                # 处理中文句号、问号、感叹号和英文句号、问号、感叹号
+                formatted_text = re.sub(r'([。！？.!?])\s*', r'\1\n\n', formatted_text)
+                
+                # 处理逗号和分号，添加适当的空格
+                formatted_text = re.sub(r'([，,、;；:：])\s*', r'\1 ', formatted_text)
+                
+                # 确保每个句子都在新行开始
+                formatted_text = re.sub(r'\n([^\n])', r'\n\n\1', formatted_text)
+                
+                # 处理连续的换行符，避免过多空行
+                formatted_text = re.sub(r'\n{3,}', '\n\n', formatted_text)
+                
+                # 合并连续的空格
+                formatted_text = re.sub(r'\s{2,}', ' ', formatted_text)
+            except Exception as e:
+                logger.warning(f"格式化文本出错: {str(e)}")
+            
+            # 生成简单标题
+            try:
+                # 尝试使用传统方法生成标题
+                title = generate_title_traditional(segment_text)
+            except Exception as e:
+                logger.warning(f"生成标题出错: {str(e)}")
+                # 使用默认标题
+                title = f"第{len(results)+1}部分"
+            
+            # 添加结果
+            results.append({
+                "start_time": chunk[i]["start_time"],
+                "end_time": chunk[end_idx]["end_time"],
+                "text": formatted_text,
+                "title": title,
+                "original_subtitles": [{
+                    "start_time": chunk[j]["start_time"],
+                    "end_time": chunk[j]["end_time"],
+                    "text": chunk[j]["text"]
+                } for j in range(i, end_idx + 1)]
+            })
+        
+        logger.info(f"备用方法处理完成，生成了{len(results)}个段落")
+        return results
+    except Exception as e:
+        logger.error(f"备用方法处理出错: {str(e)}")
+        # 最后的保底方案：将整个块作为一个段落返回
+        try:
+            return [{
+                "start_time": chunk[0]["start_time"],
+                "end_time": chunk[-1]["end_time"],
+                "text": " ".join([sub["text"] for sub in chunk]),
+                "title": "字幕内容",
+                "original_subtitles": [{
+                    "start_time": sub["start_time"],
+                    "end_time": sub["end_time"],
+                    "text": sub["text"]
+                } for sub in chunk]
+            }]
+        except Exception as final_error:
+            logger.error(f"最终保底方案也失败: {str(final_error)}")
+            return []
 
 def process_subtitle_chunk(chunk, start_offset):
     """处理单个字幕块"""
@@ -100,38 +233,59 @@ def process_subtitle_chunk(chunk, start_offset):
     for i, subtitle in enumerate(chunk):
         chunk_text += f"{i+1}. {subtitle['text']}\n"
     
-    # 构建提示词 - 简化提示词以加快处理速度
+    # 根据字幕块大小动态确定分段策略，与不分块处理时的标准保持一致
+    chunk_size = len(chunk)
+    if chunk_size < 20:  # 字幕很少
+        segment_guidance = "应该生成2-3个段落，不要过度分段"
+        segment_count = "2-3"
+    elif chunk_size < 50:  # 字幕较少
+        segment_guidance = "应该生成4-6个段落，确保每个段落内容连贯"
+        segment_count = "4-6"
+    elif chunk_size < 100:  # 字幕中等
+        segment_guidance = "应该生成10-11个段落，合理划分主题"
+        segment_count = "10-11"
+    elif chunk_size < 150:  # 字幕较多
+        segment_guidance = "应该生成15-16个段落，确保主题清晰划分"
+        segment_count = "15-16"
+    else:  # 字幕很多
+        segment_guidance = "应该生成20-21个段落，确保主题清晰划分"
+        segment_count = "20-21"
+    
+    # 构建提示词 - 根据字幕块大小动态调整分段要求
     prompt_template = """请分析以下字幕文本，按语义将其分成若干段落，并为每个段落生成标题。
 
 {{ text }}
 
 要求：
-1. 基于语义内容进行分段，相关主题应该在同一段落中
-2. 为每个段落添加适当的标点符号，使其更易于阅读
+1. 根据字幕总数（共{{ chunk_size }}条），{{ segment_guidance }}
+2. 基于语义内容进行分段，相关主题应该在同一段落中
 3. 确保每个段落的开始和结束索引正确
-4. 为每个段落生成一个简短的标题（不超过10个字）
+4. 为每个段落生成一个简短的标题（不超过8个字符）
 
 返回格式（JSON）：
 ```
 [
   {{
     "start_index": 0,
-    "end_index": 5,
-    "formatted_text": "这是添加了标点符号的文本。这样更容易阅读和理解。",
+    "end_index": 30,
+    "formatted_text": "这是第一个语义段落的内容。包含多个相关主题。",
     "title": "主题介绍"
   }},
   {{
-    "start_index": 6,
-    "end_index": 12,
-    "formatted_text": "这是第二段添加了标点符号的文本。",
+    "start_index": 31,
+    "end_index": 60,
+    "formatted_text": "这是第二个语义段落的内容。包含另一组相关主题。",
     "title": "要点讨论"
   }}
 ]
 ```
 
-请直接返回JSON格式的结果，不要有任何解释或其他内容。"""
-    # 替换变量
+请直接返回JSON格式的结果，不要有任何解释或其他内容。注意：必须将全部内容合并为{{ segment_count }}个段落，不要生成过多段落。"""
+    # 替换所有变量
     prompt = prompt_template.replace("{{ text }}", chunk_text)
+    prompt = prompt.replace("{{ chunk_size }}", str(chunk_size))
+    prompt = prompt.replace("{{ segment_guidance }}", segment_guidance)
+    prompt = prompt.replace("{{ segment_count }}", segment_count)
     
     # 调用Ollama API
     try:
@@ -150,10 +304,11 @@ def process_subtitle_chunk(chunk, start_offset):
                     "stream": False,
                     "options": {
                         "temperature": 0.1,  # 降低温度以加快生成速度
-                        "num_predict": 1024  # 限制生成的token数量
+                        "num_predict": 2048,  # 增加生成的token数量上限
+                        "num_ctx": 4096  # 增加上下文窗口大小
                     }
                 },
-                timeout=30  # 减少超时时间
+                timeout=120  # 增加超时时间到120秒
             )
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
@@ -185,6 +340,27 @@ def process_subtitle_chunk(chunk, start_offset):
         
         # 处理结果
         results = []
+        
+        # 确定目标段落数量
+        target_segment_count = 0
+        if chunk_size < 20:  # 字幕很少
+            target_segment_count = 3  # 2-3个段落，取中间值
+        elif chunk_size < 50:  # 字幕较少
+            target_segment_count = 5  # 4-6个段落，取中间值
+        elif chunk_size < 100:  # 字幕中等
+            target_segment_count = 10  # 10-11个段落，取中间值
+        elif chunk_size < 150:  # 字幕较多
+            target_segment_count = 15  # 15-16个段落，取中间值
+        else:  # 字幕很多
+            target_segment_count = 20  # 20-21个段落，取中间值
+        
+        # 检查LLM生成的段落数量是否符合要求
+        if len(segments_info) < target_segment_count * 0.7 or len(segments_info) > target_segment_count * 1.3:
+            logger.warning(f"LLM生成的段落数量({len(segments_info)})与目标数量({target_segment_count})相差过大，使用强制分段")
+            # 当LLM生成的段落数量与目标相差过大时，使用强制分段
+            return process_subtitle_chunk_backup(chunk, start_offset)
+        
+        # 如果LLM生成的段落数量基本符合要求，则正常处理
         for segment in segments_info:
             # 获取段落的起始和结束索引（相对于当前块）
             chunk_start_index = segment.get("start_index", 0)
@@ -205,9 +381,34 @@ def process_subtitle_chunk(chunk, start_offset):
             if formatted_text:
                 formatted_text = re.sub(r'\[\d+\]\s*', '', formatted_text)
             
-            # 如果没有格式化文本，使用原始合并文本
-            if not formatted_text:
-                formatted_text = " ".join([chunk[i]["text"] for i in range(chunk_start_index, chunk_end_index + 1)])
+            # 始终使用原始字幕内容，确保不会丢失内容
+            # 收集该段落内的所有原始字幕
+            original_subtitles_texts = [chunk[i]["text"] for i in range(chunk_start_index, chunk_end_index + 1)]
+            
+            # 如果没有格式化文本，或者格式化文本明显短于原始文本，使用原始合并文本
+            original_text = " ".join(original_subtitles_texts)
+            if not formatted_text or len(formatted_text) < len(original_text) * 0.7:  # 如果格式化文本长度小于原始文本的70%
+                # 尝试格式化原始文本
+                try:
+                    # 处理中文句号、问号、感叹号和英文句号、问号、感叹号
+                    original_text = re.sub(r'([\u3002\uff01\uff1f.!?])\s*', r'\1\n\n', original_text)  # 双换行增加可读性
+                    
+                    # 处理逗号和分号，添加适当的空格
+                    original_text = re.sub(r'([\uff0c,\u3001;\uff1b:\uff1a])\s*', r'\1 ', original_text)
+                    
+                    # 确保每个句子都在新行开始
+                    original_text = re.sub(r'\n([^\n])', r'\n\n\1', original_text)
+                    
+                    # 处理连续的换行符，避免过多空行
+                    original_text = re.sub(r'\n{3,}', '\n\n', original_text)
+                    
+                    # 合并连续的空格
+                    original_text = re.sub(r'\s{2,}', ' ', original_text)
+                    
+                    formatted_text = original_text
+                except Exception as e:
+                    logger.warning(f"格式化原始文本出错: {str(e)}")
+                    formatted_text = original_text
             
             title = segment.get("title", f"段落{len(results)+1}")
             
@@ -215,12 +416,20 @@ def process_subtitle_chunk(chunk, start_offset):
             start_time = chunk[chunk_start_index]["start_time"]
             end_time = chunk[chunk_end_index]["end_time"]
             
+            # 收集该段落的所有原始字幕信息
+            original_subtitles = [{
+                "start_time": chunk[j]["start_time"],
+                "end_time": chunk[j]["end_time"],
+                "text": chunk[j]["text"]
+            } for j in range(chunk_start_index, chunk_end_index + 1)]
+            
             results.append({
                 "start_time": start_time,
                 "end_time": end_time,
                 "text": formatted_text,
                 "title": title,
-                "original_indices": list(range(global_start_index, global_end_index + 1))
+                "original_indices": list(range(global_start_index, global_end_index + 1)),
+                "original_subtitles": original_subtitles
             })
         
         return results
@@ -282,19 +491,29 @@ def merge_subtitles_by_semantics_ollama(subtitles):
         if subtitle_count < 20:  # 字幕很少
             segment_guidance = "应该生成2-3个段落，不要过度分段"
         elif subtitle_count < 50:  # 字幕较少
-            segment_guidance = "应该生成4-5个段落，确保每个段落内容连贯"
+            segment_guidance = "应该生成4-6个段落，确保每个段落内容连贯"
         elif subtitle_count < 100:  # 字幕中等
-            segment_guidance = "应该生成8-9个段落，合理划分主题"
+            segment_guidance = "应该生成10-11个段落，合理划分主题"
         elif subtitle_count < 150:  # 字幕较多
-            segment_guidance = "应该生成11-12个段落，确保主题清晰划分"
+            segment_guidance = "应该生成15-16个段落，确保主题清晰划分"
         elif subtitle_count < 200:  # 字幕很多
-            segment_guidance = "应该生成14-15个段落，确保主题清晰划分"
+            segment_guidance = "应该生成20-21个段落，确保主题清晰划分"
         elif subtitle_count < 300:  # 字幕非常多
-            segment_guidance = "应该生成17-18个段落，确保主题清晰划分"
+            segment_guidance = "应该生成25-26个段落，确保主题清晰划分"
         elif subtitle_count < 400:  # 字幕极多
-            segment_guidance = "应该生成19-20个段落，确保主题清晰划分"
+            segment_guidance = "应该生成30-31个段落，确保主题清晰划分"
+        elif subtitle_count < 500:  # 字幕极多
+            segment_guidance = "应该生成35-36个段落，确保主题清晰划分"
+        elif subtitle_count < 600:  # 字幕极多
+            segment_guidance = "应该生成40-41个段落，确保主题清晰划分"
+        elif subtitle_count < 700:  # 字幕极多
+            segment_guidance = "应该生成45-46个段落，确保主题清晰划分"
+        elif subtitle_count < 800:  # 字幕极多
+            segment_guidance = "应该生成50-51个段落，确保主题清晰划分"
+        elif subtitle_count < 900:  # 字幕极多
+            segment_guidance = "应该生成55-56个段落，确保主题清晰划分"
         else:  # 字幕数量巨大
-            segment_guidance = "应该生成20-22个段落，确保主题清晰划分"
+            segment_guidance = "应该生成60-61个段落，确保主题清晰划分"
             
         prompt_template = """请分析以下视频字幕文本，并完成三个任务：
 1. 根据内容的语义连贯性将其分成若干个有意义的段落
@@ -399,32 +618,32 @@ def merge_subtitles_by_semantics_ollama(subtitles):
         # 确定目标段落数量
         target_segments_count = 0
         subtitle_count = len(subtitles)
-        if subtitle_count < 20:  # 字幕很少
-            target_segments_count = 3  # 目标为2-3个段落
-        elif subtitle_count < 50:  # 字幕较少
-            target_segments_count = 5  # 目标为4-5个段落
-        elif subtitle_count < 100:  # 字幕中等
-            target_segments_count = 8  # 目标为8-9个段落
-        elif subtitle_count < 150:  # 字幕较多
-            target_segments_count = 10  # 目标为11-12个段落
-        elif subtitle_count < 200:  # 字幕很多
-            target_segments_count = 15  # 目标为14-15个段落
-        elif subtitle_count < 300:  # 字幕非常多
-            target_segments_count = 18  # 目标为17-19个段落
-        elif subtitle_count < 400:  # 字幕极多
-            target_segments_count = 22  # 目标为21-23个段落
-        elif subtitle_count < 500:  # 字幕极多
-            target_segments_count = 25  # 目标为24-26个段落
-        elif subtitle_count < 600:  # 字幕极多
-            target_segments_count = 28  # 目标为27-29个段落
-        elif subtitle_count < 700:  # 字幕极多
-            target_segments_count = 31  # 目标为30-32个段落
-        elif subtitle_count < 800:  # 字幕极多
-            target_segments_count = 35  # 目标为34-36个段落
+        if subtitle_count < 20:  
+            target_segments_count = 3  
+        elif subtitle_count < 50: 
+            target_segments_count = 6 
+        elif subtitle_count < 100: 
+            target_segments_count = 11 
+        elif subtitle_count < 150: 
+            target_segments_count = 16 
+        elif subtitle_count < 200:  
+            target_segments_count = 21 
+        elif subtitle_count < 300:  
+            target_segments_count = 26 
+        elif subtitle_count < 400:  
+            target_segments_count = 31 
+        elif subtitle_count < 500:  
+            target_segments_count = 36 
+        elif subtitle_count < 600:  
+            target_segments_count = 41  
+        elif subtitle_count < 700:  
+            target_segments_count = 46  
+        elif subtitle_count < 800:  
+            target_segments_count = 51 
         elif subtitle_count < 900:  # 字幕极多
-            target_segments_count = 38  # 目标为37-39个段落
+            target_segments_count = 56  
         else:  # 字幕数量巨大
-            target_segments_count = 42  # 目标为40-43个段落
+            target_segments_count = 61  
         
         # 合并字幕 - 直接使用Ollama返回的标题，但使用原始文本
         merged_subtitles = []
@@ -444,7 +663,50 @@ def merge_subtitles_by_semantics_ollama(subtitles):
             # 始终使用原始字幕文本，而不是模型生成的格式化文本
             original_text = " ".join([subtitles[i]["text"] for i in range(start_index, end_index + 1)])
             
-            # 如果没有标题，生成一个简单的标题
+            # 格式化文本，提高可读性
+            try:
+                # 处理中文句号、问号、感叹号和英文句号、问号、感叹号 - 强制在这些标点后分段
+                original_text = re.sub(r'([。！？.!?])\s*', r'\1\n\n', original_text)  # 双换行增加可读性
+                
+                # 处理逗号和分号，添加适当的空格
+                original_text = re.sub(r'([，,、;；:：])\s*', r'\1 ', original_text)
+                
+                # 确保每个句子都在新行开始
+                original_text = re.sub(r'\n([^\n])', r'\n\n\1', original_text)
+                
+                # 处理连续的换行符，避免过多空行
+                original_text = re.sub(r'\n{3,}', '\n\n', original_text)
+                
+                # 合并连续的空格
+                original_text = re.sub(r'\s{2,}', ' ', original_text)
+                
+                # 确保段落之间有足够的空白，但不过度
+                original_text = re.sub(r'([^\n])\n([^\n])', r'\1\n\n\2', original_text)
+                original_text = re.sub(r'\n\n\n+', '\n\n', original_text)
+                
+                logger.info("字幕格式化完成")
+            except Exception as e:
+                logger.error(f"字幕格式化出错: {str(e)}")
+                # 出错时保留原始文本，不进行格式化
+            
+            # 使用LLM生成标题
+            try:
+                # 首先尝试使用Ollama生成标题
+                if check_ollama_service():
+                    new_title = generate_title_with_ollama(original_text)
+                    if new_title and len(new_title.strip()) > 0:
+                        title = new_title.strip()
+                        logger.info(f"使用Ollama生成标题: {title}")
+                # 如果Ollama失败，尝试使用在线LLM
+                if not title or title == f"第{len(merged_subtitles) + 1}部分":
+                    new_title = generate_title_with_llm(original_text)
+                    if new_title and len(new_title.strip()) > 0:
+                        title = new_title.strip()
+                        logger.info(f"使用在线LLM生成标题: {title}")
+            except Exception as e:
+                logger.error(f"生成标题时出错: {str(e)}")
+                
+            # 如果没有成功生成标题，使用默认标题
             if not title:
                 title = f"第{len(merged_subtitles) + 1}部分"
             
@@ -459,6 +721,10 @@ def merge_subtitles_by_semantics_ollama(subtitles):
             
             merged_subtitles.append(merged_subtitle)
         
+        # 先按照时间戳对所有段落进行排序，确保时间顺序正确
+        merged_subtitles = sorted(merged_subtitles, key=lambda x: x["start_time"])
+        logger.info("已对所有段落按时间戳进行排序")
+        
         # 检查段落数量是否符合要求
         actual_segments_count = len(merged_subtitles)
         logger.info(f"模型生成的段落数量: {actual_segments_count}, 目标段落数量: {target_segments_count}")
@@ -468,49 +734,123 @@ def merge_subtitles_by_semantics_ollama(subtitles):
             logger.warning("Ollama没有返回有效的段落，使用方案二")
             return merge_subtitles_by_semantics(subtitles)
         
-        # 如果段落数量远小于目标数量，强制分段
-        if actual_segments_count < target_segments_count * 0.7:  # 如果实际段落数量小于目标的70%
-            logger.warning(f"段落数量({actual_segments_count})远小于目标数量({target_segments_count})，强制分段")
+        # 获取目标段落数量范围
+        target_min = int(segment_guidance.split("应该生成")[1].split("-")[0])
+        target_max = int(segment_guidance.split("-")[1].split("个段落")[0])
+        
+        # 如果生成的段落数量不符合预期，进行智能调整
+        # 限制标题长度，确保所有标题都不超过8个字符
+        for subtitle in merged_subtitles:
+            if len(subtitle["title"]) > 8:
+                subtitle["title"] = subtitle["title"][:8]
+        
+        if len(merged_subtitles) < target_min:
+            logger.info(f"生成的段落数量({len(merged_subtitles)})少于目标范围({target_min}-{target_max})，进行智能分割")
             
-            # 强制分段策略：将现有段落分割成更多段落
-            new_merged_subtitles = []
-            for segment in merged_subtitles:
-                original_indices = segment["original_indices"]
-                segment_size = len(original_indices)
-                
-                # 计算每个段落应该分成几个子段落
-                sub_segments_count = max(2, round(segment_size / (subtitle_count / target_segments_count)))
-                
-                if sub_segments_count <= 1 or segment_size < 6:  # 如果段落太小，不再分割
-                    new_merged_subtitles.append(segment)
-                    continue
-                
-                # 将当前段落分成多个子段落
-                sub_segment_size = segment_size // sub_segments_count
-                for i in range(sub_segments_count):
-                    start_pos = i * sub_segment_size
-                    end_pos = (i + 1) * sub_segment_size if i < sub_segments_count - 1 else segment_size
-                    
-                    if start_pos >= end_pos:
-                        continue
-                    
-                    sub_indices = original_indices[start_pos:end_pos]
-                    if not sub_indices:
-                        continue
-                    
-                    # 创建新的子段落
-                    sub_segment = {
-                        "start_time": subtitles[sub_indices[0]]["start_time"],
-                        "end_time": subtitles[sub_indices[-1]]["end_time"],
-                        "text": " ".join([subtitles[i]["text"] for i in sub_indices]),
-                        "title": f"{segment['title']}-第{i+1}部分",
-                        "original_indices": sub_indices
-                    }
-                    
-                    new_merged_subtitles.append(sub_segment)
+            # 智能分割现有段落以达到目标数量
+            adjusted_subtitles = []
+            segments_to_add = target_min - len(merged_subtitles)
             
-            merged_subtitles = new_merged_subtitles
-            logger.info(f"强制分段后的段落数量: {len(merged_subtitles)}")
+            # 按段落长度排序，优先分割较长的段落
+            sorted_by_length = sorted(merged_subtitles, key=lambda x: len(x['text']), reverse=True)
+            
+            # 计算需要分割的段落数量
+            segments_to_split = min(segments_to_add, len(sorted_by_length))
+            
+            # 分割最长的几个段落
+            for i, segment in enumerate(merged_subtitles):
+                if i < segments_to_split and len(segment['text']) > 100:  # 只分割较长的段落
+                    # 获取原始字幕索引
+                    original_indices = segment.get('original_indices', [])
+                    if not original_indices and 'start_index' in segment and 'end_index' in segment:
+                        original_indices = list(range(segment['start_index'], segment['end_index'] + 1))
+                    
+                    if len(original_indices) >= 4:  # 确保有足够的字幕可以分割
+                        # 找到中间位置分割点
+                        mid_point = len(original_indices) // 2
+                        
+                        # 创建两个新段落
+                        first_half_indices = original_indices[:mid_point]
+                        second_half_indices = original_indices[mid_point:]
+                        
+                        if first_half_indices and second_half_indices:
+                            # 第一部分
+                            first_half_text = " ".join([subtitles[idx]["text"] for idx in first_half_indices])
+                            
+                            # 为第一部分生成新标题
+                            # 对分割后的段落内容进行总结生成标题
+                            try:
+                                # 尝试使用生成标题的函数
+                                first_half_title = generate_title_traditional(first_half_text, max_words=4)
+                                # 确保标题不为空
+                                if not first_half_title or len(first_half_title) < 2:
+                                    # 如果生成失败，使用文本的前几个字
+                                    words = re.sub(r'[\s\n]+', '', first_half_text[:20])
+                                    first_half_title = words[:8]
+                            except Exception as e:
+                                logger.error(f"生成第一部分标题时出错: {str(e)}")
+                                # 出错时使用原标题
+                                first_half_title = segment["title"]
+                                
+                            # 确保标题不超过8个字符
+                            if len(first_half_title) > 8:
+                                first_half_title = first_half_title[:8]
+                            
+                            first_half = {
+                                "start_time": subtitles[first_half_indices[0]]["start_time"],
+                                "end_time": subtitles[first_half_indices[-1]]["end_time"],
+                                "text": first_half_text,
+                                "title": first_half_title,
+                                "original_indices": first_half_indices
+                            }
+                            
+                            # 第二部分
+                            second_half_text = " ".join([subtitles[idx]["text"] for idx in second_half_indices])
+                            
+                            # 为第二部分生成新标题
+                            # 对分割后的段落内容进行总结生成标题
+                            try:
+                                # 尝试使用生成标题的函数
+                                second_half_title = generate_title_traditional(second_half_text, max_words=4)
+                                # 确保标题不为空
+                                if not second_half_title or len(second_half_title) < 2:
+                                    # 如果生成失败，使用文本的前几个字
+                                    words = re.sub(r'[\s\n]+', '', second_half_text[:20])
+                                    second_half_title = words[:8]
+                            except Exception as e:
+                                logger.error(f"生成第二部分标题时出错: {str(e)}")
+                                # 出错时使用原标题
+                                second_half_title = segment["title"]
+                                
+                            # 确保标题不超过8个字符
+                            if len(second_half_title) > 8:
+                                second_half_title = second_half_title[:8]
+                            
+                            second_half = {
+                                "start_time": subtitles[second_half_indices[0]]["start_time"],
+                                "end_time": subtitles[second_half_indices[-1]]["end_time"],
+                                "text": second_half_text,
+                                "title": second_half_title,
+                                "original_indices": second_half_indices
+                            }
+                            
+                            adjusted_subtitles.append(first_half)
+                            adjusted_subtitles.append(second_half)
+                            continue
+                
+                # 如果不需要分割或无法分割，直接添加原段落
+                adjusted_subtitles.append(segment)
+            
+            # 更新合并后的字幕列表
+            if len(adjusted_subtitles) > len(merged_subtitles):
+                merged_subtitles = adjusted_subtitles
+                logger.info(f"智能分割完成，调整后的段落数量: {len(merged_subtitles)}")
+            else:
+                logger.warning("无法进行有效的段落分割，保留原始段落")
+        
+        # 如果段落数量仍不符合预期，记录日志
+        if len(merged_subtitles) < target_min or len(merged_subtitles) > target_max:
+            logger.warning(f"最终生成的段落数量({len(merged_subtitles)})不符合目标范围({target_min}-{target_max})")
         
         logger.info(f"Ollama语义分段完成，共{len(merged_subtitles)}个语义段落")
         return merged_subtitles
@@ -607,13 +947,54 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
                 # 短视频提示词 - 根据字幕数量确定分段
                 subtitle_count = len(subtitles)
                 
-                # 根据字幕数量确定段落数量
-                if subtitle_count < 30:
-                    segment_guidance = "2-3个段落"
-                elif subtitle_count < 80:
-                    segment_guidance = "3-5个段落"
-                else:
-                    segment_guidance = "5-8个段落"
+                # 根据字幕数量确定段落数量 - 与Ollama方案保持一致
+                if subtitle_count < 20:  # 字幕很少
+                    target_segments = "2-3"
+                    segment_guidance = f"{target_segments}个段落"
+                elif subtitle_count < 50:  # 字幕较少
+                    target_segments = "4-6"
+                    segment_guidance = f"{target_segments}个段落"
+                elif subtitle_count < 100:  # 字幕中等
+                    target_segments = "10-12"
+                    segment_guidance = f"{target_segments}个段落"
+                elif subtitle_count < 150:  # 字幕较多
+                    target_segments = "15-17"
+                    segment_guidance = f"{target_segments}个段落"
+                elif subtitle_count < 200:  # 字幕很多
+                    target_segments = "20-23"
+                    segment_guidance = f"{target_segments}个段落"
+                elif subtitle_count < 300:  # 字幕非常多
+                    target_segments = "23-27"
+                    segment_guidance = f"{target_segments}个段落"
+                elif subtitle_count < 400:  # 字幕极多
+                    target_segments = "29-32"
+                    segment_guidance = f"{target_segments}个段落"
+                elif subtitle_count < 500:  # 字幕极多
+                    target_segments = "34-38"
+                    segment_guidance = f"{target_segments}个段落"
+                elif subtitle_count < 600:  # 字幕极多
+                    target_segments = "40-43"
+                    segment_guidance = f"{target_segments}个段落"
+                elif subtitle_count < 700:  # 字幕极多
+                    target_segments = "44-48"
+                    segment_guidance = f"{target_segments}个段落"
+                elif subtitle_count < 800:  # 字幕极多
+                    target_segments = "49-53"
+                    segment_guidance = f"{target_segments}个段落"
+                elif subtitle_count < 900:  # 字幕极多
+                    target_segments = "54-58"
+                    segment_guidance = f"{target_segments}个段落"
+                else:  # 字幕数量巨大
+                    target_segments = "60-68"
+                    segment_guidance = f"{target_segments}个段落"
+                
+                # 保存目标段落数量，便于后续处理
+                segment_count = int(target_segments.split("-")[1])
+                
+                # 从目标段落数量中提取具体数字
+                target_min = int(target_segments.split("-")[0])
+                target_max = int(target_segments.split("-")[1])
+                target_avg = (target_min + target_max) // 2  # 取平均值作为目标
                 
                 prompt_template = """请分析以下视频字幕文本，并根据内容的语义连贯性将其分成若干个有意义的段落。
                 
@@ -624,8 +1005,10 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
 1. 根据内容的语义连贯性和主题变化进行分段，而不是简单地按固定间隔分段
 2. 每个段落应该表达一个相对完整的意思或主题
 3. 返回JSON格式的结果，包含每个段落的开始和结束字幕索引
-4. 根据字幕总数（共{subtitle_count}条），应该生成{segment_guidance}，确保每个段落内容连贯
-5. 确保分段是连续的，不要有重叠或遗漏
+4. 【重要】这个视频共有{subtitle_count}条字幕，你必须严格生成{target_avg}个段落（允许误差±2个）
+5. 【重要】请确保生成的段落数量在{target_min}到{target_max}之间，这是硬性要求
+6. 确保分段是连续的，不要有重叠或遗漏
+7. 段落之间的大小应该相对均衡，避免某些段落过大而其他段落过小
 
 返回格式示例：
 ```
@@ -641,8 +1024,13 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
             # 使用安全的方式替换变量
             prompt = prompt_template.replace("{text}", full_text)
             prompt = prompt.replace("{subtitle_count}", str(subtitle_count))
-            prompt = prompt.replace("{segment_count}", segment_count)
-            prompt = prompt.replace("{segment_size}", segment_size) if is_long_video else prompt.replace("{segment_guidance}", segment_guidance)
+            # 只在长视频时才使用segment_count和segment_size
+            if is_long_video:
+                prompt = prompt.replace("{segment_count}", str(segment_count))
+                prompt = prompt.replace("{segment_size}", str(segment_size))
+            else:
+                # 短视频使用segment_guidance
+                prompt = prompt.replace("{segment_guidance}", segment_guidance)
             
             # 调用API
             response = client.chat.completions.create(
@@ -718,7 +1106,9 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
             
         except Exception as e:
             logger.error(f"使用LLM API进行语义分段时出错: {str(e)}")
-            logger.error(f"错误详情: {traceback.format_exc()}")
+            # 确保导入traceback模块
+            import traceback as tb
+            logger.error(f"错误详情: {tb.format_exc()}")
             # 如果LLM API语义分段失败，回退到基于时间的分段方法
             logger.warning("LLM API语义分段失败，回退到基于时间的分段方法")
         
@@ -965,13 +1355,13 @@ def generate_title_with_llm(text):
         )
         
         # 构建提示词
-        prompt_template = """请为以下文本生成一个简短的标题（不超过10个字）：
+        prompt_template = """请为以下文本生成一个简短的标题（不超过8个字符）：
 
 文本内容：
 {text}
 
 要求：
-1. 标题应该简洁明了，不超过10个字
+1. 标题应该简洁明了，不超过8个字符
 2. 标题应该能够准确反映文本的核心内容和主题
 3. 不要使用"关于..."、"论..."等形式
 4. 直接返回标题，不要有任何解释或其他内容"""
@@ -992,9 +1382,9 @@ def generate_title_with_llm(text):
         # 获取生成的标题
         title = response.choices[0].message.content.strip()
         
-        # 如果标题太长，截断它
-        if len(title) > 10:
-            title = title[:10]
+        # 记录生成的标题长度
+        if len(title) > 8:
+            logger.warning(f"生成的标题长度超过8个字符: {title}")
         
         logger.info(f"LLM生成的标题: {title}")
         return title
@@ -1045,13 +1435,13 @@ def generate_title_with_ollama(text):
             return generate_title_traditional(text)
         
         # 构建提示词
-        prompt_template = """请为以下文本生成一个简短的标题（不超过10个字）：
+        prompt_template = """请为以下文本生成一个简短的标题（不超过8个字符）：
 
 文本内容：
 {text}
 
 要求：
-1. 标题应该简洁明了，不超过10个字
+1. 标题应该简洁明了，不超过8个字符
 2. 标题应该能够准确反映文本的核心内容和主题
 3. 不要使用"关于..."、"论..."等形式
 4. 直接返回标题，不要有任何解释或其他内容"""
@@ -1083,9 +1473,9 @@ def generate_title_with_ollama(text):
         # 清理标题，移除可能的引号和多余空格
         title = re.sub(r'^["\'\s]+|["\'\s]+$', '', title)
         
-        # 如果标题太长，截断它
-        if len(title) > 10:
-            title = title[:10]
+        # 记录生成的标题长度
+        if len(title) > 8:
+            logger.warning(f"生成的标题长度超过8个字符: {title}")
         
         logger.info(f"Ollama生成的标题: {title}")
         return title
@@ -1240,6 +1630,14 @@ def merge_subtitles_by_time_intervals(subtitles):
 
 def _fix_json_format(json_str):
     """修复常见的JSON格式错误，如缺少逗号、引号等"""
+    logger = logging.getLogger(__name__)
+    
+    # 记录原始JSON字符串用于调试
+    logger.debug(f"尝试修复JSON格式: {json_str[:100]}...")
+    
+    # 移除行号前缀，如 "15: "end_index": 27" 中的 "15: "
+    json_str = re.sub(r'\s*\d+\s*:\s*"', '"', json_str)
+    
     # 修复缺少逗号的问题
     json_str = re.sub(r'}\s*{', '},{', json_str)
     json_str = re.sub(r'"\s*{', '",{', json_str)
@@ -1253,6 +1651,18 @@ def _fix_json_format(json_str):
     pattern = r'("formatted_text"\s*:\s*"[^"]*")\s*("title"\s*:)'
     json_str = re.sub(pattern, r'\1,\2', json_str)
     
+    # 修复错误的属性名格式 - 例如 "start_index": 13, 14: 25 应改为 "start_index": 13, "end_index": 25
+    json_str = re.sub(r'(\d+)\s*:\s*(\d+)', r'"end_index": \2', json_str)
+    
+    # 修复缺少引号的属性名
+    json_str = re.sub(r'([{,])\s*(\w+)\s*:', r'\1"\2":', json_str)
+    
+    # 修复缺少逗号的属性
+    json_str = re.sub(r'("\w+"\s*:\s*[^{\[,\s][^{\[,]*?)\s*("\w+"\s*:)', r'\1,\2', json_str)
+    
+    # 移除可能存在的行号和冒号格式 (如 "12: " 或 "end_index": 27, 28: "formatted_text")
+    json_str = re.sub(r',\s*\d+\s*:\s*"', ',"', json_str)
+    
     # 确保JSON数组正确关闭
     if not json_str.strip().endswith(']'):
         json_str = json_str.rstrip() + ']'
@@ -1260,5 +1670,8 @@ def _fix_json_format(json_str):
     # 确保JSON数组正确开始
     if not json_str.strip().startswith('['):
         json_str = '[' + json_str.lstrip()
+    
+    # 记录修复后的JSON字符串
+    logger.debug(f"修复后的JSON格式: {json_str[:100]}...")
     
     return json_str

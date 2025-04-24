@@ -592,6 +592,14 @@ def trigger_semantic_merge(video_id):
         video_name = video.filename.rsplit('.', 1)[0] if video.filename else f'video_{video_id}'
         cache_file = os.path.join(cache_dir, f'{video_name}_semantic.json')
         
+        # 如果缓存文件已存在，先删除它
+        if os.path.exists(cache_file):
+            try:
+                os.remove(cache_file)
+                current_app.logger.info(f"已删除现有缓存文件: {cache_file}")
+            except Exception as e:
+                current_app.logger.error(f"删除现有缓存文件时出错: {str(e)}")
+        
         # 调用基于Ollama的语义合并和标题生成函数
         merged_subtitles = merge_subtitles_by_semantics_ollama(subtitles)
         
@@ -599,9 +607,16 @@ def trigger_semantic_merge(video_id):
         
         # 将结果保存到缓存文件
         try:
-            with open(cache_file, 'w', encoding='utf-8') as f:
-                json.dump(merged_subtitles, f, ensure_ascii=False, indent=2)
-            current_app.logger.info(f"语义合并字幕已缓存到: {cache_file}")
+            # 检查合并后的字幕是否为空
+            if not merged_subtitles:
+                current_app.logger.warning("合并后的字幕为空，不写入空数组")
+                # 如果合并后的字幕为空，返回错误
+                return jsonify({"error": "合并字幕失败，结果为空"}), 500
+            else:
+                # 直接覆盖现有缓存文件，不创建备份
+                with open(cache_file, 'w', encoding='utf-8') as f:
+                    json.dump(merged_subtitles, f, ensure_ascii=False, indent=2)
+                current_app.logger.info(f"语义合并字幕已缓存到: {cache_file}")
         except Exception as e:
             current_app.logger.error(f"保存缓存文件时出错: {str(e)}")
             # 保存缓存失败不影响返回结果

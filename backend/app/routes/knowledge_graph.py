@@ -53,13 +53,24 @@ def check_neo4j_connection():
     return True
 
 # 获取知识图谱
-@router.route('/<int:video_id>', methods=['GET'])
+@router.route('/<video_id>', methods=['GET'])
 def get_knowledge_graph(video_id):
     try:
-        # 检查视频是否存在
-        video = Video.query.get(video_id)
-        if not video:
-            return jsonify({'error': '视频不存在'}), 404
+        # 检查是否是合并视频ID（包含下划线）
+        is_combined = '_' in str(video_id)
+        
+        if not is_combined:
+            # 如果不是合并视频，检查视频是否存在于数据库中
+            try:
+                video_id_int = int(video_id)
+                video = Video.query.get(video_id_int)
+                if not video:
+                    return jsonify({'error': '视频不存在'}), 404
+            except ValueError:
+                return jsonify({'error': '无效的视频ID格式'}), 400
+        else:
+            # 合并视频ID格式为 "x_y"，不需要在数据库中查询
+            logger.info(f"正在获取合并视频 {video_id} 的知识图谱")
         
         # 检查Neo4j连接
         if not check_neo4j_connection():
@@ -71,9 +82,6 @@ def get_knowledge_graph(video_id):
         # 如果知识图谱不存在，返回404状态码
         if not graph_data["nodes"]:
             logger.info(f"视频 {video_id} 的知识图谱不存在")
-            
-            # 不再检查数据库中的字幕记录，直接返回404状态码
-            # 字幕文件可能存在于文件系统中，即使数据库中没有记录
             return jsonify({'error': '该视频的知识图谱不存在'}), 404
         
         return jsonify(graph_data)
@@ -320,8 +328,17 @@ def create_knowledge_graph_task(video_id, video_title, subtitle_text, video_tags
         
         if success:
             logger.info(f"视频 {video_id} 的知识图谱生成完成")
-            # 更新任务状态为完成
-            generation_tasks[str(video_id)] = TASK_COMPLETED
+            
+            # 验证知识图谱数据是否真的存在
+            graph_data = kg_manager.get_knowledge_graph(video_id)
+            if graph_data and graph_data["nodes"] and len(graph_data["nodes"]) > 0:
+                logger.info(f"验证成功: 视频 {video_id} 的知识图谱数据存在，包含 {len(graph_data['nodes'])} 个节点")
+                # 更新任务状态为完成
+                generation_tasks[str(video_id)] = TASK_COMPLETED
+            else:
+                logger.error(f"验证失败: 视频 {video_id} 的知识图谱生成标记为成功，但数据不存在")
+                # 更新任务状态为失败
+                generation_tasks[str(video_id)] = TASK_FAILED
         else:
             logger.error(f"视频 {video_id} 的知识图谱生成失败")
             # 更新任务状态为失败

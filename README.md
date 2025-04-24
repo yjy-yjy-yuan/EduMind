@@ -64,6 +64,24 @@ IVS-Flask-Vue/
 
 ## 安装和运行
 
+### 启动前需要修改的信息
+- 1. 修改backend\app\utils\knowledge_graph_utils.py中的class KnowledgeGraphManager类中的__init__的neo4j数据库信息为自己的信息。比如，我这里是：
+```python
+def __init__(self, uri="bolt://localhost:7687", user="neo4j", password="cjx20040328", similarity_service=None):
+```
+
+- 2. 修改backend\app\routes\knowledge_graph.py中的kg_manager = KnowledgeGraphManager()中的neo4j数据库信息也修改为自己的信息。比如，我这里是：
+```python
+# 创建知识图谱管理器实例
+kg_manager = KnowledgeGraphManager(
+    uri="bolt://localhost:7687",
+    user="neo4j",
+    password="cjx20040328"
+)
+```
+
+- 3. 
+
 ### 启动 Redis
 ```bash
 # 终端中进行
