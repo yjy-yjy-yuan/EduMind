@@ -185,36 +185,21 @@
       <p v-if="selectedNode.description">{{ selectedNode.description }}</p>
       <div class="knowledge-actions">
         <h4>您想要：</h4>
-        <el-button type="primary" @click="navigateToVideo">
-          学习当前视频中的该知识点
-        </el-button>
-        <el-button type="success" @click="findBasicVideos" :loading="isSearchingBasic">
-          查看该知识点的基础讲解
-        </el-button>
-        <el-button type="warning" @click="findAdvancedVideos" :loading="isSearchingAdvanced">
-          深入研究该系列知识
-        </el-button>
+        <!-- 视频节点只显示查看当前视频按钮 -->
+        <template v-if="selectedNode.type === 'video'">
+          <el-button type="primary" @click="navigateToVideo">
+            查看当前视频
+          </el-button>
+        </template>
+        <!-- 非视频节点显示所有选项 -->
+        <template v-else>
+          <el-button type="primary" @click="navigateToVideo">
+            学习当前视频中的该知识点
+          </el-button>
+        </template>
       </div>
       
-      <!-- 搜索结果展示 -->
-      <div v-if="searchResults.length > 0" class="search-results">
-        <h4>相关视频：</h4>
-        <el-table :data="searchResults" style="width: 100%">
-          <el-table-column prop="title" label="标题" width="300" />
-          <el-table-column prop="source" label="来源" width="100" />
-          <el-table-column prop="duration" label="时长" width="100" />
-          <el-table-column label="操作">
-            <template #default="scope">
-              <el-button type="primary" size="small" @click="openVideo(scope.row.url)">
-                查看
-              </el-button>
-              <el-button type="success" size="small" @click="downloadVideo(scope.row.url)">
-                下载
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
+
     </div>
   </el-dialog>
 </template>
@@ -239,9 +224,7 @@ let checkFailCount = 0 // 检查失败次数
 const graphContainer = ref(null)
 const dialogVisible = ref(false)
 const selectedNode = ref({})
-const searchResults = ref([])
-const isSearchingBasic = ref(false)
-const isSearchingAdvanced = ref(false)
+
 
 // 知识图谱生成步骤跟踪
 const currentStep = ref(0) // 0: 视频分析, 1: 知识提取, 2: 图谱构建, 3: 完成渲染
@@ -1230,142 +1213,103 @@ const renderGraph = () => {
 const handleNodeClick = (event, d) => {
   selectedNode.value = d
   dialogVisible.value = true
-  searchResults.value = []
 }
 
 // 导航到视频
-const navigateToVideo = () => {
-  if (!selectedNode.value.videoId || !selectedNode.value.timestamp) {
-    ElMessage.warning('无法定位到视频中的知识点')
+const navigateToVideo = async () => {
+  // 处理视频节点的情况
+  if (selectedNode.value.type === 'video') {
+    // 对于视频节点，直接使用节点的id作为视频id
+    const videoId = selectedNode.value.id ? selectedNode.value.id.replace('video-', '') : null;
+    
+    if (!videoId) {
+      ElMessage.warning('无法找到视频信息')
+      return
+    }
+    
+    router.push({
+      path: `/player/${videoId}`
+    })
+    
+    dialogVisible.value = false
     return
   }
   
-  router.push({
+  // 判断是否是一级知识点
+  const isPrimaryKnowledge = selectedNode.value.type === 'primary_concept' || 
+                            selectedNode.value.isPrimaryKnowledge || 
+                            (selectedNode.value.itemStyle && selectedNode.value.itemStyle.color === '#3B82F6');
+  
+  // 处理知识点节点的情况
+  if (!selectedNode.value.videoId) {
+    // 尝试从节点的其他属性中获取视频ID
+    if (selectedNode.value.source_video_id) {
+      selectedNode.value.videoId = selectedNode.value.source_video_id;
+    } else {
+      ElMessage.warning('无法找到知识点对应的视频')
+      return
+    }
+  }
+  
+  // 如果是一级知识点，生成相关问题
+  let generatedQuestion = null;
+  if (isPrimaryKnowledge) {
+    try {
+      // 显示加载中提示
+      ElMessage.info('正在生成相关学习问题...');
+      
+      // 调用后端生成问题的API
+      const response = await fetch('/api/knowledge-graph/generate-questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          concept: selectedNode.value.label,
+          context: selectedNode.value.description || '',
+          count: 3,  // 生成3个问题
+          use_ollama: true  // 默认使用离线模式
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.questions && data.questions.length > 0) {
+          // 随机选择一个问题
+          const randomIndex = Math.floor(Math.random() * data.questions.length);
+          generatedQuestion = data.questions[randomIndex];
+          
+          // 将其他问题保存到localStorage，供用户后续使用
+          const otherQuestions = data.questions.filter((_, index) => index !== randomIndex);
+          localStorage.setItem(`concept_questions_${selectedNode.value.videoId}_${selectedNode.value.label}`, JSON.stringify(otherQuestions));
+        }
+      } else {
+        console.error('生成问题失败:', await response.text());
+      }
+    } catch (error) {
+      console.error('生成问题时出错:', error);
+    }
+  }
+  
+  // 将生成的问题添加到路由参数中
+  const routeParams = {
     path: `/player/${selectedNode.value.videoId}`,
-    query: { t: selectedNode.value.timestamp }
-  })
+    query: {}
+  };
   
-  dialogVisible.value = false
-}
-
-// 查找基础讲解视频
-const findBasicVideos = async () => {
-  if (!selectedNode.value || !selectedNode.value.label) {
-    ElMessage.warning('请先选择一个知识点')
-    return
+  // 如果有时间戳，添加到查询参数中
+  if (selectedNode.value.timestamp) {
+    routeParams.query.t = selectedNode.value.timestamp;
   }
   
-  try {
-    isSearchingBasic.value = true
-    searchResults.value = []
-    
-    // 调用后端API搜索基础讲解视频
-    const response = await fetch('/api/knowledge-graph/search-videos', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        keyword: selectedNode.value.label,
-        type: 'basic'
-      })
-    })
-    
-    if (!response.ok) {
-      throw new Error('搜索视频失败')
-    }
-    
-    const result = await response.json()
-    searchResults.value = result.videos || []
-    
-    if (searchResults.value.length === 0) {
-      ElMessage.info('未找到相关视频')
-    }
-  } catch (error) {
-    console.error('搜索基础视频失败:', error)
-    ElMessage.error('搜索基础视频失败')
-  } finally {
-    isSearchingBasic.value = false
-  }
-}
-
-// 查找进阶视频
-const findAdvancedVideos = async () => {
-  if (!selectedNode.value || !selectedNode.value.label) {
-    ElMessage.warning('请先选择一个知识点')
-    return
+  // 如果有生成的问题，添加到查询参数中
+  if (generatedQuestion) {
+    routeParams.query.auto_question = generatedQuestion;
   }
   
-  try {
-    isSearchingAdvanced.value = true
-    searchResults.value = []
-    
-    // 获取相关知识点
-    const relatedNodes = graphData.value.links
-      .filter(link => link.source === selectedNode.value.id || link.target === selectedNode.value.id)
-      .map(link => {
-        const relatedId = link.source === selectedNode.value.id ? link.target : link.source
-        return graphData.value.nodes.find(node => node.id === relatedId)
-      })
-      .filter(node => node)
-      .map(node => node.label)
-    
-    // 调用后端API搜索进阶视频
-    const response = await fetch('/api/knowledge-graph/search-videos', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        keyword: selectedNode.value.label,
-        type: 'advanced',
-        expanded: relatedNodes
-      })
-    })
-    
-    if (!response.ok) {
-      throw new Error('搜索视频失败')
-    }
-    
-    const result = await response.json()
-    searchResults.value = result.videos || []
-    
-    if (searchResults.value.length === 0) {
-      ElMessage.info('未找到相关视频')
-    }
-  } catch (error) {
-    console.error('搜索进阶视频失败:', error)
-    ElMessage.error('搜索进阶视频失败')
-  } finally {
-    isSearchingAdvanced.value = false
-  }
-}
-
-// 打开视频
-const openVideo = (url) => {
-  window.open(url, '_blank')
-}
-
-// 下载视频
-const downloadVideo = async (url) => {
-  try {
-    const response = await fetch(`/api/videos/download-external`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ url })
-    })
-    
-    if (!response.ok) {
-      throw new Error('下载请求失败')
-    }
-    
-    ElMessage.success('视频下载请求已提交，请在视频管理页面查看进度')
-  } catch (error) {
-    console.error('下载视频失败:', error)
-    ElMessage.error('下载视频失败')
-  }
+  router.push(routeParams);
+  
+  dialogVisible.value = false;
 }
 
 // 缩放控制
@@ -1545,16 +1489,7 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
-.search-results {
-  margin-top: 20px;
-  border-top: 1px solid var(--border-color);
-  padding-top: 20px;
-}
 
-.search-results h4 {
-  margin-bottom: 10px;
-  color: var(--text-secondary);
-}
 
 /* 响应式设计 */
 @media (max-width: 768px) {

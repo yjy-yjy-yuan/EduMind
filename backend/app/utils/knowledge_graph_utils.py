@@ -1771,105 +1771,11 @@ class KnowledgeGraphManager:
             logger.error(traceback.format_exc())
             return []
             
-    async def search_related_videos(self, keyword: str, video_type: str, expanded: List[str] = None) -> List[Dict[str, Any]]:
-        """搜索相关视频
-        
-        Args:
-            keyword: 关键词
-            video_type: 视频类型，'basic'或'advanced'
-            expanded: 扩展知识点列表
+
             
-        Returns:
-            相关视频列表
-        """
-        try:
-            # 构建搜索关键词
-            if video_type == "basic":
-                # 基础讲解搜索
-                search_query = f"{keyword} 基础 教程"
-            else:
-                # 进阶搜索，结合扩展知识点
-                expanded_terms = " ".join(expanded[:3]) if expanded else ""
-                search_query = f"{keyword} {expanded_terms} 进阶 深入"
+
             
-            # 搜索B站视频
-            bilibili_videos = await self.search_bilibili_videos(search_query)
-            
-            # 搜索YouTube视频
-            youtube_videos = await self.search_youtube_videos(search_query)
-            
-            # 合并结果并限制数量
-            all_videos = bilibili_videos + youtube_videos
-            result_videos = all_videos[:5]  # 最多返回5个视频
-            
-            return result_videos
-            
-        except Exception as e:
-            logger.error(f"搜索视频失败: {str(e)}")
-            logger.error(traceback.format_exc())
-            return []
-            
-    async def search_bilibili_videos(self, keyword: str) -> List[Dict[str, Any]]:
-        """搜索B站视频
-        
-        Args:
-            keyword: 关键词
-            
-        Returns:
-            B站视频列表
-        """
-        try:
-            # 模拟B站搜索API调用
-            # 实际实现中应该使用B站的API
-            # 这里使用模拟数据
-            return [
-                {
-                    "title": f"{keyword} - B站教程1",
-                    "url": f"https://www.bilibili.com/video/BV1xx411c7mD",
-                    "source": "哔哩哔哩",
-                    "duration": "10:30"
-                },
-                {
-                    "title": f"{keyword} - B站教程2",
-                    "url": f"https://www.bilibili.com/video/BV1xx411c7mE",
-                    "source": "哔哩哔哩",
-                    "duration": "15:45"
-                }
-            ]
-        except Exception as e:
-            logger.error(f"搜索B站视频失败: {str(e)}")
-            return []
-            
-    async def search_youtube_videos(self, keyword: str) -> List[Dict[str, Any]]:
-        """搜索YouTube视频
-        
-        Args:
-            keyword: 关键词
-            
-        Returns:
-            YouTube视频列表
-        """
-        try:
-            # 模拟YouTube搜索API调用
-            # 实际实现中应该使用YouTube的API
-            # 这里使用模拟数据
-            return [
-                {
-                    "title": f"{keyword} - YouTube Tutorial 1",
-                    "url": f"https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                    "source": "YouTube",
-                    "duration": "8:20"
-                },
-                {
-                    "title": f"{keyword} - YouTube Tutorial 2",
-                    "url": f"https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-                    "source": "YouTube",
-                    "duration": "12:15"
-                }
-            ]
-        except Exception as e:
-            logger.error(f"搜索YouTube视频失败: {str(e)}")
-            return []
+
 
     def is_combined_video(self, video_id) -> bool:
         """检查视频是否是合并视频
@@ -1950,3 +1856,5 @@ class KnowledgeGraphManager:
             return None
         finally:
             self.close()
+            
+

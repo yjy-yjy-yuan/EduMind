@@ -12,6 +12,7 @@ export default defineConfig({
   },
   publicDir: 'public',  // 明确指定 public 目录
   server: {
+    host: true,  // ✅ 添加此行，允许网络访问
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:5001',

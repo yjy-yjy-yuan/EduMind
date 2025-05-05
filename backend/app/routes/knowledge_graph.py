@@ -388,37 +388,159 @@ def get_knowledge_graph_status(video_id):
         return jsonify({'error': f'获取知识图谱生成状态失败: {str(e)}'}), 500
 
 # 搜索相关视频
-@router.route('/search-videos', methods=['POST'])
-def search_videos():
+
+
+
+# 生成与知识点相关的问题
+@router.route('/generate-questions', methods=['POST'])
+def generate_questions():
     try:
         # 获取请求数据
         data = request.get_json()
         if not data:
             return jsonify({'error': '请求数据格式错误'}), 400
             
-        keyword = data.get('keyword')
-        video_type = data.get('type')
-        expanded = data.get('expanded', [])
+        concept = data.get('concept')
+        context = data.get('context', '')
+        count = data.get('count', 3)  # 默认生成3个问题
         
-        if not keyword:
-            return jsonify({'error': '关键词不能为空'}), 400
+        if not concept:
+            return jsonify({'error': '知识点不能为空'}), 400
+        
+        # 使用LLM生成问题
+        try:
+            # 检查是否使用Ollama
+            use_ollama = data.get('use_ollama', True)
             
-        # 使用知识图谱管理器搜索相关视频
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        videos = loop.run_until_complete(kg_manager.search_related_videos(
-            keyword=keyword,
-            video_type=video_type,
-            expanded=expanded
-        ))
-        loop.close()
-        
-        return jsonify({"videos": videos})
-        
+            if use_ollama:
+                # 使用Ollama生成问题
+                from app.utils.semantic_utils import is_ollama_available
+                
+                if not is_ollama_available():
+                    logger.warning("Ollama服务不可用，将使用在线API")
+                    use_ollama = False
+            
+            if use_ollama:
+                # 使用本地Ollama服务
+                import requests
+                
+                prompt = f"""
+                基于以下知识点，生成{count}个用户可能想要学习或询问的问题。这些问题应该帮助用户更好地理解这个知识点。
+                只返回问题列表，每个问题应该简洁明了，格式为JSON数组。
+                
+                知识点: {concept}
+                背景信息: {context}
+                """
+                
+                response = requests.post(
+                    "http://localhost:11434/api/generate",
+                    json={
+                        "model": "qwen2.5:7b",
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {"temperature": 0.7}
+                    },
+                    timeout=30
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    response_text = result.get('response', '')
+                    
+                    # 尝试提取JSON数组
+                    import re
+                    import json
+                    
+                    # 查找可能的JSON数组
+                    json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+                    if json_match:
+                        try:
+                            questions = json.loads(json_match.group())
+                            return jsonify({"questions": questions})
+                        except json.JSONDecodeError:
+                            # 如果JSON解析失败，尝试使用正则表达式提取问题
+                            pass
+                    
+                    # 如果没有找到JSON或解析失败，使用正则表达式提取问题
+                    questions = re.findall(r'\d+\.\s*(.+?)(?=\d+\.\s*|$)', response_text, re.DOTALL)
+                    if not questions:
+                        questions = response_text.split('\n')
+                        questions = [q.strip() for q in questions if q.strip() and '?' in q]
+                    
+                    # 清理问题文本
+                    questions = [q.strip().strip('"').strip() for q in questions]
+                    questions = [q for q in questions if q and len(q) > 5]  # 过滤太短的问题
+                    
+                    # 限制问题数量
+                    questions = questions[:count]
+                    
+                    return jsonify({"questions": questions})
+                else:
+                    logger.error(f"Ollama请求失败: {response.status_code} {response.text}")
+                    raise Exception(f"Ollama请求失败: {response.status_code}")
+            else:
+                # 使用在线API
+                from openai import OpenAI
+                
+                client = OpenAI(
+                    api_key="sk-178e130a121445659860893fdfae1e7d",
+                    base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+                )
+                
+                response = client.chat.completions.create(
+                    model="qwen-max",
+                    messages=[
+                        {"role": "system", "content": "你是一个教育助手，负责生成与特定知识点相关的学习问题。"},
+                        {"role": "user", "content": f"基于以下知识点，生成{count}个用户可能想要学习或询问的问题。这些问题应该帮助用户更好地理解这个知识点。只返回问题列表，每个问题应该简洁明了，格式为JSON数组。\n\n知识点: {concept}\n背景信息: {context}"}
+                    ],
+                    temperature=0.7
+                )
+                
+                response_text = response.choices[0].message.content
+                
+                # 尝试提取JSON数组
+                import re
+                import json
+                
+                # 查找可能的JSON数组
+                json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+                if json_match:
+                    try:
+                        questions = json.loads(json_match.group())
+                        return jsonify({"questions": questions})
+                    except json.JSONDecodeError:
+                        # 如果JSON解析失败，尝试使用正则表达式提取问题
+                        pass
+                
+                # 如果没有找到JSON或解析失败，使用正则表达式提取问题
+                questions = re.findall(r'\d+\.\s*(.+?)(?=\d+\.\s*|$)', response_text, re.DOTALL)
+                if not questions:
+                    questions = response_text.split('\n')
+                    questions = [q.strip() for q in questions if q.strip() and '?' in q]
+                
+                # 清理问题文本
+                questions = [q.strip().strip('"').strip() for q in questions]
+                questions = [q for q in questions if q and len(q) > 5]  # 过滤太短的问题
+                
+                # 限制问题数量
+                questions = questions[:count]
+                
+                return jsonify({"questions": questions})
+                
+        except Exception as e:
+            logger.error(f"生成问题失败: {str(e)}")
+            logger.error(traceback.format_exc())
+            
+            # 如果LLM生成失败，返回一些默认问题
+            default_questions = [
+                f"什么是{concept}？",
+                f"{concept}的主要特点是什么？",
+                f"{concept}在实际应用中有哪些例子？"
+            ]
+            return jsonify({"questions": default_questions[:count]})
+            
     except Exception as e:
-        logger.error(f"搜索视频失败: {str(e)}")
+        logger.error(f"生成问题API失败: {str(e)}")
         logger.error(traceback.format_exc())
-        return jsonify({'error': f'搜索视频失败: {str(e)}'}), 500
-
+        return jsonify({'error': f'生成问题失败: {str(e)}'}), 500
 

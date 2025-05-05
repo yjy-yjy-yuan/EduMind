@@ -42,10 +42,9 @@
           <div class="tutorial-header">
             <div class="tutorial-header-left">
               <div class="tutorial-icon-wrapper">
-                <i class="el-icon-user"></i>
+                <div class="tutorial-order">01</div>
               </div>
               <div class="tutorial-title-container">
-                <div class="tutorial-order">01</div>
                 <h3 class="tutorial-title">登录/注册</h3>
               </div>
             </div>
@@ -85,10 +84,9 @@
           <div class="tutorial-header">
             <div class="tutorial-header-left">
               <div class="tutorial-icon-wrapper">
-                <i class="el-icon-upload"></i>
+                <div class="tutorial-order">02</div>
               </div>
               <div class="tutorial-title-container">
-                <div class="tutorial-order">02</div>
                 <h3 class="tutorial-title">视频上传与分析</h3>
               </div>
             </div>
@@ -127,10 +125,9 @@
           <div class="tutorial-header">
             <div class="tutorial-header-left">
               <div class="tutorial-icon-wrapper">
-                <i class="el-icon-video-play"></i>
+                <div class="tutorial-order">03</div>
               </div>
               <div class="tutorial-title-container">
-                <div class="tutorial-order">03</div>
                 <h3 class="tutorial-title">视频播放</h3>
               </div>
             </div>
@@ -169,10 +166,9 @@
           <div class="tutorial-header">
             <div class="tutorial-header-left">
               <div class="tutorial-icon-wrapper">
-                <i class="el-icon-chat-dot-round"></i>
+                <div class="tutorial-order">04</div>
               </div>
               <div class="tutorial-title-container">
-                <div class="tutorial-order">04</div>
                 <h3 class="tutorial-title">智能问答与字幕查看</h3>
               </div>
             </div>
@@ -208,10 +204,9 @@
           <div class="tutorial-header">
             <div class="tutorial-header-left">
               <div class="tutorial-icon-wrapper">
-                <i class="el-icon-notebook-1"></i>
+                <div class="tutorial-order">05</div>
               </div>
               <div class="tutorial-title-container">
-                <div class="tutorial-order">05</div>
                 <h3 class="tutorial-title">笔记系统辅助学习</h3>
               </div>
             </div>
@@ -250,10 +245,9 @@
           <div class="tutorial-header">
             <div class="tutorial-header-left">
               <div class="tutorial-icon-wrapper">
-                <i class="el-icon-data-line"></i>
+                <div class="tutorial-order">06</div>
               </div>
               <div class="tutorial-title-container">
-                <div class="tutorial-order">06</div>
                 <h3 class="tutorial-title">知识点总览与扩展</h3>
               </div>
             </div>
@@ -478,11 +472,11 @@ export default {
     const navigateToVideos = () => {
       isLoading.value = true
       showToast.value = true
-      toastMessage.value = '正在前往视频列表...'
+      toastMessage.value = '正在前往知识图谱页面...'
       // 模拟加载过程
       setTimeout(() => {
         isLoading.value = false
-        router.push('/video/upload') // 修改为与navigateToUpload相同的路由
+        router.push('/knowledge') // 修改为知识图谱路由
       }, 800)
       // 2秒后隐藏提示
       setTimeout(() => {
@@ -832,7 +826,7 @@ section {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: #ffb6c1; /* 浅粉色背景 */
   display: flex;
   justify-content: center;
   align-items: center;
@@ -840,9 +834,13 @@ section {
   flex-shrink: 0;
 }
 
-.tutorial-icon-wrapper i {
-  color: white;
+.tutorial-order {
   font-size: 1.5rem;
+  font-weight: 700;
+  color: white; /* 白色文字 */
+  margin: 0; /* 移除外边距确保居中 */
+  text-align: center; /* 文本居中 */
+  line-height: 50px; /* 与容器高度相同，垂直居中 */
 }
 
 .tutorial-title-container {
@@ -850,13 +848,7 @@ section {
   align-items: center;
 }
 
-.tutorial-order {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #667eea;
-  margin-right: 0.75rem;
-  opacity: 0.8;
-}
+/* .tutorial-order 样式已移至上方与 .tutorial-icon-wrapper 一起定义 */
 
 .tutorial-title {
   font-size: 1.5rem;

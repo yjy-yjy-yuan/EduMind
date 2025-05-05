@@ -9,7 +9,10 @@ import re
 import os
 import json
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import traceback
+import time
 from openai import OpenAI
 
 # 直接使用固定的API密钥（与chat_system.py保持一致）
@@ -20,11 +23,37 @@ OPENAI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 OLLAMA_BASE_URL = "http://localhost:11434/api"
 OLLAMA_MODEL = "qwen2.5:7b"  # 默认使用qwen2.5:7b模型，可以根据需要更改
 
+# Ollama请求配置
+OLLAMA_REQUEST_TIMEOUT = 180  # 请求超时时间（秒）
+OLLAMA_MAX_RETRIES = 3  # 最大重试次数
+OLLAMA_RETRY_BACKOFF = 1.5  # 重试间隔倍数
+OLLAMA_MAX_WORKERS = 2  # 并发处理的最大工作线程数
+
+# 创建带有重试机制的会话
+def create_retry_session(retries=OLLAMA_MAX_RETRIES, backoff_factor=OLLAMA_RETRY_BACKOFF, 
+                        status_forcelist=[408, 429, 500, 502, 503, 504]):
+    """创建带有重试机制的请求会话"""
+    session = requests.Session()
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+        allowed_methods=["GET", "POST"]
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+
 def check_ollama_service():
     """检查Ollama服务是否可用"""
     logger = logging.getLogger(__name__)
     try:
-        response = requests.get(f"{OLLAMA_BASE_URL}/tags", timeout=5)
+        # 使用带重试机制的会话，但设置较短的超时时间和较少的重试次数
+        session = create_retry_session(retries=1, backoff_factor=0.5)
+        response = session.get(f"{OLLAMA_BASE_URL}/tags", timeout=10)
         if response.status_code == 200:
             logger.info("Ollama服务正在运行")
             return True
@@ -40,7 +69,7 @@ def is_ollama_available():
     return check_ollama_service()
 
 def process_long_video_subtitles(subtitles):
-    """分块处理长视频字幕"""
+    """分块处理长视频字幕，使用优化的并发和重试机制"""
     logger = logging.getLogger(__name__)
     logger.info("开始分块处理长视频字幕")
     
@@ -59,20 +88,79 @@ def process_long_video_subtitles(subtitles):
     # 导入并行处理模块
     import concurrent.futures
     
-    # 使用线程池并行处理字幕块，减少并发数量以减载Ollama服务
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    # 使用并发队列来控制并发数量
+    from queue import Queue
+    task_queue = Queue()
+    
+    # 将字幕分块并添加到任务队列
+    chunks = []
+    for i in range(0, len(subtitles), chunk_size):
+        end_idx = min(i + chunk_size, len(subtitles))
+        chunk = subtitles[i:end_idx]
+        chunks.append((i, end_idx-1, chunk))
+    
+    # 根据字幕块数量动态调整并发线程数
+    num_chunks = len(chunks)
+    max_workers = min(OLLAMA_MAX_WORKERS, num_chunks)  # 不超过块数
+    
+    logger.info(f"共{num_chunks}个字幕块，使用{max_workers}个并发线程处理")
+    
+    # 定义处理单个字幕块的函数，包含重试机制
+    def process_chunk_with_retry(start_idx, end_idx, chunk, max_retries=OLLAMA_MAX_RETRIES):
+        chunk_desc = f"{start_idx}-{end_idx}"
+        logger.info(f"开始处理字幕块 {chunk_desc}，共{len(chunk)}条字幕")
+        
+        retries = 0
+        while retries <= max_retries:
+            try:
+                # 在重试前添加随机延迟，避免并发请求对服务器的压力
+                if retries > 0:
+                    # 指数退避策略，每次重试等待时间增加
+                    wait_time = OLLAMA_RETRY_BACKOFF ** retries
+                    logger.info(f"字幕块 {chunk_desc} 第{retries}次重试，等待{wait_time:.2f}秒")
+                    time.sleep(wait_time)
+                
+                # 处理字幕块
+                result = merge_subtitles_by_semantics_ollama(chunk)
+                
+                if result:
+                    # 调整每个段落的索引以反映其在原始字幕中的位置
+                    for segment in result:
+                        if 'original_indices' in segment:
+                            # 将块内索引转换为全局索引
+                            segment['original_indices'] = [idx + start_idx for idx in segment['original_indices']]
+                    
+                    logger.info(f"字幕块 {chunk_desc} 处理成功，生成了 {len(result)} 个段落")
+                    return result
+                else:
+                    logger.warning(f"字幕块 {chunk_desc} 处理结果为空，尝试重试")
+                    retries += 1
+            except Exception as e:
+                logger.error(f"字幕块 {chunk_desc} 处理失败: {str(e)}")
+                retries += 1
+                if retries > max_retries:
+                    logger.error(f"字幕块 {chunk_desc} 超过最大重试次数，将使用备用方法")
+                    # 如果超过最大重试次数，尝试使用备用方法
+                    try:
+                        logger.info(f"字幕块 {chunk_desc} 尝试使用备用方法")
+                        return merge_subtitles_by_semantics(chunk)
+                    except Exception as backup_e:
+                        logger.error(f"字幕块 {chunk_desc} 备用方法也失败: {str(backup_e)}")
+                        return None
+        
+        # 如果所有重试都失败，返回None
+        return None
+    
+    # 使用线程池并行处理字幕块
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         # 准备任务列表
         future_to_chunk = {}
         
         # 提交所有任务到线程池
-        for i in range(0, len(subtitles), chunk_size):
-            end_idx = min(i + chunk_size, len(subtitles))
-            chunk = subtitles[i:end_idx]
-            
-            logger.info(f"提交字幕块 {i}-{end_idx-1} 到线程池，共{len(chunk)}条字幕")
-            # 使用标准的字幕处理函数处理每个字幕块，而不是使用专门为分块设计的函数
-            future = executor.submit(merge_subtitles_by_semantics_ollama, chunk)
-            future_to_chunk[future] = (i, end_idx-1)
+        for i, end_idx, chunk in chunks:
+            logger.info(f"提交字幕块 {i}-{end_idx} 到线程池，共{len(chunk)}条字幕")
+            future = executor.submit(process_chunk_with_retry, i, end_idx, chunk)
+            future_to_chunk[future] = (i, end_idx)
         
         # 收集结果
         for future in concurrent.futures.as_completed(future_to_chunk):
@@ -80,20 +168,10 @@ def process_long_video_subtitles(subtitles):
             try:
                 chunk_results = future.result()
                 if chunk_results:
-                    # 调整每个段落的索引以反映其在原始字幕中的位置
-                    for segment in chunk_results:
-                        if 'original_indices' in segment:
-                            # 将块内索引转换为全局索引
-                            segment['original_indices'] = [idx + chunk_range[0] for idx in segment['original_indices']]
-                    
                     all_results.extend(chunk_results)
                     logger.info(f"字幕块 {chunk_range[0]}-{chunk_range[1]} 处理完成，生成了 {len(chunk_results)} 个段落")
                 else:
-                    logger.warning(f"字幕块 {chunk_range[0]}-{chunk_range[1]} 处理结果为空，使用备用方法处理")
-                    # 如果块处理结果为空，使用备用方法处理该块
-                    start_idx = chunk_range[0]
-                    end_idx = chunk_range[1] + 1  # 范围是闭区间
-                    chunk = subtitles[start_idx:end_idx]
+                    logger.warning(f"字幕块 {chunk_range[0]}-{chunk_range[1]} 处理结果为空")
                     backup_results = process_subtitle_chunk_backup(chunk, start_idx)
                     
                     # 调整每个段落的索引以反映其在原始字幕中的位置
@@ -1226,7 +1304,7 @@ def merge_subtitles_by_semantics(subtitles, distance_threshold=0.5):
         return []
 
 def format_text_with_ollama(text):
-    """使用Ollama为文本添加适当的标点符号"""
+    """使用Ollama为文本添加适当的标点符号，并使用重试机制"""
     logger = logging.getLogger(__name__)
     
     # 如果文本为空，直接返回
@@ -1248,39 +1326,72 @@ def format_text_with_ollama(text):
         # 替换变量
         prompt = prompt_template.replace("{text}", text)
         
-        # 调用Ollama API
-        try:
-            response = requests.post(
-                OLLAMA_BASE_URL + "/generate",
-                json={
-                    "model": OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.3
-                    }
-                }
-            )
+        # 创建带重试机制的会话
+        session = create_retry_session()
+        
+        # 定义重试函数
+        def call_ollama_with_retry(max_retries=OLLAMA_MAX_RETRIES):
+            retries = 0
+            while retries <= max_retries:
+                try:
+                    # 在重试前添加随机延迟
+                    if retries > 0:
+                        wait_time = OLLAMA_RETRY_BACKOFF ** retries
+                        logger.info(f"格式化文本第{retries}次重试，等待{wait_time:.2f}秒")
+                        time.sleep(wait_time)
+                    
+                    # 调用Ollama API
+                    response = session.post(
+                        OLLAMA_BASE_URL + "/generate",
+                        json={
+                            "model": OLLAMA_MODEL,
+                            "prompt": prompt,
+                            "stream": False,
+                            "options": {
+                                "temperature": 0.3
+                            }
+                        },
+                        timeout=OLLAMA_REQUEST_TIMEOUT  # 使用配置的超时时间
+                    )
+                    
+                    if response.status_code != 200:
+                        logger.error(f"Ollama API调用失败: {response.status_code} {response.text}")
+                        retries += 1
+                        continue
+                    
+                    # 获取响应文本
+                    formatted_text = response.json().get("response", "").strip()
+                    
+                    # 如果返回为空，重试
+                    if not formatted_text:
+                        logger.warning("Ollama返回的格式化文本为空，尝试重试")
+                        retries += 1
+                        continue
+                    
+                    logger.info("成功使用Ollama添加标点符号")
+                    return formatted_text
+                    
+                except Exception as e:
+                    logger.error(f"使用Ollama添加标点符号时出错: {str(e)}")
+                    retries += 1
+                    if retries > max_retries:
+                        logger.error(f"超过最大重试次数，将使用原始文本")
+                        return None
             
-            if response.status_code != 200:
-                logger.error(f"Ollama API调用失败: {response.status_code} {response.text}")
-                raise Exception(f"Ollama API调用失败: {response.status_code}")
-            
-            # 获取响应文本
-            formatted_text = response.json().get("response", "").strip()
-            
-            # 如果返回为空，使用原始文本
-            if not formatted_text:
-                logger.warning("Ollama返回的格式化文本为空，使用原始文本")
+            return None
+        
+        # 调用重试函数
+        result = call_ollama_with_retry()
+        if result:
+            return result
+        else:
+            # 如果Ollama失败，尝试使用备用方法
+            logger.info("尝试使用备用方法格式化文本")
+            try:
+                return format_text_with_llm(text)
+            except Exception as e:
+                logger.error(f"备用格式化方法也失败: {str(e)}")
                 return text
-            
-            logger.info("成功使用Ollama添加标点符号")
-            return formatted_text
-            
-        except Exception as e:
-            logger.error(f"使用Ollama添加标点符号时出错: {str(e)}")
-            # 出错时使用原始文本
-            return text
     except Exception as e:
         logger.error(f"格式化文本时出错: {str(e)}")
         return text
@@ -1422,79 +1533,121 @@ def generate_title_traditional(text, max_words=4):
         return text[:10] + '...' if len(text) > 10 else text
 
 def generate_title_with_ollama(text):
-    """使用Ollama模型生成标题"""
+    """使用Ollama模型生成标题，并使用重试机制"""
     logger = logging.getLogger(__name__)
     
-    if not text or len(text) < 5:
-        return text
+    # 如果文本为空，返回默认标题
+    if not text or text.strip() == "":
+        return "无标题"
     
     try:
-        # 首先检查Ollama服务是否可用
-        if not check_ollama_service():
-            logger.warning("Ollama服务不可用，回退到传统标题生成方法")
-            return generate_title_traditional(text)
+        # 如果文本过长，截取前面的部分
+        if len(text) > 1000:
+            text = text[:1000] + "..."
         
         # 构建提示词
-        prompt_template = """请为以下文本生成一个简短的标题（不超过8个字符）：
+        prompt_template = """请为以下文本生成一个简短的标题（不超过10个字），标题应准确反映文本的主要内容和主题：
 
-文本内容：
 {text}
 
 要求：
-1. 标题应该简洁明了，不超过8个字符
-2. 标题应该能够准确反映文本的核心内容和主题
-3. 不要使用"关于..."、"论..."等形式
-4. 直接返回标题，不要有任何解释或其他内容"""
+1. 标题应简洁明确，不超过10个字
+2. 标题应能准确反映文本的主要内容和主题
+3. 不要使用太简单或太空泛的标题
+4. 直接返回标题，不要有任何其他内容
+5. 不要使用引号或其他特殊格式"""
         
-        # 使用安全的方式替换变量
+        # 替换变量
         prompt = prompt_template.replace("{text}", text)
         
-        # 调用Ollama API
-        response = requests.post(
-            OLLAMA_BASE_URL + "/generate",
-            json={
-                "model": OLLAMA_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.3
-                }
-            }
-        )
+        # 创建带重试机制的会话
+        session = create_retry_session()
         
-        if response.status_code != 200:
-            logger.error(f"Ollama API调用失败: {response.status_code} {response.text}")
-            # 失败时回退到传统方法
-            return generate_title_traditional(text)
+        # 定义重试函数
+        def call_ollama_with_retry(max_retries=OLLAMA_MAX_RETRIES):
+            retries = 0
+            while retries <= max_retries:
+                try:
+                    # 在重试前添加随机延迟
+                    if retries > 0:
+                        wait_time = OLLAMA_RETRY_BACKOFF ** retries
+                        logger.info(f"生成标题第{retries}次重试，等待{wait_time:.2f}秒")
+                        time.sleep(wait_time)
+                    
+                    # 调用Ollama API
+                    response = session.post(
+                        OLLAMA_BASE_URL + "/generate",
+                        json={
+                            "model": OLLAMA_MODEL,
+                            "prompt": prompt,
+                            "stream": False,
+                            "options": {
+                                "temperature": 0.3
+                            }
+                        },
+                        timeout=OLLAMA_REQUEST_TIMEOUT  # 使用配置的超时时间
+                    )
+                    
+                    if response.status_code != 200:
+                        logger.error(f"Ollama API调用失败: {response.status_code} {response.text}")
+                        retries += 1
+                        continue
+                    
+                    # 获取响应文本
+                    title = response.json().get("response", "").strip()
+                    
+                    # 如果返回为空，重试
+                    if not title:
+                        logger.warning("Ollama返回的标题为空，尝试重试")
+                        retries += 1
+                        continue
+                    
+                    # 限制标题长度
+                    if len(title) > 20:  # 给一些缓冲空间
+                        title = title[:20]
+                    
+                    logger.info(f"成功使用Ollama生成标题: {title}")
+                    return title
+                    
+                except Exception as e:
+                    logger.error(f"使用Ollama生成标题时出错: {str(e)}")
+                    retries += 1
+                    if retries > max_retries:
+                        logger.error(f"超过最大重试次数，将使用备用方法")
+                        return None
+            
+            return None
         
-        # 获取生成的标题
-        title = response.json().get("response", "").strip()
-        
-        # 清理标题，移除可能的引号和多余空格
-        title = re.sub(r'^["\'\s]+|["\'\s]+$', '', title)
-        
-        # 记录生成的标题长度
-        if len(title) > 8:
-            logger.warning(f"生成的标题长度超过8个字符: {title}")
-        
-        logger.info(f"Ollama生成的标题: {title}")
-        return title
-        
+        # 调用重试函数
+        result = call_ollama_with_retry()
+        if result:
+            return result
+        else:
+            # 如果Ollama失败，尝试使用备用方法
+            logger.info("尝试使用备用方法生成标题")
+            try:
+                return generate_title_with_llm(text)
+            except Exception as e:
+                logger.error(f"备用标题生成方法也失败: {str(e)}")
+                return generate_title_traditional(text)
     except Exception as e:
-        logger.error(f"使用Ollama生成标题时出错: {str(e)}")
-        # 出错时回退到传统方法
+        logger.error(f"生成标题时出错: {str(e)}")
         return generate_title_traditional(text)
 
-def generate_title(text, max_words=4):
-    """生成标题的主函数，优先使用LLM，失败时回退到传统方法"""
-    # 优先使用LLM生成标题
-    return generate_title_with_llm(text)
-
-def merge_subtitles_by_time_intervals(subtitles):
-    """按时间间隔强制分段"""
-    logger = logging.getLogger(__name__)
-    
-    if not subtitles:
+def generate_title(text):
+    """生成标题的主函数，优先使用Ollama，失败时回退到其他方法"""
+    try:
+        # 优先使用Ollama生成标题
+        return generate_title_with_ollama(text)
+    except Exception as e:
+        logger.error(f"使用Ollama生成标题失败，回退到LLM: {str(e)}")
+        # 如果失败，尝试使用LLM
+        try:
+            return generate_title_with_llm(text)
+        except Exception as e2:
+            logger.error(f"使用LLM生成标题也失败，回退到传统方法: {str(e2)}")
+            # 如果再次失败，使用传统方法
+            return generate_title_traditional(text)
         logger.warning("没有提供字幕数据进行合并")
         return []
     

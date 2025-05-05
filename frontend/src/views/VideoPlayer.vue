@@ -16,10 +16,17 @@
           <div class="menu-item" @click="navigateToHome">
             <el-icon><home-filled /></el-icon>
             <span>返回首页</span>
+            <el-icon class="arrow-icon"><arrow-right /></el-icon>
           </div>
           <div class="menu-item" @click="navigateToVideoUpload">
             <el-icon><video-camera /></el-icon>
             <span>分析新视频</span>
+            <el-icon class="arrow-icon"><arrow-right /></el-icon>
+          </div>
+          <div class="menu-item" @click="navigateToGuide">
+            <el-icon><document /></el-icon>
+            <span>使用指南</span>
+            <el-icon class="arrow-icon"><arrow-right /></el-icon>
           </div>
           
           <!-- 已分析视频列表 -->
@@ -29,12 +36,14 @@
               <div class="video-item" 
                    v-for="video in processedVideos" 
                    :key="video.id"
+                   :class="{ 'current-playing': video.id === Number(videoId) }"
                    @click="navigateToVideo(video.id)">
                 <div class="video-thumbnail" :style="video.thumbnail ? `background-image: url(${video.thumbnail})` : ''"></div>
                 <div class="video-info">
                   <div class="video-title" :title="video.title || '未命名视频'">{{ video.title || '未命名视频' }}</div>
                   <div class="video-duration">{{ formatDuration(video.duration) }}</div>
                 </div>
+                <el-icon class="arrow-icon"><arrow-right /></el-icon>
               </div>
             </div>
             <div class="empty-list" v-else>
@@ -43,13 +52,16 @@
             </div>
           </div>
           
-          <div class="menu-item" @click="navigateToGuide">
-            <el-icon><document /></el-icon>
-            <span>使用指南</span>
+          
+          <div class="menu-item" @click="navigateToKnowledgeGraph">
+            <el-icon><connection /></el-icon>
+            <span>知识点总览</span>
+            <el-icon class="arrow-icon"><arrow-right /></el-icon>
           </div>
           <div class="menu-item" @click="navigateToNoteSystem">
             <el-icon><edit /></el-icon>
             <span>笔记系统</span>
+            <el-icon class="arrow-icon"><arrow-right /></el-icon>
           </div>
         </div>
       </div>
@@ -410,7 +422,8 @@ import { ElMessage, ElLoading, ElMessageBox } from 'element-plus';
 import { 
   Loading, Warning, FullScreen, Close, User, Monitor, 
   QuestionFilled, ChatLineSquare, ArrowDown as ArrowDown,
-  ArrowRight, ArrowLeft, HomeFilled, VideoCamera, Document, Edit as Edit
+  ArrowRight, ArrowLeft, HomeFilled, VideoCamera, Document, Edit as Edit,
+  Connection
 } from '@element-plus/icons-vue';
 import { getVideo, getSubtitle, getVideoList, getVideoPreview } from '@/api/video';
 import { askQuestionStream } from '@/api/qa';
@@ -567,6 +580,11 @@ const closeHelpDialog = () => {
 // 导航到视频上传/管理页面
 const navigateToVideoUpload = () => {
   router.push('/video/upload');
+};
+
+// 导航到知识点总览页面
+const navigateToKnowledgeGraph = () => {
+  router.push('/knowledge');
 };
 
 // 加载视频信息
@@ -1186,20 +1204,76 @@ onMounted(async () => {
     // 延迟显示引导弹窗，等待页面加载完成
     setTimeout(() => {
       showGuideDialog.value = true;
-    }, 1000);
-  }
-  if (!videoId.value) {
-    ElMessage.error('无效的视频ID');
-    router.push('/');
-    return;
+    }, 1500);
   }
   
+  // 加载视频信息
   await loadVideoInfo();
-  await loadSubtitles();
-  await fetchProcessedVideos();
-  await loadMergedSubtitles();
-  setupTimeUpdateListener();
   
+  // 加载字幕
+  await loadSubtitles();
+  
+  // 加载已处理视频列表
+  await fetchProcessedVideos();
+  
+  // 加载合并字幕
+  await loadMergedSubtitles();
+  
+  // 检查URL参数中是否有时间戳
+  const timeParam = route.query.t;
+  if (timeParam) {
+    // 将字符串转换为数字
+    const timeInSeconds = parseFloat(timeParam);
+    if (!isNaN(timeInSeconds)) {
+      // 等待视频加载完成后再跳转
+      setTimeout(() => {
+        seekToTime(timeInSeconds);
+      }, 1000);
+    }
+  }
+  
+  // 检查URL参数中是否有自动问题
+  const autoQuestion = route.query.auto_question;
+  if (autoQuestion) {
+    // 设置问答模式为基于视频内容问答
+    qaMode.value = 'video';
+    // 设置为离线模式
+    useOllama.value = true;
+    
+    // 等待视频加载完成后再自动提问
+    setTimeout(async () => {
+      // 将问题设置到输入框
+      question.value = autoQuestion;
+      // 自动提交问题
+      await askQuestion();
+      
+      // 显示提示信息
+      ElMessage.success('已自动发送知识点相关问题');
+      
+      // 检查是否有其他存储的问题
+      const storedQuestions = localStorage.getItem(`concept_questions_${videoId.value}_${decodeURIComponent(autoQuestion).split('?')[0]}`);
+      if (storedQuestions) {
+        try {
+          const questions = JSON.parse(storedQuestions);
+          if (questions && questions.length > 0) {
+            // 展示提示消息，提示用户还有其他可以提问的问题
+            setTimeout(() => {
+              ElNotification({
+                title: '其他推荐问题',
+                message: `您还可以尝试提问：${questions.join(' | ')}`,
+                type: 'info',
+                duration: 10000
+              });
+            }, 5000); // 等待几秒后再显示，避免信息过多
+          }
+        } catch (e) {
+          console.error('解析存储的问题失败:', e);
+        }
+      }
+    }, 2000);
+  }
+  
+  setupTimeUpdateListener();
 });
 
 // 根据当前模式获取输入框提示文本
@@ -1427,76 +1501,7 @@ const closeGuideDialog = () => {
   overflow: hidden;
 }
 
-.video-info-section {
-  height: 100%;
-  background-color: #fff;
-  max-height: 240px; /* 添加最大高度限制 */
-  border-radius: 12px;
-  padding: 15px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  overflow-y: hidden;
-  transition: all 0.3s ease;
-  border: 3px solid #ff9a9e; /* 添加粉色边框 */
-}
 
-.video-info h3 {
-  margin-top: 0;
-  margin-bottom: 5px;
-  color: #333;
-  font-weight: 600;
-  font-size: 16px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  position: relative;
-  padding-left: 15px;
-}
-
-.video-info h3::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 18px;
-  background: linear-gradient(to bottom, #3CAEA3, #2a9d8f);
-  border-radius: 2px;
-}
-
-.video-details-card {
-  background: linear-gradient(135deg, #f5f7fa, #e4e7eb);
-  border-radius: 8px;
-  padding: 8px; /* 减少内边距 */
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  margin-bottom: 5px; /* 减少下边距 */
-}
-
-.video-detail-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 3px; /* 减少每个项目之间的间距 */
-  font-size: 14px; /* 减小字体大小 */
-}
-
-.video-detail-item:last-child {
-  margin-bottom: 0; /* 最后一项不需要下边距 */
-}
-
-.detail-label {
-  font-weight: 500;
-  color: #606266;
-}
-
-.detail-value {
-  color: #333333;
-  margin: 0;
-  line-height: 1.6;
-  font-size: 15px;
-}
 
 /*字幕控制*/
 .subtitle-controls-card {
@@ -2030,12 +2035,12 @@ const closeGuideDialog = () => {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
-  color: #333; /* 修改文字颜色为深色，以便在浅色背景上更易读 */
-  background-color: #ffcdd2; /* 修改为浅粉色背景 */
+  color: #000000; /* 修改文字颜色为黑色 */
+  background-color: #ffffff; /* 修改为白色背景 */
 }
 
 .menu-item:hover {
-  background-color: #ffb6c1; /* 悬停时使用稍深的粉色 */
+  background-color: #f5f5f5; /* 悬停时使用浅灰色 */
   transform: translateY(-2px);
 }
 
@@ -2044,8 +2049,15 @@ const closeGuideDialog = () => {
   margin-right: 10px;
 }
 
+.menu-item .arrow-icon {
+  margin-left: auto;
+  margin-right: 0;
+  color: #000000;
+  font-size: 14px;
+}
+
 .menu-section {
-  margin-top: 20px;
+  margin-top: 1px;
 }
 
 /* 侧边栏菜单标题 */
@@ -2053,7 +2065,7 @@ const closeGuideDialog = () => {
   margin-bottom: 10px;
   font-weight: 600;
   font-size: 20px;
-  color: #ff9a9e;
+  color: #000000;
 }
 
 .video-list {
@@ -2089,7 +2101,7 @@ const closeGuideDialog = () => {
   align-items: center;
   padding: 10px;
   border-radius: 8px;
-  background-color: #ffcdd2; /* 修改为浅粉色背景 */  cursor: pointer;
+  background-color: #ffffff; /* 修改为白色背景 */  cursor: pointer;
   transition: all 0.3s ease;
   width: 100%;
   box-sizing: border-box;
@@ -2097,8 +2109,20 @@ const closeGuideDialog = () => {
 }
 
 .video-item:hover {
-  background-color: #ffb6c1; /* 悬停时使用稍深的粉色 */
+  background-color: #f5f5f5; /* 悬停时使用浅灰色 */
   transform: translateY(-2px);
+}
+
+.video-item.current-playing {
+  background-color: #e6e6e6; /* 当前播放视频使用浅灰色 */
+  border-left: 4px solid #c0c0c0; /* 左侧添加醒目的边框 */
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15); /* 添加阴影效果增强视觉层次 */
+  transform: translateY(-2px); /* 轻微上移效果 */
+}
+
+.video-item.current-playing .video-title {
+  font-weight: 700; /* 加粗标题 */
+  color: #000000 ; /* 黑色文字颜色 */
 }
 
 .video-thumbnail {
@@ -2119,6 +2143,12 @@ const closeGuideDialog = () => {
   overflow: hidden; /* 确保溢出内容被隐藏 */
 }
 
+.video-item .arrow-icon {
+  margin-left: 10px;
+  color: #000000;
+  font-size: 14px;
+}
+
 .video-title {  /* 侧边栏已分析视频标题 */
   font-weight: 600;
   margin-bottom: 5px;
@@ -2126,7 +2156,7 @@ const closeGuideDialog = () => {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%; /* 确保标题不会超出父容器 */
-  color: #333; /* 增加对比度 */
+  color: #000000; /* 修改为黑色字体 */
 }
 
 .video-duration {
@@ -2148,7 +2178,7 @@ const closeGuideDialog = () => {
 }
 
 .empty-list .el-icon {
-  color: #ff9a9e; /* 修改图标颜色为粉色 */
+  color: #808080; /* 修改图标颜色为灰色 */
   font-size: 24px;
   margin-bottom: 10px;
 }
