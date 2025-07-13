@@ -435,7 +435,7 @@ def generate_questions():
                 response = requests.post(
                     "http://localhost:11434/api/generate",
                     json={
-                        "model": "qwen2.5:7b",
+                        "model": "qwen3:8b",
                         "prompt": prompt,
                         "stream": False,
                         "options": {"temperature": 0.7}
@@ -483,12 +483,12 @@ def generate_questions():
                 from openai import OpenAI
                 
                 client = OpenAI(
-                    api_key="sk-178e130a121445659860893fdfae1e7d",
+                    api_key="sk-59a6a7690bfb42cd887365795e114002",
                     base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
                 )
                 
                 response = client.chat.completions.create(
-                    model="qwen-max",
+                    model="qwen-turbo",
                     messages=[
                         {"role": "system", "content": "你是一个教育助手，负责生成与特定知识点相关的学习问题。"},
                         {"role": "user", "content": f"基于以下知识点，生成{count}个用户可能想要学习或询问的问题。这些问题应该帮助用户更好地理解这个知识点。只返回问题列表，每个问题应该简洁明了，格式为JSON数组。\n\n知识点: {concept}\n背景信息: {context}"}

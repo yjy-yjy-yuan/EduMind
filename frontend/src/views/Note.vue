@@ -864,9 +864,37 @@ const renderedContent = computed(() => {
 
 // 渲染Markdown内容
 const renderMarkdown = (content) => {
-  // 如果你已经有Markdown渲染库，可以直接使用
-  // 这里假设使用marked库
-  if (!content) return '';  
+  if (!content) return '';
+  
+  try {
+    // 配置marked选项，启用breaks选项以支持单行换行
+    marked.setOptions({
+      breaks: true,  // 将单个换行符转换为<br>
+      gfm: true      // 启用GitHub风格的Markdown
+    });
+    
+    // 使用marked解析Markdown
+    let html = marked.parse(content || '');
+    
+    // 处理新的时间戳标记格式 [MM:SS]{{timestamp:秒数}}
+    html = html.replace(/\[([0-9:]+)\]\{\{timestamp:(\d+\.?\d*)\}\}/g, (match, text, time) => {
+      const timeSeconds = parseFloat(time);
+      return `<a href="javascript:void(0)" class="timestamp-link" data-time="${timeSeconds}" onclick="window.handleTimestampClick(${timeSeconds})">${text}</a>`;
+    });
+    
+    // 处理段落间距问题，将过大的段落间距减小
+    html = html.replace(/<\/p><p>/g, '</p><p style="margin: 2px 0; line-height: 1.5;">'); 
+    // 更彻底地替换所有段落标签，但保留原有的class和其他属性
+    html = html.replace(/<p(?![^>]*style=)([^>]*)>/g, '<p$1 style="margin: 2px 0; line-height: 1.5;">');
+    
+    // 使用DOMPurify清理HTML以防止XSS攻击，但保留onclick和data-time属性和样式
+    return DOMPurify.sanitize(html, {
+      ADD_ATTR: ['onclick', 'data-time', 'style']
+    });
+  } catch (error) {
+    console.error('Markdown渲染错误:', error);
+    return `<p>渲染错误: ${error.message}</p>`;
+  }
 };
 
 // 批量操作相关状态

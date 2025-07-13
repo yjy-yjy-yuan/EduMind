@@ -10,13 +10,13 @@ from neo4j import GraphDatabase
 from openai import OpenAI
 from flask import request
 
-# 直接使用固定的API密钥（与semantic_utils.py保持一致）
-OPENAI_API_KEY = "sk-178e130a121445659860893fdfae1e7d"
-OPENAI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+# 调用大模型(本地/云端)API密钥
+OPENAI_API_KEY = "sk-59a6a7690bfb42cd887365795e114002" #使用的通义千问API
+OPENAI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1" #本地Ollama的API
 
 # Ollama API配置
 OLLAMA_BASE_URL = "http://localhost:11434/api"
-OLLAMA_MODEL = "qwen2.5:7b"  # 默认使用qwen2.5:7b模型
+OLLAMA_MODEL = "qwen3:8b"  # 默认使用qwen2.5:7b模型
 
 # 配置日志
 logging.basicConfig(
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class KnowledgeGraphManager:
     """知识图谱管理器"""
     
-    def __init__(self, uri="bolt://localhost:7687", user="neo4j", password="cjx20040328", similarity_service=None):
+    def __init__(self, uri="bolt://localhost:7687", user="neo4j", password="cjx20040328", similarity_service=None): # 配置知识图谱
         """初始化知识图谱管理器
         
         Args:

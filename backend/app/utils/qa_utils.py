@@ -292,7 +292,7 @@ class QASystem:
             yield f"获取答案时出错: {str(e)}"
     
     # 使用在线API获取问题的答案（非流式）
-    def get_answer_online(self, question: str, api_key: str = "sk-178e130a121445659860893fdfae1e7d", mode: str = 'video', context: str = None, deep_thinking: bool = False):
+    def get_answer_online(self, question: str, api_key: str = "sk-59a6a7690bfb42cd887365795e114002", mode: str = 'video', context: str = None, deep_thinking: bool = False):
         """
         Args:
             question: 用户问题
@@ -521,7 +521,7 @@ class QASystem:
             return f"获取答案时出错: {str(e)}"
     
     # 使用在线API获取问题的答案（流式响应）
-    def get_answer_stream_online(self, question: str, api_key: str = "sk-178e130a121445659860893fdfae1e7d", mode: str = 'video', context: str = None, deep_thinking: bool = False):
+    def get_answer_stream_online(self, question: str, api_key: str = "sk-59a6a7690bfb42cd887365795e114002", mode: str = 'video', context: str = None, deep_thinking: bool = False):
         """
         Args:
             question: 用户问题
@@ -1093,7 +1093,7 @@ class QASystem:
                 model_to_use = "deepseek-r1:8b"  # 深度思考模式使用 deepseek-r1:8b
                 logger.info(f"使用深度思考模式，选择模型: {model_to_use}")
             else:
-                model_to_use = "qwen2.5:7b"  # 普通模式使用 qwen2.5:7b
+                model_to_use = "qwen3:8b"  # 普通模式使用 qwen2.5:7b
                 logger.info(f"使用普通模式，选择模型: {model_to_use}")
             
             # 构建请求
@@ -1281,7 +1281,7 @@ class QASystem:
             try:
                 logger.info("尝试使用非流式API获取回答")
                 payload_non_stream = {
-                    "model": "qwen2.5:7b",
+                    "model": "qwen3:8b",
                     "prompt": prompt,
                     "system": system_prompt,
                     "stream": False
@@ -1398,13 +1398,13 @@ class QASystem:
             # 如果非流式API失败，尝试流式API
             logger.info("尝试使用流式API获取回答")
             payload = {
-                "model": "qwen2.5:7b",
+                "model": "qwen3:8b",
                 "prompt": prompt,
                 "system": system_prompt,
                 "stream": True
             }
             
-            logger.info(f"发送请求到Ollama API: {OLLAMA_BASE_URL}/generate，使用模型: qwen2.5:7b")
+            logger.info(f"发送请求到Ollama API: {OLLAMA_BASE_URL}/generate，使用模型: qwen3:8b")
             
             # 如果没有收到响应，提供一个默认回答
             has_yielded = False

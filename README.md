@@ -96,7 +96,7 @@ AI-EdVision/
 - 打开命令提示符，运行以下命令下载所需模型：
   ```bash
   ollama pull deepseek-r1:8b
-  ollama pull qwen2.5:7b
+  ollama pull qwen3:8b
   ```
 
 ## 安装与部署指南
@@ -171,7 +171,7 @@ conda install -c conda-forge faiss-gpu=1.8.0 -y
 conda install -c conda-forge faiss-cpu=1.8.0 -y
 
 # 初始化数据库
-python create_tables.py
+python update_tables.py
 ```
 
 ### 第六步：安装前端依赖

@@ -30,7 +30,7 @@ class ChatSystem:
         
         # 初始化通义千问客户端
         self.client = OpenAI(
-            api_key = "sk-178e130a121445659860893fdfae1e7d",
+            api_key = "sk-59a6a7690bfb42cd887365795e114002",
             base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1",
         )
         

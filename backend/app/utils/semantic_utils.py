@@ -16,12 +16,12 @@ import time
 from openai import OpenAI
 
 # 直接使用固定的API密钥（与chat_system.py保持一致）
-OPENAI_API_KEY = "sk-178e130a121445659860893fdfae1e7d"
+OPENAI_API_KEY = "sk-59a6a7690bfb42cd887365795e114002"
 OPENAI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
 # Ollama API配置
 OLLAMA_BASE_URL = "http://localhost:11434/api"
-OLLAMA_MODEL = "qwen2.5:7b"  # 默认使用qwen2.5:7b模型，可以根据需要更改
+OLLAMA_MODEL = "qwen3:8b"  # 默认使用qwen2.5:7b模型，可以根据需要更改
 
 # Ollama请求配置
 OLLAMA_REQUEST_TIMEOUT = 180  # 请求超时时间（秒）
