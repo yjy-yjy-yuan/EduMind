@@ -79,24 +79,81 @@ AI-EdVision/
 
 ### 3. 安装Redis
 
+#### 3.1 Windows系统
 - 访问[Redis for Windows](https://github.com/microsoftarchive/redis/releases)下载最新的Redis-x64-xxx.msi安装包
 - 双击安装包进行安装
 - 安装时选择"Add the Redis installation folder to the PATH environment variable"
 - 验证安装：打开命令提示符，输入`redis-cli --version`确认安装成功
 
+#### 3.2 Mac 系统
+-  安装 Redis
+brew install redis
+
+-  启动 Redis 服务（后台运行）
+brew services start redis
+
+- 或手动启动（前台运行）
+redis-server
+
+-  配置文件位置
+cat /opt/homebrew/etc/redis.conf
+
+- 启动服务
+brew services start redis
+
+- 停止服务
+brew services stop redis
+
+- 查看日志
+tail -f /opt/homebrew/var/log/redis.log
+
+- 测试连接
+redis-cli ping  # 应该返回：PONG
+
+- 进入 Redis 命令行
+redis-cli
+
 ### 4. 安装FFmpeg
 
+#### 4.1 Windows系统
 - 访问[FFmpeg官网](https://ffmpeg.org/download.html)下载FFmpeg
 - 解压下载的文件到指定目录（如C:\ffmpeg）
 - 将FFmpeg的bin目录添加到系统环境变量PATH中
 - 验证安装：打开命令提示符，输入`ffmpeg -version`确认安装成功
 
+#### 4.2 Mac系统
+
+- 安装 FFmpeg
+brew install ffmpeg
+
+- 检查版本
+ffmpeg -version
+
+- 测试是否正常工作
+ffmpeg -version | head -n 1
+
 ### 5. 安装Neo4j
 
+#### 5.1 Windows系统
 - 访问[Neo4j官网](https://neo4j.com/download/)下载Neo4j Desktop
 - 按照安装向导完成安装
 - 创建一个新的数据库，设置用户名和密码（默认用户名为neo4j）
 - 启动数据库并记录连接信息（URI、用户名和密码）
+
+#### 5.2 Mac系统
+
+- 安装neo4j
+brew install neo4j
+
+- 方法1：后台服务（开机自启）
+brew services start neo4j
+
+- 方法2：前台运行（关闭终端会停止）
+/opt/homebrew/opt/neo4j/bin/neo4j console
+
+- 访问 Web 界面
+open http://localhost:7474
+
 
 ### 6. 安装Ollama并下载模型
 
@@ -165,10 +222,6 @@ redis-cli ping  # 应返回PONG
 ```bash
 # 创建并激活虚拟环境
 cd backend
-python -m venv venv
-venv\Scripts\activate  # Windows
-
-# 或使用Conda
 conda create -n ai-edvision python=3.10 -y
 conda activate ai-edvision
 
@@ -180,6 +233,12 @@ pip install -r requirements.txt
 conda install pytorch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 pytorch-cuda=11.8 -c pytorch -c nvidia
 # 或CPU环境
 pip install torch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 --index-url https://download.pytorch.org/whl/cpu
+
+# Mac上使用 MPS 加速
+# 安装 PyTorch 2.0.0（支持 MPS 加速）
+pip install torch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0
+- 安装 PyTorch（conda 会自动选择合适的版本）
+conda install pytorch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 -c pytorch
 
 # 安装FAISS（根据您的环境选择）
 # GPU环境

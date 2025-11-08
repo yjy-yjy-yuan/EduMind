@@ -10,7 +10,8 @@
 import os
 from flask import Blueprint, request, jsonify, Response, stream_with_context, current_app
 from ..utils.chat_system import ChatSystem
-from ..utils.rag_system import RAGSystem
+# 🍎 使用平台检测工具自动导入适合当前平台的 RAG 系统（Mac MPS / Windows CUDA / CPU）
+from ..utils.platform_utils import import_rag_system
 from ..models import Video  # noqa: F401
 import traceback
 
@@ -20,7 +21,8 @@ chat_bp = Blueprint('chat', __name__, url_prefix='/api/chat')
 # 创建聊天系统实例
 chat_system = ChatSystem()
 
-# 创建RAG系统实例
+# 创建RAG系统实例（自动适配 Mac M4 MPS / Windows CUDA / CPU）
+RAGSystem = import_rag_system()
 rag_system = RAGSystem()
 
 @chat_bp.route('/ask', methods=['POST'])

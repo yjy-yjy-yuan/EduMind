@@ -733,8 +733,9 @@ def process_video_route(video_id):
         return response
     
     try:
-        # 导入process_video任务
-        from app.tasks.video_processing import process_video
+        # 🍎 使用平台检测工具自动导入适合当前平台的视频处理任务（Mac MPS / Windows CUDA / CPU）
+        from app.utils.platform_utils import import_video_processing
+        process_video = import_video_processing()
         
         video = Video.query.get_or_404(video_id)
         
@@ -795,8 +796,13 @@ def delete_video(video_id):
         Question.query.filter_by(video_id=video_id).delete()
         db.session.commit()
         
-        # 启动清理任务
-        from ..tasks.video_processing import cleanup_video
+        # 🍎 使用平台检测工具导入清理任务（自动适配 Mac/Windows/Linux）
+        import platform
+        if platform.system() == "Darwin":  # Mac
+            from ..tasks.video_processing_mac import cleanup_video
+        else:  # Windows/Linux
+            from ..tasks.video_processing import cleanup_video
+        
         task = cleanup_video.delay(video.id)
         
         # 立即从数据库中删除记录

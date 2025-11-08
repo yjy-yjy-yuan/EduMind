@@ -1,0 +1,289 @@
+"""
+平台自适应使用示例
+演示如何在项目中使用平台检测工具自动选择合适的模块
+"""
+
+# ============================================================
+# 示例 1: 在路由中使用 RAG 系统
+# ============================================================
+
+# 方式 A: 手动导入（简单直接）
+# ----------------------------------------------------------
+# 在 backend/app/routes/qa.py 或 backend/app/routes/chat.py 中
+
+import platform
+
+# 根据平台选择导入
+if platform.system() == "Darwin":  # Mac
+    from app.utils.rag_system_mac import RAGSystem
+    print("🍎 使用 Mac 优化版 RAG 系统")
+else:  # Windows/Linux
+    from app.utils.rag_system import RAGSystem
+    print("💻 使用标准版 RAG 系统")
+
+# 使用 RAGSystem
+def search_in_subtitles(query, subtitle_path):
+    rag = RAGSystem()
+    rag.create_knowledge_base(subtitle_path)
+    results = rag.search_similar_segments(query, top_k=5)
+    return results
+
+
+# 方式 B: 使用平台工具（推荐）
+# ----------------------------------------------------------
+from app.utils.platform_utils import import_rag_system
+
+# 自动导入适合当前平台的 RAG 系统
+RAGSystem = import_rag_system()
+
+# 使用方式完全相同
+def search_in_subtitles_v2(query, subtitle_path):
+    rag = RAGSystem()
+    rag.create_knowledge_base(subtitle_path)
+    results = rag.search_similar_segments(query, top_k=5)
+    return results
+
+
+# ============================================================
+# 示例 2: 在视频处理中使用
+# ============================================================
+
+# 方式 A: 手动导入
+# ----------------------------------------------------------
+# 在 backend/app/routes/video.py 中
+
+import platform
+
+if platform.system() == "Darwin":  # Mac
+    from app.tasks.video_processing_mac import process_video
+    print("🍎 使用 Mac 优化版视频处理")
+else:  # Windows/Linux
+    from app.tasks.video_processing import process_video
+    print("💻 使用标准版视频处理")
+
+# 使用 process_video 任务
+def start_video_processing(video_id, language='zh', model='turbo'):
+    task = process_video.delay(video_id, language, model)
+    return task.id
+
+
+# 方式 B: 使用平台工具（推荐）
+# ----------------------------------------------------------
+from app.utils.platform_utils import import_video_processing
+
+# 自动导入适合当前平台的视频处理任务
+process_video = import_video_processing()
+
+# 使用方式完全相同
+def start_video_processing_v2(video_id, language='zh', model='turbo'):
+    task = process_video.delay(video_id, language, model)
+    return task.id
+
+
+# ============================================================
+# 示例 3: 获取设备信息
+# ============================================================
+
+from app.utils.platform_utils import (
+    get_device,
+    get_system_info,
+    get_pytorch_info,
+    IS_MAC,
+    IS_APPLE_SILICON,
+    DEVICE
+)
+
+def check_environment():
+    """检查运行环境"""
+    print("🖥️  系统信息:")
+    sys_info = get_system_info()
+    for key, value in sys_info.items():
+        print(f"  {key}: {value}")
+    
+    print(f"\n🔥 PyTorch 设备: {get_device()}")
+    print(f"🍎 是否为 Mac: {IS_MAC}")
+    print(f"🍎 是否为 Apple Silicon: {IS_APPLE_SILICON}")
+    print(f"⚡ 当前设备: {DEVICE}")
+    
+    pt_info = get_pytorch_info()
+    if pt_info['available']:
+        print(f"\n✅ PyTorch {pt_info['version']} 已安装")
+        if pt_info['cuda_available']:
+            print(f"  GPU: {pt_info['gpu_name']}")
+        if pt_info['mps_available']:
+            print(f"  MPS 加速: 已启用")
+    else:
+        print("⚠️  PyTorch 未安装")
+
+
+# ============================================================
+# 示例 4: 在初始化时打印系统信息
+# ============================================================
+
+# 在 backend/app/__init__.py 中添加
+
+from app.utils.platform_utils import print_system_info, get_device
+
+def create_app():
+    # ... 现有代码 ...
+    
+    # 打印系统信息
+    print_system_info()
+    
+    # 根据平台加载不同的配置
+    device = get_device()
+    if device == "mps":
+        print("🍎 Mac M 系列芯片检测成功，启用 MPS 加速")
+        # 可以设置一些 Mac 特定的配置
+    elif device == "cuda":
+        print("🚀 NVIDIA GPU 检测成功，启用 CUDA 加速")
+        # 可以设置一些 CUDA 特定的配置
+    else:
+        print("💻 使用 CPU 模式")
+    
+    # ... 现有代码 ...
+
+
+# ============================================================
+# 示例 5: 在配置文件中使用
+# ============================================================
+
+# 在 backend/config.py 中添加
+
+from app.utils.platform_utils import get_device, IS_MAC
+
+class Config:
+    # ... 现有配置 ...
+    
+    # 平台相关配置
+    DEVICE = get_device()
+    IS_MAC = IS_MAC
+    
+    # 根据平台调整配置
+    if DEVICE == "mps":
+        # Mac MPS 特定配置
+        WHISPER_FP16 = False  # MPS 不支持 fp16
+        MAX_WORKERS = 4  # M 系列芯片适合的并发数
+    elif DEVICE == "cuda":
+        # CUDA 特定配置
+        WHISPER_FP16 = True  # CUDA 支持 fp16
+        MAX_WORKERS = 8  # 根据 GPU 调整
+    else:
+        # CPU 配置
+        WHISPER_FP16 = False
+        MAX_WORKERS = 2
+
+
+# ============================================================
+# 示例 6: 完整的路由文件示例
+# ============================================================
+
+# backend/app/routes/qa.py (修改后的完整示例)
+
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
+import os
+
+# 使用平台检测工具自动导入
+from app.utils.platform_utils import import_rag_system, DEVICE
+
+# 自动导入适合当前平台的 RAG 系统
+RAGSystem = import_rag_system()
+
+qa_bp = Blueprint('qa', __name__)
+
+@qa_bp.route('/api/qa/search', methods=['POST'])
+@jwt_required()
+def search_answer():
+    """搜索答案"""
+    try:
+        data = request.get_json()
+        query = data.get('query')
+        video_id = data.get('video_id')
+        
+        if not query or not video_id:
+            return jsonify({'error': '缺少必要参数'}), 400
+        
+        # 获取视频字幕路径
+        # ... 查询数据库获取 subtitle_path ...
+        
+        # 使用 RAG 系统搜索
+        print(f"🔍 使用 {DEVICE.upper()} 设备进行搜索")
+        rag = RAGSystem()
+        rag.create_knowledge_base(subtitle_path)
+        results = rag.search_similar_segments(query, top_k=5)
+        
+        return jsonify({
+            'success': True,
+            'device': DEVICE,  # 返回使用的设备类型
+            'results': results
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================
+# 示例 7: 在 Celery 任务中使用
+# ============================================================
+
+# backend/celery_app.py
+
+from celery import Celery
+from app.utils.platform_utils import get_device, print_system_info
+
+# 创建 Celery 应用
+celery = Celery('tasks')
+
+# 打印系统信息（启动时）
+print_system_info()
+
+# 根据平台配置 Celery
+device = get_device()
+if device == "mps":
+    # Mac 配置
+    celery.conf.update(
+        worker_prefetch_multiplier=1,  # Mac 上使用较小的预取数
+        worker_max_tasks_per_child=50,  # 避免内存泄漏
+    )
+elif device == "cuda":
+    # CUDA 配置
+    celery.conf.update(
+        worker_prefetch_multiplier=4,  # GPU 上可以并行处理更多任务
+        worker_max_tasks_per_child=100,
+    )
+
+
+# ============================================================
+# 使用说明总结
+# ============================================================
+
+"""
+📝 使用步骤：
+
+1. ✅ 确保已创建平台工具模块
+   - backend/app/utils/platform_utils.py
+
+2. ✅ 确保已创建平台特定的模块
+   - backend/app/utils/rag_system_mac.py (Mac版)
+   - backend/app/tasks/video_processing_mac.py (Mac版)
+
+3. 📝 修改现有代码中的导入语句
+   替换：
+     from app.utils.rag_system import RAGSystem
+   为：
+     from app.utils.platform_utils import import_rag_system
+     RAGSystem = import_rag_system()
+
+4. ✅ 测试两个平台
+   - Mac: python test_pytorch_m4.py
+   - Windows/Linux: python -c "import torch; print(torch.cuda.is_available())"
+
+5. 🚀 运行项目
+   - 系统会自动检测平台并使用最佳配置
+
+⚠️  注意事项：
+- Mac 版本使用 MPS 而非 CUDA
+- FAISS GPU 在 Mac 上不可用，使用 CPU 索引
+- fp16 在 Mac MPS 上支持有限，使用 fp32
+"""
