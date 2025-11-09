@@ -320,7 +320,7 @@ def merge_transcriptions(chunks_results):
     
     return merged_result
 
-@celery.task(name='app.tasks.process_video_mac', bind=True, max_retries=3, retry_backoff=True, retry_backoff_max=240, retry_jitter=True)
+@celery.task(name='app.tasks.video_processing_mac.process_video', bind=True, max_retries=3, retry_backoff=True, retry_backoff_max=240, retry_jitter=True)
 def process_video(self, video_id, language='zh', model='turbo'):
     """处理视频任务 - Mac优化版"""
     try:
@@ -659,7 +659,7 @@ def process_video(self, video_id, language='zh', model='turbo'):
         
         return {'status': 'failed', 'message': f'处理视频失败: {str(e)}'}
 
-@celery.task(name='app.tasks.cleanup_video_mac')
+@celery.task(name='app.tasks.video_processing_mac.cleanup_video')
 def cleanup_video(video_id):
     """清理视频文件"""
     try:

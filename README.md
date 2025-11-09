@@ -241,13 +241,19 @@ pip install torch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0
 conda install pytorch==2.0.0 torchvision==0.15.0 torchaudio==2.0.0 -c pytorch
 
 # 安装FAISS（根据您的环境选择）
-# GPU环境
+# Windows/Linux GPU环境（NVIDIA CUDA）
 conda install -c conda-forge faiss-gpu=1.8.0 -y
-# 或CPU环境
+
+# Mac 系统（包括 M1/M2/M3/M4 芯片）- 使用 CPU 版本的环境(包含其他系统)
+# 注意：虽然 FAISS 使用 CPU，但 PyTorch 向量计算仍会使用 MPS 加速
 conda install -c conda-forge faiss-cpu=1.8.0 -y
 
-# 初始化数据库
-python update_tables.py
+# 初始化数据库（首次安装时按顺序执行）
+python init_db.py          # 创建所有数据库表
+python run_migration.py    # 运行数据库迁移，添加额外字段
+
+# 如果只是更新表结构（已有数据库时使用）
+python update_tables.py    # 更新表结构，不删除数据
 ```
 
 ### 第六步：安装前端依赖
@@ -264,7 +270,7 @@ npm install
    ```bash
    # 在backend目录下
    cd backend
-   venv\Scripts\activate  # 或 conda activate ai-edvision
+   conda activate ai-edvision
    python -m celery -A app.celery_app worker --loglevel=info -P solo
    ```
 
@@ -272,7 +278,7 @@ npm install
 
    ```bash
    # 在另一个终端，backend目录下
-   venv\Scripts\activate  # 或 conda activate ai-edvision
+   conda activate ai-edvision
    python run.py
    ```
 
