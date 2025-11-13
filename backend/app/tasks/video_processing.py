@@ -27,6 +27,63 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
+def get_device():
+    """获取最佳计算设备 - 自动检测 CUDA/CPU"""
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"
+
+def get_whisper_device(model_size):
+    """
+    根据模型大小和可用设备选择最佳设备
+    
+    Args:
+        model_size: 模型大小 (tiny, base, small, medium, large)
+    
+    Returns:
+        设备名称 (cpu 或 cuda)
+    """
+    if torch.cuda.is_available():
+        logger.info(f"✅ {model_size} 模型使用 CUDA 加速 (NVIDIA GPU)")
+        return "cuda"
+    
+    logger.info(f"💻 {model_size} 模型使用 CPU")
+    return "cpu"
+
+def clear_gpu_cache():
+    """清理GPU缓存,释放显存"""
+    try:
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            logger.info("🧹 已清理 CUDA 缓存")
+    except Exception as e:
+        logger.warning(f"清理 CUDA 缓存时出错: {str(e)}")
+
+def create_placeholder_preview(video):
+    """为占位文件创建默认预览图"""
+    try:
+        preview_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'previews')
+        os.makedirs(preview_dir, exist_ok=True)
+        
+        preview_filename = f"preview_{video.id}.jpg"
+        preview_path = os.path.join(preview_dir, preview_filename)
+        
+        # 创建一个简单的占位图
+        placeholder_img = np.ones((360, 640, 3), dtype=np.uint8) * 200
+        cv2.putText(placeholder_img, "Placeholder Video", (150, 180),
+                   cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 100, 100), 2)
+        
+        cv2.imwrite(preview_path, placeholder_img)
+        
+        video.preview_filename = preview_filename
+        video.preview_filepath = preview_path
+        db.session.commit()
+        
+        return True
+    except Exception as e:
+        logger.error(f"创建占位预览图失败: {str(e)}")
+        return False
+
 def generate_video_info(video_path):
     """生成视频信息"""
     try:
@@ -272,9 +329,12 @@ def get_whisper_params(model_name, language='zh'):
 def transcribe_audio(audio_path, model_name="base", language="zh"):
     """使用Whisper API转录音频"""
     try:
+        # 自定义Whisper模型下载路径
+        custom_model_path = os.path.expanduser("~/Desktop/File/graduation/whisper")
+        
         # 加载模型
         logger.info(f"加载Whisper模型: {model_name}")
-        model = whisper.load_model(model_name)
+        model = whisper.load_model(model_name, download_root=custom_model_path)
         
         # 转录音频
         logger.info(f"开始转录音频: {os.path.basename(audio_path)}")
@@ -544,222 +604,134 @@ def process_video(self, video_id, language='zh', model='turbo'):
                     logger.warning(f"⚠️ 音频提取过程中出错: {str(e)}，将使用原视频文件")
                     input_file = video.filepath
                 
-                # 调用whisper命令行工具进行转录
-                whisper_cmd = [
-                    "python", "-m", "whisper", 
-                    input_file,  # 使用提取的音频文件或原视频文件
-                    "--model", model,
-                    "--language", language,
-                    "--output_dir", subtitle_dir,
-                    "--output_format", "all",  # 使用all生成所有格式，包括srt和txt
-                ]
-                
-                if language:
-                    whisper_cmd.extend(["--language", language])
-                
-                # 记录命令
-                logger.info(f"🚀 启动AI转录引擎 | 模型: {model} | 语言: {language} | CUDA加速: {'已启用' if torch.cuda.is_available() else '未启用'}")
-                logger.info(f"📝 处理文件: {os.path.basename(input_file)}")
-                
-                # 启动子进程并实时监控输出
-                process = subprocess.Popen(
-                    whisper_cmd, 
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    bufsize=1,
-                    universal_newlines=True,
-                    encoding='utf-8',  # 显式指定使用UTF-8编码
-                    errors='replace'   # 遇到无法解码的字符时替换而不是报错
-                )
-                
-                # 监控进度
-                with tqdm(total=100, desc="转录进度", unit="%", ncols=100) as pbar:
-                    # 设置一个计时器，用于估算进度
-                    start_time = time.time()
-                    estimated_total_time = 45  # 估计的总处理时间（秒）
-                    
-                    # 创建一个线程安全的队列用于更新进度
-                    import queue
-                    progress_queue = queue.Queue()
-                    
-                    # 创建一个变量来跟踪实际的转录进度
-                    actual_progress = 0
-                    
-                    # 创建一个线程来更新进度条
-                    def update_progress():
-                        nonlocal actual_progress
-                        last_progress = 0
-                        while process.poll() is None:  # 当进程仍在运行时
-                            # 使用实际进度（如果有）或基于时间的估算
-                            if actual_progress > 0:
-                                current_progress = actual_progress
-                            else:
-                                # 计算经过的时间和估计的进度
-                                elapsed_time = time.time() - start_time
-                                current_progress = min(95, int(elapsed_time / estimated_total_time * 100))
-                            
-                            # 只有当当前进度大于上次更新的进度时才更新
-                            if current_progress > last_progress:
-                                # 更新进度条
-                                pbar.update(current_progress - last_progress)
-                                last_progress = current_progress
-                                
-                                # 将进度信息放入队列，而不是直接更新数据库
-                                progress_queue.put({
-                                    'progress': 60.0 + (current_progress * 0.3),
-                                    'step': f"转录中: {current_progress}%"
-                                })
-                            
-                            # 每秒更新一次
-                            time.sleep(1)
-                    
-                    # 启动进度更新线程
-                    import threading
-                    progress_thread = threading.Thread(target=update_progress)
-                    progress_thread.daemon = True  # 设置为守护线程，这样主线程结束时它也会结束
-                    progress_thread.start()
-                    
-                    # 在主线程中处理进度队列，因为主线程有应用上下文
-                    last_queue_check = time.time()
-                    queue_check_interval = 0.5  # 每0.5秒检查一次队列
-                    
-                    # 读取进程的输出（不阻塞主线程）
-                    for line in iter(lambda: process.stdout.readline() or process.stderr.readline(), ''):
-                        logger.debug(f"Whisper输出: {line.strip()}")
-                        
-                        # 尝试从输出中提取实际进度信息
-                        try:
-                            # 检查是否包含进度信息
-                            if "%" in line:
-                                # 尝试提取百分比
-                                percent_parts = line.split('%')
-                                if len(percent_parts) > 0:
-                                    # 提取百分比前面的数字
-                                    percent_text = percent_parts[0].strip().split(' ')[-1]
-                                    try:
-                                        # 转换为数字
-                                        percent_value = float(percent_text)
-                                        # 更新实际进度
-                                        actual_progress = int(percent_value)
-                                        logger.debug(f"检测到实际进度: {actual_progress}%")
-                                    except (ValueError, IndexError):
-                                        pass
-                            
-                            # 检查是否包含特定的处理阶段信息
-                            progress_markers = {
-                                "Detecting language": 5,
-                                "Language detected": 10,
-                                "Loading model": 15,
-                                "Transcribing": 20,
-                                "Processing": 30,
-                                "Transcription complete": 100
-                            }
-                            
-                            for marker, progress in progress_markers.items():
-                                if marker in line and progress > actual_progress:
-                                    actual_progress = progress
-                                    logger.debug(f"检测到处理阶段: {marker}, 设置进度为 {progress}%")
-                        except Exception as e:
-                            logger.debug(f"解析进度信息出错: {str(e)}")
-                        
-                        # 定期检查进度队列并更新数据库
-                        current_time = time.time()
-                        if current_time - last_queue_check >= queue_check_interval:
-                            last_queue_check = current_time
-                            
-                            # 处理队列中的所有进度更新
-                            try:
-                                while not progress_queue.empty():
-                                    progress_info = progress_queue.get_nowait()
-                                    # 在主线程中更新数据库
-                                    video.process_progress = progress_info['progress']
-                                    video.current_step = progress_info['step']
-                                    db.session.commit()
-                            except Exception as e:
-                                logger.warning(f"更新进度时出错: {str(e)}")
-                    
-                    # 等待进程完成
-                    process.wait()
-                    # 等待进度线程结束
-                    progress_thread.join(timeout=1)
-                    
-                    # 处理队列中剩余的进度更新
-                    try:
-                        while not progress_queue.empty():
-                            progress_info = progress_queue.get_nowait()
-                            video.process_progress = progress_info['progress']
-                            video.current_step = progress_info['step']
-                            db.session.commit()
-                    except Exception as e:
-                        logger.warning(f"处理剩余进度更新时出错: {str(e)}")
-                    
-                    # 完成后更新到100%
-                    if pbar.n < 100:
-                        pbar.update(100 - pbar.n)
-                        video.process_progress = 90.0
-                        video.current_step = "转录完成"
-                        db.session.commit()
-                
-                result = process.returncode
-                
-                # 更新进度
-                video.process_progress = 90.0
-                video.current_step = "转录完成，处理结果"
-                db.session.commit()
-                
-                if result != 0:
-                    stderr_output = process.stderr.read()
-                    logger.error(f"❌ 转录失败: {stderr_output}")
-                    # 不要因为字幕失败而使整个处理失败，继续处理
-                else:
-                    logger.info(f"✅ 转录完成 | 状态: 成功")
-                    
-                # 检查生成的字幕文件是否存在
-                expected_srt = os.path.join(subtitle_dir, f"{base_filename}.srt")
-                if os.path.exists(expected_srt):
-                    video.subtitle_filepath = expected_srt
-                    logger.info(f"📄 字幕文件已生成 | 文件: {os.path.basename(expected_srt)}")
-                else:
-                    # 尝试查找任何生成的srt文件
-                    srt_files = [f for f in os.listdir(subtitle_dir) if f.endswith('.srt')]
-                    if srt_files:
-                        newest_srt = max([os.path.join(subtitle_dir, f) for f in srt_files], 
-                                       key=os.path.getctime)
-                        video.subtitle_filepath = newest_srt
-                        logger.info(f"📄 字幕文件已生成 | 文件: {os.path.basename(newest_srt)}")
-                    else:
-                        logger.warning(f"⚠️ 未找到生成的字幕文件")
-                
-                # 清理临时音频文件
+                # 🔥 使用 Python API 直接调用 Whisper (可控制超时和设备)
                 try:
-                    if 'audio_path' in locals() and os.path.exists(audio_path):
-                        os.remove(audio_path)
-                        logger.info(f"🧹 已清理临时音频文件: {os.path.basename(audio_path)}")
-                except Exception as e:
-                    logger.warning(f"⚠️ 清理临时文件失败: {str(e)}")
+                    # 根据模型大小选择合适的设备
+                    device = get_whisper_device(model)
                     
-                # 立即更新视频状态为已完成
+                    logger.info(f"🚀 启动AI转录引擎 | 模型: {model} | 语言: {language} | 设备: {device}")
+                    logger.info(f"📝 处理文件: {os.path.basename(input_file)}")
+                    
+                    # 更新进度
+                    video.process_progress = 55.0
+                    video.current_step = f"加载 {model} 模型"
+                    db.session.commit()
+                    
+                    # 加载模型 (添加超时保护和自定义下载路径)
+                    import signal
+                    
+                    # 自定义模型下载路径 (跨平台兼容)
+                    custom_model_path = os.path.expanduser("~/Desktop/File/graduation/whisper")
+                    
+                    def timeout_handler(signum, frame):
+                        raise TimeoutError(f"加载 {model} 模型超时 (超过300秒)")
+                    
+                    # 检查模型是否已下载
+                    model_file = os.path.join(custom_model_path, f"{model}.pt")
+                    is_model_downloaded = os.path.exists(model_file)
+                    
+                    # 如果模型未下载,设置更长的超时时间(5分钟)用于下载
+                    # 如果已下载,使用60秒超时(加载很快)
+                    timeout_seconds = 60 if is_model_downloaded else 300
+                    
+                    logger.info(f"🔍 模型文件检查: {'已存在' if is_model_downloaded else '需要下载'}")
+                    logger.info(f"⏱️  超时设置: {timeout_seconds}秒")
+                    
+                    # 设置60秒超时 (仅 Unix 系统支持)
+                    if hasattr(signal, 'SIGALRM'):
+                        signal.signal(signal.SIGALRM, timeout_handler)
+                        signal.alarm(timeout_seconds)
+                    
+                    try:
+                        # 使用自定义路径加载模型
+                        whisper_model = whisper.load_model(
+                            model, 
+                            device=device,
+                            download_root=custom_model_path
+                        )
+                        if hasattr(signal, 'SIGALRM'):
+                            signal.alarm(0)  # 取消超时
+                        logger.info(f"✅ 模型加载成功 | 设备: {device} | 路径: {custom_model_path}")
+                    except TimeoutError as e:
+                        if hasattr(signal, 'SIGALRM'):
+                            signal.alarm(0)
+                        logger.error(str(e))
+                        if is_model_downloaded:
+                            raise Exception(f"模型加载超时,建议使用更小的模型 (如 small 或 base)")
+                        else:
+                            raise Exception(f"模型下载超时,请检查网络连接或手动下载模型")
+                    
+                    # 更新进度
+                    video.process_progress = 60.0
+                    video.current_step = "开始转录"
+                    db.session.commit()
+                    
+                    # 转录音频 (添加进度回调)
+                    logger.info("🎤 开始语音识别...")
+                    start_time = time.time()
+                    
+                    # 使用 whisper 的 transcribe 方法
+                    result = whisper_model.transcribe(
+                        input_file,
+                        language=language if language else None,
+                        verbose=False,
+                        fp16=(device == "cuda"),  # CUDA使用FP16,CPU使用FP32
+                    )
+                    
+                    elapsed = time.time() - start_time
+                    logger.info(f"✅ 转录完成 | 耗时: {elapsed:.1f}秒")
+                    
+                    # 清理模型和缓存,释放内存
+                    del whisper_model
+                    clear_gpu_cache()
+                    
+                    # 更新进度
+                    video.process_progress = 85.0
+                    video.current_step = "生成字幕文件"
+                    db.session.commit()
+                    
+                    # 生成 SRT 字幕文件
+                    from whisper.utils import WriteSRT, WriteTXT
+                    
+                    with open(srt_filepath, 'w', encoding='utf-8') as srt:
+                        WriteSRT(None).write_result(result, srt)
+                    
+                    with open(txt_filepath, 'w', encoding='utf-8') as txt:
+                        WriteTXT(None).write_result(result, txt)
+                    
+                    logger.info(f"✅ 字幕文件已生成:")
+                    logger.info(f"  � SRT: {os.path.basename(srt_filepath)}")
+                    logger.info(f"  📄 TXT: {os.path.basename(txt_filepath)}")
+                    
+                    # 清理临时音频文件
+                    if input_file != video.filepath and os.path.exists(input_file):
+                        try:
+                            os.remove(input_file)
+                            logger.info(f"🧹 已清理临时音频文件: {os.path.basename(input_file)}")
+                        except Exception as e:
+                            logger.warning(f"清理临时文件失败: {str(e)}")
+                    
+                except Exception as e:
+                    logger.error(f"❌ 转录失败: {str(e)}")
+                    video.status = VideoStatus.FAILED
+                    video.process_progress = 0.0
+                    video.current_step = f"转录失败: {str(e)}"
+                    db.session.commit()
+                    
+                    # 清理资源
+                    clear_gpu_cache()
+                    
+                    return {'status': 'failed', 'message': f'转录失败: {str(e)}'}
+                
+                # 更新视频状态为已完成
                 video.status = VideoStatus.COMPLETED
                 video.processed = True
+                video.subtitle_filepath = srt_filepath  # 保存字幕文件路径
                 video.process_progress = 100.0
                 video.current_step = "处理完成"
                 db.session.commit()
-                
-                # 确保所有数据库更改已提交
-                try:
-                    db.session.commit()
-                except Exception as e:
-                    logger.error(f"提交数据库更改时出错: {str(e)}")
-                    db.session.rollback()
-                    # 再次尝试提交
-                    video.status = VideoStatus.COMPLETED
-                    video.processed = True
-                    video.process_progress = 100.0
-                    video.current_step = "处理完成"
-                    db.session.commit()
             else:
-                logger.info(f"📝 占位文件，跳过字幕处理 | 文件: {os.path.basename(video.filepath)}")
+                logger.info(f"📝 占位文件，跳过字幕处理")
                 video.process_progress = 100.0
                 video.status = VideoStatus.COMPLETED
                 video.processed = True
@@ -767,12 +739,14 @@ def process_video(self, video_id, language='zh', model='turbo'):
                 db.session.commit()
         except Exception as e:
             logger.error(f"❌ 字幕处理失败: {str(e)}")
-            # 即使字幕处理失败，也将视频标记为已完成
             video.status = VideoStatus.COMPLETED
             video.processed = True
             video.process_progress = 100.0
             video.current_step = "处理完成（字幕处理失败）"
             db.session.commit()
+            
+            # 清理资源
+            clear_gpu_cache()
         
         logger.info(f"✅ 视频处理完成 | ID: {video_id}")
         return {'status': 'success', 'message': '视频处理成功'}

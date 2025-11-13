@@ -34,6 +34,54 @@ def get_device():
         return "mps"
     return "cpu"
 
+def get_whisper_device(model_size):
+    """
+    根据模型大小和可用设备选择最佳设备
+    
+    Args:
+        model_size: 模型大小 (tiny, base, small, medium, large)
+    
+    Returns:
+        设备名称 (cpu 或 mps)
+    
+    注意: PyTorch 2.0.0 的 MPS 有 SparseMPS backend bug
+          导致 Whisper 模型无法加载到 MPS 设备
+          因此强制使用 CPU 模式,直到升级到 PyTorch 2.1+
+    """
+    # 检测 PyTorch 版本
+    pytorch_version = torch.__version__.split('+')[0]  # 去除 +cu118 等后缀
+    major, minor = map(int, pytorch_version.split('.')[:2])
+    
+    # PyTorch 2.1+ 有更好的 MPS 支持
+    if major > 2 or (major == 2 and minor >= 1):
+        if torch.backends.mps.is_available():
+            logger.info(f"✅ {model_size} 模型使用 MPS 加速 (Apple Silicon)")
+            return "mps"
+    else:
+        # PyTorch 2.0.x 有 MPS bug,强制使用 CPU
+        logger.warning(f"⚠️  PyTorch {pytorch_version} 的 MPS 不兼容 Whisper")
+        logger.warning(f"⚠️  已降级为 CPU 模式 (建议升级到 PyTorch 2.1+)")
+    
+    logger.info(f"💻 {model_size} 模型使用 CPU")
+    return "cpu"
+
+def clear_mps_cache():
+    """清理MPS缓存,释放显存"""
+    try:
+        if torch.backends.mps.is_available():
+            # PyTorch 2.0.0 使用 torch.mps (如果存在)
+            # PyTorch 2.1+ 可能需要其他方式
+            if hasattr(torch, 'mps') and hasattr(torch.mps, 'empty_cache'):
+                torch.mps.empty_cache()
+                logger.info("🧹 已清理 MPS 缓存")
+            else:
+                # 对于不支持 empty_cache 的版本，通过垃圾回收释放内存
+                import gc
+                gc.collect()
+                logger.info("🧹 已触发垃圾回收 (MPS cache 不可用)")
+    except Exception as e:
+        logger.warning(f"清理 MPS 缓存时出错: {str(e)}")
+
 def generate_video_info(video_path):
     """生成视频信息"""
     try:
@@ -543,86 +591,127 @@ def process_video(self, video_id, language='zh', model='turbo'):
                     logger.warning(f"⚠️  音频提取过程中出错: {str(e)}，将使用原视频文件")
                     input_file = video.filepath
                 
-                # 调用whisper命令行工具进行转录
-                whisper_cmd = [
-                    "python", "-m", "whisper", 
-                    input_file,
-                    "--model", model,
-                    "--language", language,
-                    "--output_dir", subtitle_dir,
-                    "--output_format", "all",
-                ]
-                
-                if language:
-                    whisper_cmd.extend(["--language", language])
-                
-                # 记录命令
-                logger.info(f"🚀 启动AI转录引擎 | 模型: {model} | 语言: {language} | MPS加速: {'已启用' if mps_available else '未启用'}")
-                logger.info(f"📝 处理文件: {os.path.basename(input_file)}")
-                
-                # 启动子进程并实时监控输出
-                process = subprocess.Popen(
-                    whisper_cmd, 
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    bufsize=1,
-                    universal_newlines=True,
-                    encoding='utf-8',
-                    errors='replace'
-                )
-                
-                # 监控进度（简化版，避免线程问题）
-                start_time = time.time()
-                while process.poll() is None:
-                    elapsed = time.time() - start_time
-                    progress = min(95, int(elapsed / 45 * 100))
+                # 🔥 使用 Python API 直接调用 Whisper (可控制超时和设备)
+                try:
+                    # 根据模型大小选择合适的设备
+                    device = get_whisper_device(model)
                     
-                    video.process_progress = 60.0 + (progress * 0.3)
-                    video.current_step = f"转录中: {progress}%"
+                    logger.info(f"🚀 启动AI转录引擎 | 模型: {model} | 语言: {language} | 设备: {device}")
+                    logger.info(f"📝 处理文件: {os.path.basename(input_file)}")
+                    
+                    # 更新进度
+                    video.process_progress = 55.0
+                    video.current_step = f"加载 {model} 模型"
                     db.session.commit()
                     
-                    time.sleep(2)
-                
-                result = process.returncode
-                
-                # 更新进度
-                video.process_progress = 90.0
-                video.current_step = "转录完成，处理结果"
-                db.session.commit()
-                
-                if result != 0:
-                    stderr_output = process.stderr.read()
-                    logger.error(f"❌ 转录失败: {stderr_output}")
-                else:
-                    logger.info(f"✅ 转录完成 | 状态: 成功")
-                
-                # 检查生成的字幕文件是否存在
-                expected_srt = os.path.join(subtitle_dir, f"{base_filename}.srt")
-                if os.path.exists(expected_srt):
-                    video.subtitle_filepath = expected_srt
-                    logger.info(f"📄 字幕文件已生成 | 文件: {os.path.basename(expected_srt)}")
-                else:
-                    srt_files = [f for f in os.listdir(subtitle_dir) if f.endswith('.srt')]
-                    if srt_files:
-                        newest_srt = max([os.path.join(subtitle_dir, f) for f in srt_files], 
-                                       key=os.path.getctime)
-                        video.subtitle_filepath = newest_srt
-                        logger.info(f"📄 字幕文件已生成 | 文件: {os.path.basename(newest_srt)}")
-                    else:
-                        logger.warning(f"⚠️  未找到生成的字幕文件")
-                
-                # 清理临时音频文件
-                try:
-                    if 'audio_path' in locals() and os.path.exists(audio_path):
-                        os.remove(audio_path)
-                        logger.info(f"🧹 已清理临时音频文件: {os.path.basename(audio_path)}")
-                except Exception as e:
-                    logger.warning(f"⚠️  清理临时文件失败: {str(e)}")
+                    # 加载模型 (添加超时保护和自定义下载路径)
+                    import signal
                     
+                    # 自定义Whisper模型下载路径
+                    custom_model_path = os.path.expanduser("~/Desktop/File/graduation/whisper")
+                    
+                    def timeout_handler(signum, frame):
+                        raise TimeoutError(f"加载 {model} 模型超时 (超过300秒)")
+                    
+                    # 检查模型是否已下载
+                    model_file = os.path.join(custom_model_path, f"{model}.pt")
+                    is_model_downloaded = os.path.exists(model_file)
+                    
+                    # 如果模型未下载,设置更长的超时时间(5分钟)用于下载
+                    # 如果已下载,使用60秒超时(加载很快)
+                    timeout_seconds = 60 if is_model_downloaded else 300
+                    
+                    logger.info(f"🔍 模型文件检查: {'已存在' if is_model_downloaded else '需要下载'}")
+                    logger.info(f"⏱️  超时设置: {timeout_seconds}秒")
+                    
+                    # 设置超时
+                    signal.signal(signal.SIGALRM, timeout_handler)
+                    signal.alarm(timeout_seconds)
+                    
+                    try:
+                        # 使用自定义路径加载模型
+                        whisper_model = whisper.load_model(
+                            model, 
+                            device=device,
+                            download_root=custom_model_path
+                        )
+                        signal.alarm(0)  # 取消超时
+                        logger.info(f"✅ 模型加载成功 | 设备: {device} | 路径: {custom_model_path}")
+                    except TimeoutError as e:
+                        signal.alarm(0)
+                        logger.error(str(e))
+                        if is_model_downloaded:
+                            raise Exception(f"模型加载超时,建议使用更小的模型 (如 small 或 base)")
+                        else:
+                            raise Exception(f"模型下载超时,请检查网络连接或手动下载模型")
+                    
+                    # 更新进度
+                    video.process_progress = 60.0
+                    video.current_step = "开始转录"
+                    db.session.commit()
+                    
+                    # 转录音频 (添加进度回调)
+                    logger.info("🎤 开始语音识别...")
+                    start_time = time.time()
+                    
+                    # 使用 whisper 的 transcribe 方法
+                    # 注意: PyTorch 2.0.0 的 MPS 对 fp16 支持不完善,强制使用 fp32
+                    result = whisper_model.transcribe(
+                        input_file,
+                        language=language if language else None,
+                        verbose=False,
+                        fp16=False,  # MPS 在 PyTorch 2.0 中使用 fp32 更稳定
+                    )
+                    
+                    elapsed = time.time() - start_time
+                    logger.info(f"✅ 转录完成 | 耗时: {elapsed:.1f}秒")
+                    
+                    # 清理模型和缓存,释放内存
+                    del whisper_model
+                    clear_mps_cache()
+                    
+                    # 更新进度
+                    video.process_progress = 85.0
+                    video.current_step = "生成字幕文件"
+                    db.session.commit()
+                    
+                    # 生成 SRT 字幕文件
+                    from whisper.utils import WriteSRT, WriteTXT
+                    
+                    with open(srt_filepath, 'w', encoding='utf-8') as srt:
+                        WriteSRT(None).write_result(result, srt)
+                    
+                    with open(txt_filepath, 'w', encoding='utf-8') as txt:
+                        WriteTXT(None).write_result(result, txt)
+                    
+                    logger.info(f"✅ 字幕文件已生成:")
+                    logger.info(f"  📄 SRT: {os.path.basename(srt_filepath)}")
+                    logger.info(f"  📄 TXT: {os.path.basename(txt_filepath)}")
+                    
+                    # 清理临时音频文件
+                    if input_file != video.filepath and os.path.exists(input_file):
+                        try:
+                            os.remove(input_file)
+                            logger.info(f"🧹 已清理临时音频文件: {os.path.basename(input_file)}")
+                        except Exception as e:
+                            logger.warning(f"清理临时文件失败: {str(e)}")
+                    
+                except Exception as e:
+                    logger.error(f"❌ 转录失败: {str(e)}")
+                    video.status = VideoStatus.FAILED
+                    video.process_progress = 0.0
+                    video.current_step = f"转录失败: {str(e)}"
+                    db.session.commit()
+                    
+                    # 清理资源
+                    clear_mps_cache()
+                    
+                    return {'status': 'failed', 'message': f'转录失败: {str(e)}'}
+                
                 # 更新视频状态为已完成
                 video.status = VideoStatus.COMPLETED
                 video.processed = True
+                video.subtitle_filepath = srt_filepath  # 保存字幕文件路径
                 video.process_progress = 100.0
                 video.current_step = "处理完成"
                 db.session.commit()
@@ -640,6 +729,9 @@ def process_video(self, video_id, language='zh', model='turbo'):
             video.process_progress = 100.0
             video.current_step = "处理完成（字幕处理失败）"
             db.session.commit()
+            
+            # 清理资源
+            clear_mps_cache()
         
         logger.info(f"✅ 视频处理完成 | ID: {video_id}")
         return {'status': 'success', 'message': '视频处理成功'}

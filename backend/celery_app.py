@@ -53,26 +53,30 @@ celery.conf.update(
     timezone='Asia/Shanghai',
     enable_utc=True,
     task_track_started=True,
-    task_time_limit=7200,  # 增加到2小时
-    worker_max_tasks_per_child=10,  # 减少以防止内存泄漏
+    task_time_limit=10800,  # 3小时硬超时 (中大型模型需要更长时间)
+    worker_max_tasks_per_child=5,  # 减少到5个任务后重启worker,防止内存泄漏
     worker_prefetch_multiplier=1,
     broker_connection_retry_on_startup=True,
-    broker_transport_options={'visibility_timeout': 7200},  # 与任务超时保持一致
-    task_soft_time_limit=7000,  # 软超时限制
+    broker_transport_options={'visibility_timeout': 10800},  # 与任务超时保持一致
+    task_soft_time_limit=10500,  # 软超时限制 (2.9小时)
     task_acks_late=True,  # 任务完成后再确认
     task_reject_on_worker_lost=True,  # 工作进程丢失时拒绝任务
     task_default_retry_delay=60,  # 默认重试延迟
-    task_max_retries=3,  # 最大重试次数
+    task_max_retries=2,  # 最大重试次数 (降低避免反复失败)
     
-    # 🔥 关键修复：Mac 使用 spawn 模式避免 MPS 设备 fork 崩溃
+    # 🔥 关键修复：Mac 使用 solo 模式避免 MPS 设备 fork 崩溃
     # fork 模式在子进程中使用 MPS/CUDA 会导致 SIGSEGV
     worker_pool='solo' if platform.system() == "Darwin" else 'prefork',
+    
+    # 任务结果过期时间
+    result_expires=3600,  # 1小时后清理任务结果
 )
 
 # Mac 系统额外配置说明
 if platform.system() == "Darwin":
     print("⚠️  Mac 模式: 使用 solo pool (单进程) 避免 MPS fork 崩溃")
     print("💡 如需并发处理，建议启动多个 Celery worker 实例")
+    print("⏱️  任务超时: 3小时 (适配大模型处理)")
 
 # 将Flask应用上下文推送到Celery
 class FlaskTask(celery.Task):
