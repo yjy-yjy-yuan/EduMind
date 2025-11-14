@@ -346,10 +346,23 @@ def upload_video_url():
                     }
                 }
             elif is_youtube:
-                # YouTube特定配置
+                # YouTube特定配置 - 让 yt-dlp 自动选择最佳格式
                 ydl_opts = {
-                    **common_opts,
-                    'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',  # 优先选择mp4格式
+                    'outtmpl': os.path.join(download_folder, '%(title)s.%(ext)s'),
+                    'quiet': True,
+                    'no_warnings': True,
+                    # 🔥 不指定格式，让 yt-dlp 自动下载并合并最佳格式
+                    # 这是 yt-dlp 推荐的方式，避免格式选择错误
+                    'merge_output_format': 'mp4',
+                    # 🚀 性能优化：并发下载和重试
+                    'concurrent_fragment_downloads': 4,  # 并发下载4个片段
+                    'retries': 10,
+                    'fragment_retries': 10,
+                    'file_access_retries': 3,
+                    'extractor_retries': 3,
+                    # 🚀 代理配置：加速下载Youtube视频
+                    'proxy': 'http://127.0.0.1:7890',  # 常见的 Clash 代理端口
+                    # 'proxy': 'socks5://127.0.0.1:1080',  # 或 V2Ray 代理
                     'http_headers': {
                         'User-Agent': user_agent,
                         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -359,6 +372,12 @@ def upload_video_url():
                     'nocheckcertificate': True,
                     'ignoreerrors': False,
                 }
+
+                # 🔥 最新方案：直接从浏览器提取 cookies（最可靠！）
+                # 这避免了所有 cookies 文件导出的问题
+                ydl_opts['cookiesfrombrowser'] = ('chrome',)
+                current_app.logger.info('🍪 从 Chrome 浏览器实时提取 cookies')
+                current_app.logger.info('💡 注意：Chrome 必须已登录 YouTube 且保持后台运行')
             elif is_mooc:
                 # 慕课特定配置
                 ydl_opts = {
@@ -393,16 +412,13 @@ def upload_video_url():
                     return jsonify({'error': f'下载视频失败: {message}'}), 500
             else:
                 # 使用yt-dlp下载B站和YouTube视频
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    # 对于YouTube视频，设置更长的超时时间
-                    if is_youtube:
-                        current_app.logger.info(f'YouTube视频下载可能需要较长时间，已设置更长的超时时间')
-                        ydl.params['socket_timeout'] = 180  # 设置更长的超时时间，3分钟
-                    
-                    try:
-                        # 先获取视频信息
-                        current_app.logger.info(f'开始获取视频信息: {video_url}')
-                        
+                try:
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        # 对于YouTube视频，设置更长的超时时间
+                        if is_youtube:
+                            current_app.logger.info(f'YouTube视频下载可能需要较长时间，已设置更长的超时时间')
+                            ydl.params['socket_timeout'] = 180  # 设置更长的超时时间，3分钟
+
                         # 为哔哩哔哩视频设置特殊的网络参数
                         if is_bilibili:
                             # 增加重试次数和超时时间
@@ -410,10 +426,9 @@ def upload_video_url():
                             ydl.params['socket_timeout'] = 60  # 增加超时时间到60秒
                             ydl.params['fragment_retries'] = 10  # 片段下载重试次数
                             current_app.logger.info(f'哔哩哔哩视频：已设置更高的重试次数和更长的超时时间')
-                            
-                            # 添加代理设置（如果需要）
-                            # ydl.params['proxy'] = 'http://127.0.0.1:7890'  # 如果有代理，可以取消注释
-                        
+
+                        # 先获取视频信息
+                        current_app.logger.info(f'开始获取视频信息: {video_url}')
                         info = ydl.extract_info(video_url, download=False)
                         video_title = info.get('title', '未知标题')
                         # 清理标题中的特殊字符，但保留中文字符
@@ -421,29 +436,41 @@ def upload_video_url():
                         # 根据来源添加前缀
                         prefix = 'bilibili-' if is_bilibili else 'youtube-'
                         title = f"{prefix}{video_title}"
-                        
+
                         # 更新下载配置中的输出模板
                         ydl_opts['outtmpl'] = os.path.join(download_folder, f'{title}.%(ext)s')
-                        
+
                         # 使用新的配置下载视频
                         current_app.logger.info(f'开始下载视频: {video_url}')
                         with yt_dlp.YoutubeDL(ydl_opts) as ydl2:
                             ydl2.download([video_url])
-                        
+
                         # 设置文件路径
                         filename = f"{title}.mp4"
                         filepath = os.path.join(download_folder, filename)
-                        
+
                         # 检查文件是否存在
                         if not os.path.exists(filepath):
                             current_app.logger.error(f'下载的视频文件不存在: {filepath}')
                             raise FileNotFoundError(f"下载的视频文件不存在: {filepath}")
-                        
-                        current_app.logger.info(f'视频下载成功: {filepath}')
-                        
-                    except Exception as e:
-                        current_app.logger.error(f'下载视频时出错: {str(e)}')
-                        raise
+
+                        current_app.logger.info(f'✅ 视频下载成功: {filepath}')
+
+                except Exception as e:
+                    error_msg = str(e)
+                    current_app.logger.error(f'下载视频时出错: {error_msg}')
+
+                    # 特殊处理 YouTube 错误
+                    if is_youtube:
+                        if 'Sign in to confirm' in error_msg or 'bot' in error_msg or 'cookie' in error_msg.lower():
+                            cookies_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'youtube_cookies.txt')
+                            current_app.logger.error('❌ YouTube 需要登录验证')
+                            current_app.logger.error(f'💡 解决方法：')
+                            current_app.logger.error(f'   1. 安装浏览器插件导出 cookies')
+                            current_app.logger.error(f'   2. 将 cookies 文件保存到: {cookies_file}')
+                            current_app.logger.error(f'   3. 重新尝试下载')
+                            raise Exception(f'YouTube 需要登录验证。请导出 cookies 文件到: {cookies_file}')
+                    raise
             
             # 更新临时视频记录
             temp_video.filename = filename
