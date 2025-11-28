@@ -5,10 +5,10 @@
         <!-- 添加与顶部栏相同的logo -->
         <div class="logo-container">
           <i class="fas fa-graduation-cap logo-icon"></i>
-          <span class="logo-text">AI-EdVision</span>
+          <span class="logo-text">视频智能伴学</span>
         </div>
         <h2>注册账号</h2>
-        <p>加入 AI-EdVision，开启智能学习之旅</p>
+        <p>加入视频智能伴学系统，开启智能学习之旅</p>
       </div>
       
       <div class="register-form">

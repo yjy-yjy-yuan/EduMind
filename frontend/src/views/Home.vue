@@ -5,7 +5,7 @@
     <div class="hero-container">
       <div class="hero-content-wrapper">
         <div class="hero-text">
-          <h1 class="main-title">AI-EdVision<br><span class="highlight">智能教育视频分析系统</span></h1>
+          <h1 class="main-title"><span class="highlight">视频智能伴学系统</span></h1>
           <p class="subtitle">通过 AI 技术赋能教育视频，提供智能字幕、知识问答、笔记管理等功能，让学习更高效、更智能、更个性化</p>
           <el-button type="primary" size="large" class="hero-button" @click="navigateToUpload" :loading="isLoading">
             <span v-if="!isLoading">开始上传视频</span>
@@ -24,7 +24,7 @@
     <div class="container">
       <div class="section-header">
         <h2 class="section-title">强大功能，智能学习</h2>
-        <p class="section-subtitle">AI-EdVision 集成多种智能功能，为您的学习体验带来革命性变化</p>
+        <p class="section-subtitle">视频智能伴学系统集成多种智能功能，为您的学习体验带来革命性变化</p>
       </div>
 
       <div class="features-grid">
@@ -96,7 +96,7 @@
   <section class="advantages-section">
     <div class="container">
       <div class="section-header">
-        <h2 class="section-title">AI-EdVision 核心优势</h2>
+        <h2 class="section-title">核心优势</h2>
         <p class="section-subtitle">我们的系统具备多项独特优势，为您的学习提供全方位支持</p>
       </div>
 
@@ -167,7 +167,7 @@
     <div class="container">
       <div class="section-header">
         <h2 class="section-title">用户的声音</h2>
-        <p class="section-subtitle">听听我们的用户如何评价 AI-EdVision</p>
+        <p class="section-subtitle">听听我们的用户如何评价视频智能伴学系统</p>
       </div>
     
       <div class="testimonials-container">
@@ -210,7 +210,7 @@
   <section class="cta-section">
     <div class="cta-card">
       <h2 class="cta-title">准备好开始智能学习之旅了吗？</h2>
-      <p class="cta-description">立即体验 AI-EdVision，让 AI 技术为您的学习提供全方位支持</p>
+      <p class="cta-description">立即体验视频智能伴学系统，让深度学习技术为您的学习提供全方位支持</p>
       <el-button type="primary" size="large" class="cta-button" @click="navigateToUpload">
         免费开始使用
       </el-button>
@@ -224,10 +224,10 @@
         <div class="footer-info">
           <div class="footer-logo">
             <i class="fas fa-brain"></i>
-            <h3>AI-EdVision</h3>
+            <h3>视频智能伴学系统</h3>
           </div>
           <p class="footer-description">
-            智能教育视频分析系统，让学习更高效、更智能、更个性化
+            基于深度学习的视频智能伴学系统，让学习更高效、更智能、更个性化
           </p>
         </div>
         
@@ -269,7 +269,7 @@
       </div>
       
       <div class="footer-bottom">
-        <p>&copy; 2025 AI-EdVision. 保留所有权利。</p>
+        <p>&copy; 2025 视频智能伴学系统. 保留所有权利。</p>
       </div>
     </div>
   </footer>
@@ -372,7 +372,7 @@ export default {
         name: '张老师',
         role: '大学教授',
         icon: 'fas fa-chalkboard-teacher',
-        content: 'AI-EdVision 彻底改变了我的教学方式，学生们可以随时回顾课程视频并获得 AI 辅助，学习效果显著提升。'
+        content: '视频智能伴学系统彻底改变了我的教学方式，学生们可以随时回顾课程视频并获得 AI 辅助，学习效果显著提升。'
       },
       {
         name: '李同学',
@@ -396,7 +396,7 @@ export default {
         name: '王经理',
         role: '企业培训师',
         icon: 'fas fa-briefcase',
-        content: '我们公司将所有培训视频都上传到了 AI-EdVision，员工培训效率提高了 50%，满意度也大幅提升。'
+        content: '我们公司将所有培训视频都上传到了视频智能伴学系统，员工培训效率提高了 50%，满意度也大幅提升。'
       },
       {
         name: '山田健太',
@@ -813,7 +813,7 @@ section {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* AI-EdVision 核心优势区域样式 */
+/* 核心优势区域样式 */
 .advantages-section {
   background-color: #fff;
   padding: 2.5rem 0;  /* 从5rem减小到2.5rem */
@@ -878,7 +878,7 @@ section {
 }
 
 .advantage-icon {
-  color: #4F46E5;  /* AI-EdVision 核心优势图标颜色*/
+  color: #4F46E5;  /* 核心优势图标颜色*/
   font-size: 1.75rem;
   transition: all 0.3s ease;
 }

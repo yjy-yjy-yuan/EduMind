@@ -110,7 +110,7 @@ const router = createRouter({
 
 // 设置页面标题
 router.beforeEach((to, from, next) => {
-  document.title = to.meta.title ? `${to.meta.title} - AI-EdVision` : 'AI-EdVision'
+  document.title = to.meta.title ? `${to.meta.title} - 视频智能伴学系统` : '视频智能伴学系统'
   next()
 })
 

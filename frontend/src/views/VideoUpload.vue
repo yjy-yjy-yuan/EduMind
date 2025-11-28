@@ -273,7 +273,7 @@
     <!-- 页脚 -->
     <div class="page-footer">
       <div class="footer-content">
-        <p>&copy; 2025 AI-EdVision 智能教育视频分析系统</p>
+        <p>&copy; 2025 基于深度学习的视频智能伴学系统</p>
       </div>
     </div>
   </div>

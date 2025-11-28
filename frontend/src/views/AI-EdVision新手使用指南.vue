@@ -6,8 +6,8 @@
       <div class="hero-container">
         <div class="hero-content-wrapper">
           <div class="hero-text full-width">
-            <h1 class="main-title">AI-EdVision<br><span class="highlight">新手使用指南</span></h1>
-            <p class="subtitle">通过本指南快速掌握 AI-EdVision 的核心功能，让您的学习体验更高效、更智能、更个性化</p>
+            <h1 class="main-title"><span class="highlight">新手使用指南</span></h1>
+            <p class="subtitle">通过本指南快速掌握视频智能伴学系统的核心功能，让您的学习体验更高效、更智能、更个性化</p>
             <el-button type="primary" size="large" class="hero-button" @click="navigateToUpload">
               开始上传视频
             </el-button>
@@ -20,11 +20,11 @@
     <section class="workflow-section">
       <div class="section-header">
         <h2 class="section-title">使用流程</h2>
-        <p class="section-subtitle">按照以下步骤，轻松开始使用 AI-EdVision</p>
+        <p class="section-subtitle">按照以下步骤，轻松开始使用视频智能伴学系统</p>
       </div>
       <div class="workflow-container">
         <div class="workflow-diagram">
-          <img src="../assets/workflow.svg" alt="AI-EdVision使用流程图" class="workflow-image" />
+          <img src="../assets/workflow.svg" alt="视频智能伴学系统使用流程图" class="workflow-image" />
         </div>
       </div>
     </section>
@@ -33,7 +33,7 @@
     <section class="tutorials-section">
       <div class="section-header">
         <h2 class="section-title">详细教程</h2>
-        <p class="section-subtitle">跟随以下步骤，轻松掌握 AI-EdVision 的全部功能</p>
+        <p class="section-subtitle">跟随以下步骤，轻松掌握视频智能伴学系统的全部功能</p>
       </div>
 
       <div class="tutorials-container">
@@ -57,7 +57,7 @@
             <div class="tutorial-steps">
               <div class="step">
                 <span class="step-number">1</span>
-                <p>访问 AI-EdVision 首页，点击右上角的<strong>「登录/注册」</strong>按钮</p>
+                <p>访问视频智能伴学系统首页，点击右上角的<strong>「登录/注册」</strong>按钮</p>
               </div>
               <div class="step">
                 <span class="step-number">2</span>
@@ -336,7 +336,7 @@
     <section class="cta-section">
       <div class="cta-card">
         <h2 class="cta-title">准备好开始智能学习之旅了吗？</h2>
-        <p class="cta-description">立即体验 AI-EdVision，让 AI 技术为您的学习提供全方位支持</p>
+        <p class="cta-description">立即体验视频智能伴学系统，让深度学习技术为您的学习提供全方位支持</p>
         <el-button type="primary" size="large" class="cta-button" @click="navigateToUpload">
           免费开始使用
         </el-button>
@@ -350,10 +350,10 @@
           <div class="footer-info">
             <div class="footer-logo">
               <i class="fas fa-brain"></i>
-              <h3>AI-EdVision</h3>
+              <h3>视频智能伴学系统</h3>
             </div>
             <p class="footer-description">
-              智能教育视频分析系统，让学习更高效、更智能、更个性化
+              基于深度学习的视频智能伴学系统，让学习更高效、更智能、更个性化
             </p>
           </div>
           
@@ -395,7 +395,7 @@
         </div>
         
         <div class="footer-bottom">
-          <p>&copy; 2025 AI-EdVision. 保留所有权利。</p>
+          <p>&copy; 2025 视频智能伴学系统. 保留所有权利。</p>
         </div>
       </div>
     </footer>

@@ -5,7 +5,7 @@
       <!-- 左侧Logo和名称 -->
       <div class="logo-container">
         <i class="fas fa-graduation-cap logo-icon"></i>
-        <span class="logo-text">AI-EdVision</span>
+        <span class="logo-text">视频智能伴学</span>
       </div>
       
       <div class="flex-spacer"></div>

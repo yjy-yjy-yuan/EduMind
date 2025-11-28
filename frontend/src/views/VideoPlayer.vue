@@ -316,13 +316,13 @@
     <!-- 帮助文档对话框 -->
     <el-dialog
       v-model="helpDialogVisible"
-      title="AI-EdVision 使用帮助"
+      title="视频智能伴学系统 使用帮助"
       width="60%"
       :before-close="closeHelpDialog"
       v-if="false"
     >
       <div class="help-content">
-        <h3>欢迎使用 AI-EdVision 智能教育视频分析系统</h3>
+        <h3>欢迎使用视频智能伴学系统</h3>
     
         <div class="help-section">
           <h4>1. 视频播放与字幕</h4>
@@ -387,7 +387,7 @@
       :close-on-press-escape="true"
     >
       <div class="guide-content">
-        <h3>欢迎使用 AI-EdVision 视频学习系统</h3>
+        <h3>欢迎使用视频智能伴学系统</h3>
         
         <div class="guide-section">
           <h4><el-icon><edit /></el-icon> 记录学习笔记</h4>

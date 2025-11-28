@@ -12,7 +12,7 @@
       <div class="note-guide-content">
         <div class="guide-header">
           <el-icon class="header-icon"><Document /></el-icon>
-          <h2>欢迎使用 AI-EdVision 智能笔记系统！</h2>
+          <h2>欢迎使用视频智能伴学系统的智能笔记功能！</h2>
         </div>
         
         <div class="guide-description">
