@@ -1,5 +1,7 @@
-from .video import Video, VideoStatus
+from .note import Note
+from .note import NoteTimestamp
 from .subtitle import Subtitle
-from .note import Note, NoteTimestamp
+from .video import Video
+from .video import VideoStatus
 
 __all__ = ['Video', 'VideoStatus', 'Subtitle', 'Note', 'NoteTimestamp']

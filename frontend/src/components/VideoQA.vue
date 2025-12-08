@@ -10,7 +10,7 @@
           </el-radio-group>
         </div>
       </template>
-      
+
       <!-- 问答历史 -->
       <div class="qa-history" v-loading="loading">
         <el-timeline>
@@ -27,7 +27,7 @@
           </el-timeline-item>
         </el-timeline>
       </div>
-      
+
       <!-- 提问表单 -->
       <div class="ask-form">
         <el-input
@@ -87,7 +87,7 @@ const formatTime = (isoString) => {
 
 const loadQAHistory = async () => {
   if (qaMode.value !== 'video') return
-  
+
   loading.value = true
   try {
     const response = await getQAHistory(props.videoId)
@@ -102,7 +102,7 @@ const loadQAHistory = async () => {
 
 const handleAsk = async () => {
   if (!question.value || !apiKey.value) return
-  
+
   asking.value = true
   try {
     const response = await askQuestion({
@@ -111,7 +111,7 @@ const handleAsk = async () => {
       api_key: apiKey.value,
       mode: qaMode.value
     })
-    
+
     // 添加新问答到历史记录
     if (qaMode.value === 'video') {
       qaHistory.value.unshift(response.data)
@@ -123,10 +123,10 @@ const handleAsk = async () => {
         created_at: new Date().toISOString()
       })
     }
-    
+
     // 清空问题输入
     question.value = ''
-    
+
     ElMessage.success('回答成功')
   } catch (error) {
     ElMessage.error(error.response?.data?.error || '提问失败')

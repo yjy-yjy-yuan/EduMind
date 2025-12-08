@@ -7,9 +7,9 @@
         <i class="fas fa-graduation-cap logo-icon"></i>
         <span class="logo-text">视频智能伴学</span>
       </div>
-      
+
       <div class="flex-spacer"></div>
-      
+
       <!-- 右侧导航菜单 -->
       <div class="nav-items">
         <router-link to="/" class="nav-item" :class="{ active: activeRoute === '/' }">首页</router-link>
@@ -17,13 +17,13 @@
         <router-link to="/notes" class="nav-item" :class="{ active: activeRoute === '/notes' }">笔记管理</router-link>
         <router-link to="/knowledge" class="nav-item" :class="{ active: activeRoute === '/knowledge' }">知识点总览</router-link>
         <router-link to="/guide" class="nav-item" :class="{ active: activeRoute === '/guide' }">使用指南</router-link>
-        
+
         <!-- 护眼模式切换按钮 -->
         <div class="nav-item theme-item" @click="toggleEyeCareMode">
           <i :class="isEyeCareMode ? 'fas fa-sun' : 'fas fa-eye'"></i>
           <span>{{ isEyeCareMode ? '标准模式' : '护眼模式' }}</span>
         </div>
-        
+
         <!-- 用户登录状态 -->
         <template v-if="authState.isAuthenticated">
           <el-dropdown trigger="click" @command="handleCommand" class="user-dropdown">
@@ -39,7 +39,7 @@
             </template>
           </el-dropdown>
         </template>
-        
+
         <!-- 未登录状态 -->
         <template v-else>
           <router-link to="/login" class="nav-item login-item">
@@ -92,9 +92,9 @@ const logout = async () => {
       },
       credentials: 'include'
     })
-    
+
     const data = await response.json()
-    
+
     if (data.success) {
       // 清除认证状态
       authStore.clearAuth()
@@ -114,7 +114,7 @@ const logout = async () => {
 // 护眼模式切换功能
 const toggleEyeCareMode = () => {
   isEyeCareMode.value = !isEyeCareMode.value
-  
+
   if (isEyeCareMode.value) {
     document.body.classList.add('eye-care-mode')
     localStorage.setItem('eyeCareMode', 'true')
@@ -215,7 +215,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-.nav-item:hover, 
+.nav-item:hover,
 .nav-item.active {
   background-color: rgba(255, 255, 255, 0.15);
   color: #fff;
@@ -309,12 +309,12 @@ onMounted(() => {
   .logo-text {
     display: none;
   }
-  
+
   .nav-item {
     padding: 0 15px;
     font-size: 14px;
   }
-  
+
   .theme-item span {
     display: none;
   }
@@ -340,7 +340,7 @@ body {
   --code-bg: #f5f7ff;
   --selection-bg: #e6e9f5;
   --selection-text: #333333;
-  
+
   background-color: var(--primary-bg);
   color: var(--primary-text);
   transition: all 0.3s ease;

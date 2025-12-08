@@ -2,7 +2,7 @@
 API 测试 - 笔记相关接口
 测试笔记的 CRUD 操作
 """
-import pytest
+
 import json
 
 
@@ -14,7 +14,9 @@ class TestNoteListAPI:
         response = client.get('/api/notes/notes')
         assert response.status_code == 200
         data = response.get_json()
-        assert isinstance(data, (list, dict))
+        # 响应格式: {'status': 'success', 'data': [...]}
+        assert isinstance(data, dict)
+        assert 'status' in data or 'data' in data
 
 
 class TestNoteCreateAPI:
@@ -26,13 +28,9 @@ class TestNoteCreateAPI:
         note_data = {
             'title': sample_note_data['title'],
             'content': sample_note_data['content'],
-            'tags': ','.join(sample_note_data['tags'])
+            'tags': ','.join(sample_note_data['tags']),
         }
-        response = client.post(
-            '/api/notes/notes',
-            data=json.dumps(note_data),
-            headers=auth_headers
-        )
+        response = client.post('/api/notes/notes', data=json.dumps(note_data), headers=auth_headers)
         assert response.status_code in [200, 201]
         data = response.get_json()
         if 'note' in data:
@@ -40,21 +38,13 @@ class TestNoteCreateAPI:
 
     def test_create_note_without_title(self, client, auth_headers):
         """测试创建无标题笔记"""
-        response = client.post(
-            '/api/notes/notes',
-            data=json.dumps({'content': '只有内容'}),
-            headers=auth_headers
-        )
+        response = client.post('/api/notes/notes', data=json.dumps({'content': '只有内容'}), headers=auth_headers)
         # 应该失败（title 是必填字段）
         assert response.status_code in [400, 422, 500]
 
     def test_create_note_empty_body(self, client, auth_headers):
         """测试空请求体创建笔记"""
-        response = client.post(
-            '/api/notes/notes',
-            data=json.dumps({}),
-            headers=auth_headers
-        )
+        response = client.post('/api/notes/notes', data=json.dumps({}), headers=auth_headers)
         assert response.status_code in [400, 422, 500]
 
 
@@ -64,21 +54,20 @@ class TestNoteDetailAPI:
     def test_get_nonexistent_note(self, client):
         """测试获取不存在的笔记"""
         response = client.get('/api/notes/notes/99999')
-        assert response.status_code in [404, 500]
+        # Flask 的 get_or_404 返回 404
+        assert response.status_code == 404
 
     def test_update_nonexistent_note(self, client, auth_headers):
         """测试更新不存在的笔记"""
         response = client.put(
-            '/api/notes/notes/99999',
-            data=json.dumps({'title': '更新', 'content': '内容'}),
-            headers=auth_headers
+            '/api/notes/notes/99999', data=json.dumps({'title': '更新', 'content': '内容'}), headers=auth_headers
         )
-        assert response.status_code in [404, 500]
+        assert response.status_code == 404
 
     def test_delete_nonexistent_note(self, client):
         """测试删除不存在的笔记"""
         response = client.delete('/api/notes/notes/99999')
-        assert response.status_code in [404, 500]
+        assert response.status_code == 404
 
 
 class TestNoteSimilarAPI:
@@ -86,19 +75,13 @@ class TestNoteSimilarAPI:
 
     def test_similar_notes_without_content(self, client, auth_headers):
         """测试无内容的相似搜索"""
-        response = client.post(
-            '/api/notes/notes/similar',
-            data=json.dumps({}),
-            headers=auth_headers
-        )
+        response = client.post('/api/notes/notes/similar', data=json.dumps({}), headers=auth_headers)
         assert response.status_code in [200, 400, 500]
 
     def test_similar_notes_with_content(self, client, auth_headers):
         """测试有效内容的相似搜索"""
         response = client.post(
-            '/api/notes/notes/similar',
-            data=json.dumps({'content': '测试内容'}),
-            headers=auth_headers
+            '/api/notes/notes/similar', data=json.dumps({'content': '测试内容'}), headers=auth_headers
         )
         # 可能返回空结果或成功
         assert response.status_code in [200, 500]

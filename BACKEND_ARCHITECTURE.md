@@ -69,7 +69,7 @@ Video
   ├── Video Metadata: duration, fps, width, height, frame_count, md5
   ├── Generated Content: preview_filepath, processed_filepath, subtitle_filepath
   ├── AI Output: summary (video abstract), tags (JSON)
-  └── Relationships: 
+  └── Relationships:
       ├── has many Subtitles
       ├── has many Notes
       └── has many Questions
@@ -550,14 +550,14 @@ User Creates Note
          ├─ Create Note record
          ├─ Optionally link to video_id
          └─ Generate embeddings (content_vector)
-              
+
 User Links Note to Video Timestamp
     └─ POST /api/notes/{id}/link
          ├─ Create NoteTimestamp record
          ├─ time_seconds: video position
          ├─ subtitle_text: matching subtitle
          └─ Enable time-based note retrieval
-              
+
 User Views Notes for Video
     └─ GET /api/notes/video/{video_id}
          ├─ Query notes by video_id
@@ -850,4 +850,3 @@ backend/
 6. **Video Compression**: Automated video codec optimization
 7. **Distributed Processing**: Multi-server Celery setup for horizontal scaling
 8. **Graph Database Optimization**: Better indexing strategies for large graphs
-

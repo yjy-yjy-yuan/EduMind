@@ -2,8 +2,10 @@
 单元测试 - 数据模型测试
 测试 Video, Note, Subtitle 等模型的基本功能
 """
-import pytest
+
 from datetime import datetime
+
+import pytest
 
 
 class TestVideoModel:
@@ -13,11 +15,7 @@ class TestVideoModel:
         """测试创建视频记录"""
         from app.models import Video
 
-        video = Video(
-            title='测试视频',
-            filepath='/uploads/test.mp4',
-            duration=120
-        )
+        video = Video(title='测试视频', filepath='/uploads/test.mp4', duration=120)
         db_session.add(video)
         db_session.commit()
 
@@ -27,12 +25,10 @@ class TestVideoModel:
 
     def test_video_default_status(self, app, db_session):
         """测试视频默认状态"""
-        from app.models import Video, VideoStatus
+        from app.models import Video
+        from app.models import VideoStatus
 
-        video = Video(
-            title='测试视频',
-            filepath='/uploads/test.mp4'
-        )
+        video = Video(title='测试视频', filepath='/uploads/test.mp4')
         db_session.add(video)
         db_session.commit()
 
@@ -43,11 +39,7 @@ class TestVideoModel:
         """测试视频转字典"""
         from app.models import Video
 
-        video = Video(
-            title='测试视频',
-            filepath='/uploads/test.mp4',
-            duration=120
-        )
+        video = Video(title='测试视频', filepath='/uploads/test.mp4', duration=120)
         db_session.add(video)
         db_session.commit()
 
@@ -58,7 +50,8 @@ class TestVideoModel:
 
     def test_video_status_change(self, app, db_session):
         """测试视频状态变更"""
-        from app.models import Video, VideoStatus
+        from app.models import Video
+        from app.models import VideoStatus
 
         video = Video(title='测试视频', filepath='/test.mp4')
         db_session.add(video)
@@ -78,10 +71,7 @@ class TestNoteModel:
         """测试创建笔记"""
         from app.models import Note
 
-        note = Note(
-            title='测试笔记',
-            content='这是笔记内容'
-        )
+        note = Note(title='测试笔记', content='这是笔记内容')
         db_session.add(note)
         db_session.commit()
 
@@ -92,10 +82,7 @@ class TestNoteModel:
         """测试笔记创建时间"""
         from app.models import Note
 
-        note = Note(
-            title='测试笔记',
-            content='内容'
-        )
+        note = Note(title='测试笔记', content='内容')
         db_session.add(note)
         db_session.commit()
 
@@ -106,11 +93,7 @@ class TestNoteModel:
         """测试笔记转字典"""
         from app.models import Note
 
-        note = Note(
-            title='测试笔记',
-            content='内容',
-            tags='标签1,标签2'
-        )
+        note = Note(title='测试笔记', content='内容', tags='标签1,标签2')
         db_session.add(note)
         db_session.commit()
 
@@ -124,7 +107,8 @@ class TestSubtitleModel:
 
     def test_create_subtitle(self, app, db_session):
         """测试创建字幕"""
-        from app.models import Video, Subtitle
+        from app.models import Subtitle
+        from app.models import Video
 
         # 先创建视频
         video = Video(title='测试视频', filepath='/test.mp4')
@@ -133,12 +117,7 @@ class TestSubtitleModel:
 
         # 创建字幕（使用正确的字段名）
         subtitle = Subtitle(
-            video_id=video.id,
-            start_time=0.0,
-            end_time=5.0,
-            text='这是字幕内容',
-            source='asr',
-            language='zh'
+            video_id=video.id, start_time=0.0, end_time=5.0, text='这是字幕内容', source='asr', language='zh'
         )
         db_session.add(subtitle)
         db_session.commit()
@@ -148,20 +127,14 @@ class TestSubtitleModel:
 
     def test_subtitle_time_range(self, app, db_session):
         """测试字幕时间范围"""
-        from app.models import Video, Subtitle
+        from app.models import Subtitle
+        from app.models import Video
 
         video = Video(title='测试视频', filepath='/test.mp4')
         db_session.add(video)
         db_session.commit()
 
-        subtitle = Subtitle(
-            video_id=video.id,
-            start_time=10.5,
-            end_time=15.5,
-            text='字幕',
-            source='asr',
-            language='zh'
-        )
+        subtitle = Subtitle(video_id=video.id, start_time=10.5, end_time=15.5, text='字幕', source='asr', language='zh')
         db_session.add(subtitle)
         db_session.commit()
 
@@ -171,19 +144,15 @@ class TestSubtitleModel:
 
     def test_subtitle_to_dict(self, app, db_session):
         """测试字幕转字典"""
-        from app.models import Video, Subtitle
+        from app.models import Subtitle
+        from app.models import Video
 
         video = Video(title='测试视频', filepath='/test.mp4')
         db_session.add(video)
         db_session.commit()
 
         subtitle = Subtitle(
-            video_id=video.id,
-            start_time=0.0,
-            end_time=5.0,
-            text='字幕内容',
-            source='manual',
-            language='zh'
+            video_id=video.id, start_time=0.0, end_time=5.0, text='字幕内容', source='manual', language='zh'
         )
         db_session.add(subtitle)
         db_session.commit()

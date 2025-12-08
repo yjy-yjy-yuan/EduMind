@@ -27,21 +27,21 @@
           </div>
         </div>
       </template>
-      
+
       <div class="selection-content">
-        <el-select 
-          v-model="selectedVideo" 
-          placeholder="请选择要查看的视频" 
+        <el-select
+          v-model="selectedVideo"
+          placeholder="请选择要查看的视频"
           class="video-select"
           @change="loadKnowledgeGraph"
           style="width: 100%"
           :key="'video-select-' + (selectedVideo ? selectedVideo.id : 'empty')"
           value-key="id"
         >
-          <el-option 
-            v-for="video in videoList" 
-            :key="video.id" 
-            :label="video.filename" 
+          <el-option
+            v-for="video in videoList"
+            :key="video.id"
+            :label="video.filename"
             :value="video"
           />
         </el-select>
@@ -67,13 +67,13 @@
           </div>
         </div>
       </template>
-      
+
       <div class="graph-container">
         <!-- 空状态提示 -->
         <div v-if="!hasGraph && !isLoading && !isGenerating" class="empty-graph">
           <el-empty description="暂无知识图谱数据，请选择视频并生成知识图谱" />
         </div>
-        
+
         <!-- 生成中的提示信息 -->
         <div v-if="isGenerating" class="generating-container">
           <div class="generating-content">
@@ -81,12 +81,12 @@
               <el-icon class="rotating"><Connection /></el-icon>
             </div>
             <h3 class="generating-title">正在生成知识图谱</h3>
-            
+
             <p class="generating-tip" v-if="currentStep === 0">正在为您分析视频内容和字幕数据...</p>
             <p class="generating-tip" v-else-if="currentStep === 1">正在从内容中提取核心知识点和关键概念...</p>
             <p class="generating-tip" v-else-if="currentStep === 2">正在建立知识点之间的关联关系和结构...</p>
             <p class="generating-tip" v-else-if="currentStep === 3">正在完成知识图谱的渲染和可视化处理...</p>
-            
+
             <div class="generating-steps">
               <div class="step-item" :class="{ active: currentStep === 0 }">
                 <div class="step-icon">
@@ -97,7 +97,7 @@
                   <p>正在分析视频内容和字幕</p>
                 </div>
               </div>
-              
+
               <div class="step-item" :class="{ active: currentStep === 1 }">
                 <div class="step-icon">
                   <el-icon><Connection /></el-icon>
@@ -107,7 +107,7 @@
                   <p>从内容中提取核心知识点</p>
                 </div>
               </div>
-              
+
               <div class="step-item" :class="{ active: currentStep === 2 }">
                 <div class="step-icon">
                   <i class="graph-icon"></i>
@@ -117,9 +117,9 @@
                   <p>建立知识点之间的关联关系</p>
                 </div>
               </div>
-              
+
             </div>
-            
+
             <div class="generating-tips-container">
               <div class="tip-card">
                 <h4>💡 小贴士</h4>
@@ -128,7 +128,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 图例说明 -->
         <div v-if="hasGraph" class="graph-legend">
           <h4>图例说明：</h4>
@@ -161,7 +161,7 @@
             <span>其它视频的扩展关系</span>
           </div>
         </div>
-        
+
         <div id="knowledge-graph-container" class="graph-svg-container" style="width: 100%; height: 600px;"></div>
       </div>
     </el-card>
@@ -176,12 +176,12 @@
   >
     <div class="knowledge-detail">
       <h3>{{ selectedNode.label }}</h3>
-      
+
       <!-- 显示来源视频信息 -->
       <div v-if="selectedNode.source_video_title" class="knowledge-source">
         <el-tag type="info">来源视频: {{ selectedNode.source_video_title }}</el-tag>
       </div>
-      
+
       <p v-if="selectedNode.description">{{ selectedNode.description }}</p>
       <div class="knowledge-actions">
         <h4>您想要：</h4>
@@ -198,7 +198,7 @@
           </el-button>
         </template>
       </div>
-      
+
 
     </div>
   </el-dialog>
@@ -243,20 +243,20 @@ let containerG = null // 容器
 // 初始化
 onMounted(async () => {
   await loadVideoList()
-  
+
   // 从 URL 参数或本地存储中恢复视频 ID
   await restoreSelectedVideo()
-  
+
   // 检查是否有未完成的生成任务
   const pendingGeneration = checkPendingGeneration()
   if (pendingGeneration && selectedVideo.value && pendingGeneration.videoId === selectedVideo.value.id) {
     console.log(`发现未完成的知识图谱生成任务，视频ID: ${pendingGeneration.videoId}`)
     // 恢复生成状态
     isGenerating.value = true
-    
+
     // 显示生成进度提示
     showGenerationNotification(true)
-    
+
     // 开始轮询
     console.log('继续轮询知识图谱生成状态...')
     pollKnowledgeGraphStatus()
@@ -266,15 +266,15 @@ onMounted(async () => {
 // 当组件被激活时（从其他页面切换回来）
 onActivated(async () => {
   console.log('知识图谱组件被激活')
-  
+
   // 检查视频列表是否已加载
   if (videoList.value.length === 0) {
     await loadVideoList()
   }
-  
+
   // 恢复选择的视频
   await restoreSelectedVideo()
-  
+
   // 强制更新下拉框的选择状态
   nextTick(() => {
     if (selectedVideo.value) {
@@ -295,9 +295,9 @@ const restoreSelectedVideo = async () => {
   // 优先从URL参数中获取视频ID
   const videoIdFromUrl = route.query.videoId
   const savedVideoId = localStorage.getItem('selectedKnowledgeGraphVideo')
-  
+
   let videoIdToRestore = null
-  
+
   // 确定要恢复的视频ID
   if (videoIdFromUrl) {
     console.log('从URL参数中获取视频ID:', videoIdFromUrl)
@@ -306,57 +306,57 @@ const restoreSelectedVideo = async () => {
     console.log('从本地存储中获取视频ID:', savedVideoId)
     videoIdToRestore = savedVideoId
   }
-  
+
   // 如果有视频ID要恢复，检查它是否在视频列表中
   if (videoIdToRestore) {
     // 确保视频列表已加载
     if (videoList.value.length === 0) {
       await loadVideoList()
     }
-    
+
     // 打印视频列表，帮助调试
     console.log('当前视频列表:', videoList.value.map(v => `${v.id}(${typeof v.id}):${v.filename}`))
-    
+
     // 查找视频对象
     const videoObj = videoList.value.find(video => String(video.id) === String(videoIdToRestore))
-    
+
     if (videoObj) {
       console.log('恢复的视频ID在列表中存在:', videoIdToRestore, '视频名称:', videoObj.filename)
       selectedVideo.value = videoObj
       await loadKnowledgeGraph()
     } else {
       console.warn('恢复的视频ID在列表中不存在:', videoIdToRestore)
-      
+
       // 尝试直接加载知识图谱，即使视频不在列表中
       try {
         console.log('尝试直接加载知识图谱:', videoIdToRestore)
-        
+
         // 创建临时视频对象
         const tempVideo = { id: videoIdToRestore, filename: `视频 ${videoIdToRestore}` }
         selectedVideo.value = tempVideo
-        
+
         const response = await fetch(`/api/knowledge-graph/${videoIdToRestore}`)
-        
+
         if (response.ok) {
           console.log('成功加载知识图谱，保留选择状态')
           const data = await response.json()
           if (data && data.nodes && data.nodes.length > 0) {
             graphData.value = data
             hasGraph.value = true
-            
+
             // 更新URL参数
             router.push({
               query: { ...route.query, videoId: videoIdToRestore }
             })
-            
+
             // 保存到本地存储
             localStorage.setItem('selectedKnowledgeGraphVideo', videoIdToRestore)
-            
+
             // 渲染图谱
             nextTick(() => {
               renderGraph()
             })
-            
+
             // 尝试获取视频详情，更新下拉框显示
             try {
               const videoResponse = await fetch(`/api/videos/${videoIdToRestore}`)
@@ -365,7 +365,7 @@ const restoreSelectedVideo = async () => {
                 if (videoData && videoData.filename) {
                   // 更新临时视频对象的文件名
                   tempVideo.filename = videoData.filename
-                  
+
                   // 如果视频不在列表中，添加到列表中
                   if (!videoList.value.some(v => String(v.id) === String(videoIdToRestore))) {
                     videoList.value.push({
@@ -380,11 +380,11 @@ const restoreSelectedVideo = async () => {
             } catch (error) {
               console.error('获取视频详情失败:', error)
             }
-            
+
             return
           }
         }
-        
+
         // 如果加载失败，重置选择
         console.warn('无法加载知识图谱，重置选择')
         selectedVideo.value = null
@@ -421,32 +421,32 @@ const loadVideoList = async () => {
 // 加载知识图谱
 const loadKnowledgeGraph = async () => {
   if (!selectedVideo.value) return
-  
+
   const videoId = selectedVideo.value.id
-  
+
   // 保存到本地存储
   localStorage.setItem('selectedKnowledgeGraphVideo', videoId)
-  
+
   // 更新URL参数，不刷新页面
   router.push({
     query: { ...route.query, videoId }
   })
-  
+
   try {
     isLoading.value = true
     hasGraph.value = false
-    
+
     // 首先检查该视频是否参与了合并
     console.log(`检查视频 ${videoId} 是否参与了合并...`)
     const checkResponse = await fetch(`/api/knowledge-graph-integration/check-combined/${videoId}`)
-    
+
     let videoIdToLoad = videoId
     let isCombined = false
-    
+
     if (checkResponse.ok) {
       const checkData = await checkResponse.json()
       console.log('检查结果:', checkData)
-      
+
       if (checkData.is_combined) {
         console.log(`视频 ${videoId} 是合并视频`)
         isCombined = true
@@ -454,74 +454,74 @@ const loadKnowledgeGraph = async () => {
         console.log(`视频 ${videoId} 参与了合并，合并ID为: ${checkData.combined_video_id}`)
         videoIdToLoad = checkData.combined_video_id
         isCombined = true
-        
+
         // 显示提示信息
         ElMessage.info(`正在显示合并知识图谱 (ID: ${videoIdToLoad})，包含当前视频和其他相似视频的知识点`)
       }
     }
-    
+
     // 调用后端API获取知识图谱数据
     const apiUrl = `/api/knowledge-graph/${videoIdToLoad}`
     console.log(`请求知识图谱数据: ${apiUrl}`)
-    
+
     // 如果是合并视频，显示提示信息
     if (isCombined && videoId !== videoIdToLoad) {
       ElMessage.info(`正在显示合并知识图谱 (ID: ${videoIdToLoad})，包含多个相关视频的知识点，每个知识点都标注了来源视频`)
     }
-    
+
     const response = await fetch(apiUrl)
-    
+
     if (!response.ok) {
       const responseData = await response.json()
       console.log('知识图谱响应数据:', responseData)
-      
+
       // 如果返回202，说明知识图谱正在生成中
       if (response.status === 202) {
         console.info('知识图谱正在生成中:', responseData.status)
         ElMessage.info('知识图谱正在生成中，请稍后刷新页面')
         isGenerating.value = true
-        
+
         // 显示生成进度提示
         ElNotification({
           title: '知识图谱生成中',
           message: '正在为您生成知识图谱，这可能需要几分钟左右时间，请耐心等待',
           type: 'info',
-          duration: 10000 
+          duration: 10000
         })
-        
+
         // 设置定时器，10秒后自动重新加载
         setTimeout(() => {
           loadKnowledgeGraph()
           isGenerating.value = false
         }, 10000)
-        
+
         return
       }
-      
+
       // 如果返回404，说明该视频尚未生成知识图谱
       if (response.status === 404) {
         console.info('知识图谱不存在，自动开始生成')
         hasGraph.value = false
-        
+
         // 显示提示信息
         ElMessage.info('正在为您生成知识图谱，请稍等...')
-        
+
         // 自动生成知识图谱
         generateKnowledgeGraph()
         return
       }
-      
+
       throw new Error(responseData.error || '获取知识图谱失败')
     }
-    
+
     // 解析响应数据
     const data = await response.json()
-    
+
     // 确保数据有效再设置和渲染
     if (data && data.nodes && data.nodes.length > 0) {
       graphData.value = data
       hasGraph.value = true
-      
+
       // 渲染图谱
       nextTick(() => {
         renderGraph()
@@ -545,11 +545,11 @@ let currentPollId = 0
 // 轮询知识图谱生成状态
 const pollKnowledgeGraphStatus = () => {
   if (!selectedVideo.value) return
-  
+
   // 生成新的轮询ID
   const pollId = ++currentPollId
   isGenerating.value = true
-  
+
   // 开始轮询
   console.log(`[轮询#${pollId}] 开始轮询知识图谱生成状态...`)
   checkStatusWithRetry(pollId, 1)
@@ -562,49 +562,49 @@ const checkStatusWithRetry = async (pollId, attempt) => {
     console.log(`[轮询#${pollId}] 轮询已终止，可能有新的轮询开始或用户取消了生成`)
     return
   }
-  
+
   console.log(`[轮询#${pollId}] 第${attempt}次尝试检查状态...`)
-  
+
   try {
     // 先检查生成状态，这是最可靠的方法
     const statusResponse = await fetch(`/api/knowledge-graph/status/${selectedVideo.value.id}`)
-    
+
     if (statusResponse.ok) {
       const statusData = await statusResponse.json()
       console.log(`[轮询#${pollId}] 知识图谱生成状态:`, statusData.status)
-      
+
       // 如果任务已完成，尝试获取知识图谱数据
       if (statusData.status === 'completed') {
         console.log(`[轮询#${pollId}] 状态显示已完成，获取知识图谱数据`)
-        
+
         try {
           // 尝试获取知识图谱数据
           const graphResponse = await fetch(`/api/knowledge-graph/${selectedVideo.value.id}`)
-          
+
           if (graphResponse.ok) {
             const data = await graphResponse.json()
-            
+
             // 确认数据有效
             if (data && data.nodes && data.nodes.length > 0) {
               console.log(`[轮询#${pollId}] 知识图谱已生成完成，共有节点:`, data.nodes.length)
-              
+
               // 更新UI
               graphData.value = data
               hasGraph.value = true
               isLoading.value = false
               isGenerating.value = false
-              
+
               // 停止步骤进度模拟
               stopStepProgressSimulation()
-              
+
               // 清除生成状态
               clearGenerationStatus()
-              
+
               // 渲染图谱
               nextTick(() => {
                 renderGraph()
               })
-              
+
               // 显示成功消息
               ElMessage.success('知识图谱生成完成')
               ElNotification.closeAll() // 关闭所有通知
@@ -613,7 +613,7 @@ const checkStatusWithRetry = async (pollId, attempt) => {
           } else {
             // 即使返回404，但状态已经是completed，我们也认为生成已完成
             console.log(`[轮询#${pollId}] 状态显示已完成，但无法获取知识图谱数据，状态码:`, graphResponse.status)
-            
+
             // 清除生成状态并停止轮询
             isGenerating.value = false
             stopStepProgressSimulation()
@@ -632,7 +632,7 @@ const checkStatusWithRetry = async (pollId, attempt) => {
           ElNotification.closeAll()
           return
         }
-    
+
       // 如果任务失败
       if (statusData.status === 'failed') {
         console.error(`[轮询#${pollId}] 知识图谱生成失败`)
@@ -646,7 +646,7 @@ const checkStatusWithRetry = async (pollId, attempt) => {
         return
       }
     }
-    
+
     // 继续轮询
     console.log(`[轮询#${pollId}] 知识图谱仍在生成中，等待10秒后再次检查`)
     setTimeout(() => {
@@ -661,7 +661,7 @@ const checkStatusWithRetry = async (pollId, attempt) => {
   }
   } catch (error) {
     console.error(`[轮询#${pollId}] 检查失败:`, error)
-    
+
     // 如果尝试次数超过50次，认为失败
     if (attempt > 50) {
       console.error(`[轮询#${pollId}] 超过最大尝试次数，认为失败`)
@@ -670,7 +670,7 @@ const checkStatusWithRetry = async (pollId, attempt) => {
       ElNotification.closeAll() // 关闭所有通知
       return
     }
-    
+
     // 继续重试
     setTimeout(() => {
       checkStatusWithRetry(pollId, attempt + 1)
@@ -699,12 +699,12 @@ const clearGenerationStatus = () => {
 const showGenerationNotification = (isResume = false) => {
   // 先关闭所有通知，避免重复显示
   ElNotification.closeAll()
-  
+
   // 显示生成进度提示
   ElNotification({
     title: '知识图谱生成中',
-    message: isResume ? 
-      '正在继续为您生成知识图谱，这可能需要几分钟时间，请耐心等待' : 
+    message: isResume ?
+      '正在继续为您生成知识图谱，这可能需要几分钟时间，请耐心等待' :
       '正在为您生成知识图谱，这可能需要几分钟时间，请耐心等待',
     type: 'info',
     duration: 0 // 不自动关闭
@@ -715,17 +715,17 @@ const showGenerationNotification = (isResume = false) => {
 const checkPendingGeneration = () => {
   const statusJson = localStorage.getItem(GENERATION_STATUS_KEY)
   if (!statusJson) return null
-  
+
   try {
     const status = JSON.parse(statusJson)
     // 检查状态是否过期（30分钟）
     const isExpired = Date.now() - status.timestamp > 30 * 60 * 1000
-    
+
     if (isExpired) {
       clearGenerationStatus()
       return null
     }
-    
+
     return status
   } catch (e) {
     console.error('解析生成状态失败:', e)
@@ -740,10 +740,10 @@ const startStepProgressSimulation = () => {
   if (stepUpdateTimer.value) {
     clearInterval(stepUpdateTimer.value)
   }
-  
+
   // 重置当前步骤
   currentStep.value = 0
-  
+
   // 创建新的定时器，模拟生成过程中的步骤进展
   stepUpdateTimer.value = setInterval(() => {
     if (currentStep.value < 3) {
@@ -772,19 +772,19 @@ const generateKnowledgeGraph = async () => {
     ElMessage.warning('请先选择视频')
     return
   }
-  
+
   try {
     console.log('开始生成知识图谱...')
-    
+
     isGenerating.value = true
     currentStep.value = 0 // 重置当前步骤
-    
+
     // 启动步骤进度模拟
     startStepProgressSimulation()
-    
+
     // 保存生成状态
     saveGenerationStatus(selectedVideo.value.id)
-    
+
     // 调用后端API生成知识图谱
     const response = await fetch(`/api/knowledge-graph/generate/${selectedVideo.value.id}`, {
       method: 'POST',
@@ -792,26 +792,26 @@ const generateKnowledgeGraph = async () => {
         'Content-Type': 'application/json'
       }
     })
-    
+
     if (!response.ok) {
       // 解析错误响应
       const errorData = await response.json()
       throw new Error(errorData.error || '生成知识图谱请求失败')
     }
-    
+
     const result = await response.json()
     ElMessage.success(result.message || '知识图谱生成任务已提交，请稍后查看')
-    
+
     // 显示生成进度提示
     showGenerationNotification(false)
-    
+
     // 立即开始轮询
     console.log('开始轮询知识图谱生成状态...')
     pollKnowledgeGraphStatus()
   } catch (error) {
     if (error !== 'cancel') {
       console.error('生成知识图谱失败:', error)
-      
+
       // 检查是否是因为没有字幕文件导致的错误
       if (error.message && error.message.includes('没有找到字幕文件')) {
         // 使用 ElMessageBox 弹出确认窗口，提示用户跳转到播放器页面
@@ -837,7 +837,7 @@ const generateKnowledgeGraph = async () => {
         // 其他错误直接显示错误信息
         ElMessage.error(error.message || '生成知识图谱失败')
       }
-      
+
       // 只在出错时才设置isGenerating为false，不影响轮询
       isGenerating.value = false
     }
@@ -857,19 +857,19 @@ const renderGraph = () => {
     return
   }
   console.log('渲染图谱，节点数量:', graphData.value.nodes.length, '连接数量:', graphData.value.links.length)
-  
+
   // 渲染图谱
-  
+
   // 清除现有图谱
   d3.select('#knowledge-graph-container').selectAll('*').remove()
-  
+
   // 获取容器实际宽度
   const container = document.getElementById('knowledge-graph-container')
   const width = container.clientWidth || 800 // 使用容器实际宽度，如果无法获取则使用默认值
   const height = 600
-  
+
   console.log('图谱容器尺寸:', width, 'x', height)
-  
+
   // 创建SVG
   svg.value = d3.select('#knowledge-graph-container')
     .append('svg')
@@ -877,26 +877,26 @@ const renderGraph = () => {
     .attr('height', height)
     .attr('viewBox', [0, 0, width, height])
     .attr('style', 'max-width: 100%; height: auto;')
-  
+
   // 创建容器
   containerG = svg.value.append('g')
-  
+
   // 添加缩放功能
   zoom = d3.zoom()
     .scaleExtent([0.1, 3])
     .on('zoom', (event) => {
       containerG.attr('transform', event.transform)
     })
-  
+
   svg.value.call(zoom)
-  
+
   // 创建力导向图
   simulation = d3.forceSimulation(graphData.value.nodes)
     .force('link', d3.forceLink(graphData.value.links).id(d => d.id).distance(100))
     .force('charge', d3.forceManyBody().strength(-300))
     .force('center', d3.forceCenter(width / 2, height / 2)) // 使用实际宽度居中
     .force('collision', d3.forceCollide().radius(60))
-  
+
   // 绘制连接线
   const link = containerG.append('g')
     .selectAll('line')
@@ -904,26 +904,26 @@ const renderGraph = () => {
     .join('line')
     .attr('stroke', d => {
       console.log('处理连线:', d);
-      
+
       // 强制处理其他视频的一级知识点与视频节点之间的连线
       if (d.source && d.target) {
         // 将源和目标转换为字符串，以防止对象引用
         const sourceId = typeof d.source === 'string' ? d.source : d.source.id;
         const targetId = typeof d.target === 'string' ? d.target : d.target.id;
-        
+
         // 检查是否是视频节点到其他知识点的连线
         if (sourceId && sourceId.startsWith && sourceId.startsWith('video-')) {
           // 获取目标节点
           const targetNode = graphData.value.nodes.find(node => node.id === targetId);
           console.log('检查连线:', sourceId, '->', targetId, '目标节点:', targetNode);
-          
+
           // 如果目标节点存在且是其他视频的知识点
           if (targetNode) {
             // 检查目标节点是否是其他视频的知识点
-            if (targetNode.category === 'similar_concept' || 
+            if (targetNode.category === 'similar_concept' ||
                 targetNode.category === 'similar_secondary_concept' ||
-                (targetNode.itemStyle && (targetNode.itemStyle.color === '#EAB308' || 
-                                          targetNode.itemStyle.color === '#fac858' || 
+                (targetNode.itemStyle && (targetNode.itemStyle.color === '#EAB308' ||
+                                          targetNode.itemStyle.color === '#fac858' ||
                                           targetNode.itemStyle.color === '#e6a23c'))) {
               console.log('强制将视频节点与其他视频知识点的连线设置为红色');
               // 强制将该连线的关系类型设置为 SIMILAR_TO
@@ -933,12 +933,12 @@ const renderGraph = () => {
           }
         }
       }
-      
+
       // 使用连接线自定义样式（如果有）
       if (d.lineStyle && d.lineStyle.color) {
         return d.lineStyle.color;
       }
-      
+
       // 根据关系类型设置不同的颜色
       if (d.relationship === 'SIMILAR_TO') {
         return '#FF6B6B'; // 相似关系使用红色
@@ -965,7 +965,7 @@ const renderGraph = () => {
       if (d.lineStyle && d.lineStyle.width) {
         return d.lineStyle.width;
       }
-      
+
       // 相似关系的线宽度根据相似度调整
       if (d.relationship === 'SIMILAR_TO') {
         return Math.max(1, d.similarity * 3);
@@ -985,7 +985,7 @@ const renderGraph = () => {
       }
       return null;
     })
-  
+
   // 绘制节点
   const node = containerG.append('g')
     .selectAll('.node')
@@ -997,7 +997,7 @@ const renderGraph = () => {
       .on('drag', dragged)
       .on('end', dragended))
     .on('click', handleNodeClick)
-  
+
   // 节点圆形背景，根据节点类型和来源添加不同颜色
   node.append('circle')
     .attr('r', d => {
@@ -1011,21 +1011,21 @@ const renderGraph = () => {
       if (d.itemStyle && d.itemStyle.color) {
         return d.itemStyle.color;
       }
-      
+
       // 否则根据节点类型设置默认颜色
       if (d.type === 'video') return '#F472B6'; // 视频节点，浅粉色
       if (d.type === 'primary_concept') return '#3B82F6'; // 一级知识点使用蓝色
       if (d.type === 'secondary_concept') return '#10B981'; // 二级知识点使用绿色
       if (d.type === 'similar_concept') return '#EAB308'; // 相似知识点使用黄色
       if (d.type === 'similar_secondary_concept') return '#e6a23c'; // 其他视频的二级知识点使用更深的黄色
-      
+
       // 如果是合并视频的节点，根据来源视频使用不同颜色
       if (d.source_video_id) {
         // 检查是否是当前选中的视频
-        const isCurrentVideo = selectedVideo.value && 
-          (d.source_video_id === selectedVideo.value.id || 
+        const isCurrentVideo = selectedVideo.value &&
+          (d.source_video_id === selectedVideo.value.id ||
            d.source_video_id === parseInt(selectedVideo.value.id));
-        
+
         if (isCurrentVideo) {
           // 当前视频的知识点使用蓝色
           return d.isPrimaryKnowledge ? '#5470c6' : '#91cc75';
@@ -1034,7 +1034,7 @@ const renderGraph = () => {
           return '#fac858';
         }
       }
-      
+
       // 兼容旧版本
       if (d.isPrimaryKnowledge) return '#5470c6'; // 一级知识点使用蓝色
       if (d.isSecondaryKnowledge) return '#91cc75'; // 二级知识点使用绿色
@@ -1042,8 +1042,8 @@ const renderGraph = () => {
     })
     .attr('stroke', d => {
       // 为当前视频的知识点添加更明显的边框
-      if (d.source_video_id && selectedVideo.value && 
-          (d.source_video_id === selectedVideo.value.id || 
+      if (d.source_video_id && selectedVideo.value &&
+          (d.source_video_id === selectedVideo.value.id ||
            d.source_video_id === parseInt(selectedVideo.value.id))) {
         return '#2563EB'; // 深蓝色边框
       }
@@ -1051,23 +1051,23 @@ const renderGraph = () => {
     })
     .attr('stroke-width', d => {
       // 为当前视频的知识点添加更粗的边框
-      if (d.source_video_id && selectedVideo.value && 
-          (d.source_video_id === selectedVideo.value.id || 
+      if (d.source_video_id && selectedVideo.value &&
+          (d.source_video_id === selectedVideo.value.id ||
            d.source_video_id === parseInt(selectedVideo.value.id))) {
         return 3;
       }
       return 2;
     })
-  
+
   // 添加来源标记
   node.append('text')
     .filter(d => d.source_video_title) // 只为有来源信息的节点添加标记
     .text(d => {
       // 检查是否是当前选中的视频
-      const isCurrentVideo = selectedVideo.value && 
-        (d.source_video_id === selectedVideo.value.id || 
+      const isCurrentVideo = selectedVideo.value &&
+        (d.source_video_id === selectedVideo.value.id ||
          d.source_video_id === parseInt(selectedVideo.value.id));
-      
+
       // 从视频标题中提取简短标识
       const shortTitle = d.source_video_title.split('-').pop().substring(0, 3);
       return isCurrentVideo ? `★${shortTitle}` : `○${shortTitle}`;
@@ -1078,13 +1078,13 @@ const renderGraph = () => {
     .attr('font-size', '10px')
     .attr('fill', d => {
       // 检查是否是当前选中的视频
-      const isCurrentVideo = selectedVideo.value && 
-        (d.source_video_id === selectedVideo.value.id || 
+      const isCurrentVideo = selectedVideo.value &&
+        (d.source_video_id === selectedVideo.value.id ||
          d.source_video_id === parseInt(selectedVideo.value.id));
-      
+
       return isCurrentVideo ? '#2563EB' : '#666';
     })
-  
+
   // 节点文本
   node.append('text')
     .text(d => {
@@ -1103,7 +1103,7 @@ const renderGraph = () => {
     // 添加标题属性，在鼠标悬停时显示完整名称
     .append('title')
     .text(d => d.label)
-  
+
   // 更新力导向图
   simulation.on('tick', () => {
     link
@@ -1111,29 +1111,29 @@ const renderGraph = () => {
       .attr('y1', d => d.source.y)
       .attr('x2', d => d.target.x)
       .attr('y2', d => d.target.y)
-    
+
     node
       .attr('transform', d => `translate(${d.x},${d.y})`)
   })
-  
+
   // 拖拽函数
   function dragstarted(event, d) {
     if (!event.active) simulation.alphaTarget(0.3).restart()
     d.fx = d.x
     d.fy = d.y
   }
-  
+
   function dragged(event, d) {
     d.fx = event.x
     d.fy = event.y
   }
-  
+
   function dragended(event, d) {
     if (!event.active) simulation.alphaTarget(0)
     d.fx = null
     d.fy = null
   }
-  
+
   // 在控制台输出图谱数据，便于调试
   console.log('知识图谱数据:', graphData.value)
   console.log('节点数量:', graphData.value.nodes.length)
@@ -1152,9 +1152,9 @@ const renderGraph = () => {
     acc[type] = (acc[type] || 0) + 1
     return acc
   }, {}))
-  
+
   // 不再需要D3添加的图例，使用HTML图例替代
-  
+
   // 添加节点悬停提示
   const tooltip = d3.select('body').append('div')
     .attr('class', 'tooltip')
@@ -1172,29 +1172,29 @@ const renderGraph = () => {
   node.on('mouseover', function(event, d) {
     // 构建提示内容
     let content = `<strong>${d.name || d.title}</strong>`;
-    
+
     if (d.description) {
       content += `<p>${d.description}</p>`;
     }
-    
+
     if (d.source_video_title) {
-      const isCurrentVideo = selectedVideo.value && 
-        (d.source_video_id === selectedVideo.value.id || 
+      const isCurrentVideo = selectedVideo.value &&
+        (d.source_video_id === selectedVideo.value.id ||
          d.source_video_id === parseInt(selectedVideo.value.id));
-      
-      const sourceLabel = isCurrentVideo ? 
-        '<span style="color:#2563EB;font-weight:bold;">当前视频</span>' : 
+
+      const sourceLabel = isCurrentVideo ?
+        '<span style="color:#2563EB;font-weight:bold;">当前视频</span>' :
         '<span style="color:#666;">其他视频</span>';
-      
+
       content += `<p>来源: ${sourceLabel} ${d.source_video_title}</p>`;
     }
-    
+
     if (d.timestamp) {
       const minutes = Math.floor(d.timestamp / 60);
       const seconds = d.timestamp % 60;
       content += `<p>时间点: ${minutes}:${seconds.toString().padStart(2, '0')}</p>`;
     }
-    
+
     tooltip.html(content)
       .style('visibility', 'visible')
       .style('left', (event.pageX + 10) + 'px')
@@ -1221,25 +1221,25 @@ const navigateToVideo = async () => {
   if (selectedNode.value.type === 'video') {
     // 对于视频节点，直接使用节点的id作为视频id
     const videoId = selectedNode.value.id ? selectedNode.value.id.replace('video-', '') : null;
-    
+
     if (!videoId) {
       ElMessage.warning('无法找到视频信息')
       return
     }
-    
+
     router.push({
       path: `/player/${videoId}`
     })
-    
+
     dialogVisible.value = false
     return
   }
-  
+
   // 判断是否是一级知识点
-  const isPrimaryKnowledge = selectedNode.value.type === 'primary_concept' || 
-                            selectedNode.value.isPrimaryKnowledge || 
+  const isPrimaryKnowledge = selectedNode.value.type === 'primary_concept' ||
+                            selectedNode.value.isPrimaryKnowledge ||
                             (selectedNode.value.itemStyle && selectedNode.value.itemStyle.color === '#3B82F6');
-  
+
   // 处理知识点节点的情况
   if (!selectedNode.value.videoId) {
     // 尝试从节点的其他属性中获取视频ID
@@ -1250,14 +1250,14 @@ const navigateToVideo = async () => {
       return
     }
   }
-  
+
   // 如果是一级知识点，生成相关问题
   let generatedQuestion = null;
   if (isPrimaryKnowledge) {
     try {
       // 显示加载中提示
       ElMessage.info('正在生成相关学习问题...');
-      
+
       // 调用后端生成问题的API
       const response = await fetch('/api/knowledge-graph/generate-questions', {
         method: 'POST',
@@ -1271,14 +1271,14 @@ const navigateToVideo = async () => {
           use_ollama: true  // 默认使用离线模式
         })
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.questions && data.questions.length > 0) {
           // 随机选择一个问题
           const randomIndex = Math.floor(Math.random() * data.questions.length);
           generatedQuestion = data.questions[randomIndex];
-          
+
           // 将其他问题保存到localStorage，供用户后续使用
           const otherQuestions = data.questions.filter((_, index) => index !== randomIndex);
           localStorage.setItem(`concept_questions_${selectedNode.value.videoId}_${selectedNode.value.label}`, JSON.stringify(otherQuestions));
@@ -1290,25 +1290,25 @@ const navigateToVideo = async () => {
       console.error('生成问题时出错:', error);
     }
   }
-  
+
   // 将生成的问题添加到路由参数中
   const routeParams = {
     path: `/player/${selectedNode.value.videoId}`,
     query: {}
   };
-  
+
   // 如果有时间戳，添加到查询参数中
   if (selectedNode.value.timestamp) {
     routeParams.query.t = selectedNode.value.timestamp;
   }
-  
+
   // 如果有生成的问题，添加到查询参数中
   if (generatedQuestion) {
     routeParams.query.auto_question = generatedQuestion;
   }
-  
+
   router.push(routeParams);
-  
+
   dialogVisible.value = false;
 }
 
@@ -1497,7 +1497,7 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .graph-container {
     height: 400px;
   }

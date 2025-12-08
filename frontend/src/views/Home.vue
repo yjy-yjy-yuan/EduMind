@@ -169,7 +169,7 @@
         <h2 class="section-title">用户的声音</h2>
         <p class="section-subtitle">听听我们的用户如何评价视频智能伴学系统</p>
       </div>
-    
+
       <div class="testimonials-container">
         <swiper
           :modules="swiperModules"
@@ -216,7 +216,7 @@
       </el-button>
     </div>
   </section>
-    
+
   <!-- 页脚 -->
   <footer class="footer-section">
     <div class="container">
@@ -230,7 +230,7 @@
             基于深度学习的视频智能伴学系统，让学习更高效、更智能、更个性化
           </p>
         </div>
-        
+
         <div class="footer-links">
           <h4 class="footer-title">功能</h4>
           <ul>
@@ -241,7 +241,7 @@
             <li><a href="#">知识点总览与扩展</a></li>
           </ul>
         </div>
-        
+
         <div class="footer-links">
           <h4 class="footer-title">资源</h4>
           <ul>
@@ -251,7 +251,7 @@
             <li><a href="#">博客</a></li>
           </ul>
         </div>
-        
+
         <div class="footer-contact">
           <h4 class="footer-title">联系我们</h4>
           <ul>
@@ -267,13 +267,13 @@
           </div>
         </div>
       </div>
-      
+
       <div class="footer-bottom">
         <p>&copy; 2025 视频智能伴学系统. 保留所有权利。</p>
       </div>
     </div>
   </footer>
-  
+
   <!-- Toast 通知组件 -->
   <div class="toast-notification" :class="{ show: showToast }">
     {{ toastMessage }}
@@ -309,14 +309,14 @@ export default {
     const isLoading = ref(false)
     const showToast = ref(false)
     const toastMessage = ref('')
-    
+
     // 图片资源
     const heroBackground = 'https://public.readdy.ai/ai/img_res/b2856a465ee244a4bb2ffa4b39614527.jpg'
     const heroImage = 'https://public.readdy.ai/ai/img_res/3d0b4003873f780e91d428780abce6d6.jpg'
     const workflowImage1 = 'https://public.readdy.ai/ai/img_res/06e83fad25171a893e307d4bd002735a.jpg'
     const workflowImage2 = 'https://public.readdy.ai/ai/img_res/476cc88496e5400285d2b382daabf154.jpg'
     const workflowImage3 = 'https://public.readdy.ai/ai/img_res/abfb0f0106752b9290d6f09432b497bb.jpg'
-    
+
     // 功能特性数据
     const features = ref([
       {
@@ -340,7 +340,7 @@ export default {
         description: '记录、导出、批量管理笔记，基于相似性推荐，帮助掌握核心知识点'
       }
     ])
-    
+
     // 工作流程数据
     const workflows = ref([
       {
@@ -362,7 +362,7 @@ export default {
         image: workflowImage3
       }
     ])
-    
+
     // Swiper 模块
     const swiperModules = [Pagination, Navigation, Autoplay]
 
@@ -405,7 +405,7 @@ export default {
         content: 'AI实时学术翻译精准度惊人！专业文献中的复杂术语都能即时解析，语言障碍不再是问题。'
       },
     ])
-    
+
     // 统计数据
     const stats = ref([
       { number: '10,000+', label: '视频分析' },
@@ -413,26 +413,26 @@ export default {
       { number: '98%', label: '用户满意度' },
       { number: '50,000+', label: '智能问答' }
     ])
-    
+
     // 使用步骤数据
     const steps = ref([
       { title: '上传视频', description: '在"视频管理"中上传您的教育视频' },
       { title: '等待处理', description: '系统将自动处理视频并生成字幕' },
       { title: '观看与互动', description: '观看视频并使用AI问答功能深入学习' }
     ])
-    
+
     // 导航到上传页面
     const navigateToUpload = () => {
       isLoading.value = true
       showToast.value = true
       toastMessage.value = '正在准备上传页面...'
-      
+
       // 模拟加载过程
       setTimeout(() => {
         isLoading.value = false
         router.push('/video/upload')
       }, 800)
-      
+
       // 2秒后隐藏提示
       setTimeout(() => {
         showToast.value = false
@@ -553,8 +553,8 @@ export default {
   letter-spacing: -0.5px;
   line-height: 1.2;
   animation: fadeInDown 1s ease-out;
-  color: #fff; 
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); 
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .main-title .highlight {
@@ -603,18 +603,18 @@ export default {
     justify-content: space-between;
     align-items: center;
   }
-  
+
   .hero-text {
     width: 50%;
     text-align: left;
     margin-bottom: 0;
     padding-right: 2rem;
   }
-  
+
   .hero-image-container {
     width: 50%;
   }
-  
+
   .subtitle {
     margin-left: 0;
   }
@@ -1044,11 +1044,11 @@ section {
     min-width: 150px;
     padding: 1rem;
   }
-  
+
   .stat-number {
     font-size: 2rem;
   }
-  
+
   .stat-label {
     font-size: 1rem;
   }
@@ -1272,11 +1272,11 @@ section {
   .main-title {
     font-size: 2.5rem;
   }
-  
+
   .section-title {
     font-size: 2rem;
   }
-  
+
   .cta-title {
     font-size: 2rem;
   }
@@ -1286,23 +1286,23 @@ section {
   .hero-section {
     padding: 80px 20px;
   }
-  
+
   .main-title {
     font-size: 2.25rem;
   }
-  
+
   .subtitle {
     font-size: 1.1rem;
   }
-  
+
   .section-title {
     font-size: 1.75rem;
   }
-  
+
   .feature-title {
     font-size: 1.25rem;
   }
-  
+
   .stat-number {
     font-size: 2rem;
   }
@@ -1312,40 +1312,40 @@ section {
   .hero-section {
     padding: 60px 15px;
   }
-  
+
   .main-title {
     font-size: 2rem;
   }
-  
+
   .subtitle {
     font-size: 1rem;
   }
-  
+
   section {
     padding: 3rem 0;
   }
-  
+
   .section-title {
     font-size: 1.5rem;
   }
-  
+
   .cta-title {
     font-size: 1.5rem;
   }
-  
+
   .cta-description {
     font-size: 1rem;
   }
-  
+
   .stat-item {
     min-width: 150px;
     padding: 1rem;
   }
-  
+
   .stat-number {
     font-size: 1.75rem;
   }
-  
+
   .stat-label {
     font-size: 0.9rem;
   }
@@ -1355,50 +1355,50 @@ section {
   .hero-section {
     padding: 50px 15px;
   }
-  
+
   .main-title {
     font-size: 1.75rem;
   }
-  
+
   .subtitle {
     font-size: 0.9rem;
     margin-bottom: 1.5rem;
   }
-  
+
   .hero-button {
     padding: 0.5rem 1.5rem !important;
     font-size: 1rem !important;
   }
-  
+
   .section-title {
     font-size: 1.35rem;
   }
-  
+
   .section-subtitle {
     font-size: 0.9rem;
   }
-  
+
   .feature-card {
     padding: 1.5rem;
   }
-  
+
   .feature-icon-wrapper {
     width: 60px;
     height: 60px;
   }
-  
+
   .feature-title {
     font-size: 1.15rem;
   }
-  
+
   .cta-card {
     padding: 2.5rem 1.5rem;
   }
-  
+
   .cta-title {
     font-size: 1.35rem;
   }
-  
+
   .cta-button {
     padding: 0.5rem 1.5rem !important;
     font-size: 1rem !important;

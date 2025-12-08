@@ -14,12 +14,12 @@
           <el-icon class="header-icon"><Document /></el-icon>
           <h2>欢迎使用视频智能伴学系统的智能笔记功能！</h2>
         </div>
-        
+
         <div class="guide-description">
           <p>当前页面可以进行普通笔记的创建、编辑和管理。</p>
           <p>如果您想要<span class="highlight">结合学习视频进行笔记</span>，请按照以下步骤操作：</p>
         </div>
-        
+
         <div class="steps-container">
           <div class="step-item">
             <div class="step-number">1</div>
@@ -29,7 +29,7 @@
               <el-icon class="step-icon"><VideoCamera /></el-icon>
             </div>
           </div>
-          
+
           <div class="step-item">
             <div class="step-number">2</div>
             <div class="step-content">
@@ -38,7 +38,7 @@
               <el-icon class="step-icon"><Back /></el-icon>
             </div>
           </div>
-          
+
           <div class="step-item">
             <div class="step-number">3</div>
             <div class="step-content">
@@ -47,7 +47,7 @@
               <el-icon class="step-icon"><ArrowDown /></el-icon>
             </div>
           </div>
-          
+
           <div class="step-item">
             <div class="step-number">4</div>
             <div class="step-content">
@@ -57,13 +57,13 @@
             </div>
           </div>
         </div>
-        
+
         <div class="guide-footer">
           <el-icon class="footer-icon"><InfoFilled /></el-icon>
           <p>系统支持从视频中提取字幕内容到笔记中，并自动添加时间戳记录，方便您后续复习。</p>
         </div>
       </div>
-      
+
       <template #footer>
         <div class="dialog-footer">
           <el-checkbox v-model="dontShowNoteGuideAgain">不再显示</el-checkbox>
@@ -90,7 +90,7 @@
               <el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
           </template>
-          
+
           <div class="note-manager-container">
             <!-- 左侧标签面板 -->
             <div class="tags-panel">
@@ -105,7 +105,7 @@
                   </el-button>
                 </div>
               </div>
-              
+
               <div class="tags-list">
                 <el-tag
                   v-for="tag in allTags"
@@ -119,7 +119,7 @@
                   <span class="tag-count">{{ tag.count }}</span>
                 </el-tag>
               </div>
-              
+
               <div v-if="selectedTags.length > 0" class="selected-tags">
                 <div class="selected-tags-header">已选标签：</div>
                 <div class="selected-tags-list">
@@ -135,7 +135,7 @@
                 </div>
               </div>
             </div>
-            
+
             <!-- 右侧笔记列表 -->
             <div class="notes-panel">
               <div class="panel-header">
@@ -143,24 +143,24 @@
                 <div class="list-actions">
                   <!-- 批量操作工具栏 -->
                   <div class="batch-operations-toolbar">
-                    <el-button 
+                    <el-button
                       link
                       size="small"
                       @click="toggleBatchOperations"
                     >
                       {{ showBatchOperations ? '退出批量操作' : '批量操作' }}
                     </el-button>
-                    
+
                     <template v-if="showBatchOperations">
-                      <el-button 
+                      <el-button
                         link
                         size="small"
                         @click="toggleSelectAll"
                       >
                         {{ isAllSelected ? '取消全选' : '全选' }}
                       </el-button>
-                      
-                      <el-button 
+
+                      <el-button
                         link
                         type="primary"
                         size="small"
@@ -169,8 +169,8 @@
                       >
                         导出 ({{ selectedNoteIds.length }})
                       </el-button>
-                      
-                      <el-button 
+
+                      <el-button
                         link
                         type="danger"
                         size="small"
@@ -183,32 +183,32 @@
                   </div>
                 </div>
               </div>
-              
+
               <div class="notes-list card-layout">
-                <div 
-                  v-for="note in filteredNotes" 
+                <div
+                  v-for="note in filteredNotes"
                   :key="note.id"
                   class="note-item"
                   :class="{ 'selected': currentNote && currentNote.id === note.id }"
                   @click="selectNote(note)"
                 >
                   <!-- 批量选择复选框 -->
-                  <el-checkbox 
+                  <el-checkbox
                     v-if="showBatchOperations"
                     v-model="note.selected"
                     @change="(val) => toggleNoteSelection(note.id, val)"
                     @click.stop
                   />
-                  
+
                   <div class="note-item-content">
                     <div class="note-title">{{ note.title }}</div>
                     <div class="note-preview">{{ getPreviewText(note) }}</div>
                     <div class="note-meta">
                       <span class="note-date">{{ formatDateTime(note.created_at) }}</span>
                       <div class="note-tags">
-                        <el-tag 
-                          v-for="tag in note.tags.slice(0, 3)" 
-                          :key="tag" 
+                        <el-tag
+                          v-for="tag in note.tags.slice(0, 3)"
+                          :key="tag"
                           size="small"
                           :type="getTagType(tag)"
                           effect="plain"
@@ -219,7 +219,7 @@
                       </div>
                     </div>
                   </div>
-                  
+
                   <div class="note-actions">
                     <el-dropdown trigger="click" @command="(cmd) => handleNoteItemAction(cmd, note.id)" @click.stop>
                       <el-button type="text">
@@ -234,7 +234,7 @@
                     </el-dropdown>
                   </div>
                 </div>
-                
+
                 <div v-if="filteredNotes.length === 0" class="empty-notes">
                   <el-icon><Document /></el-icon>
                   <p>没有找到符合条件的笔记</p>
@@ -243,7 +243,7 @@
             </div>
           </div>
         </el-popover>
-        
+
         <!-- 搜索笔记 -->
         <div class="search-container">
           <el-input
@@ -265,11 +265,11 @@
           <div v-else-if="searchQuery && notes.length === 0" class="search-info">
             未找到相关笔记
           </div>
-          
+
           <!-- 搜索结果下拉列表 -->
           <div v-if="searchQuery && notes.length > 0" class="search-results">
-            <div 
-              v-for="note in notes.slice(0, 5)" 
+            <div
+              v-for="note in notes.slice(0, 5)"
               :key="note.id"
               class="search-result-item"
               @click="selectNote(note)"
@@ -277,9 +277,9 @@
               <div class="search-result-title">{{ note.title }}</div>
               <div class="search-result-preview">{{ getPreviewText(note) }}</div>
               <div class="search-result-tags">
-                <el-tag 
-                  v-for="tag in note.tags.slice(0, 2)" 
-                  :key="tag" 
+                <el-tag
+                  v-for="tag in note.tags.slice(0, 2)"
+                  :key="tag"
                   size="small"
                   :type="getTagType(tag)"
                   effect="plain"
@@ -310,15 +310,15 @@
               <el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </el-button>
           </template>
-      
+
           <div class="video-manager-container">
             <div class="panel-header">
               <h4>已分析视频</h4>
             </div>
-        
+
             <div class="video-list custom-scrollbar" v-if="processedVideos.length > 0">
-              <div class="video-item" 
-                v-for="video in processedVideos" 
+              <div class="video-item"
+                v-for="video in processedVideos"
                 :key="video.id"
                 @click="navigateToVideo(video.id)">
                 <div class="video-thumbnail" :style="video.thumbnail ? `background-image: url(${video.thumbnail})` : ''"></div>
@@ -332,7 +332,7 @@
               <el-icon><VideoCamera /></el-icon>
               <span>暂无已处理视频</span>
             </div>
-        
+
             <div class="video-manager-actions">
               <el-button type="primary" size="small" @click="navigateToVideoUpload">
                 分析新视频
@@ -346,7 +346,7 @@
         <el-button type="primary" round @click="createNewNote">
           <el-icon><Plus /></el-icon>新建笔记
         </el-button>
-        
+
         <!-- 添加侧边栏切换按钮 -->
         <el-button type="primary" round @click="toggleSimilarNotesSidebar" class="pink-button">
           <el-icon><Document /></el-icon>相似笔记
@@ -354,7 +354,7 @@
         </el-button>
       </div>
     </div>
-  
+
     <!-- 主要内容区域 -->
     <div class="note-content-container" :class="{ 'main-content-with-sidebar': showSimilarNotesSidebar }">
       <!-- 左侧区域：视频播放和字幕 -->
@@ -486,7 +486,7 @@
                 >
                   <el-icon><Check /></el-icon> 保存
                 </el-button>
-                
+
                 <el-button
                   type="danger"
                   @click="deleteCurrentNote"
@@ -520,16 +520,16 @@
                     />
                   </div>
                 </div>
-                
-                <div class="editor-content-area">              
-                <div 
-                  id="note-editor-container" 
+
+                <div class="editor-content-area">
+                <div
+                  id="note-editor-container"
                   v-show="vditorInstance"
                   class="note-editor-container"
                 ></div>
                   <!-- Markdown预览区域 -->
-                  <div 
-                    v-show="showPreview" 
+                  <div
+                    v-show="showPreview"
                     class="markdown-preview"
                   >
                     <!-- 添加时间戳点击提示 -->
@@ -544,7 +544,7 @@
                     <div v-html="renderedContent" class="rendered-markdown-content"></div>
                   </div>
                 </div>
-                
+
                 <!-- 编辑器禁用遮罩 -->
                 <div class="editor-mask" v-if="!currentNote && !isCreatingNote">
                   <div class="mask-content">
@@ -569,12 +569,12 @@
       <el-tooltip v-if="!showNoteDetailInSidebar" content="基于您当前编写的内容，系统为您推荐了以下相似的笔记" placement="top">
         <el-icon><QuestionFilled /></el-icon>
       </el-tooltip>
-      
+
       <!-- 返回按钮，仅在查看笔记详情时显示 -->
       <el-button v-if="showNoteDetailInSidebar" type="text" @click="backToSimilarNotesList" class="back-button">
         <el-icon><Back /></el-icon>
       </el-button>
-      
+
       <!-- 设置按钮，仅在笔记列表时显示 -->
       <el-dropdown v-if="!showNoteDetailInSidebar" trigger="click" @command="handleSidebarSetting">
         <el-button type="text" class="sidebar-setting">
@@ -588,19 +588,19 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      
+
       <el-button type="text" @click="showSimilarNotesSidebar = false" class="close-sidebar">
         <el-icon><Close /></el-icon>
       </el-button>
     </div>
-  
+
     <!-- 侧边栏内容 -->
     <div class="sidebar-content">
       <!-- 相似笔记列表，仅在未查看笔记详情时显示 -->
       <template v-if="!showNoteDetailInSidebar">
-        <div 
-          v-for="note in similarNotes" 
-          :key="note.id" 
+        <div
+          v-for="note in similarNotes"
+          :key="note.id"
           class="similar-note-card"
           @click="viewSimilarNote(note)"
         >
@@ -609,9 +609,9 @@
           <div class="similar-note-card-meta">
             <span class="similar-note-card-date">{{ formatDateTime(note.created_at) }}</span>
             <div class="similar-note-card-tags">
-              <el-tag 
-                v-for="tag in note.tags.slice(0, 2)" 
-                :key="tag" 
+              <el-tag
+                v-for="tag in note.tags.slice(0, 2)"
+                :key="tag"
                 size="small"
                 effect="plain"
               >
@@ -621,17 +621,17 @@
             </div>
           </div>
         </div>
-        
+
         <div v-if="similarNotes.length === 0" class="no-similar-notes">
           暂无相似笔记
         </div>
-        
+
         <!-- 提示信息 -->
         <div class="sidebar-tip">
           不想显示相似性笔记？点击上方"相似笔记"或按下"ESC"退出
         </div>
       </template>
-      
+
       <!-- 笔记详情视图，仅在查看笔记详情时显示 -->
       <template v-else>
         <div class="note-detail-view">
@@ -639,9 +639,9 @@
           <div class="note-detail-meta">
             <span class="note-detail-date">{{ formatDateTime(sidebarViewingNote.created_at) }}</span>
             <div class="note-detail-tags">
-              <el-tag 
-                v-for="tag in sidebarViewingNote.tags" 
-                :key="tag" 
+              <el-tag
+                v-for="tag in sidebarViewingNote.tags"
+                :key="tag"
                 size="small"
                 effect="plain"
               >
@@ -650,7 +650,7 @@
             </div>
           </div>
           <div class="note-detail-content markdown-body" v-html="renderMarkdown(sidebarViewingNote.content)"></div>
-          
+
           <!-- 操作按钮 -->
           <div class="note-detail-actions">
             <el-button type="primary" size="small" @click="selectNote(sidebarViewingNote)">
@@ -678,9 +678,9 @@ import { ref, onMounted, computed, watch, nextTick, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { debounce } from 'lodash-es';
-import { 
-  getNotes, getNote, createNote, updateNote, deleteNote, 
-  addTimestamp, deleteTimestamp, getTags, getSimilarNotes, 
+import {
+  getNotes, getNote, createNote, updateNote, deleteNote,
+  addTimestamp, deleteTimestamp, getTags, getSimilarNotes,
   batchDeleteNotes, batchExportNotes, exportNote, syncTags
 } from '@/api/note';
 import { getVideo, getSubtitle, getVideoList, getVideoPreview } from '@/api/video';
@@ -701,7 +701,7 @@ const dontShowNoteGuideAgain = ref(false);
 // 关闭笔记指南弹窗
 const closeNoteGuideDialog = () => {
   showNoteGuideDialog.value = false;
-  
+
   // 如果用户选择不再显示，则保存到本地存储
   if (dontShowNoteGuideAgain.value) {
     localStorage.setItem('dontShowNoteGuide', 'true');
@@ -713,10 +713,10 @@ const fetchProcessedVideos = async () => {
   try {
     const response = await getVideoList();
     console.log('视频列表响应:', response);
-    
+
     // 处理不同的数据结构
     let videoList = [];
-    
+
     if (response && response.data) {
       if (Array.isArray(response.data)) {
         // 如果是数组，直接使用
@@ -729,12 +729,12 @@ const fetchProcessedVideos = async () => {
         videoList = Object.values(response.data);
       }
     }
-    
+
     // 过滤已处理的视频
-    const filteredVideos = videoList.filter(video => 
+    const filteredVideos = videoList.filter(video =>
       video && (video.status === 'completed' || video.status === 'processed')
     );
-    
+
     // 为每个视频加载预览图
     processedVideos.value = await Promise.all(filteredVideos.map(async (video) => {
       try {
@@ -837,21 +837,21 @@ const renderedContent = computed(() => {
       breaks: true,  // 将单个换行符转换为<br>
       gfm: true      // 启用GitHub风格的Markdown
     });
-    
+
     // 使用marked解析Markdown
     let html = marked.parse(noteContent.value || '');
-    
+
     // 处理新的时间戳标记格式 [MM:SS]{{timestamp:秒数}}
     html = html.replace(/\[([0-9:]+)\]\{\{timestamp:(\d+\.?\d*)\}\}/g, (match, text, time) => {
       const timeSeconds = parseFloat(time);
       return `<a href="javascript:void(0)" class="timestamp-link" data-time="${timeSeconds}" onclick="window.handleTimestampClick(${timeSeconds})">${text}</a>`;
     });
-    
+
     // 处理段落间距问题，将过大的段落间距减小
-    html = html.replace(/<\/p><p>/g, '</p><p style="margin: 2px 0; line-height: 1.5;">'); 
+    html = html.replace(/<\/p><p>/g, '</p><p style="margin: 2px 0; line-height: 1.5;">');
     // 更彻底地替换所有段落标签，但保留原有的class和其他属性
     html = html.replace(/<p(?![^>]*style=)([^>]*)>/g, '<p$1 style="margin: 2px 0; line-height: 1.5;">');
-    
+
     // 使用DOMPurify清理HTML以防止XSS攻击，但保留onclick和data-time属性和样式
     return DOMPurify.sanitize(html, {
       ADD_ATTR: ['onclick', 'data-time', 'style']
@@ -865,28 +865,28 @@ const renderedContent = computed(() => {
 // 渲染Markdown内容
 const renderMarkdown = (content) => {
   if (!content) return '';
-  
+
   try {
     // 配置marked选项，启用breaks选项以支持单行换行
     marked.setOptions({
       breaks: true,  // 将单个换行符转换为<br>
       gfm: true      // 启用GitHub风格的Markdown
     });
-    
+
     // 使用marked解析Markdown
     let html = marked.parse(content || '');
-    
+
     // 处理新的时间戳标记格式 [MM:SS]{{timestamp:秒数}}
     html = html.replace(/\[([0-9:]+)\]\{\{timestamp:(\d+\.?\d*)\}\}/g, (match, text, time) => {
       const timeSeconds = parseFloat(time);
       return `<a href="javascript:void(0)" class="timestamp-link" data-time="${timeSeconds}" onclick="window.handleTimestampClick(${timeSeconds})">${text}</a>`;
     });
-    
+
     // 处理段落间距问题，将过大的段落间距减小
-    html = html.replace(/<\/p><p>/g, '</p><p style="margin: 2px 0; line-height: 1.5;">'); 
+    html = html.replace(/<\/p><p>/g, '</p><p style="margin: 2px 0; line-height: 1.5;">');
     // 更彻底地替换所有段落标签，但保留原有的class和其他属性
     html = html.replace(/<p(?![^>]*style=)([^>]*)>/g, '<p$1 style="margin: 2px 0; line-height: 1.5;">');
-    
+
     // 使用DOMPurify清理HTML以防止XSS攻击，但保留onclick和data-time属性和样式
     return DOMPurify.sanitize(html, {
       ADD_ATTR: ['onclick', 'data-time', 'style']
@@ -904,9 +904,9 @@ const selectedNoteIds = ref([]);
 // 计算属性：根据标签和搜索筛选后的笔记列表
 const filteredNotes = computed(() => {
   if (!notes.value) return [];
-  
+
   let result = [...notes.value];
-  
+
   // 根据标签筛选
   if (selectedTags.value.length > 0) {
     result = result.filter(note => {
@@ -914,18 +914,18 @@ const filteredNotes = computed(() => {
       return selectedTags.value.every(tag => note.tags.includes(tag));
     });
   }
-  
+
   // 根据搜索词筛选
   if (searchQuery.value) {
     const searchLower = searchQuery.value.toLowerCase();
-    result = result.filter(note => 
-      (note.title && typeof note.title === 'string' && note.title.toLowerCase().includes(searchLower)) || 
+    result = result.filter(note =>
+      (note.title && typeof note.title === 'string' && note.title.toLowerCase().includes(searchLower)) ||
       (note.content && typeof note.content === 'string' && note.content.toLowerCase().includes(searchLower)) ||
       (note.keywords && typeof note.keywords === 'string' && note.keywords.toLowerCase().includes(searchLower)) ||
       (note.tags && typeof note.tags === 'string' && note.tags.toLowerCase().includes(searchLower))
     );
   }
-  
+
   return result;
 });
 
@@ -954,12 +954,12 @@ const fetchNotes = async () => {
     if (searchQuery.value) {
       params.search = searchQuery.value;
     }
-    
+
     // 添加标签筛选参数
     if (selectedTags.value.length > 0) {
       params.tag = selectedTags.value[0]; // 后端API只支持单个标签筛选
     }
-    
+
     console.log('获取笔记参数:', params);
     const response = await getNotes(params);
     if (response.data && response.data.status === 'success') {
@@ -996,24 +996,24 @@ onMounted(async () => {
   await fetchNotes();
   await fetchTags(); // 确保标签列表被加载
   await fetchProcessedVideos();
-  
+
   // 检查是否需要显示笔记指南弹窗
   const dontShow = localStorage.getItem('dontShowNoteGuide');
   if (!dontShow) {
     showNoteGuideDialog.value = true;
   }
-  
+
   if (videoId.value) {
     console.log('准备加载视频:', videoId.value);
     await loadVideo(videoId.value);
   }
-  
+
   // 初始化笔记编辑器
   initNoteEditor();
-  
+
   // 尝试从本地存储恢复笔记
   const restored = restoreFromLocalStorage();
-  
+
   // 如果没有恢复成功，则创建新笔记
   if (!restored) {
     // 自动创建新笔记，无需点击按钮
@@ -1053,21 +1053,21 @@ onUnmounted(() => {
   if (vditorInstance.value) {
     vditorInstance.value.destroy();
   }
-  
+
   // 移除视频事件监听器
   if (videoPlayer.value) {
     videoPlayer.value.removeEventListener('timeupdate', onVideoTimeUpdate);
   }
-  
+
   // 清除自动保存定时器
   if (autoSaveInterval) {
     clearInterval(autoSaveInterval);
     autoSaveInterval = null;
   }
-  
+
   // 在组件卸载前保存一次笔记
   autoSaveToLocalStorage();
-  
+
   window.handleTimestampClick = undefined;
 
   // 移除键盘事件监听
@@ -1091,9 +1091,9 @@ watch(currentNote, (newNote) => {
     noteTitle.value = newNote.title || '';
     noteTags.value = [...(newNote.tags || [])];
     timestamps.value = [...(newNote.timestamps || [])];
-    
+
     noteContent.value = newNote.content || '';
-    
+
     // 加载相似笔记
     fetchSimilarNotes();
   } else if (!isCreatingNote.value) {
@@ -1116,9 +1116,9 @@ watch(videoId, async (newVideoId) => {
 // 视频时间更新处理
 const onVideoTimeUpdate = () => {
   if (!videoPlayer.value) return;
-  
+
   currentTime.value = videoPlayer.value.currentTime;
-  
+
   // 更新当前字幕
   if (subtitles.value && subtitles.value.length > 0) {
     // 查找当前时间对应的字幕
@@ -1127,16 +1127,16 @@ const onVideoTimeUpdate = () => {
       const end = sub.end_time || sub.end || (start + 5); // 如果没有结束时间，默认为开始时间+5秒
       return currentTime.value >= start && currentTime.value <= end;
     });
-    
+
     // 如果找到对应字幕，并且与当前字幕不同
     if (currentSub && (!currentSubtitle.value || currentSub !== currentSubtitle.value)) {
       currentSubtitle.value = currentSub;
-      
+
       // 如果需要滚动到字幕
       if (needScrollToSubtitle.value) {
         // 获取字幕索引
         const index = subtitles.value.indexOf(currentSub);
-        
+
         // 滚动到字幕位置
         setTimeout(() => {
           const subtitleElement = document.getElementById(`subtitle-${index}`);
@@ -1145,7 +1145,7 @@ const onVideoTimeUpdate = () => {
             if (subtitleContainer) {
               // 计算滚动位置，使字幕在容器中居中显示
               subtitleContainer.scrollTop = subtitleElement.offsetTop - 100;
-              
+
               // 添加闪烁效果
               subtitleElement.classList.add('highlight-flash');
               setTimeout(() => {
@@ -1153,7 +1153,7 @@ const onVideoTimeUpdate = () => {
               }, 2000);
             }
           }
-          
+
           // 重置标志
           needScrollToSubtitle.value = false;
         }, 100);
@@ -1176,14 +1176,14 @@ const initNoteEditor = () => {
       vditorInstance.value.destroy();
       vditorInstance.value = null;
     }
-    
+
     // 获取编辑器容器
     const editorContainer = document.getElementById('note-editor-container');
     if (!editorContainer) {
       console.error('找不到编辑器容器');
       return;
     }
-    
+
     // 初始化 Vditor - 使用最简化的配置
     vditorInstance.value = new Vditor('note-editor-container', {
       height: '100%',
@@ -1208,11 +1208,11 @@ const initNoteEditor = () => {
         }
       },
       toolbar: [
-        'emoji', '|', 'bold', 'italic', 'strike', 
-        '|', 'list', 'ordered-list', 'check', 
-        '|', 'quote', 'line', 'code', 'inline-code', 'insert-before', 'insert-after', 
-        '|', 'upload', 'table', 
-        '|', 'undo', 'redo', 
+        'emoji', '|', 'bold', 'italic', 'strike',
+        '|', 'list', 'ordered-list', 'check',
+        '|', 'quote', 'line', 'code', 'inline-code', 'insert-before', 'insert-after',
+        '|', 'upload', 'table',
+        '|', 'undo', 'redo',
         '|', 'fullscreen'
       ],
       // 启用表情面板
@@ -1234,24 +1234,24 @@ const initNoteEditor = () => {
       after: () => {
         // 编辑器初始化完成后的回调
         console.log('Vditor 初始化完成');
-        
+
         // 设置编辑器内容
         if (noteContent.value) {
           vditorInstance.value.setValue(noteContent.value);
         }
-        
+
         console.log('编辑器初始化完成，使用简化配置');
-        
+
         // 手动创建表情面板
         setTimeout(() => {
           const emojiButton = document.querySelector('.vditor-toolbar .vditor-tooltipped[data-type="emoji"]');
           if (emojiButton) {
             emojiButton.addEventListener('click', function(event) {
               event.stopPropagation();
-              
+
               // 如果已存在表情面板，则切换其显示状态
               let emojiPanel = document.querySelector('.custom-emoji-panel');
-              
+
               if (emojiPanel) {
                 // 如果面板已存在，则切换显示/隐藏状态
                 if (emojiPanel.style.display === 'none') {
@@ -1265,7 +1265,7 @@ const initNoteEditor = () => {
                 }
                 return;
               }
-              
+
               // 创建自定义表情面板
               emojiPanel = document.createElement('div');
               emojiPanel.className = 'custom-emoji-panel';
@@ -1284,7 +1284,7 @@ const initNoteEditor = () => {
                 box-shadow: 0 2px 10px rgba(0,0,0,0.1);
                 z-index: 9999;
               `;
-              
+
               // 添加表情 - 精选常用表情
               const emojis = [
                 '😀', '😄', '😁', '😆', '😉', '😊',
@@ -1292,7 +1292,7 @@ const initNoteEditor = () => {
                 '🙂', '😌', '😏', '😒', '😔', '😜',
                 '😭', '😱', '😨', '👍', '👎', '❤️'
               ];
-              
+
               emojis.forEach(emoji => {
                 const emojiElement = document.createElement('div');
                 emojiElement.textContent = emoji;
@@ -1321,10 +1321,10 @@ const initNoteEditor = () => {
                 });
                 emojiPanel.appendChild(emojiElement);
               });
-              
+
               // 添加到文档中
               document.body.appendChild(emojiPanel);
-              
+
               // 点击其他地方关闭表情面板
               // 点击其他地方关闭表情面板
               document.addEventListener('click', function closePanel(e) {
@@ -1332,7 +1332,7 @@ const initNoteEditor = () => {
                   emojiPanel.style.display = 'none';
                 }
               });
-              
+
               // 添加样式表以确保表情面板始终保持网格布局
               const styleElement = document.createElement('style');
               styleElement.textContent = `
@@ -1350,7 +1350,7 @@ const initNoteEditor = () => {
             });
           }
         }, 500);
-        
+
         // 设置编辑器状态
         updateEditorEditableState();
       },
@@ -1374,7 +1374,7 @@ const initNoteEditor = () => {
         console.log('编辑器失去焦点');
       }
     });
-    
+
     // 调试信息
     console.log('noteEditor:', noteEditor.value);
     console.log('vditorInstance:', vditorInstance.value);
@@ -1429,34 +1429,34 @@ const handleContentChange = debounce(() => {
 const fetchSimilarNotes = async () => {
   // 在函数开始处添加日志
   console.log('开始获取相似笔记，内容长度:', noteContent.value.length);
-  
+
   if (isFetchingSimilarNotes.value) return;
-  
+
   isFetchingSimilarNotes.value = true;
-  
+
   try {
     const response = await getSimilarNotes({
       content: noteContent.value,
       limit: 5
     });
-    
+
     // 在获取响应后添加日志
     console.log('相似笔记API响应:', response);
-    
+
     if (response && response.data && response.data.status === 'success') {
-      similarNotes.value = response.data.data.filter(note => 
+      similarNotes.value = response.data.data.filter(note =>
         !currentNote.value || note.id !== currentNote.value.id
       );
-      
+
       // 如果有相似笔记，自动打开侧边栏
       if (similarNotes.value.length > 0 && autoOpenSidebar.value) {
         showSimilarNotesSidebar.value = true;
-      } 
+      }
       // 如果没有相似笔记，且侧边栏是打开的，自动关闭侧边栏
       else if (similarNotes.value.length === 0 && showSimilarNotesSidebar.value) {
         showSimilarNotesSidebar.value = false;
       }
-      
+
       // 在处理完数据后添加日志
       console.log('过滤后的相似笔记:', similarNotes.value);
     }
@@ -1508,7 +1508,7 @@ const getContentPreview = (content) => {
 const formatTimeMMSS = (time) => {
   // 确保time是数字
   const seconds = typeof time === 'number' ? time : parseFloat(time) || 0;
-  
+
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
@@ -1529,7 +1529,7 @@ const formatDateTime = (dateString) => {
 // 自动保存笔记到本地存储
 const autoSaveToLocalStorage = () => {
   if ((!currentNote.value && !isCreatingNote.value)) return;
-  
+
   // 从Vditor编辑器获取内容，添加更严格的检查
   let content = noteContent.value;
   try {
@@ -1540,7 +1540,7 @@ const autoSaveToLocalStorage = () => {
     console.error('获取Vditor内容时出错:', error);
     // 出错时使用noteContent.value作为备选
   }
-  
+
   const noteData = {
     title: noteTitle.value,
     content: content,
@@ -1551,7 +1551,7 @@ const autoSaveToLocalStorage = () => {
     currentNoteId: currentNote.value ? currentNote.value.id : null,
     lastSaved: new Date().toISOString()
   };
-  
+
   // 保存到本地存储
   localStorage.setItem('draft_note', JSON.stringify(noteData));
   console.log('笔记已自动保存到本地存储', new Date().toLocaleTimeString());
@@ -1561,20 +1561,20 @@ const autoSaveToLocalStorage = () => {
 const restoreFromLocalStorage = () => {
   const savedNote = localStorage.getItem('draft_note');
   if (!savedNote) return false;
-  
+
   try {
     const noteData = JSON.parse(savedNote);
-    
+
     // 检查保存时间，如果超过24小时则不恢复
     const lastSaved = new Date(noteData.lastSaved);
     const now = new Date();
     const hoursDiff = (now - lastSaved) / (1000 * 60 * 60);
-    
+
     if (hoursDiff > 24) {
       localStorage.removeItem('draft_note');
       return false;
     }
-    
+
     // 恢复笔记数据
     noteTitle.value = noteData.title || '';
     noteContent.value = noteData.content || '';
@@ -1589,7 +1589,7 @@ const restoreFromLocalStorage = () => {
     } catch (error) {
       console.error('设置Vditor内容时出错:', error);
     }
-    
+
     // 恢复笔记状态
     if (noteData.isCreating) {
       isCreatingNote.value = true;
@@ -1605,15 +1605,15 @@ const restoreFromLocalStorage = () => {
         currentNote.value = null;
       }
     }
-    
+
     // 更新编辑器状态
     updateEditorEditableState();
-    
+
     // 如果笔记内容不为空，获取相似笔记
     if (noteContent.value && noteContent.value.length > 5) {
       fetchSimilarNotes();
     }
-    
+
     ElMessage.info('已恢复未保存的笔记');
     return true;
   } catch (error) {
@@ -1627,17 +1627,17 @@ const restoreFromLocalStorage = () => {
 const insertHeading = () => {
   const textarea = noteEditor.value;
   if (!textarea) return;
-  
+
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
   const text = noteContent.value;
-  
+
   // 在选中文本前后添加 # 和换行符
   const selectedText = text.substring(start, end);
   const replacement = `# ${selectedText}`;
-  
+
   noteContent.value = text.substring(0, start) + replacement + text.substring(end);
-  
+
   // 重新设置光标位置
   nextTick(() => {
     textarea.focus();
@@ -1648,22 +1648,22 @@ const insertHeading = () => {
 const formatText = (format) => {
   const textarea = noteEditor.value;
   if (!textarea) return;
-  
+
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
   const text = noteContent.value;
-  
+
   let selectedText = text.substring(start, end);
   let replacement = '';
-  
+
   if (format === 'bold') {
     replacement = `**${selectedText}**`;
   } else if (format === 'italic') {
     replacement = `*${selectedText}*`;
   }
-  
+
   noteContent.value = text.substring(0, start) + replacement + text.substring(end);
-  
+
   // 重新设置光标位置
   nextTick(() => {
     textarea.focus();
@@ -1674,15 +1674,15 @@ const formatText = (format) => {
 const insertList = (type) => {
   const textarea = noteEditor.value;
   if (!textarea) return;
-  
+
   const start = textarea.selectionStart;
   const text = noteContent.value;
-  
+
   let prefix = type === 'bullet' ? '- ' : '1. ';
   let insertion = `\n${prefix}`;
-  
+
   noteContent.value = text.substring(0, start) + insertion + text.substring(start);
-  
+
   // 重新设置光标位置
   nextTick(() => {
     textarea.focus();
@@ -1693,16 +1693,16 @@ const insertList = (type) => {
 const insertCodeBlock = () => {
   const textarea = noteEditor.value;
   if (!textarea) return;
-  
+
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
   const text = noteContent.value;
-  
+
   const selectedText = text.substring(start, end);
   const replacement = `\n\`\`\`\n${selectedText}\n\`\`\`\n`;
-  
+
   noteContent.value = text.substring(0, start) + replacement + text.substring(end);
-  
+
   // 更新光标位置到插入文本后
   nextTick(() => {
     textarea.focus();
@@ -1714,16 +1714,16 @@ const insertCodeBlock = () => {
 const insertQuote = () => {
   const textarea = noteEditor.value;
   if (!textarea) return;
-  
+
   const start = textarea.selectionStart;
   const end = textarea.selectionEnd;
   const text = noteContent.value;
-  
+
   const selectedText = text.substring(start, end);
   const replacement = `> ${selectedText}`;
-  
+
   noteContent.value = text.substring(0, start) + replacement + text.substring(end);
-  
+
   // 重新设置光标位置
   nextTick(() => {
     textarea.focus();
@@ -1735,7 +1735,7 @@ const insertQuote = () => {
 // 选择笔记
 const selectNote = async (note) => {
   if (currentNote.value && currentNote.value.id === note.id) return;
-  
+
   // 如果当前正在创建新笔记，提示保存
   if (isCreatingNote.value) {
     try {
@@ -1745,7 +1745,7 @@ const selectNote = async (note) => {
         distinguishCancelAndClose: true,
         closeOnClickModal: false
       });
-      
+
       await saveNote();
     } catch (action) {
       if (action === 'cancel') {
@@ -1757,27 +1757,27 @@ const selectNote = async (note) => {
       }
     }
   }
-  
+
   currentNote.value = note;
   isCreatingNote.value = false;
-  
+
   // 如果笔记关联了视频，且与当前视频不同，则加载该视频
   if (note.video_id && (!videoId.value || note.video_id !== videoId.value)) {
     router.replace({ query: { ...route.query, videoId: note.video_id } });
   }
-  
+
   // 设置笔记类型和内容
   noteContent.value = note.content || '';
-  
+
   // 更新编辑器状态
   updateEditorEditableState();
-  
+
   // 清空相似笔记推荐
   similarNotes.value = [];
 
   // 设置为预览模式
   showPreview.value = true;
-  
+
   // 关闭笔记管理弹窗（仅在非批量操作模式下）
   if (!showBatchOperations.value) {
     // 使用Element Plus的方式关闭弹窗
@@ -1806,18 +1806,18 @@ const saveNote = async () => {
       timestamps: timestamps.value,
       video_id: videoId.value || null
     };
-    
+
     let response;
-    
+
     if (isCreatingNote.value) {
       // 创建新笔记
       response = await createNote(noteData);
-      
+
       if (response.data && response.data.status === 'success') {
         ElMessage.success('笔记创建成功');
         isCreatingNote.value = false;
         await fetchNotes();
-        
+
         // 保存成功后，重置编辑器准备创建新笔记
         initNewNote();
         // 清除本地存储的草稿
@@ -1826,19 +1826,19 @@ const saveNote = async () => {
     } else if (currentNote.value) {
       // 更新现有笔记
       response = await updateNote(currentNote.value.id, noteData);
-      
+
       if (response.data && response.data.status === 'success') {
         ElMessage.success('笔记更新成功');
         await fetchNotes();
-        
+
         // 保存成功后，重置编辑器准备创建新笔记
         initNewNote();
       }
     }
-    
+
     // 清空相似笔记推荐
     similarNotes.value = [];
-    
+
     return response;
   } catch (error) {
     console.error('保存笔记失败:', error);
@@ -1851,7 +1851,7 @@ const saveNote = async () => {
 const createNewNote = () => {
   // 如果当前正在创建新笔记，直接返回
   if (isCreatingNote.value) return;
-  
+
   // 如果当前有选中的笔记且内容已修改，提示保存
   if (currentNote.value && noteContent.value !== currentNote.value.content) {
     ElMessageBox.confirm('当前笔记已修改，是否保存？', '保存确认', {
@@ -1881,21 +1881,21 @@ const createNewNote = () => {
 const initNewNote = () => {
   currentNote.value = null;
   isCreatingNote.value = true;
-  
+
   // 重置表单
   noteTitle.value = '';
   noteContent.value = '';
   noteTags.value = [];
   timestamps.value = [];
-  
+
   // 添加这段代码来清空 Vditor 编辑器的内容
   if (vditorInstance.value) {
     vditorInstance.value.setValue('');
   }
-  
+
   // 更新编辑器状态
   updateEditorEditableState();
-  
+
   // 清空相似笔记推荐
   similarNotes.value = [];
 };
@@ -1920,26 +1920,26 @@ const loadVideo = async (id) => {
     console.log('开始加载视频，ID:', id);
     const response = await getVideo(id);
     console.log('视频API响应:', response);
-    
+
     // 检查响应格式并适应不同的响应结构
     if (response.data) {
       // 直接使用响应数据，不检查status字段
       currentVideo.value = response.data;
       console.log('设置当前视频:', currentVideo.value);
-      
+
       // 设置视频URL
       videoUrl.value = `/api/videos/${id}/stream`;
       console.log('视频URL已设置:', videoUrl.value);
-      
+
       // 只加载语义合并字幕，不加载普通字幕
       await loadMergedSubtitles(id);
-      
+
       // 确保视频元素更新
       nextTick(() => {
         if (videoPlayer.value) {
           videoPlayer.value.load();
           console.log('视频元素已重新加载');
-          
+
           // 添加时间更新事件监听
           videoPlayer.value.addEventListener('timeupdate', onVideoTimeUpdate);
         } else {
@@ -1962,7 +1962,7 @@ const loadMergedSubtitles = async (id, force = false) => {
     // 构建API URL，添加force_refresh参数
     const apiUrl = `/api/subtitles/videos/${id}/subtitles/semantic-merged${force ? '?force_refresh=true' : ''}`;
     console.log('请求API:', apiUrl);
-    
+
     // 显示加载提示
     const loadingMessage = ElMessage({
       message: '正在处理视频字幕，这可能需要几分钟时间...',
@@ -1970,17 +1970,17 @@ const loadMergedSubtitles = async (id, force = false) => {
       duration: 0,
       showClose: true
     });
-    
+
     const response = await request({
       url: apiUrl,
       method: 'get'
     });
-    
+
     // 关闭加载提示
     loadingMessage.close();
-    
+
     console.log('合并字幕API响应:', response);
-    
+
     if (response && response.data) {
       if (Array.isArray(response.data) && response.data.length > 0) {
         console.log(`成功加载${response.data.length}条合并字幕`);
@@ -2010,7 +2010,7 @@ const resetEditor = () => {
   noteContent.value = '';
   noteTags.value = [];
   timestamps.value = [];
-  
+
   // 清空相似笔记推荐
   similarNotes.value = [];
 };
@@ -2018,7 +2018,7 @@ const resetEditor = () => {
 // 删除当前笔记
 const deleteCurrentNote = async () => {
   if (!currentNote.value) return;
-  
+
   try {
     await ElMessageBox.confirm('确定要删除该笔记吗？此操作不可恢复', '删除确认', {
       confirmButtonText: '确定',
@@ -2026,9 +2026,9 @@ const deleteCurrentNote = async () => {
       distinguishCancelAndClose: true,
       closeOnClickModal: false
     });
-    
+
     const response = await deleteNote(currentNote.value.id);
-    
+
     if (response.data && response.data.status === 'success') {
       ElMessage.success('笔记已删除');
       currentNote.value = null;
@@ -2046,13 +2046,13 @@ const deleteCurrentNote = async () => {
 // 导出笔记
 const exportCurrentNote  = () => {
   if (!currentNote.value && !isCreatingNote.value) return;
-  
+
   let content = '';
   let filename = '';
-  
+
   content = noteContent.value;
   filename = `${noteTitle.value}.md`;
-  
+
   // 创建下载链接
   const blob = new Blob([content], { type: 'text/markdown' });
   const url = URL.createObjectURL(blob);
@@ -2061,7 +2061,7 @@ const exportCurrentNote  = () => {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
-  
+
   ElMessage.success(`笔记已导出为 ${filename}`);
 };
 
@@ -2075,32 +2075,32 @@ const handleBatchExport = async () => {
   try {
     ElMessage.info('正在准备导出文件...');
     const response = await batchExportNotes(selectedNoteIds.value);
-    
+
     // 创建Blob对象
     const blob = new Blob([response.data], { type: 'application/zip' });
-    
+
     // 创建下载链接
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    
+
     // 从响应头中获取文件名
     const contentDisposition = response.headers['content-disposition'];
     let filename = 'notes_export.zip';
-    
+
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename=(.+)/);
       if (filenameMatch && filenameMatch[1]) {
         filename = filenameMatch[1].replace(/"/g, '');
       }
     }
-    
+
     link.download = filename;
-    
+
     // 触发下载
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     ElMessage.success('笔记导出成功');
   } catch (error) {
     console.error('批量导出失败:', error);
@@ -2216,14 +2216,14 @@ const getTagType = (tag) => {
 // 获取笔记预览文本
 const getPreviewText = (note) => {
   let text = '';
-  
+
   if (note.content) {
     // 从HTML中提取纯文本
     text = note.content.replace(/<[^>]*>/g, '');
   } else if (note.markdown_content) {
     text = note.markdown_content;
   }
-  
+
   return text.length > 100 ? text.substring(0, 100) + '...' : text;
 };
 
@@ -2294,18 +2294,18 @@ const exportSingleNote = async (noteId) => {
     // 先获取笔记信息
     const noteInfo = await getNote(noteId);
     const noteTitle = noteInfo.data.data.title;
-    
+
     // 导出笔记
     const response = await exportNote(noteId);
     const blob = new Blob([response.data], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    
+
     // 使用笔记标题作为文件名
     const safeTitle = noteTitle.replace(/[^\w\s-]/g, '_');
     const filename = `${safeTitle}.md`;
-    
+
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
@@ -2328,16 +2328,16 @@ const deleteSingleNote = async (noteId) => {
         type: 'warning',
       }
     );
-    
+
     if (result === 'confirm') {
       await deleteNote(noteId);
       ElMessage.success('笔记已删除');
-      
+
       // 如果当前正在编辑的笔记被删除，重置编辑器
       if (currentNote.value && currentNote.value.id === noteId) {
         currentNote.value = null;
       }
-      
+
       // 刷新笔记列表和标签列表
       await fetchNotes();
       await fetchTags(); // 删除笔记后刷新标签列表
@@ -2367,20 +2367,20 @@ const isCurrentSubtitle = (subtitle) => {
 const addSubtitleToNote = (subtitle) => {
   // 只检查是否有正在编辑的笔记或者是否正在创建新笔记
   if (!currentNote.value && !isCreatingNote.value) return;
-  
+
   // 获取字幕文本和时间
   const subtitleContent = subtitle.text || subtitle.content || '';
   const timeSeconds = subtitle.start_time || subtitle.start || 0;
   const formattedTime = formatTimeMMSS(timeSeconds);
-  
+
   // 创建一个更美观的时间戳标记
   // 格式: [03:02]{{timestamp:182}}
   const timestampMark = `[${formattedTime}]{{timestamp:${timeSeconds}}}`;
-  
+
   // 添加带时间戳的字幕文本到编辑器
   const subtitleText = `> ${timestampMark} ${subtitleContent}\n\n`;
-  
-  
+
+
   // 如果使用的是Vditor编辑器
   if (vditorInstance.value) {
     const currentContent = vditorInstance.value.getValue();
@@ -2392,16 +2392,16 @@ const addSubtitleToNote = (subtitle) => {
     // 获取当前光标位置
     const textarea = noteEditor.value;
     if (!textarea) return; // 添加：如果没有文本编辑器，直接返回
-    
+
     const cursorPosition = textarea.selectionStart;
-    
+
     // 在光标位置插入字幕文本
     const currentContent = noteContent.value;
-    noteContent.value = 
-      currentContent.substring(0, cursorPosition) + 
-      subtitleText + 
+    noteContent.value =
+      currentContent.substring(0, cursorPosition) +
+      subtitleText +
       currentContent.substring(cursorPosition);
-    
+
     // 更新光标位置到插入文本后
     nextTick(() => {
       textarea.focus();
@@ -2409,18 +2409,18 @@ const addSubtitleToNote = (subtitle) => {
       textarea.setSelectionRange(newPosition, newPosition);
     });
   }
-  
+
   // 记录字幕时间戳
   const timestampObj = {
     time_seconds: timeSeconds,
     subtitle_text: subtitleContent
   };
-  
+
   // 检查是否已存在相同时间戳的记录
   if (!timestamps.value.some(t => t.time_seconds === timestampObj.time_seconds)) {
     timestamps.value.push(timestampObj);
   }
-  
+
   // 自动保存笔记
   if (currentNote.value) {
     saveNote();
@@ -2432,7 +2432,7 @@ const handleSubtitleClick = (subtitle) => {
   // 首先跳转到对应的视频时间点
   const startTime = subtitle.start_time || subtitle.start;
   seekToTime(startTime);
-  
+
   // 然后添加字幕到笔记
   addSubtitleToNote(subtitle);
 };
@@ -2441,7 +2441,7 @@ const handleSubtitleClick = (subtitle) => {
 const removeTimestamp = (index) => {
   if (index >= 0 && index < timestamps.value.length) {
     timestamps.value.splice(index, 1);
-    
+
     // 如果当前有笔记，自动保存
     if (currentNote.value) {
       saveNote();
@@ -2462,7 +2462,7 @@ const seekToTime = (timeSeconds) => {
         console.error('自动播放失败:', err);
       });
     }
-    
+
     // 设置需要滚动到字幕的标志
     needScrollToSubtitle.value = true;
   }
@@ -2471,33 +2471,33 @@ const seekToTime = (timeSeconds) => {
 // 处理文本编辑器点击事件
 const handleEditorClick = (event) => {
   if (!noteEditor.value) return;
-  
+
   // 获取当前选中的文本
   const selectedText = window.getSelection().toString();
-  
+
   // 如果没有选中文本，检查是否点击了时间戳
   if (!selectedText) {
     // 获取编辑器内容
     const content = noteContent.value;
-    
+
     // 获取光标位置
     const cursorPosition = noteEditor.value.selectionStart;
-    
+
     // 查找光标附近的时间戳标记 - 新格式
     const timestampRegex = /\[([0-9:]+)\]\{\{timestamp:(\d+\.?\d*)\}\}/g;
     let match;
-    
+
     // 查找所有时间戳标记
     while ((match = timestampRegex.exec(content)) !== null) {
       const startIndex = match.index;
       const endIndex = startIndex + match[0].length;
-      
+
       // 检查光标是否在时间戳标记内或附近（允许5个字符的误差）
-      if (Math.abs(cursorPosition - startIndex) <= 5 || 
+      if (Math.abs(cursorPosition - startIndex) <= 5 ||
           (cursorPosition >= startIndex && cursorPosition <= endIndex)) {
         // 提取时间戳
         const timeSeconds = parseFloat(match[2]);
-        
+
         // 跳转到对应时间
         seekToTime(timeSeconds);
         break;
@@ -2901,7 +2901,7 @@ const handleSyncTags = async () => {
 
 /* 调整字幕列表容器 */
 .subtitle-list-wrapper {
-  flex: 1; 
+  flex: 1;
   overflow-y: auto;
   background-color: #fff;
   border-radius: 8px;
@@ -2986,7 +2986,7 @@ const handleSyncTags = async () => {
   overflow: hidden;
   background-color: #fff;
   margin-left: 15px; /* 添加左边距 */
-  position: relative; 
+  position: relative;
   padding: 0; /* 移除内边距 */
 }
 
@@ -3007,7 +3007,7 @@ const handleSyncTags = async () => {
   border-radius: 12px;
   background-color: #fff;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  margin: 5px; 
+  margin: 5px;
   transition: none;
 }
 
@@ -3064,8 +3064,8 @@ const handleSyncTags = async () => {
   padding-left: 30px !important;
   font-size: 16px !important;
   font-weight: 600 !important;
-  transition: all 0.3s ease !important; 
-  box-shadow: 0 0 5px rgba(255, 182, 193, 0.3) !important; 
+  transition: all 0.3s ease !important;
+  box-shadow: 0 0 5px rgba(255, 182, 193, 0.3) !important;
   background-color: #fff !important;
 }
 
@@ -3465,17 +3465,17 @@ const handleSyncTags = async () => {
   .note-content-container {
     flex-direction: column;
   }
-  
+
   .left-section, .right-section {
     width: 100%;
   }
-  
+
   .left-section {
     height: 50%;
     border-right: none;
     border-bottom: 1px solid #e0e0e0;
   }
-  
+
   .right-section {
     height: 50%;
   }
@@ -3643,8 +3643,8 @@ const handleSyncTags = async () => {
 .note-item {
   display: flex;
   align-items: flex-start;
-  padding: 12px 12px; 
-  height: 120px; 
+  padding: 12px 12px;
+  height: 120px;
   border-radius: 12px;
   background-color: #fff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
@@ -3938,8 +3938,8 @@ const handleSyncTags = async () => {
   margin-left: 10px;
   margin-top: 10px;
   transition: none;
-  width: 100px; 
-  height: 30px;    
+  width: 100px;
+  height: 30px;
 }
 
 .button-new-tag:hover {
@@ -3974,7 +3974,7 @@ const handleSyncTags = async () => {
   .note-content-container {
     max-width: 100%; /* 在更小屏幕上不留白 */
   }
-  
+
   .left-section, .right-section {
     width: 48%; /* 调整宽度比例 */
     margin: 0 5px; /* 减小间距 */
@@ -3986,7 +3986,7 @@ const handleSyncTags = async () => {
     flex-direction: column;
     align-items: center;
   }
-  
+
   .left-section, .right-section {
     width: 90%;
     max-width: none;

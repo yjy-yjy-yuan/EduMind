@@ -28,13 +28,13 @@
             <span>使用指南</span>
             <el-icon class="arrow-icon"><arrow-right /></el-icon>
           </div>
-          
+
           <!-- 已分析视频列表 -->
           <div class="menu-section">
             <h4>已分析视频</h4>
             <div class="video-list custom-scrollbar" v-if="processedVideos.length > 0">
-              <div class="video-item" 
-                   v-for="video in processedVideos" 
+              <div class="video-item"
+                   v-for="video in processedVideos"
                    :key="video.id"
                    :class="{ 'current-playing': video.id === Number(videoId) }"
                    @click="navigateToVideo(video.id)">
@@ -51,8 +51,8 @@
               <span>暂无已处理视频</span>
             </div>
           </div>
-          
-          
+
+
           <div class="menu-item" @click="navigateToKnowledgeGraph">
             <el-icon><connection /></el-icon>
             <span>知识点总览</span>
@@ -66,7 +66,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- 左侧区域 -->
     <div class="left-section" :class="{ 'with-sidebar': sidebarVisible }">
       <!-- 左侧上方区域：视频名称和视频播放区域的上下布局 -->
@@ -83,7 +83,7 @@
             class="subtitle-toggle-switch"
           />
         </div>
-        
+
         <!-- 视频播放区域 -->
         <div class="video-main-area">
           <div class="video-wrapper">
@@ -129,7 +129,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- 下方区域：智能问答区域 -->
       <div class="lower-section">
         <div class="qa-container">
@@ -137,8 +137,8 @@
             <div class="qa-header">
               <h3>
                 智能问答
-                <el-tag 
-                  size="small" 
+                <el-tag
+                  size="small"
                   :type="useOllama ? 'success' : 'primary'"
                   effect="dark"
                   class="mode-tag"
@@ -148,8 +148,8 @@
               </h3>
               <div class="qa-mode-switch">
                 <div class="qa-mode-buttons">
-                  <el-button 
-                    size="small" 
+                  <el-button
+                    size="small"
                     :type="qaMode === 'video' ? 'primary' : 'default'"
                     round
                     @click="toggleQaMode"
@@ -168,8 +168,8 @@
                   :active-value="true"
                   :inactive-value="false"
                 />
-                <el-button 
-                  type="text" 
+                <el-button
+                  type="text"
                   @click="clearChat"
                   size="small"
                 >
@@ -205,8 +205,8 @@
               <div class="qa-input">
                 <div class="qa-input-options">
                   <div class="thinking-mode-button" @click="toggleDeepThinking">
-                    <el-button 
-                      size="small" 
+                    <el-button
+                      size="small"
                       :type="deepThinking ? 'primary' : 'default'"
                       :icon="deepThinking ? 'Brain' : ''"
                       round
@@ -215,11 +215,11 @@
                     </el-button>
                   </div>
                 </div>
-                <el-input 
-                  v-model="question" 
-                  :placeholder="getPlaceholderByMode" 
-                  type="textarea" 
-                  :rows="2" 
+                <el-input
+                  v-model="question"
+                  :placeholder="getPlaceholderByMode"
+                  type="textarea"
+                  :rows="2"
                 />
                 <el-button type="primary" @click="askQuestion" :loading="isAsking">提问</el-button>
               </div>
@@ -228,7 +228,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- 右侧区域：字幕区域 -->
     <div class="subtitle-section">
       <div class="subtitle-display-container">
@@ -238,16 +238,16 @@
             <div class="subtitle-buttons-row">
               <!-- 左侧：字幕模式选择 -->
               <div class="subtitle-left-buttons">
-                <el-button 
-                  :type="subtitleMode === 'merged' ? 'primary' : 'purple'" 
-                  size="small" 
+                <el-button
+                  :type="subtitleMode === 'merged' ? 'primary' : 'purple'"
+                  size="small"
                   @click="toggleSubtitleMode"
                   :class="{'subtitle-mode-button': true, 'purple-button': subtitleMode !== 'merged'}"
                 >
                   {{ subtitleMode === 'merged' ? '语义合并字幕' : '标准分段字幕' }}
                 </el-button>
               </div>
-              
+
               <!-- 右侧：字幕下载和重新合并按钮 -->
               <div class="subtitle-right-buttons">
                 <!-- 字幕下载 -->
@@ -264,12 +264,12 @@
                     </el-dropdown-menu>
                   </template>
                 </el-dropdown>
-                
+
                 <!-- 重新合并字幕 -->
-                <el-button 
-                  type="primary" 
-                  size="small" 
-                  @click="refreshMergedSubtitles" 
+                <el-button
+                  type="primary"
+                  size="small"
+                  @click="refreshMergedSubtitles"
                   :loading="mergeSubtitlesLoading"
                 >
                   重新合并字幕
@@ -278,7 +278,7 @@
             </div>
           </div>
         </div>
-      
+
         <div class="subtitle-display">
           <template v-if="subtitleMode === 'full'">
             <div class="subtitle-display full-subtitle">
@@ -296,7 +296,7 @@
           </template>
           <template v-else>
             <div class="subtitle-content" v-if="mergedSubtitles.length">
-              <div v-for="(section, index) in mergedSubtitles" :key="index" 
+              <div v-for="(section, index) in mergedSubtitles" :key="index"
                    :class="['subtitle-item', 'merged-item', { 'current': isCurrentMergedSubtitle(section) }]">
                 <div class="subtitle-header">
                   <span class="subtitle-time">{{ formatTimeMMSS(section.start_time) }} - {{ formatTimeMMSS(section.end_time) }}</span>
@@ -312,7 +312,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- 帮助文档对话框 -->
     <el-dialog
       v-model="helpDialogVisible"
@@ -323,7 +323,7 @@
     >
       <div class="help-content">
         <h3>欢迎使用视频智能伴学系统</h3>
-    
+
         <div class="help-section">
           <h4>1. 视频播放与字幕</h4>
           <ul>
@@ -332,7 +332,7 @@
             <li><strong>字幕下载</strong>：点击字幕区域顶部的"下载字幕"按钮，可以下载SRT或TXT格式的字幕文件。</li>
           </ul>
         </div>
-    
+
         <div class="help-section">
           <h4>2. 智能问答功能</h4>
           <ul>
@@ -341,7 +341,7 @@
             <li><strong>清空对话</strong>：点击"清空对话"按钮可以清除当前的问答记录。</li>
           </ul>
         </div>
-    
+
         <div class="help-section">
           <h4>3. 侧边栏功能</h4>
           <ul>
@@ -351,7 +351,7 @@
             <li><strong>已分析视频</strong>：显示所有已处理完成的视频列表，点击任意视频可以直接播放。</li>
           </ul>
         </div>
-    
+
         <div class="help-section">
           <h4>4. 常见问题</h4>
           <ul>
@@ -360,7 +360,7 @@
             <li><strong>问答没有回复</strong>：请确保问题清晰明确，并与视频内容相关。</li>
           </ul>
         </div>
-    
+
         <div class="help-section">
           <h4>5. 使用技巧</h4>
           <ul>
@@ -376,7 +376,7 @@
         </span>
       </template>
     </el-dialog>
-    
+
     <!-- 功能引导提示弹窗 -->
     <el-dialog
       v-model="showGuideDialog"
@@ -388,12 +388,12 @@
     >
       <div class="guide-content">
         <h3>欢迎使用视频智能伴学系统</h3>
-        
+
         <div class="guide-section">
           <h4><el-icon><edit /></el-icon> 记录学习笔记</h4>
           <p>想要记录学习笔记？只需点击左上角的侧边栏按钮 <el-icon><arrow-right /></el-icon>，然后选择"笔记系统"即可进入笔记页面。</p>
         </div>
-        
+
         <div class="guide-section">
           <h4>侧边栏其他功能</h4>
           <ul>
@@ -403,7 +403,7 @@
           </ul>
         </div>
       </div>
-      
+
       <template #footer>
         <div class="dialog-footer">
           <el-checkbox v-model="dontShowGuideAgain">不再显示</el-checkbox>
@@ -419,8 +419,8 @@ import DOMPurify from 'dompurify';
 import { ref, onMounted, computed, watch, onUnmounted , nextTick  } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElLoading, ElMessageBox } from 'element-plus';
-import { 
-  Loading, Warning, FullScreen, Close, User, Monitor, 
+import {
+  Loading, Warning, FullScreen, Close, User, Monitor,
   QuestionFilled, ChatLineSquare, ArrowDown as ArrowDown,
   ArrowRight, ArrowLeft, HomeFilled, VideoCamera, Document, Edit as Edit,
   Connection
@@ -613,9 +613,9 @@ const loadSubtitles = async () => {
       method: 'get',
       params: { format: 'srt' }
     });
-    
+
     console.log('字幕数据响应:', response);
-    
+
     // 解析SRT格式字幕
     if (typeof response.data === 'string') {
       fullSubtitles.value = parseSRT(response.data);
@@ -636,28 +636,28 @@ const parseSRT = (srtString) => {
   // 按空行分割字幕块
   const subtitleBlocks = srtString.trim().split(/\r?\n\r?\n/);
   const subtitles = [];
-  
+
   for (const block of subtitleBlocks) {
     const lines = block.split(/\r?\n/);
     if (lines.length < 3) continue; // 跳过格式不正确的块
-    
+
     // 第二行包含时间信息
     const timeMatch = lines[1].match(/(\d{2}:\d{2}:\d{2},\d{3}) --> (\d{2}:\d{2}:\d{2},\d{3})/);
     if (!timeMatch) continue;
-    
+
     const startTime = convertSRTTimeToSeconds(timeMatch[1]);
     const endTime = convertSRTTimeToSeconds(timeMatch[2]);
-    
+
     // 第三行及以后是字幕文本
     const text = lines.slice(2).join('\n');
-    
+
     subtitles.push({
       startTime,
       endTime,
       text
     });
   }
-  
+
   return subtitles;
 };
 
@@ -665,12 +665,12 @@ const parseSRT = (srtString) => {
 const convertSRTTimeToSeconds = (timeString) => {
   const parts = timeString.split(/[:,]/);
   if (parts.length !== 4) return 0;
-  
+
   const hours = parseInt(parts[0], 10);
   const minutes = parseInt(parts[1], 10);
   const seconds = parseInt(parts[2], 10);
   const milliseconds = parseInt(parts[3], 10);
-  
+
   return hours * 3600 + minutes * 60 + seconds + milliseconds / 1000;
 };
 
@@ -682,7 +682,7 @@ const loadMergedSubtitles = async (retryCount = 0, maxRetries = 3, force = false
     // 构建API URL，添加force_refresh参数
     const apiUrl = `/api/subtitles/videos/${videoId.value}/subtitles/semantic-merged${force ? '?force_refresh=true' : ''}`;
     console.log('请求API:', apiUrl);
-    
+
     // 显示加载提示
     const loadingMessage = ElMessage({
       message: '正在处理视频字幕，这可能需要几分钟时间...',
@@ -690,17 +690,17 @@ const loadMergedSubtitles = async (retryCount = 0, maxRetries = 3, force = false
       duration: 0,
       showClose: true
     });
-    
+
     const response = await request({
       url: apiUrl,
       method: 'get'
     });
-    
+
     // 关闭加载提示
     loadingMessage.close();
-    
+
     console.log('合并字幕API响应:', response);
-    
+
     if (response && response.data) {
       if (Array.isArray(response.data) && response.data.length > 0) {
         console.log(`成功加载${response.data.length}条合并字幕`);
@@ -718,14 +718,14 @@ const loadMergedSubtitles = async (retryCount = 0, maxRetries = 3, force = false
     }
   } catch (error) {
     console.error('加载合并字幕失败:', error);
-    
+
     // 检查是否是404错误（语义合并字幕不存在）
     if (error.response && error.response.status === 404) {
       console.log('语义合并字幕不存在，自动触发语义合并处理');
-      
+
       // 显示单一提示信息
       ElMessage.info('语义合并字幕生成中，请稍候...');
-      
+
       // 自动触发语义合并
       try {
         await triggerSemanticMerge();
@@ -736,7 +736,7 @@ const loadMergedSubtitles = async (retryCount = 0, maxRetries = 3, force = false
         ElMessage.error('语义合并处理失败，请稍后再试');
       }
     }
-    
+
     mergedSubtitles.value = [];
     ElMessage.error(`加载合并字幕失败: ${error.message || '未知错误'}`);
   } finally {
@@ -828,7 +828,7 @@ const downloadSubtitle = async (format, showMessage = false) => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     if (showMessage) {
       ElMessage.success(`${format.toUpperCase()} 字幕下载成功`);
     }
@@ -857,7 +857,7 @@ const downloadMergedSubtitle = async (format, showMessage = false) => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
+
     if (showMessage) {
       ElMessage.success(`合并${format.toUpperCase()} 字幕下载成功`);
     }
@@ -872,10 +872,10 @@ const fetchProcessedVideos = async () => {
   try {
     const response = await getVideoList();
     console.log('视频列表响应:', response);
-    
+
     // 处理不同的数据结构
     let videoList = [];
-    
+
     if (response && response.data) {
       if (Array.isArray(response.data)) {
         // 如果是数组，直接使用
@@ -888,12 +888,12 @@ const fetchProcessedVideos = async () => {
         videoList = Object.values(response.data);
       }
     }
-    
+
     // 过滤已处理的视频
-    const filteredVideos = videoList.filter(video => 
+    const filteredVideos = videoList.filter(video =>
       video && (video.status === 'completed' || video.status === 'processed')
     );
-    
+
     // 为每个视频加载预览图
     processedVideos.value = await Promise.all(filteredVideos.map(async (video) => {
       try {
@@ -928,7 +928,7 @@ const navigateToVideo = (videoId) => {
   } else {
     // 关闭侧边栏
     sidebarVisible.value = false;
-    
+
     // 跳转到新视频
     router.push(`/player/${videoId}`).then(() => {
       // 页面跳转后刷新页面
@@ -941,13 +941,13 @@ const navigateToVideo = (videoId) => {
 const triggerSemanticMerge = async () => {
   try {
     ElMessage.info('正在启动语义合并处理，这可能需要几分钟时间...');
-    
+
     // 发送POST请求触发语义合并
     const response = await request({
       url: `/api/subtitles/videos/${videoId.value}/subtitles/semantic-merge`,
       method: 'post'
     });
-    
+
     if (response && response.data && response.data.success) {
       ElMessage.success('语义合并操作已启动，请稍候...');
       // 等待几秒后尝试加载合并字幕
@@ -996,19 +996,19 @@ const askQuestion = async () => {
     ElMessage.warning('请输入问题');
     return;
   }
-  
+
   if (isAsking.value) {
     ElMessage.warning('正在回答中，请稍候...');
     return;
   }
-  
+
   const questionText = question.value.trim();
   isAsking.value = true;
-  
+
   try {
     let answer = '';
     let currentQuestionIndex = -1; // 用于存储当前问题的索引，避免因切换模式后询问相同的问题导致错误
-    
+
     // 添加问题到历史记录
     if (qaMode.value === 'video') {
       videoQaHistory.value.push({
@@ -1033,7 +1033,7 @@ const askQuestion = async () => {
     console.log('使用的API服务:', useOllama.value ? 'Ollama本地服务' : '在线API服务');
     // 使用视频ID或null，取决于当前问答模式
     const videoIdParam = qaMode.value === 'video' ? videoId.value : null;
-    
+
     console.log('开始提问:', {
       问题: questionText,
       模式: qaMode.value,
@@ -1041,7 +1041,7 @@ const askQuestion = async () => {
       使用离线模式: useOllama.value,
       深度思考: deepThinking.value
     });
-    
+
     // 设置超时检查，如果30秒后仍然显示"正在思考..."，则更新为错误消息
     let timeoutId = null;
     if (useOllama.value) {
@@ -1063,7 +1063,7 @@ const askQuestion = async () => {
         }
       }, 30000); // 30秒超时
     }
-    
+
     // 使用新的流式问答API
     await askQuestionStream(
       {
@@ -1081,7 +1081,7 @@ const askQuestion = async () => {
             clearTimeout(timeoutId);
             timeoutId = null;
           }
-          
+
           // 如果收到空字符串，跳过处理
           if (data === "") {
             console.log('收到空字符串，跳过处理');
@@ -1090,10 +1090,10 @@ const askQuestion = async () => {
 
           answer = data;
           console.log('收到回答:', answer.substring(0, 50) + '...');
-          
+
           // 检查是否包含深度思考的格式化回答（通常包含<details>标签）
           const isFormattedAnswer = data.includes('<details>') && data.includes('</details>');
-          
+
           // 实时更新最新的回答到历史记录
           if (qaMode.value === 'video' && currentQuestionIndex >= 0) {
             videoQaHistory.value[currentQuestionIndex].answer = answer;
@@ -1109,10 +1109,10 @@ const askQuestion = async () => {
             clearTimeout(timeoutId);
             timeoutId = null;
           }
-          
+
           console.error('提问失败:', error);
           ElMessage.error('提问失败，请重试');
-          
+
           // 更新错误信息到历史记录
           if (qaMode.value === 'video' && currentQuestionIndex >= 0) {
             videoQaHistory.value[currentQuestionIndex].answer = `提问失败: ${error}`;
@@ -1126,7 +1126,7 @@ const askQuestion = async () => {
             clearTimeout(timeoutId);
             timeoutId = null;
           }
-          
+
           question.value = '';
           console.log('问答完成');
           // 滚动到底部
@@ -1137,7 +1137,7 @@ const askQuestion = async () => {
   } catch (error) {
     console.error('提问失败:', error);
     ElMessage.error('提问失败，请重试');
-    
+
     // 更新错误信息到历史记录
     if (qaMode.value === 'video' && currentQuestionIndex >= 0) {
       videoQaHistory.value[currentQuestionIndex].answer = `提问失败: ${error}`;
@@ -1206,19 +1206,19 @@ onMounted(async () => {
       showGuideDialog.value = true;
     }, 1500);
   }
-  
+
   // 加载视频信息
   await loadVideoInfo();
-  
+
   // 加载字幕
   await loadSubtitles();
-  
+
   // 加载已处理视频列表
   await fetchProcessedVideos();
-  
+
   // 加载合并字幕
   await loadMergedSubtitles();
-  
+
   // 检查URL参数中是否有时间戳
   const timeParam = route.query.t;
   if (timeParam) {
@@ -1231,7 +1231,7 @@ onMounted(async () => {
       }, 1000);
     }
   }
-  
+
   // 检查URL参数中是否有自动问题
   const autoQuestion = route.query.auto_question;
   if (autoQuestion) {
@@ -1239,17 +1239,17 @@ onMounted(async () => {
     qaMode.value = 'video';
     // 设置为离线模式
     useOllama.value = true;
-    
+
     // 等待视频加载完成后再自动提问
     setTimeout(async () => {
       // 将问题设置到输入框
       question.value = autoQuestion;
       // 自动提交问题
       await askQuestion();
-      
+
       // 显示提示信息
       ElMessage.success('已自动发送知识点相关问题');
-      
+
       // 检查是否有其他存储的问题
       const storedQuestions = localStorage.getItem(`concept_questions_${videoId.value}_${decodeURIComponent(autoQuestion).split('?')[0]}`);
       if (storedQuestions) {
@@ -1272,7 +1272,7 @@ onMounted(async () => {
       }
     }, 2000);
   }
-  
+
   setupTimeUpdateListener();
 });
 
@@ -1280,22 +1280,22 @@ onMounted(async () => {
 const getPlaceholderByMode = computed(() => {
   if (qaMode.value === 'video') {
     if (deepThinking.value) {
-      return useOllama.value 
-        ? "请输入关于视频内容的问题（深度思考模式）..." 
+      return useOllama.value
+        ? "请输入关于视频内容的问题（深度思考模式）..."
         : "请输入关于视频内容的问题（深度思考模式）...";
     } else {
-      return useOllama.value 
-        ? "请输入关于视频内容的问题..." 
+      return useOllama.value
+        ? "请输入关于视频内容的问题..."
         : "请输入关于视频内容的问题...";
     }
   } else {
     if (deepThinking.value) {
-      return useOllama.value 
-        ? "请输入任何问题（深度思考模式）..." 
+      return useOllama.value
+        ? "请输入任何问题（深度思考模式）..."
         : "请输入任何问题（深度思考模式）...";
     } else {
-      return useOllama.value 
-        ? "请输入任何问题..." 
+      return useOllama.value
+        ? "请输入任何问题..."
         : "请输入任何问题...";
     }
   }
@@ -1303,12 +1303,12 @@ const getPlaceholderByMode = computed(() => {
 // 获取模式标题
 const getModeTitle = computed(() => {
   if (qaMode.value === 'video') {
-    return deepThinking.value 
-      ? "基于视频内容的深度思考模式" 
+    return deepThinking.value
+      ? "基于视频内容的深度思考模式"
       : "基于视频内容的问答模式";
   } else {
-    return deepThinking.value 
-      ? "自由问答的深度思考模式" 
+    return deepThinking.value
+      ? "自由问答的深度思考模式"
       : "自由问答模式";
   }
 });
@@ -1317,22 +1317,22 @@ const getModeTitle = computed(() => {
 const getModeDescription = computed(() => {
   if (qaMode.value === 'video') {
     if (deepThinking.value) {
-      return useOllama.value 
-        ? "AI将分析视频内容并展示详细思考过程（离线模式）" 
+      return useOllama.value
+        ? "AI将分析视频内容并展示详细思考过程（离线模式）"
         : "AI将分析视频内容并展示详细思考过程（在线模式）";
     } else {
-      return useOllama.value 
-        ? "可提问：视频主要讲了什么？关键概念是什么？（离线模式）" 
+      return useOllama.value
+        ? "可提问：视频主要讲了什么？关键概念是什么？（离线模式）"
         : "可提问：视频主要讲了什么？关键概念是什么？（在线模式）";
     }
   } else {
     if (deepThinking.value) {
-      return useOllama.value 
-        ? "可提问任何问题，AI将展示详细思考过程（离线模式）" 
+      return useOllama.value
+        ? "可提问任何问题，AI将展示详细思考过程（离线模式）"
         : "可提问任何问题，AI将展示详细思考过程（在线模式）";
     } else {
-      return useOllama.value 
-        ? "自由提问模式，不限于视频内容（离线模式）" 
+      return useOllama.value
+        ? "自由提问模式，不限于视频内容（离线模式）"
         : "自由提问模式，不限于视频内容（在线模式）";
     }
   }
@@ -1461,7 +1461,7 @@ const closeGuideDialog = () => {
 /*视频主区域*/
 .video-main-area {
   flex: 1;
-  padding: 15px; 
+  padding: 15px;
   overflow: hidden;
 }
 
@@ -1496,7 +1496,7 @@ const closeGuideDialog = () => {
 
 /*视频播放区域*/
 .video-player-area {
-  flex: 0.43; 
+  flex: 0.43;
   padding: 15px;
   overflow: hidden;
 }
@@ -1584,7 +1584,7 @@ const closeGuideDialog = () => {
   height: 98%;
   width: 98%;
   border-radius: 12px;
-  overflow: hidden; 
+  overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
@@ -1902,7 +1902,7 @@ const closeGuideDialog = () => {
 
 /* 移除字幕项悬停效果 */
 
-.subtitle-item.current, 
+.subtitle-item.current,
 .merged-item.current {
   background-color: rgba(60, 174, 163, 0.2);
   border-left: 3px solid #3CAEA3;
@@ -1912,7 +1912,7 @@ const closeGuideDialog = () => {
 }
 
 /* 添加左侧标记，增强视觉效果 */
-.subtitle-item.current::before, 
+.subtitle-item.current::before,
 .merged-item.current::before {
   content: "";
   position: absolute;
@@ -2174,7 +2174,7 @@ const closeGuideDialog = () => {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  color: #ff9a9e; 
+  color: #ff9a9e;
 }
 
 .empty-list .el-icon {

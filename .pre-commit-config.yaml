@@ -1,0 +1,58 @@
+# AI-EdVision Pre-commit 配置
+# 使用环境提供的 black, flake8, pylint 工具
+# 需要提前安装好相关的环境
+repos:
+  - repo: local
+    hooks:
+      - id: black
+        name: black
+        entry: black
+        language: system
+        types: [python]
+        exclude: ^migrations/|^uploads/|^logs/|^docs/|^dist/|^build/|^\.venv/|^venv/
+        verbose: true
+
+      - id: isort
+        name: isort
+        entry: isort
+        language: system
+        types: [python]
+        args: [--profile, black]
+        exclude: ^migrations/|^uploads/|^logs/|^docs/|^dist/|^build/|^\.venv/|^venv/
+        verbose: true
+
+      - id: flake8
+        name: flake8
+        entry: flake8
+        language: system
+        types: [file, python]
+        exclude: ^migrations/|^uploads/|^logs/|^docs/|^dist/|^build/|^\.venv/|^venv/
+        verbose: true
+
+      - id: pylint
+        name: pylint (non-blocking)
+        entry: bash -c 'pylint --rcfile=pyproject.toml "$@" || true' --
+        language: system
+        types: [python]
+        exclude: ^migrations/|^uploads/|^logs/|^docs/|^dist/|^build/|^\.venv/|^venv/
+        verbose: true
+
+      - id: mypy
+        name: mypy (backend_fastapi, non-blocking)
+        entry: bash -c 'cd "$(git rev-parse --show-toplevel)" && PYTHONPATH=backend_fastapi:$PYTHONPATH mypy backend_fastapi || true' --
+        language: system
+        pass_filenames: false
+        files: ^backend_fastapi/
+        verbose: true
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-byte-order-marker
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict

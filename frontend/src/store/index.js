@@ -10,7 +10,7 @@ export default createStore({
     loading: false,
     error: null
   },
-  
+
   mutations: {
     setCurrentVideo(state, video) {
       state.currentVideo = video
@@ -34,7 +34,7 @@ export default createStore({
       state.error = error
     }
   },
-  
+
   actions: {
     // 视频上传
     async uploadVideo({ commit }, formData) {
@@ -131,7 +131,7 @@ export default createStore({
       }
     }
   },
-  
+
   getters: {
     isLoading: state => state.loading,
     currentError: state => state.error,

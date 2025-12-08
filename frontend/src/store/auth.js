@@ -15,7 +15,7 @@ const getState = () => readonly(state)
 const login = async (username, password) => {
   try {
     const response = await axios.post('/api/auth/login', { username, password })
-    
+
     if (response.data.success) {
       state.user = response.data.user
       state.isAuthenticated = true
@@ -26,9 +26,9 @@ const login = async (username, password) => {
     }
   } catch (error) {
     console.error('登录错误:', error)
-    return { 
-      success: false, 
-      message: error.response?.data?.message || '登录失败，请稍后再试' 
+    return {
+      success: false,
+      message: error.response?.data?.message || '登录失败，请稍后再试'
     }
   }
 }
@@ -37,7 +37,7 @@ const login = async (username, password) => {
 const register = async (userData) => {
   try {
     const response = await axios.post('/api/auth/register', userData)
-    
+
     if (response.data.success) {
       return { success: true, user: response.data.user }
     } else {
@@ -45,9 +45,9 @@ const register = async (userData) => {
     }
   } catch (error) {
     console.error('注册错误:', error)
-    return { 
-      success: false, 
-      message: error.response?.data?.message || '注册失败，请稍后再试' 
+    return {
+      success: false,
+      message: error.response?.data?.message || '注册失败，请稍后再试'
     }
   }
 }
@@ -73,10 +73,10 @@ const clearAuth = () => {
 // 检查用户状态
 const checkAuthStatus = async () => {
   if (!state.isAuthenticated) return
-  
+
   try {
     const response = await axios.get('/api/auth/user')
-    
+
     if (response.data.success) {
       state.user = response.data.user
     } else {

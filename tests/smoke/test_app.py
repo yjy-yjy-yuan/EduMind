@@ -2,6 +2,7 @@
 冒烟测试 - 验证应用基本功能
 确保应用能够启动并响应基本请求
 """
+
 import pytest
 
 
@@ -45,10 +46,9 @@ class TestCORSConfig:
 
     def test_cors_headers_present(self, client):
         """测试 CORS 头存在"""
-        response = client.options('/', headers={
-            'Origin': 'http://localhost:5173',
-            'Access-Control-Request-Method': 'GET'
-        })
+        response = client.options(
+            '/', headers={'Origin': 'http://localhost:5173', 'Access-Control-Request-Method': 'GET'}
+        )
         # CORS 应该允许请求
         assert response.status_code in [200, 204]
 
@@ -63,6 +63,7 @@ class TestDatabaseConnection:
     def test_can_query_database(self, app, db_session):
         """测试可以查询数据库"""
         from app.models import Video
+
         # 查询不应抛出异常
         videos = Video.query.all()
         assert isinstance(videos, list)

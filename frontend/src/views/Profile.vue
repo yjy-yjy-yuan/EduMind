@@ -10,7 +10,7 @@
         </div>
       </div>
     </div>
-    
+
     <div class="profile-content">
       <el-row :gutter="20">
         <!-- 左侧个人信息卡片 -->
@@ -25,9 +25,9 @@
               <h2 class="username">{{ userInfo.username }}</h2>
               <p class="user-email">{{ userInfo.email }}</p>
             </div>
-            
+
             <div class="card-divider"></div>
-            
+
             <div class="user-status">
               <div class="status-item">
                 <div class="status-icon">
@@ -36,9 +36,9 @@
                 <div class="status-text">{{ userInfo.user_level || '初级学习者' }}</div>
               </div>
             </div>
-            
+
             <div class="card-divider"></div>
-            
+
             <div class="quick-stats">
               <div class="stat-item">
                 <div class="stat-value">{{ userInfo.notes_count || 0 }}</div>
@@ -53,16 +53,16 @@
                 <div class="stat-label">问答</div>
               </div>
             </div>
-            
+
             <div class="card-divider"></div>
-            
+
             <div class="join-info">
               <div class="join-date">
                 <el-icon><Calendar /></el-icon>
                 <span>加入于 {{ formatDate(userInfo.created_at).split(' ')[0] }}</span>
               </div>
             </div>
-            
+
             <div class="profile-actions">
               <el-button type="danger" @click="handleLogout" class="action-btn">
                 <el-icon><SwitchButton /></el-icon> 退出登录
@@ -70,7 +70,7 @@
             </div>
           </el-card>
         </el-col>
-        
+
         <!-- 右侧内容区域 -->
         <el-col :xs="24" :sm="24" :md="16" :lg="18" :xl="18">
           <el-card class="tabs-card" shadow="hover">
@@ -83,7 +83,7 @@
                     <el-icon><Edit /></el-icon> {{ isEditing ? '保存资料' : '编辑资料' }}
                   </el-button>
                 </div>
-                
+
                 <div class="info-detail-list">
                   <div class="info-detail-item">
                     <div class="detail-label">用户名</div>
@@ -158,19 +158,19 @@
                   </div>
                 </div>
               </el-tab-pane>
-              
+
               <!-- 笔记管理标签页 -->
               <el-tab-pane label="笔记管理" name="notes">
                 <div class="tab-header">
                   <h3>我的笔记</h3>
                 </div>
-                
+
                 <div class="empty-placeholder" v-if="!notes.length">
                   <el-empty description="暂无笔记记录">
                     <el-button type="primary">去创建笔记</el-button>
                   </el-empty>
                 </div>
-                
+
                 <el-table v-else :data="notes" style="width: 100%">
                   <el-table-column prop="title" label="标题" width="180"></el-table-column>
                   <el-table-column prop="video_title" label="关联视频" width="180"></el-table-column>
@@ -183,19 +183,19 @@
                   </el-table-column>
                 </el-table>
               </el-tab-pane>
-              
+
               <!-- 总结记录标签页 -->
               <el-tab-pane label="总结记录" name="summaries">
                 <div class="tab-header">
                   <h3>我的总结</h3>
                 </div>
-                
+
                 <div class="empty-placeholder" v-if="!summaries.length">
                   <el-empty description="暂无总结记录">
                     <el-button type="primary">去创建总结</el-button>
                   </el-empty>
                 </div>
-                
+
                 <el-table v-else :data="summaries" style="width: 100%">
                   <el-table-column prop="title" label="标题" width="180"></el-table-column>
                   <el-table-column prop="video_title" label="关联视频" width="180"></el-table-column>
@@ -208,19 +208,19 @@
                   </el-table-column>
                 </el-table>
               </el-tab-pane>
-              
+
               <!-- 学习知识点标签页 -->
               <el-tab-pane label="学习知识点" name="knowledge">
                 <div class="tab-header">
                   <h3>我的知识点</h3>
                 </div>
-                
+
                 <div class="empty-placeholder" v-if="!knowledgePoints.length">
                   <el-empty description="暂无知识点记录">
                     <el-button type="primary">去学习</el-button>
                   </el-empty>
                 </div>
-                
+
                 <el-timeline v-else>
                   <el-timeline-item
                     v-for="(point, index) in knowledgePoints"
@@ -250,9 +250,9 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import authStore from '../store/auth'
-import { 
-  User, School, Briefcase, Compass, Calendar, Clock, 
-  Edit, SwitchButton, Trophy 
+import {
+  User, School, Briefcase, Compass, Calendar, Clock,
+  Edit, SwitchButton, Trophy
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -332,19 +332,19 @@ const updateUserInfo = async () => {
     ElMessage.warning('用户名和邮箱不能为空')
     return
   }
-  
+
   updateLoading.value = true
-  
+
   try {
     const response = await axios.post('/api/auth/user/update', editForm)
-    
+
     if (response.data.success) {
       // 更新本地用户信息
       userInfo.value = {
         ...userInfo.value,
         ...editForm
       }
-      
+
       ElMessage.success('个人信息更新成功')
       isEditing.value = false
     } else {
@@ -379,11 +379,11 @@ const handleLogout = () => {
     .then(async () => {
       try {
         const response = await axios.post('/api/auth/logout')
-        
+
         if (response.data.success) {
           // 清除本地存储的用户信息
           authStore.clearAuth()
-          
+
           ElMessage.success('退出成功')
           router.push('/login')
         } else {
@@ -402,7 +402,7 @@ const handleLogout = () => {
 // 格式化日期
 const formatDate = (dateString) => {
   if (!dateString) return '未知'
-  
+
   try {
     const date = new Date(dateString)
     return date.toLocaleString('zh-CN', {
@@ -1023,24 +1023,24 @@ onMounted(() => {
   .profile-hero-section {
     padding: 60px 15px;
   }
-  
+
   .main-title {
     font-size: 2rem;
   }
-  
+
   .subtitle {
     font-size: 1rem;
   }
-  
+
   .profile-content {
     padding: 20px 15px;
     margin-top: -30px;
   }
-  
+
   .info-item {
     padding: 8px;
   }
-  
+
   .profile-tabs {
     padding: 20px 15px;
   }

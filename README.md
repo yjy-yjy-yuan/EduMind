@@ -294,3 +294,71 @@ npm install
 4. 在浏览器中访问：
    - 本地访问：http://localhost:5173
    - 局域网访问：http://[您的IP地址]:5173 (使用`--host`选项时)
+
+## 开发者指南
+
+### 配置 Pre-commit 代码检查
+
+本项目使用 pre-commit 进行代码质量检查，包含以下检查项：
+
+- **black**: Python 代码格式化
+- **isort**: Python import 排序
+- **flake8**: Python 代码风格检查
+- **pylint**: Python 代码质量检查
+- **mypy**: Python 类型检查
+- **通用检查**: BOM、空白、大文件、YAML/JSON 格式等
+
+#### 安装步骤
+
+```bash
+# 1. 激活虚拟环境
+conda activate ai-edvision
+
+# 2. 安装开发依赖
+pip install black isort flake8 pylint mypy pre-commit
+
+# 3. 安装 pre-commit 钩子
+pre-commit install
+
+# 4. 验证安装
+pre-commit --version
+```
+
+#### 使用方法
+
+```bash
+# 手动运行所有检查（针对所有文件）
+pre-commit run --all-files
+
+# 手动运行所有检查（仅针对暂存文件）
+pre-commit run
+
+# 检查未暂存的修改文件
+pre-commit run --files $(git ls-files -mo --exclude-standard)
+
+# 跳过 pre-commit 检查提交（不推荐）
+git commit --no-verify -m "commit message"
+```
+
+#### 配置文件说明
+
+| 文件 | 说明 |
+|------|------|
+| `.pre-commit-config.yaml` | Pre-commit 钩子配置 |
+| `pyproject.toml` | Python 工具配置（black、isort、pylint、mypy） |
+
+### 运行测试
+
+```bash
+# 激活环境
+conda activate ai-edvision
+
+# 运行所有测试
+PYTHONPATH=backend python -m pytest tests/ -v
+
+# 运行特定测试文件
+PYTHONPATH=backend python -m pytest tests/unit/test_models.py -v
+
+# 运行带覆盖率的测试
+PYTHONPATH=backend python -m pytest tests/ -v --cov=backend/app
+```

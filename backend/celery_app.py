@@ -1,8 +1,9 @@
 # 功能：创建和配置 Celery 实例，用于处理异步任务
 
-from celery import Celery
-from app import create_app
 import platform
+
+from app import create_app
+from celery import Celery
 
 # 创建Flask应用实例
 flask_app = create_app()
@@ -13,10 +14,9 @@ task_modules = ['app.tasks.audio_processing']
 
 if platform.system() == "Darwin":  # Mac
     # 同时导入两个版本，确保兼容性
-    task_modules.extend([
-        'app.tasks.video_processing',      # 标准版本（兼容性）
-        'app.tasks.video_processing_mac'   # Mac MPS 优化版本
-    ])
+    task_modules.extend(
+        ['app.tasks.video_processing', 'app.tasks.video_processing_mac']  # 标准版本（兼容性）  # Mac MPS 优化版本
+    )
     print("🍎 Celery 配置: 使用 Mac MPS 优化版本")
 else:
     # Windows/Linux 使用标准版本
@@ -24,25 +24,22 @@ else:
     print("💻 Celery 配置: 使用标准版本")
 
 # 创建Celery实例
-celery = Celery(
-    'app',
-    broker='redis://localhost:6379/0',
-    backend='redis://localhost:6379/0',
-    include=task_modules
-)
+celery = Celery('app', broker='redis://localhost:6379/0', backend='redis://localhost:6379/0', include=task_modules)
 
 # 🔥 关键：在应用上下文中显式导入任务模块以注册Celery任务
 with flask_app.app_context():
     # 导入所有任务模块
     from app.tasks import subtitle_tasks
     from app.tasks import test
-    
+
     # 根据平台导入相应的视频处理任务
     if platform.system() == "Darwin":  # Mac
         from app.tasks import video_processing_mac
+
         print("✅ 已导入 Mac 视频处理任务模块")
     else:  # Windows/Linux
         from app.tasks import video_processing
+
         print("✅ 已导入标准视频处理任务模块")
 
 # 更新Celery配置
@@ -63,11 +60,9 @@ celery.conf.update(
     task_reject_on_worker_lost=True,  # 工作进程丢失时拒绝任务
     task_default_retry_delay=60,  # 默认重试延迟
     task_max_retries=2,  # 最大重试次数 (降低避免反复失败)
-    
     # 🔥 关键修复：Mac 使用 solo 模式避免 MPS 设备 fork 崩溃
     # fork 模式在子进程中使用 MPS/CUDA 会导致 SIGSEGV
     worker_pool='solo' if platform.system() == "Darwin" else 'prefork',
-    
     # 任务结果过期时间
     result_expires=3600,  # 1小时后清理任务结果
 )
@@ -78,10 +73,12 @@ if platform.system() == "Darwin":
     print("💡 如需并发处理，建议启动多个 Celery worker 实例")
     print("⏱️  任务超时: 3小时 (适配大模型处理)")
 
+
 # 将Flask应用上下文推送到Celery
 class FlaskTask(celery.Task):
     def __call__(self, *args, **kwargs):
         with flask_app.app_context():
             return self.run(*args, **kwargs)
+
 
 celery.Task = FlaskTask

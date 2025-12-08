@@ -1,27 +1,27 @@
 # 使用access_token鉴权，实现了流式对话的功能，用户输入一句话，AI回复一句话，直到用户按Ctrl+C终止。
 # 使用 Http 请求实现流式对话
-import requests  
-import json  
+import json
 import signal
 import sys
 
-API_KEY = "zTHgzj10IC19lwqwvgPVTLvc"  
-SECRET_KEY = "SUxBxmpaVlqWS86mm7zreYN5BSGZOcR6"  
- 
-payload = {  
-    "user_id": "python",  
-    "messages": [],  
-    "system": "这里是AI设定，不用可以删掉",  
-    "disable_search": False,  
-    "enable_citation": False  
-    }
- 
-def add_message(role, content):  
-    message = {  
-        "role": role,  
-        "content": content  
-    }
-    payload["messages"].append(message)   
+import requests
+
+API_KEY = "zTHgzj10IC19lwqwvgPVTLvc"
+SECRET_KEY = "SUxBxmpaVlqWS86mm7zreYN5BSGZOcR6"
+
+payload = {
+    "user_id": "python",
+    "messages": [],
+    "system": "这里是AI设定，不用可以删掉",
+    "disable_search": False,
+    "enable_citation": False,
+}
+
+
+def add_message(role, content):
+    message = {"role": role, "content": content}
+    payload["messages"].append(message)
+
 
 def signal_handler(sig, frame):
     """
@@ -30,6 +30,7 @@ def signal_handler(sig, frame):
     print("\n正在终止程序...")
     sys.exit(0)
 
+
 def is_valid_input(input_str):
     """
     验证用户输入是否有效
@@ -37,13 +38,17 @@ def is_valid_input(input_str):
     """
     return input_str.strip() != ""
 
+
 def main():
     # 注册 Ctrl+C 信号处理器
     signal.signal(signal.SIGINT, signal_handler)
-    
-    url = "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token=" + get_access_token()
+
+    url = (
+        "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token="
+        + get_access_token()
+    )
     headers = {'Content-Type': 'application/json'}
-    
+
     try:
         while True:
             user_input = input("你：")
@@ -74,15 +79,16 @@ def main():
         print("\n正在终止程序...")
         sys.exit(0)
 
-      
+
 def get_access_token():  # 获取token
-    """  
-    使用 AK，SK 生成鉴权签名（Access Token）  
-    :return: access_token，或是None(如果错误)  
-    """  
-    url = "https://aip.baidubce.com/oauth/2.0/token"  
-    params = {"grant_type": "client_credentials", "client_id": API_KEY, "client_secret": SECRET_KEY}  
-    return str(requests.post(url, params=params).json().get("access_token"))  
-  
-if __name__ == '__main__':  
+    """
+    使用 AK，SK 生成鉴权签名（Access Token）
+    :return: access_token，或是None(如果错误)
+    """
+    url = "https://aip.baidubce.com/oauth/2.0/token"
+    params = {"grant_type": "client_credentials", "client_id": API_KEY, "client_secret": SECRET_KEY}
+    return str(requests.post(url, params=params).json().get("access_token"))
+
+
+if __name__ == '__main__':
     main()

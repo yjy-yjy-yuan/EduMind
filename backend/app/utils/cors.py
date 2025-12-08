@@ -1,5 +1,8 @@
 from functools import wraps
-from flask import request, make_response, current_app
+
+from flask import make_response
+from flask import request
+
 
 def cors_preflight():
     def wrapper(fn):
@@ -13,5 +16,7 @@ def cors_preflight():
                 response.headers.add('Access-Control-Allow-Credentials', 'true')
                 return response
             return fn(*args, **kwargs)
+
         return decorated_function
+
     return wrapper

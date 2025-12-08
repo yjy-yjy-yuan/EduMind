@@ -272,6 +272,6 @@ worker_max_tasks_per_child=5  # 每5个任务重启
 
 ---
 
-**最后更新:** 2025-11-09  
-**版本:** 1.0  
+**最后更新:** 2025-11-09
+**版本:** 1.0
 **适用平台:** Windows, Linux (Ubuntu/CentOS/Debian)

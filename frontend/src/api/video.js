@@ -55,7 +55,7 @@ export async function getSubtitle(videoId, format = 'srt', isDownload = false) {
   if (isDownload) {
     params.download = 'true'
   }
-  
+
   return await request({
     url: `/api/videos/${videoId}/subtitle`,
     method: 'get',

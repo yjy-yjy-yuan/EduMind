@@ -5,7 +5,7 @@
       <el-col :span="16">
         <el-card class="video-card">
           <!-- 视频播放器 -->
-          <video-player 
+          <video-player
             ref="videoPlayer"
             :src="videoUrl"
             :subtitle-url="subtitleUrl"
@@ -18,22 +18,22 @@
               <h3>字幕</h3>
               <div class="subtitle-actions">
                 <el-button-group>
-                  <el-button 
-                    type="primary" 
+                  <el-button
+                    type="primary"
                     @click="exportSubtitles('srt')"
                     :loading="exporting"
                   >
                     导出SRT
                   </el-button>
-                  <el-button 
-                    type="primary" 
+                  <el-button
+                    type="primary"
                     @click="exportSubtitles('vtt')"
                     :loading="exporting"
                   >
                     导出VTT
                   </el-button>
-                  <el-button 
-                    type="primary" 
+                  <el-button
+                    type="primary"
                     @click="exportSubtitles('txt')"
                     :loading="exporting"
                   >
@@ -82,15 +82,15 @@
               <el-table-column width="100">
                 <template #default="{ row }">
                   <el-button-group>
-                    <el-button 
-                      type="primary" 
-                      link 
+                    <el-button
+                      type="primary"
+                      link
                       :icon="Edit"
                       @click="row.editing = true"
                     ></el-button>
-                    <el-button 
-                      type="danger" 
-                      link 
+                    <el-button
+                      type="danger"
+                      link
                       :icon="Delete"
                       @click="handleDeleteSubtitle(row)"
                     ></el-button>
@@ -100,12 +100,12 @@
             </el-table>
 
             <!-- 无字幕时显示 -->
-            <el-empty 
-              v-else-if="!loading && subtitles.length === 0" 
+            <el-empty
+              v-else-if="!loading && subtitles.length === 0"
               description="暂无字幕"
             >
               <template #extra>
-                <el-button 
+                <el-button
                   type="primary"
                   @click="handleGenerateSubtitles"
                   :loading="generating"
@@ -295,7 +295,7 @@ onMounted(async () => {
   try {
     loading.value = true
     await store.dispatch('getVideoDetails', videoId)
-    
+
     // 如果视频已处理完成，加载字幕
     if (currentVideo.value?.status === 'completed') {
       await store.dispatch('getSubtitles', videoId)

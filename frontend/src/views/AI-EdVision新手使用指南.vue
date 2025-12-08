@@ -52,7 +52,7 @@
               <el-button type="primary" @click="navigateToLogin">前往登录/注册</el-button>
             </div>
           </div>
-          
+
           <div class="tutorial-content full-width">
             <div class="tutorial-steps">
               <div class="step">
@@ -299,7 +299,7 @@
             <p>点击导航栏中的"视频上传"，或在个人中心页面点击"上传视频"按钮，选择本地视频文件或输入视频链接即可开始上传。</p>
           </div>
         </div>
-        
+
         <div class="faq-item">
           <div class="faq-question">
             <i class="fas fa-question-circle question-icon"></i>
@@ -309,7 +309,7 @@
             <p>视频处理时间取决于视频长度和服务器负载。一般情况下，10分钟的视频大约需要2-5分钟完成处理。您可以在"已上传视频"页面查看处理进度。</p>
           </div>
         </div>
-        
+
         <div class="faq-item">
           <div class="faq-question">
             <i class="fas fa-question-circle question-icon"></i>
@@ -319,7 +319,7 @@
             <p>在视频播放页面右侧，您可以看到AI问答区域。直接输入您的问题，AI将基于视频内容为您提供答案。您还可以切换深度思考模式，获取更详细的解答。</p>
           </div>
         </div>
-        
+
         <div class="faq-item">
           <div class="faq-question">
             <i class="fas fa-question-circle question-icon"></i>
@@ -342,7 +342,7 @@
         </el-button>
       </div>
     </section>
-    
+
     <!-- 页脚 -->
     <footer class="footer-section">
       <div class="container">
@@ -356,7 +356,7 @@
               基于深度学习的视频智能伴学系统，让学习更高效、更智能、更个性化
             </p>
           </div>
-          
+
           <div class="footer-links">
             <h4 class="footer-title">功能</h4>
             <ul>
@@ -367,7 +367,7 @@
               <li><a href="#">知识点总览与扩展</a></li>
             </ul>
           </div>
-          
+
           <div class="footer-links">
             <h4 class="footer-title">资源</h4>
             <ul>
@@ -377,7 +377,7 @@
               <li><a href="#">博客</a></li>
             </ul>
           </div>
-          
+
           <div class="footer-contact">
             <h4 class="footer-title">联系我们</h4>
             <ul>
@@ -393,13 +393,13 @@
             </div>
           </div>
         </div>
-        
+
         <div class="footer-bottom">
           <p>&copy; 2025 视频智能伴学系统. 保留所有权利。</p>
         </div>
       </div>
     </footer>
-    
+
     <!-- Toast 通知组件 -->
     <div class="toast-notification" :class="{ show: showToast }">
       {{ toastMessage }}
@@ -419,26 +419,26 @@ export default {
     const isLoading = ref(false)
     const showToast = ref(false)
     const toastMessage = ref('')
-    
+
     // 获取用户认证状态
     const authState = computed(() => authStore.getState())
-    
+
     // 导航到上传页面
     const navigateToUpload = () => {
       isLoading.value = true
       showToast.value = true
-      toastMessage.value = '正在准备上传页面...'  
+      toastMessage.value = '正在准备上传页面...'
       // 模拟加载过程
       setTimeout(() => {
         isLoading.value = false
         router.push('/video/upload')
-      }, 800) 
+      }, 800)
       // 2秒后隐藏提示
       setTimeout(() => {
         showToast.value = false
       }, 2000)
     }
-    
+
     // 导航到登录页面或个人中心
     const navigateToLogin = () => {
       isLoading.value = true
@@ -454,14 +454,14 @@ export default {
       } else {
         showToast.value = true
         toastMessage.value = '正在前往登录页面...'
-        
+
         // 模拟加载过程
         setTimeout(() => {
           isLoading.value = false
           router.push('/login')
         }, 800)
       }
-      
+
       // 2秒后隐藏提示
       setTimeout(() => {
         showToast.value = false
@@ -493,13 +493,13 @@ export default {
         isLoading.value = false
         router.push('/notes') // 修改为指定的笔记管理路由
       }, 800)
-  
+
       // 2秒后隐藏提示
       setTimeout(() => {
         showToast.value = false
       }, 2000)
     }
-    
+
     return {
       navigateToUpload,
       navigateToLogin,
@@ -753,25 +753,25 @@ section {
   .workflow-description {
     padding: 1.5rem;
   }
-  
+
   .step-number {
     width: 32px;
     height: 32px;
     font-size: 1rem;
   }
-  
+
   .step-title {
     font-size: 1.1rem;
   }
-  
+
   .step-desc {
     font-size: 0.95rem;
   }
-  
+
   .substep-title {
     font-size: 1rem;
   }
-  
+
   .substep-desc {
     font-size: 0.9rem;
   }
@@ -950,7 +950,7 @@ section {
   .main-title {
     font-size: 2.5rem;
   }
-  
+
   .section-title {
     font-size: 2rem;
   }
@@ -960,19 +960,19 @@ section {
   .hero-section {
     padding: 80px 20px;
   }
-  
+
   .main-title {
     font-size: 2.25rem;
   }
-  
+
   .subtitle {
     font-size: 1.1rem;
   }
-  
+
   .section-title {
     font-size: 1.75rem;
   }
-  
+
   .feature-title {
     font-size: 1.25rem;
   }
@@ -982,19 +982,19 @@ section {
   .hero-section {
     padding: 60px 15px;
   }
-  
+
   .main-title {
     font-size: 2rem;
   }
-  
+
   .subtitle {
     font-size: 1rem;
   }
-  
+
   section {
     padding: 3rem 0;
   }
-  
+
   .section-title {
     font-size: 1.5rem;
   }
@@ -1004,38 +1004,38 @@ section {
   .hero-section {
     padding: 50px 15px;
   }
-  
+
   .main-title {
     font-size: 1.75rem;
   }
-  
+
   .subtitle {
     font-size: 0.9rem;
     margin-bottom: 1.5rem;
   }
-  
+
   .hero-button {
     padding: 0.5rem 1.5rem !important;
     font-size: 1rem !important;
   }
-  
+
   .section-title {
     font-size: 1.35rem;
   }
-  
+
   .section-subtitle {
     font-size: 0.9rem;
   }
-  
+
   .feature-card {
     padding: 1.5rem;
   }
-  
+
   .feature-icon-wrapper {
     width: 60px;
     height: 60px;
   }
-  
+
   .feature-title {
     font-size: 1.15rem;
   }
@@ -1289,11 +1289,11 @@ section {
   .faq-container {
     grid-template-columns: 1fr;
   }
-  
+
   .footer-grid {
     grid-template-columns: 1fr 1fr;
   }
-  
+
   .cta-title {
     font-size: 1.75rem;
   }
@@ -1304,15 +1304,15 @@ section {
     grid-template-columns: 1fr;
     gap: 2rem;
   }
-  
+
   .cta-card {
     padding: 2rem 1.5rem;
   }
-  
+
   .cta-title {
     font-size: 1.5rem;
   }
-  
+
   .cta-description {
     font-size: 1rem;
   }

@@ -25,12 +25,12 @@ export async function sendChatMessage(message, { mode = 'free', videoId = null, 
       message: message,
       mode: mode
     }
-    
+
     // 如果是视频问答模式，添加视频ID
     if (mode === 'video' && videoId) {
       requestData.videoId = videoId
     }
-    
+
     // 发送请求
     const response = await fetch(`${API_BASE_URL}/api/chat/ask`, {
       method: 'POST',
@@ -41,19 +41,19 @@ export async function sendChatMessage(message, { mode = 'free', videoId = null, 
       // 设置超时时间
       signal: AbortSignal.timeout(30000) // 30秒超时
     })
-    
+
     if (!response.ok) {
       throw new Error(`请求失败: ${response.status}`)
     }
-    
+
     // 处理流式响应
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
-    
+
     while (true) {
       const { done, value } = await reader.read()
-      
+
       if (done) {
         if (buffer.trim() && onData) {
           onData(buffer)
@@ -63,11 +63,11 @@ export async function sendChatMessage(message, { mode = 'free', videoId = null, 
         }
         break
       }
-      
+
       // 解码并处理数据
       const text = decoder.decode(value)
       buffer += text
-      
+
       if (onData) {
         onData(buffer)
       }
@@ -91,11 +91,11 @@ export async function getChatHistory(mode = 'free') {
       // 设置超时时间
       signal: AbortSignal.timeout(10000) // 10秒超时
     })
-    
+
     if (!response.ok) {
       throw new Error(`请求失败: ${response.status}`)
     }
-    
+
     const data = await response.json()
     return data.history || []
   } catch (error) {
@@ -121,11 +121,11 @@ export async function clearChatHistory(mode = 'free') {
       // 设置超时时间
       signal: AbortSignal.timeout(10000) // 10秒超时
     })
-    
+
     if (!response.ok) {
       throw new Error(`请求失败: ${response.status}`)
     }
-    
+
     return true
   } catch (error) {
     console.error('清空聊天历史出错:', error)

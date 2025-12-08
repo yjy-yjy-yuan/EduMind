@@ -27,15 +27,15 @@
         :format-tooltip="formatTime"
         @change="handleSeek"
       ></el-slider>
-      
+
       <div class="control-buttons">
         <el-button-group>
-          <el-button 
+          <el-button
             :icon="playing ? VideoPause : VideoPlay"
             @click="togglePlay"
           ></el-button>
-          
-          <el-button 
+
+          <el-button
             :icon="muted ? Mute : Microphone"
             @click="toggleMute"
           ></el-button>
@@ -62,7 +62,7 @@ import { VideoPlay, VideoPause, Microphone, Mute } from '@element-plus/icons-vue
 
 export default {
   name: 'VideoPlayer',
-  
+
   props: {
     src: {
       type: String,
@@ -89,7 +89,7 @@ export default {
     const volume = ref(100)
     const playing = ref(false)
     const muted = ref(false)
-    
+
     const videoType = computed(() => {
       const ext = props.src.split('.').pop()?.toLowerCase()
       switch (ext) {
@@ -101,7 +101,7 @@ export default {
           return 'video/mp4'
       }
     })
-    
+
     // 方法
     const togglePlay = () => {
       if (!videoRef.value) return
@@ -112,19 +112,19 @@ export default {
       }
       playing.value = !playing.value
     }
-    
+
     const toggleMute = () => {
       if (!videoRef.value) return
       videoRef.value.muted = !videoRef.value.muted
       muted.value = videoRef.value.muted
     }
-    
+
     const handleTimeUpdate = () => {
       if (!videoRef.value) return
       currentTime.value = videoRef.value.currentTime
       emit('timeupdate', currentTime.value)
     }
-    
+
     const handleMetadataLoaded = () => {
       if (!videoRef.value) return
       duration.value = videoRef.value.duration
@@ -134,31 +134,31 @@ export default {
         videoHeight: videoRef.value.videoHeight
       })
     }
-    
+
     const handleSeek = (value) => {
       if (!videoRef.value) return
       videoRef.value.currentTime = value
     }
-    
+
     const formatTime = (seconds) => {
       if (!seconds) return '00:00'
       const mins = Math.floor(seconds / 60)
       const secs = Math.floor(seconds % 60)
       return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
     }
-    
+
     // 监听音量变化
     watch(volume, (newValue) => {
       if (!videoRef.value) return
       videoRef.value.volume = newValue / 100
     })
-    
+
     // 监听src变化
     watch(() => props.src, () => {
       if (!videoRef.value) return
       videoRef.value.load()
     })
-    
+
     return {
       videoRef,
       currentTime,

@@ -1,8 +1,11 @@
 from datetime import datetime
+
 from app.extensions import db
+
 
 class Note(db.Model):
     """笔记模型"""
+
     __tablename__ = 'notes'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -32,11 +35,13 @@ class Note(db.Model):
             'updated_at': self.updated_at.isoformat(),
             'tags': self.tags.split(',') if self.tags else [],
             'keywords': self.keywords.split(',') if self.keywords else [],
-            'timestamps': [ts.to_dict() for ts in self.timestamps]
+            'timestamps': [ts.to_dict() for ts in self.timestamps],
         }
+
 
 class NoteTimestamp(db.Model):
     """笔记时间戳模型，用于关联笔记与视频的特定时间点"""
+
     __tablename__ = 'note_timestamps'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -52,5 +57,5 @@ class NoteTimestamp(db.Model):
             'note_id': self.note_id,
             'time_seconds': self.time_seconds,
             'subtitle_text': self.subtitle_text,
-            'created_at': self.created_at.isoformat()
+            'created_at': self.created_at.isoformat(),
         }

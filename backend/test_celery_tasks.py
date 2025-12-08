@@ -5,8 +5,9 @@ Celery 任务注册测试脚本
 验证所有任务是否正确注册到 Celery
 """
 
-import sys
 import platform
+import sys
+
 from celery_app import celery
 
 print("=" * 70)

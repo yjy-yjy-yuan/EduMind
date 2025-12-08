@@ -10,40 +10,40 @@
         <h2>注册账号</h2>
         <p>加入视频智能伴学系统，开启智能学习之旅</p>
       </div>
-      
+
       <div class="register-form">
         <el-steps :active="activeStep" finish-status="success" simple style="margin-bottom: 20px">
           <el-step title="基本信息" />
           <el-step title="个人资料" />
           <el-step title="学习偏好" />
         </el-steps>
-        
+
         <!-- 步骤1：基本信息 -->
         <div v-if="activeStep === 0">
           <div class="form-group">
             <label for="username">用户名</label>
-            <el-input 
-              v-model="registerForm.username" 
-              placeholder="请输入用户名" 
+            <el-input
+              v-model="registerForm.username"
+              placeholder="请输入用户名"
               :prefix-icon="User"
             />
           </div>
-          
+
           <div class="form-group">
             <label for="email">邮箱</label>
-            <el-input 
-              v-model="registerForm.email" 
-              placeholder="请输入邮箱" 
+            <el-input
+              v-model="registerForm.email"
+              placeholder="请输入邮箱"
               :prefix-icon="Message"
             />
           </div>
-          
+
           <div class="form-group">
             <label for="password">密码</label>
-            <el-input 
-              v-model="registerForm.password" 
-              type="password" 
-              placeholder="请输入密码" 
+            <el-input
+              v-model="registerForm.password"
+              type="password"
+              placeholder="请输入密码"
               :prefix-icon="Lock"
               show-password
               @input="checkPasswordStrength(registerForm.password)"
@@ -52,37 +52,37 @@
             <div v-else-if="passwordStrength === 1" class="password-feedback">密码较弱，请添加大写字母、小写字母、数字或特殊字符</div>
             <div v-else-if="passwordStrength === 2" class="password-feedback">密码较强，但可以通过添加更多字符类型来提高安全性</div>
             <div v-else class="password-feedback">密码强度良好</div>
-            <el-button 
-              type="text" 
-              class="generate-password-button" 
+            <el-button
+              type="text"
+              class="generate-password-button"
               @click="generateStrongPassword"
             >
               生成强密码
             </el-button>
           </div>
-          
+
           <div class="form-group">
             <label for="confirmPassword">确认密码</label>
-            <el-input 
-              v-model="confirmPassword" 
-              type="password" 
-              placeholder="请再次输入密码" 
+            <el-input
+              v-model="confirmPassword"
+              type="password"
+              placeholder="请再次输入密码"
               :prefix-icon="Lock"
               show-password
             />
           </div>
-          
+
           <div class="form-actions">
-            <el-button 
-              type="primary" 
-              class="next-button" 
+            <el-button
+              type="primary"
+              class="next-button"
               @click="nextStep"
             >
               下一步
             </el-button>
           </div>
         </div>
-        
+
         <!-- 步骤2：个人资料 -->
         <div v-if="activeStep === 1">
           <div class="form-group">
@@ -94,7 +94,7 @@
               <el-option label="不愿透露" value="不愿透露"></el-option>
             </el-select>
           </div>
-          
+
           <div class="form-group">
             <label for="education">学历</label>
             <el-select v-model="registerForm.education" placeholder="请选择学历" style="width: 100%">
@@ -105,7 +105,7 @@
               <el-option label="博士" value="博士"></el-option>
             </el-select>
           </div>
-          
+
           <div class="form-group">
             <label for="occupation">职业</label>
             <el-select v-model="registerForm.occupation" placeholder="请选择职业" style="width: 100%">
@@ -117,41 +117,41 @@
               <el-option label="其他" value="其他"></el-option>
             </el-select>
           </div>
-          
+
           <div class="form-group">
             <label for="bio">个人简介</label>
-            <el-input 
-              v-model="registerForm.bio" 
-              type="textarea" 
-              placeholder="请简单介绍一下自己" 
+            <el-input
+              v-model="registerForm.bio"
+              type="textarea"
+              placeholder="请简单介绍一下自己"
               :rows="3"
             />
           </div>
-          
+
           <div class="form-actions">
-            <el-button 
-              class="prev-button" 
+            <el-button
+              class="prev-button"
               @click="prevStep"
             >
               上一步
             </el-button>
-            <el-button 
-              type="primary" 
-              class="next-button" 
+            <el-button
+              type="primary"
+              class="next-button"
               @click="nextStep"
             >
               下一步
             </el-button>
           </div>
         </div>
-        
+
         <!-- 步骤3：学习偏好 -->
         <div v-if="activeStep === 2">
           <div class="form-group">
             <label for="learning_direction">学习方向</label>
-            <el-select 
-              v-model="registerForm.learning_direction" 
-              placeholder="请选择您感兴趣的学习方向" 
+            <el-select
+              v-model="registerForm.learning_direction"
+              placeholder="请选择您感兴趣的学习方向"
               style="width: 100%"
             >
               <el-option label="高等数学" value="高等数学"></el-option>
@@ -165,31 +165,31 @@
               <el-option label="其他" value="其他"></el-option>
             </el-select>
           </div>
-          
+
           <div class="form-actions">
-            <el-button 
-              class="prev-button" 
+            <el-button
+              class="prev-button"
               @click="prevStep"
             >
               上一步
             </el-button>
-            <el-button 
-              type="primary" 
-              class="register-button" 
-              :loading="loading" 
+            <el-button
+              type="primary"
+              class="register-button"
+              :loading="loading"
               @click="handleRegister"
             >
               完成注册
             </el-button>
           </div>
         </div>
-        
+
         <div class="form-footer">
           <p>已有账号？<router-link to="/login" class="login-link">立即登录</router-link></p>
         </div>
       </div>
     </div>
-    
+
     <!-- 提示消息 -->
     <el-dialog
       v-model="dialogVisible"
@@ -254,45 +254,45 @@ const checkPasswordStrength = (password) => {
     passwordFeedback.value = ''
     return
   }
-  
+
   let strength = 0
   let feedback = []
-  
+
   // 长度检查
   if (password.length >= 8) {
     strength += 1
   } else {
     feedback.push('密码应至少包含8个字符')
   }
-  
+
   // 包含大写字母
   if (/[A-Z]/.test(password)) {
     strength += 1
   } else {
     feedback.push('添加大写字母可提高安全性')
   }
-  
+
   // 包含小写字母
   if (/[a-z]/.test(password)) {
     strength += 1
   } else {
     feedback.push('添加小写字母可提高安全性')
   }
-  
+
   // 包含数字
   if (/[0-9]/.test(password)) {
     strength += 1
   } else {
     feedback.push('添加数字可提高安全性')
   }
-  
+
   // 包含特殊字符
   if (/[^A-Za-z0-9]/.test(password)) {
     strength += 1
   } else {
     feedback.push('添加特殊字符可提高安全性')
   }
-  
+
   passwordStrength.value = strength
   passwordFeedback.value = feedback.join('；')
 }
@@ -302,21 +302,21 @@ const generateStrongPassword = () => {
   const length = 12
   const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+'
   let password = ''
-  
+
   // 确保至少包含一个大写字母、小写字母、数字和特殊字符
   password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]
   password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]
   password += '0123456789'[Math.floor(Math.random() * 10)]
   password += '!@#$%^&*()-_=+'[Math.floor(Math.random() * 14)]
-  
+
   // 填充剩余字符
   for (let i = 4; i < length; i++) {
     password += charset[Math.floor(Math.random() * charset.length)]
   }
-  
+
   // 打乱密码字符顺序
   password = password.split('').sort(() => 0.5 - Math.random()).join('')
-  
+
   registerForm.password = password
   confirmPassword.value = password
   checkPasswordStrength(password)
@@ -355,11 +355,11 @@ const nextStep = () => {
       return
     }
   }
-  
+
   // 添加动画类
   const formContainer = document.querySelector('.register-form')
   formContainer.classList.add('slide-right')
-  
+
   // 延迟切换步骤，等待动画完成
   setTimeout(() => {
     activeStep.value++
@@ -372,7 +372,7 @@ const prevStep = () => {
   // 添加动画类
   const formContainer = document.querySelector('.register-form')
   formContainer.classList.add('slide-left')
-  
+
   // 延迟切换步骤，等待动画完成
   setTimeout(() => {
     activeStep.value--
@@ -383,15 +383,15 @@ const prevStep = () => {
 // 处理注册
 const handleRegister = async () => {
   loading.value = true
-  
+
   try {
     // 使用 authStore 的 register 方法进行注册
     const result = await authStore.register(registerForm)
-    
+
     if (result.success) {
       // 注册成功后自动登录
       const loginResult = await authStore.login(registerForm.username, registerForm.password)
-      
+
       if (loginResult.success) {
         // 登录成功，显示成功消息
         ElMessage({
@@ -399,7 +399,7 @@ const handleRegister = async () => {
           type: 'success',
           duration: 2000
         })
-        
+
         // 跳转到首页
         router.push('/')
       } else {
@@ -755,11 +755,11 @@ const showDialog = (title, message, success = false) => {
 }
 
 @keyframes fadeInUp {
-  from { 
+  from {
     opacity: 0;
     transform: translateY(10px);
   }
-  to { 
+  to {
     opacity: 1;
     transform: translateY(0);
   }

@@ -74,7 +74,7 @@ custom_model_path = "~/Desktop/File/graduation/whisper"
 # 加载模型(带超时保护和自定义路径)
 device = get_whisper_device(model)
 whisper_model = whisper.load_model(
-    model, 
+    model,
     device=device,
     download_root=custom_model_path  # 使用自定义路径
 )
@@ -231,11 +231,11 @@ Get-ChildItem "$env:USERPROFILE\Desktop\File\graduation\whisper" | Format-Table 
 def get_whisper_device(model_size):
     pytorch_version = torch.__version__
     major, minor = map(int, pytorch_version.split('.')[:2])
-    
+
     # PyTorch 2.1+ 可以使用 MPS
     if major > 2 or (major == 2 and minor >= 1):
         return "mps" if torch.backends.mps.is_available() else "cpu"
-    
+
     # PyTorch 2.0.x 强制使用 CPU
     logger.warning("PyTorch 2.0.x MPS 不兼容,已降级为 CPU 模式")
     return "cpu"
@@ -291,7 +291,7 @@ python -c "import torch; print(torch.__version__)"
 # Terminal 1
 celery -A celery_app.celery worker --loglevel=info -n worker1
 
-# Terminal 2  
+# Terminal 2
 celery -A celery_app.celery worker --loglevel=info -n worker2
 
 # Terminal 3
@@ -352,6 +352,6 @@ tail -f app.log
 
 ---
 
-**最后更新:** 2025-11-10  
-**适用版本:** AI-EdVision 1.0 (跨平台优化版)  
+**最后更新:** 2025-11-10
+**适用版本:** AI-EdVision 1.0 (跨平台优化版)
 **支持平台:** Mac (Apple Silicon MPS) / Windows (NVIDIA CUDA) / Linux (CPU/CUDA)

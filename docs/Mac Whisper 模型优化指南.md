@@ -69,7 +69,7 @@ custom_model_path = "~/Desktop/File/graduation/whisper"
 # 加载模型(带超时保护和自定义路径)
 device = get_whisper_device(model)
 whisper_model = whisper.load_model(
-    model, 
+    model,
     device=device,
     download_root=custom_model_path  # 使用自定义路径
 )
@@ -227,7 +227,7 @@ Get-ChildItem "$env:USERPROFILE\Desktop\File\graduation\whisper" | Format-Table 
 # Terminal 1
 celery -A celery_app.celery worker --loglevel=info -n worker1
 
-# Terminal 2  
+# Terminal 2
 celery -A celery_app.celery worker --loglevel=info -n worker2
 
 # Terminal 3
@@ -288,6 +288,6 @@ tail -f app.log
 
 ---
 
-**最后更新:** 2025-11-10  
-**适用版本:** AI-EdVision 1.0 (跨平台优化版)  
+**最后更新:** 2025-11-10
+**适用版本:** AI-EdVision 1.0 (跨平台优化版)
 **支持平台:** Mac (Apple Silicon MPS) / Windows (NVIDIA CUDA) / Linux (CPU/CUDA)

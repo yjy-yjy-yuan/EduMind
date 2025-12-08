@@ -10,7 +10,7 @@
         <h2>登录</h2>
         <p>欢迎回到视频智能伴学系统</p>
       </div>
-      
+
       <div class="login-form">
         <div class="form-group">
           <label for="username">用户名/邮箱</label>
@@ -40,13 +40,13 @@
             </template>
           </el-autocomplete>
         </div>
-        
+
         <div class="form-group">
           <label for="password">密码</label>
-          <el-input 
-            v-model="loginForm.password" 
-            type="password" 
-            placeholder="请输入密码" 
+          <el-input
+            v-model="loginForm.password"
+            type="password"
+            placeholder="请输入密码"
             show-password
             @keyup.enter="handleLogin"
           >
@@ -59,28 +59,28 @@
             <span>使用强密码可以提高账户安全性</span>
           </div>
         </div>
-        
+
         <div class="form-options">
           <el-checkbox v-model="rememberMe">记住我</el-checkbox>
         </div>
-        
+
         <div class="form-actions">
-          <el-button 
-            type="primary" 
-            class="login-button" 
-            :loading="loading" 
+          <el-button
+            type="primary"
+            class="login-button"
+            :loading="loading"
             @click="handleLogin"
           >
             登录
           </el-button>
         </div>
-        
+
         <div class="form-footer">
           <p>还没有账号？<router-link to="/register" class="register-link">快速注册</router-link></p>
         </div>
       </div>
     </div>
-    
+
     <!-- 提示消息 -->
     <el-dialog
       v-model="dialogVisible"
@@ -95,7 +95,7 @@
         </span>
       </template>
     </el-dialog>
-    
+
     <!-- 密码安全提示对话框 -->
     <el-dialog
       v-model="securityDialogVisible"
@@ -166,12 +166,12 @@ onMounted(() => {
       savedAccounts.value = []
     }
   }
-  
+
   // 加载上次登录的账号
   const lastAccount = localStorage.getItem('lastAccount')
   if (lastAccount) {
     selectedAccount.value = lastAccount
-    
+
     // 如果存在上次登录的账号，自动填充
     const account = savedAccounts.value.find(acc => acc.username === lastAccount)
     if (account) {
@@ -184,11 +184,11 @@ onMounted(() => {
 // 查询账号建议
 const queryAccountSuggestions = (queryString, callback) => {
   const results = queryString
-    ? savedAccounts.value.filter(account => 
+    ? savedAccounts.value.filter(account =>
         account.username.toLowerCase().includes(queryString.toLowerCase())
       )
     : savedAccounts.value
-  
+
   // 将账号对象转换为自动完成组件所需的格式
   callback(results.map(account => ({
     value: account.username,
@@ -213,22 +213,22 @@ const removeAccount = (username) => {
   const index = savedAccounts.value.findIndex(acc => acc.username === username)
   if (index >= 0) {
     savedAccounts.value.splice(index, 1)
-    
+
     // 更新本地存储
     localStorage.setItem('savedAccounts', JSON.stringify(savedAccounts.value))
-    
+
     // 如果删除的是当前选中的账号，清空选择
     if (selectedAccount.value === username) {
       selectedAccount.value = ''
       loginForm.username = ''
       loginForm.password = ''
     }
-    
+
     // 如果删除的是上次登录的账号，清空上次登录记录
     if (localStorage.getItem('lastAccount') === username) {
       localStorage.removeItem('lastAccount')
     }
-    
+
     ElMessage({
       message: '账号已删除',
       type: 'success'
@@ -248,21 +248,21 @@ const handleLogin = async () => {
     showDialog('提示', '请输入用户名/邮箱和密码')
     return
   }
-  
+
   try {
     loading.value = true
-    
+
     // 使用 authStore 的 login 方法进行登录
     const result = await authStore.login(loginForm.username, loginForm.password)
-    
+
     if (result.success) {
       // 登录成功
-      
+
       // 如果选择了"记住我"，保存账号信息
       if (rememberMe.value) {
         // 检查是否已经保存过该账号
         const existingIndex = savedAccounts.value.findIndex(acc => acc.username === loginForm.username)
-        
+
         if (existingIndex >= 0) {
           // 更新已有账号信息
           savedAccounts.value[existingIndex] = {
@@ -276,7 +276,7 @@ const handleLogin = async () => {
             password: loginForm.password
           })
         }
-        
+
         // 保存到本地存储
         localStorage.setItem('savedAccounts', JSON.stringify(savedAccounts.value))
         localStorage.setItem('lastAccount', loginForm.username)
@@ -284,17 +284,17 @@ const handleLogin = async () => {
         // 如果没有选择"记住我"，清除上次登录记录
         localStorage.removeItem('lastAccount')
       }
-      
+
       // 显示成功消息
       ElMessage({
         message: '登录成功',
         type: 'success',
         duration: 2000
       })
-      
+
       // 检查密码强度，如果密码较弱，显示安全提示
       checkPasswordStrength(loginForm.password)
-      
+
       // 跳转到首页
       router.push('/')
     } else {
@@ -312,22 +312,22 @@ const handleLogin = async () => {
 // 检查密码强度
 const checkPasswordStrength = (password) => {
   let strength = 0
-  
+
   // 长度检查
   if (password.length >= 8) strength += 1
-  
+
   // 包含大写字母
   if (/[A-Z]/.test(password)) strength += 1
-  
+
   // 包含小写字母
   if (/[a-z]/.test(password)) strength += 1
-  
+
   // 包含数字
   if (/[0-9]/.test(password)) strength += 1
-  
+
   // 包含特殊字符
   if (/[^A-Za-z0-9]/.test(password)) strength += 1
-  
+
   // 如果密码强度较弱，显示安全提示对话框
   if (strength < 3) {
     setTimeout(() => {

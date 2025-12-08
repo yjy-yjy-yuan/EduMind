@@ -19,12 +19,12 @@ service.interceptors.request.use(
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type']
     }
-    
+
     // 如果请求需要blob响应，设置responseType
     if (config.responseType === 'blob') {
       config.headers.Accept = '*/*'
     }
-    
+
     // 在请求头中添加token等认证信息
     return config
   },
@@ -42,7 +42,7 @@ service.interceptors.response.use(
     if (response.config.responseType === 'blob') {
       return response
     }
-    
+
     // 构造标准响应格式
     return {
       data: response.data,
@@ -52,23 +52,23 @@ service.interceptors.response.use(
   },
   error => {
     console.error('响应错误:', error)
-    
+
     // 处理取消请求的情况
     if (axios.isCancel(error)) {
       console.log('请求已取消')
       return Promise.reject(error)
     }
-    
+
     // 处理网络错误
     if (!error.response) {
       ElMessage.error('网络连接失败，请检查网络设置或稍后重试')
       return Promise.reject(error)
     }
-    
+
     // 处理HTTP错误
     const status = error.response.status
     const errorMsg = error.response.data?.error || error.message
-    
+
     switch (status) {
       case 400:
         ElMessage.error(errorMsg || '请求参数错误')
@@ -88,7 +88,7 @@ service.interceptors.response.use(
       default:
         ElMessage.error(errorMsg || '未知错误')
     }
-    
+
     return Promise.reject(error)
   }
 )
