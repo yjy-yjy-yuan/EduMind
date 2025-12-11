@@ -83,3 +83,33 @@ async def list_models():
             {"id": "llama3:8b", "name": "Llama3 8B (本地)", "type": "ollama"},
         ]
     }
+
+
+# 聊天历史存储 (内存存储，生产环境建议使用 Redis)
+_chat_history = {"free": [], "video": []}
+
+
+@router.get("/history")
+async def get_history(mode: str = "free"):
+    """获取聊天历史记录"""
+    try:
+        history = _chat_history.get(mode, [])
+        return {"history": history}
+    except Exception as e:
+        logger.error(f"获取历史记录出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取历史记录出错: {str(e)}")
+
+
+@router.post("/clear")
+async def clear_history(mode: str = "all"):
+    """清空聊天历史记录"""
+    try:
+        if mode == "all":
+            _chat_history["free"] = []
+            _chat_history["video"] = []
+        else:
+            _chat_history[mode] = []
+        return {"message": "历史记录已清空"}
+    except Exception as e:
+        logger.error(f"清空历史记录出错: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"清空历史记录出错: {str(e)}")

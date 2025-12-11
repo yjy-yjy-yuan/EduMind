@@ -62,6 +62,7 @@ app.add_middleware(
 from app.routers import auth
 from app.routers import chat
 from app.routers import knowledge_graph
+from app.routers import knowledge_graph_integration
 from app.routers import note
 from app.routers import qa
 from app.routers import subtitle
@@ -74,6 +75,11 @@ app.include_router(qa.router, prefix="/api/qa", tags=["问答系统"])
 app.include_router(chat.router, prefix="/api/chat", tags=["聊天系统"])
 app.include_router(auth.router, prefix="/api/auth", tags=["用户认证"])
 app.include_router(knowledge_graph.router, prefix="/api/knowledge-graph", tags=["知识图谱"])
+app.include_router(
+    knowledge_graph_integration.router,
+    prefix="/api/knowledge-graph/integration",
+    tags=["知识图谱整合"],
+)
 
 
 # 根路由

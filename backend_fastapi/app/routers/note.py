@@ -320,3 +320,33 @@ async def export_single_note(note_id: int, db: Session = Depends(get_db)):
         media_type="text/markdown",
         headers={"Content-Disposition": f'attachment; filename="{safe_title}.md"'},
     )
+
+
+@router.post("/tags/sync")
+async def sync_tags(db: Session = Depends(get_db)):
+    """同步标签数据，清除不存在于任何笔记中的标签"""
+    try:
+        notes = db.query(Note).all()
+
+        # 收集所有实际存在的标签
+        valid_tags = set()
+        for note in notes:
+            if note.tags:
+                tags = note.tags.split(",")
+                for tag in tags:
+                    if tag.strip():
+                        valid_tags.add(tag.strip())
+
+        # 更新所有笔记的标签，确保只包含有效标签
+        for note in notes:
+            if note.tags:
+                tags = note.tags.split(",")
+                filtered_tags = [tag for tag in tags if tag.strip() in valid_tags]
+                note.tags = ",".join(filtered_tags) if filtered_tags else None
+
+        db.commit()
+        return {"status": "success", "message": "标签数据已同步", "valid_tags": list(valid_tags)}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"同步标签失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"同步标签失败: {str(e)}")
