@@ -1,0 +1,92 @@
+"""配置管理 - 使用 Pydantic Settings"""
+
+import os
+from functools import lru_cache
+from typing import List
+from typing import Set
+from typing import Union
+
+from pydantic import field_validator
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    """应用配置"""
+
+    # 应用配置
+    APP_NAME: str = "AI-EdVision"
+    DEBUG: bool = True
+    HOST: str = "127.0.0.1"
+    PORT: int = 2004  # FastAPI 端口
+    SECRET_KEY: str = "dev-secret-key-change-in-production"
+
+    # 数据库配置 (与 Flask 版本一致)
+    DATABASE_URL: str = "sqlite:///./app.db"
+
+    # Neo4j 配置
+    NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str = "password"
+
+    # LLM API 配置 (通义千问/OpenAI兼容)
+    OPENAI_API_KEY: str = "sk-59a6a7690bfb42cd887365795e114002"
+    OPENAI_BASE_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    QWEN_API_KEY: str = ""
+    QWEN_API_BASE: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+
+    # Ollama 配置
+    OLLAMA_BASE_URL: str = "http://localhost:11434/api"
+    OLLAMA_MODEL: str = "qwen3:8b"
+
+    # 文件上传配置
+    BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    UPLOAD_FOLDER: str = ""
+    SUBTITLE_FOLDER: str = ""
+    PREVIEW_FOLDER: str = ""
+    TEMP_FOLDER: str = ""
+    MAX_CONTENT_LENGTH: int = 500 * 1024 * 1024  # 500MB
+    ALLOWED_EXTENSIONS: Set[str] = {"mp4", "avi", "mov", "mkv", "webm", "flv"}
+
+    # Whisper 配置 (可选: tiny, base, small, medium, large, turbo)
+    WHISPER_MODEL: str = "turbo"
+    WHISPER_MODEL_PATH: str = os.path.expanduser("~/Desktop/File/graduation/whisper")
+
+    # CORS 配置 (允许前端访问) - 使用字符串，支持逗号分隔
+    CORS_ORIGINS: Union[str, List[str]] = "http://localhost:5173,http://127.0.0.1:5173"
+
+    # Redis 配置 (可选，保留用于生产环境)
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        """解析 CORS_ORIGINS，支持逗号分隔的字符串或列表"""
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
+
+    class Config:
+        env_file = ".env"
+        case_sensitive = True
+        extra = "ignore"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # 设置文件夹路径
+        if not self.UPLOAD_FOLDER:
+            self.UPLOAD_FOLDER = os.path.join(self.BASE_DIR, "uploads")
+        if not self.SUBTITLE_FOLDER:
+            self.SUBTITLE_FOLDER = os.path.join(self.UPLOAD_FOLDER, "subtitles")
+        if not self.PREVIEW_FOLDER:
+            self.PREVIEW_FOLDER = os.path.join(self.BASE_DIR, "previews")
+        if not self.TEMP_FOLDER:
+            self.TEMP_FOLDER = os.path.join(self.BASE_DIR, "temp")
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    """获取配置单例"""
+    return Settings()
+
+
+settings = get_settings()

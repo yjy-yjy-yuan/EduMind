@@ -14,34 +14,71 @@
 - 个性化学习：根据学习者特点推荐个性化学习路径
 - 多模态分析：结合视频、音频和文本进行多模态分析
 
+## 后端架构迁移
+
+本项目已完成从 Flask 到 FastAPI 的后端架构迁移。
+
+### 为什么迁移到 FastAPI？
+
+| 对比项 | Flask (旧) | FastAPI (新) |
+|--------|-----------|--------------|
+| 请求处理 | 同步阻塞 | 异步非阻塞 (async/await) |
+| API 文档 | 无自动生成 | Swagger UI + ReDoc 自动生成 |
+| 参数验证 | 手动验证 | Pydantic 自动验证 |
+| 后台任务 | Celery + Redis (4 条启动命令) | ProcessPoolExecutor (2 条启动命令) |
+| 类型安全 | 无 | 完整类型注解 |
+| 测试 | 手动配置 | 依赖注入，易于 Mock |
+
+### 迁移详情
+
+- **框架**: Flask → FastAPI + Uvicorn
+- **ORM**: Flask-SQLAlchemy → SQLAlchemy 2.0 (Mapped[] 类型注解)
+- **配置**: python-dotenv → Pydantic Settings
+- **后台任务**: Celery + Redis → ProcessPoolExecutor
+- **验证**: 手动 → Pydantic v2
+
 ## 项目结构
 
-```content
+```
 AI-EdVision/
-├── backend/                # Flask后端
+├── backend/                # Flask 后端 (旧版本，保留兼容)
 │   ├── app/
-│   │   ├── __init__.py    # Flask应用初始化
+│   │   ├── __init__.py    # Flask 应用初始化
 │   │   ├── models/        # 数据模型
-│   │   ├── routes/        # API路由
+│   │   ├── routes/        # API 路由
 │   │   ├── services/      # 业务逻辑
-│   │   ├── tasks/         # 异步任务
+│   │   ├── tasks/         # Celery 异步任务
 │   │   └── utils/         # 工具函数
 │   ├── config.py          # 配置文件
-│   ├── requirements.txt   # Python依赖
+│   ├── requirements.txt   # Python 依赖
 │   └── run.py             # 启动脚本
 │
-├── frontend/              # Vue前端
+├── backend_fastapi/        # FastAPI 后端 (推荐使用)
+│   ├── app/
+│   │   ├── main.py        # FastAPI 应用入口
+│   │   ├── core/          # 核心配置 (config, database, executor)
+│   │   ├── routers/       # API 路由 (APIRouter)
+│   │   ├── models/        # SQLAlchemy 2.0 模型
+│   │   ├── schemas/       # Pydantic 请求/响应模型
+│   │   ├── services/      # 业务逻辑层
+│   │   ├── tasks/         # 后台任务 (ProcessPoolExecutor)
+│   │   └── utils/         # 工具函数
+│   ├── tests/             # pytest 测试框架
+│   ├── requirements.txt   # Python 依赖
+│   └── run.py             # 启动脚本
+│
+├── frontend/              # Vue 前端
 │   ├── public/            # 静态资源
 │   ├── src/
 │   │   ├── assets/        # 资源文件
-│   │   ├── components/    # Vue组件
+│   │   ├── components/    # Vue 组件
 │   │   ├── views/         # 页面视图
 │   │   ├── router/        # 路由配置
-│   │   ├── store/         # Vuex状态管理
-│   │   ├── api/           # API接口
+│   │   ├── store/         # Vuex 状态管理
+│   │   ├── api/           # API 接口
 │   │   └── utils/         # 工具函数
-│   ├── package.json       # npm配置
-│   └── vite.config.js     # Vite配置
+│   ├── package.json       # npm 配置
+│   └── vite.config.js     # Vite 配置
 ```
 
 ## 系统要求
@@ -265,19 +302,43 @@ npm install
 
 ### 第七步：启动系统
 
-1. 启动Celery Worker（处理异步任务）：
+#### 方式一：FastAPI 后端 (推荐)
+
+只需 2 条命令，无需 Redis/Celery：
+
+```bash
+# 终端 1：启动 FastAPI 后端
+cd backend_fastapi
+conda activate ai-edvision
+python run.py
+# 或: uvicorn app.main:app --reload --port 2004
+
+# 终端 2：启动前端
+cd frontend
+npm run dev
+```
+
+访问地址：
+- 前端：http://localhost:5173
+- API 文档：http://localhost:2004/docs
+- ReDoc：http://localhost:2004/redoc
+
+#### 方式二：Flask 后端 (旧版本)
+
+需要 4 条命令，依赖 Redis：
+
+1. 启动 Celery Worker（处理异步任务）：
 
    ```bash
-   # 在backend目录下
    cd backend
    conda activate ai-edvision
    python -m celery -A app.celery_app worker --loglevel=info -P solo
    ```
 
-2. 启动Flask后端服务：首次启动需要打开VPN
+2. 启动 Flask 后端服务：
 
    ```bash
-   # 在另一个终端，backend目录下
+   # 在另一个终端
    conda activate ai-edvision
    python run.py
    ```
@@ -285,7 +346,7 @@ npm install
 3. 启动前端开发服务器：
 
    ```bash
-   # 在另一个终端，frontend目录下
+   cd frontend
    npm run dev
    # 或允许局域网访问
    npm run dev --host
@@ -293,7 +354,7 @@ npm install
 
 4. 在浏览器中访问：
    - 本地访问：http://localhost:5173
-   - 局域网访问：http://[您的IP地址]:5173 (使用`--host`选项时)
+   - 局域网访问：http://[您的IP地址]:5173
 
 ## 开发者指南
 

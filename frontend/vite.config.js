@@ -15,12 +15,12 @@ export default defineConfig({
     host: true,  // ✅ 添加此行，允许网络访问
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:5001',
+        target: 'http://127.0.0.1:2004',
         changeOrigin: true,
         secure: false,
         ws: true,
         headers: {
-          'Origin': 'http://127.0.0.1:5001'
+          'Origin': 'http://127.0.0.1:2004'
         }
       }
     }

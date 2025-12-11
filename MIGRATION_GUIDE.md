@@ -226,7 +226,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "AI-EdVision"
     DEBUG: bool = True
     HOST: str = "127.0.0.1"
-    PORT: int = 5001
+    PORT: int = 2004
     SECRET_KEY: str = "your-secret-key"
 
     # 数据库配置
@@ -1804,7 +1804,7 @@ return StreamingResponse(generate(), media_type="text/plain")
 ```bash
 # ========== 简化方案启动 (推荐) ==========
 # 终端 1: 启动 FastAPI (后台任务内置)
-uvicorn app.main:app --reload --host 0.0.0.0 --port 5001
+uvicorn app.main:app --reload --host 0.0.0.0 --port 2004
 
 # 终端 2: 启动前端
 cd frontend && npm run dev
@@ -1818,7 +1818,7 @@ redis-server
 celery -A app.core.celery_app worker --loglevel=info -P solo
 
 # 终端 3: FastAPI
-uvicorn app.main:app --reload --host 0.0.0.0 --port 5001
+uvicorn app.main:app --reload --host 0.0.0.0 --port 2004
 
 # 终端 4: 前端
 cd frontend && npm run dev
