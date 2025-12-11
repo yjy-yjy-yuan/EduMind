@@ -1,4 +1,4 @@
-"""数据库连接配置 - SQLAlchemy 2.0"""
+"""数据库连接配置 - SQLAlchemy 2.0 (MySQL)"""
 
 from typing import Generator
 
@@ -7,13 +7,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import sessionmaker
 
-# 创建数据库引擎
+# 创建数据库引擎 (MySQL)
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
     pool_recycle=300,
+    pool_size=10,
+    max_overflow=20,
     echo=settings.DEBUG,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
+    connect_args={"charset": "utf8mb4"},
 )
 
 # 创建会话工厂

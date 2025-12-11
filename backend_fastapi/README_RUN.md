@@ -58,15 +58,54 @@ cp .env.production .env
 | APP_ENV | local | 环境标识 (local/development/production) |
 | DEBUG | true | 调试模式 (生产环境应为 false) |
 | PORT | 2004 | 后端端口 |
-| DATABASE_URL | sqlite:///./app.db | 数据库连接 |
+| DATABASE_URL | mysql+pymysql://... | 数据库连接 |
 | NEO4J_URI | bolt://localhost:7687 | Neo4j 地址 |
 | OPENAI_API_KEY | - | 通义千问 API 密钥 (必填) |
 | WHISPER_MODEL | turbo | 语音识别模型 |
 | OLLAMA_MODEL | qwen3:8b | AI 对话模型 |
 
+### 数据库配置 (MySQL)
+
+**连接字符串格式**：
+```
+DATABASE_URL=mysql+pymysql://user:password@host:port/database
+```
+
+**MySQL 初始化步骤**：
+
+```bash
+# 1. 登录 MySQL
+mysql -u root -p
+
+# 2. 创建数据库
+CREATE DATABASE ai_edvision CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+# 3. 初始化表结构 (两种方式)
+
+# 方式一: 启动应用时自动创建
+python run.py
+
+# 方式二: 手动初始化
+python scripts/init_db.py
+```
+
+**数据库表结构**：
+
+| 表名 | 说明 | 主要字段 |
+|------|------|----------|
+| `videos` | 视频信息 | id, title, filename, filepath, status, duration, tags, summary |
+| `users` | 用户信息 | id, username, email, password_hash, gender, education |
+| `subtitles` | 字幕数据 | id, video_id, start_time, end_time, text, source, language |
+| `notes` | 学习笔记 | id, title, content, video_id, tags, keywords |
+| `note_timestamps` | 笔记时间戳 | id, note_id, time_seconds, subtitle_text |
+| `questions` | 问答记录 | id, video_id, content, answer |
+
 ## 4. 启动依赖服务
 
 ```bash
+# 启动 MySQL (macOS)
+brew services start mysql
+
 # 启动 Neo4j (macOS)
 brew services start neo4j
 
@@ -179,6 +218,7 @@ pytest -m smoke
 |------|------|
 | FastAPI 后端 | 2004 |
 | Vue 前端 | 5173 |
+| MySQL | 3306 |
 | Neo4j Browser | 7474 |
 | Neo4j Bolt | 7687 |
 | Ollama | 11434 |

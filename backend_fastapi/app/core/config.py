@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     PORT: int = 2004  # FastAPI 端口
     SECRET_KEY: str = "dev-secret-key-change-in-production"
 
-    # 数据库配置 (与 Flask 版本一致)
-    DATABASE_URL: str = "sqlite:///./app.db"
+    # 数据库配置 (MySQL)
+    DATABASE_URL: str = "mysql+pymysql://root:password@localhost:3306/ai_edvision"
 
     # Neo4j 配置
     NEO4J_URI: str = "bolt://localhost:7687"
