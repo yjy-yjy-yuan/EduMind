@@ -21,21 +21,46 @@ pip install -r requirements.txt
 
 ## 3. 配置环境变量
 
-```bash
-# 复制示例配置
-cp .env.example .env
+### 环境区分
 
-# 编辑配置 (可选，默认配置可直接运行)
-# vim .env
+系统通过 `APP_ENV` 区分运行环境：
+
+| APP_ENV 值 | 说明 | 配置文件 |
+|------------|------|----------|
+| local | 本地开发 | .env |
+| development | 开发环境 | .env |
+| production | 生产环境 | .env.production |
+
+### 开发环境配置
+
+```bash
+# 直接使用 .env 文件 (已包含开发配置)
+# APP_ENV=local 为默认值
 ```
 
-**主要配置项**：
+### 生产环境配置
 
-| 配置 | 默认值 | 说明 |
-|------|--------|------|
+```bash
+# 复制生产环境配置模板
+cp .env.production .env
+
+# 必须修改以下敏感配置:
+# - SECRET_KEY: 改为随机强密钥
+# - NEO4J_PASSWORD: 改为实际密码
+# - OPENAI_API_KEY: 配置有效的通义千问 API 密钥
+# - CORS_ORIGINS: 改为实际的前端域名
+```
+
+### 主要配置项
+
+| 配置 | 开发默认值 | 说明 |
+|------|------------|------|
+| APP_ENV | local | 环境标识 (local/development/production) |
+| DEBUG | true | 调试模式 (生产环境应为 false) |
 | PORT | 2004 | 后端端口 |
 | DATABASE_URL | sqlite:///./app.db | 数据库连接 |
 | NEO4J_URI | bolt://localhost:7687 | Neo4j 地址 |
+| OPENAI_API_KEY | - | 通义千问 API 密钥 (必填) |
 | WHISPER_MODEL | turbo | 语音识别模型 |
 | OLLAMA_MODEL | qwen3:8b | AI 对话模型 |
 

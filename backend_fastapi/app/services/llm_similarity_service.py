@@ -4,30 +4,18 @@
 
 import json
 import logging
-import os
 import re
-import traceback
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
-from typing import Tuple
-from typing import Union
 
 import requests
+from app.core.config import settings
 from openai import OpenAI
 
 # 配置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-# 直接使用固定的API密钥（与semantic_utils.py保持一致）
-OPENAI_API_KEY = "sk-59a6a7690bfb42cd887365795e114002"
-OPENAI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-
-# Ollama API配置
-OLLAMA_BASE_URL = "http://localhost:11434/api"
-OLLAMA_MODEL = "qwen3:8b"  # 默认使用qwen2.5:7b模型
 
 
 class LLMSimilarityService:
@@ -41,9 +29,12 @@ class LLMSimilarityService:
 
         # 尝试初始化OpenAI客户端
         try:
-            self.openai_client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL)
-            self.use_openai = True
-            logger.info("OpenAI客户端初始化成功")
+            if settings.OPENAI_API_KEY:
+                self.openai_client = OpenAI(api_key=settings.OPENAI_API_KEY, base_url=settings.OPENAI_BASE_URL)
+                self.use_openai = True
+                logger.info("OpenAI客户端初始化成功")
+            else:
+                logger.warning("未配置 OPENAI_API_KEY，OpenAI 客户端未初始化")
         except Exception as e:
             logger.error(f"OpenAI客户端初始化失败: {str(e)}")
 
@@ -61,7 +52,7 @@ class LLMSimilarityService:
     def check_ollama_service(self) -> bool:
         """检查Ollama服务是否可用"""
         try:
-            response = requests.get(f"{OLLAMA_BASE_URL}/tags", timeout=5)
+            response = requests.get(f"{settings.OLLAMA_BASE_URL}/tags", timeout=5)
             return response.status_code == 200
         except Exception as e:
             logger.error(f"无法连接到Ollama服务: {str(e)}")
@@ -121,8 +112,13 @@ class LLMSimilarityService:
 
         try:
             response = requests.post(
-                f"{OLLAMA_BASE_URL}/generate",
-                json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "options": {"temperature": 0.1}},
+                f"{settings.OLLAMA_BASE_URL}/generate",
+                json={
+                    "model": settings.OLLAMA_MODEL,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {"temperature": 0.1},
+                },
                 timeout=10,
             )
 
@@ -240,8 +236,8 @@ class LLMSimilarityService:
             try:
                 logger.info(f"使用Ollama计算标签组直接相似度: {tags1} vs {tags2}")
                 response = requests.post(
-                    f"{OLLAMA_BASE_URL}/generate",
-                    json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+                    f"{settings.OLLAMA_BASE_URL}/generate",
+                    json={"model": settings.OLLAMA_MODEL, "prompt": prompt, "stream": False},
                     timeout=30,
                 )
 

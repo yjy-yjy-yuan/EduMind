@@ -13,6 +13,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """应用配置"""
 
+    # 环境配置 (local/development/production)
+    APP_ENV: str = "local"
+
     # 应用配置
     APP_NAME: str = "AI-EdVision"
     DEBUG: bool = True
@@ -29,7 +32,8 @@ class Settings(BaseSettings):
     NEO4J_PASSWORD: str = "password"
 
     # LLM API 配置 (通义千问/OpenAI兼容)
-    OPENAI_API_KEY: str = "sk-59a6a7690bfb42cd887365795e114002"
+    # 注意: 敏感密钥请在 .env 文件中配置，不要硬编码
+    OPENAI_API_KEY: str = ""
     OPENAI_BASE_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     QWEN_API_KEY: str = ""
     QWEN_API_BASE: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
