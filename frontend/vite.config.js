@@ -12,6 +12,7 @@ export default defineConfig({
   },
   publicDir: 'public',  // 明确指定 public 目录
   server: {
+    port: 328,   // 前端端口
     host: true,  // ✅ 添加此行，允许网络访问
     proxy: {
       '/api': {
