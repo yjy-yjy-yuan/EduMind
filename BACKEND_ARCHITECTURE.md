@@ -29,7 +29,7 @@ create_app(config_name='default')
 Initialized extensions:
 - **SQLAlchemy (db)**: SQL database ORM for relational data (MySQL)
 - **Flask-Migrate (migrate)**: Database schema versioning and migrations
-- **Flask-CORS (cors)**: Cross-origin request handling for frontend at http://localhost:5173
+- **Flask-CORS (cors)**: Cross-origin request handling for frontend at http://localhost:328
 - **Celery**: Asynchronous task queue for long-running operations (Redis broker/backend)
 
 **Platform-Specific Configuration**:
@@ -639,7 +639,7 @@ celery -A celery_app worker --loglevel=info
 ollama serve
 
 # Frontend (separate project)
-npm run dev  # at http://localhost:5173
+npm run dev  # at http://localhost:328
 ```
 
 ---

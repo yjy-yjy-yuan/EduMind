@@ -74,7 +74,7 @@
 | 服务 | 端口 |
 |------|------|
 | FastAPI Backend | 2004 |
-| Vue Frontend | 5173 |
+| Vue Frontend | 328 |
 | Neo4j Browser | 7474 |
 | Neo4j Bolt | 7687 |
 

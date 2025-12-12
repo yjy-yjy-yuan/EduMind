@@ -256,7 +256,7 @@ class Settings(BaseSettings):
     WHISPER_MODEL_PATH: str = os.path.expanduser("~/Desktop/File/graduation/whisper")
 
     # CORS 配置
-    CORS_ORIGINS: List[str] = ["http://localhost:5173"]
+    CORS_ORIGINS: List[str] = ["http://localhost:328"]
 
     class Config:
         env_file = ".env"

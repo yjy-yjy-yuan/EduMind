@@ -47,7 +47,7 @@ class TestCORSConfig:
     def test_cors_headers_present(self, client):
         """测试 CORS 头存在"""
         response = client.options(
-            '/', headers={'Origin': 'http://localhost:5173', 'Access-Control-Request-Method': 'GET'}
+            '/', headers={'Origin': 'http://localhost:328', 'Access-Control-Request-Method': 'GET'}
         )
         # CORS 应该允许请求
         assert response.status_code in [200, 204]

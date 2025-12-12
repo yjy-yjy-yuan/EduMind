@@ -319,7 +319,7 @@ npm run dev
 ```
 
 访问地址：
-- 前端：http://localhost:5173
+- 前端：http://localhost:328
 - API 文档：http://localhost:2004/docs
 - ReDoc：http://localhost:2004/redoc
 
@@ -353,8 +353,8 @@ npm run dev
    ```
 
 4. 在浏览器中访问：
-   - 本地访问：http://localhost:5173
-   - 局域网访问：http://[您的IP地址]:5173
+   - 本地访问：http://localhost:328
+   - 局域网访问：http://[您的IP地址]:328
 
 ## 开发者指南
 

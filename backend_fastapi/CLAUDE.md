@@ -92,7 +92,7 @@ conda activate ai-edvision
 
 # 端口
 # Backend: 2004
-# Frontend: 5173
+# Frontend: 328
 # Neo4j: 7474/7687
 ```
 

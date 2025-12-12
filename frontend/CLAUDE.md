@@ -4,7 +4,7 @@ Vue 3 + Element Plus + D3.js 前端应用
 
 ## Bash Commands
 ```bash
-npm run dev      # 启动开发服务器 (端口 5173)
+npm run dev      # 启动开发服务器 (端口 328)
 npm run build    # 构建生产版本
 npm run preview  # 预览生产构建
 ```

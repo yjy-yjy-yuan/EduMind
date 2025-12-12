@@ -141,7 +141,7 @@ INFO:     Uvicorn running on http://127.0.0.1:2004
 cd frontend
 npm install
 npm run dev
-# 访问: http://localhost:5173
+# 访问: http://localhost:328
 ```
 
 ## 快速启动脚本
@@ -204,7 +204,7 @@ pytest -m smoke
 | 服务 | 端口 |
 |------|------|
 | FastAPI 后端 | 2004 |
-| Vue 前端 | 5173 |
+| Vue 前端 | 328 |
 | MySQL | 3306 |
 | Neo4j Browser | 7474 |
 | Neo4j Bolt | 7687 |

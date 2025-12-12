@@ -208,7 +208,7 @@ def upload_video_url():
     if request.method == 'OPTIONS':
         current_app.logger.info('处理OPTIONS预检请求')
         response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:5173')
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:328')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With')
         response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         response.headers.add('Access-Control-Allow-Credentials', 'true')
