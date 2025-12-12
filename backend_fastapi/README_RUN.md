@@ -51,18 +51,6 @@ cp .env.production .env
 # - CORS_ORIGINS: 改为实际的前端域名
 ```
 
-### 主要配置项
-
-| 配置 | 开发默认值 | 说明 |
-|------|------------|------|
-| APP_ENV | local | 环境标识 (local/development/production) |
-| DEBUG | true | 调试模式 (生产环境应为 false) |
-| PORT | 2004 | 后端端口 |
-| DATABASE_URL | mysql+pymysql://... | 数据库连接 |
-| NEO4J_URI | bolt://localhost:7687 | Neo4j 地址 |
-| OPENAI_API_KEY | - | 通义千问 API 密钥 (必填) |
-| WHISPER_MODEL | turbo | 语音识别模型 |
-| OLLAMA_MODEL | qwen3:8b | AI 对话模型 |
 
 ### 数据库配置 (MySQL)
 
@@ -134,8 +122,7 @@ INFO:     Uvicorn running on http://127.0.0.1:2004
 | 地址 | 说明 |
 |------|------|
 | http://localhost:2004/health | 健康检查 |
-| http://localhost:2004/docs | Swagger UI 文档 |
-| http://localhost:2004/redoc | ReDoc 文档 |
+| http://localhost:2004/docs | Swagger UI 文档 (可交互测试 API) |
 
 **健康检查成功响应**：
 ```json
@@ -148,7 +135,7 @@ INFO:     Uvicorn running on http://127.0.0.1:2004
 }
 ```
 
-## 7. 启动前端 (可选)
+## 7. 启动前端
 
 ```bash
 cd frontend

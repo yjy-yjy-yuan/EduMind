@@ -45,7 +45,7 @@ app = FastAPI(
     version="2.0.0",
     lifespan=lifespan,
     docs_url="/docs",  # Swagger UI
-    redoc_url="/redoc",  # ReDoc
+    redoc_url=None,  # 禁用默认 ReDoc，使用自定义路由
 )
 
 # 配置 CORS
