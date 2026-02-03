@@ -1,5 +1,5 @@
 @echo off
-echo 正在启动AI-EdVision前端服务...
+echo 正在启动EduMind前端服务...
 
 REM 检查是否已安装依赖
 if not exist "node_modules" (

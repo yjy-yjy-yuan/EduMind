@@ -1,11 +1,10 @@
 {
-  "name": "ai-edvision-mobile",
+  "name": "edumind-mobile",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:android": "vite build --mode android",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -18,3 +17,4 @@
     "vite": "^4.4.9"
   }
 }
+

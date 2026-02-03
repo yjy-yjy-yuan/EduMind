@@ -8,7 +8,7 @@ YouTube经常更新其API，导致旧版本的yt-dlp无法正常下载视频。
 
 ```bash
 # 激活conda环境
-conda activate ai-edvision
+conda activate edumind
 # 升级yt-dlp
 pip install --upgrade yt-dlp
 ```

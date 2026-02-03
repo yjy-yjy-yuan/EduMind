@@ -150,7 +150,7 @@ User
 **File**: `/backend/config.py`
 
 ```python
-SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:Qw242015@localhost/ai_edvision'
+SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:Qw242015@localhost/edumind'
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 ```
 
