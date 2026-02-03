@@ -40,7 +40,7 @@
 ## 项目结构
 
 ```
-AI-EdVision/
+EduMind/
 ├── backend/                # Flask 后端 (旧版本，保留兼容)
 │   ├── app/
 │   │   ├── __init__.py    # Flask 应用初始化
@@ -206,8 +206,8 @@ open http://localhost:7474
 ### 第一步：克隆项目
 
 ```bash
-git clone https://github.com/yourusername/AI-EdVision.git
-cd AI-EdVision
+git clone https://github.com/yourusername/EduMind.git
+cd EduMind
 ```
 
 ### 第二步：配置数据库连接
@@ -259,8 +259,8 @@ redis-cli ping  # 应返回PONG
 ```bash
 # 创建并激活虚拟环境
 cd backend
-conda create -n ai-edvision python=3.10 -y
-conda activate ai-edvision
+conda create -n edumind python=3.10 -y
+conda activate edumind
 
 # 安装基本依赖
 pip install -r requirements.txt
@@ -309,7 +309,7 @@ npm install
 ```bash
 # 终端 1：启动 FastAPI 后端
 cd backend_fastapi
-conda activate ai-edvision
+conda activate edumind
 python run.py
 # 或: uvicorn app.main:app --reload --port 2004
 
@@ -331,7 +331,7 @@ npm run dev
 
    ```bash
    cd backend
-   conda activate ai-edvision
+   conda activate edumind
    python -m celery -A app.celery_app worker --loglevel=info -P solo
    ```
 
@@ -339,7 +339,7 @@ npm run dev
 
    ```bash
    # 在另一个终端
-   conda activate ai-edvision
+   conda activate edumind
    python run.py
    ```
 
@@ -373,7 +373,7 @@ npm run dev
 
 ```bash
 # 1. 激活虚拟环境
-conda activate ai-edvision
+conda activate edumind
 
 # 2. 安装开发依赖
 pip install black isort flake8 pylint mypy pre-commit
@@ -412,7 +412,7 @@ git commit --no-verify -m "commit message"
 
 ```bash
 # 激活环境
-conda activate ai-edvision
+conda activate edumind
 
 # 运行所有测试
 PYTHONPATH=backend python -m pytest tests/ -v

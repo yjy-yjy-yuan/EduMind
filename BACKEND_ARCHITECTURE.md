@@ -1,8 +1,8 @@
-# AI-EdVision Backend Architecture Overview
+# EduMind Backend Architecture Overview
 
 ## Executive Summary
 
-AI-EdVision is an intelligent educational video processing and knowledge extraction platform built with Flask, featuring automated video transcription, knowledge graph generation, and AI-powered question-answering capabilities. The backend uses Celery for async task processing, Neo4j for knowledge graph storage, and multiple LLM integrations for content analysis.
+EduMind is an intelligent educational video processing and knowledge extraction platform built with Flask, featuring automated video transcription, knowledge graph generation, and AI-powered question-answering capabilities. The backend uses Celery for async task processing, Neo4j for knowledge graph storage, and multiple LLM integrations for content analysis.
 
 ---
 

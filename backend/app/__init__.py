@@ -119,7 +119,7 @@ def create_app(config_name='default'):
         # 添加根路由
         @app.route('/')
         def index():
-            return jsonify({'status': 'success', 'message': 'Welcome to AI-EdVision API', 'version': '1.0.0'})
+            return jsonify({'status': 'success', 'message': 'Welcome to EduMind API', 'version': '1.0.0'})
 
         # 添加健康检查路由
         @app.route('/api/health')
