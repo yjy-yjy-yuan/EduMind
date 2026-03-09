@@ -1,0 +1,674 @@
+<template>
+  <div class="page">
+    <header class="topbar">
+      <h2>上传</h2>
+      <button class="link" @click="resetAll" :disabled="busy">重置</button>
+    </header>
+
+    <div class="card">
+      <div class="card-title">本地视频</div>
+      <input ref="fileInputRef" class="file" type="file" accept="video/*" @change="onFileChange" :disabled="busy" />
+      <div v-if="file" class="muted">已选择：{{ file.name }}（{{ readableSize(file.size) }}）</div>
+      <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
+        {{ busy ? '上传中…' : '开始上传' }}
+      </button>
+
+      <div v-if="busy" class="progress">
+        <div class="bar" :style="{ width: `${progress}%` }"></div>
+      </div>
+      <div v-if="busy" class="muted">进度：{{ progress }}%</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">视频链接</div>
+      <input class="input" v-model.trim="videoUrl" placeholder="请输入视频链接（B站/YouTube等）" :disabled="busy" />
+      <button class="btn" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交链接' }}</button>
+      <div class="muted">支持：B站、YouTube、中国大学慕课（icourse163）</div>
+    </div>
+
+    <div v-if="recentUploads.length > 0" class="card">
+      <div class="card-head">
+        <div class="card-title">最近上传</div>
+        <div class="card-head-actions">
+          <button class="link link--small" @click="syncRecentStatuses" :disabled="busy || syncingRecent">
+            {{ syncingRecent ? '刷新中…' : '刷新状态' }}
+          </button>
+          <button class="link link--small" @click="clearRecentUploads" :disabled="busy || syncingRecent">清空</button>
+        </div>
+      </div>
+      <div class="filters">
+        <button
+          v-for="f in STATUS_FILTERS"
+          :key="f.value"
+          class="filter"
+          :class="{ 'filter--active': statusFilter === f.value }"
+          @click="statusFilter = f.value"
+        >
+          {{ f.label }}
+        </button>
+      </div>
+      <div class="recent-list">
+        <div v-for="item in filteredRecentUploads" :key="item.key" class="recent-item">
+          <div class="recent-main">
+            <div class="recent-title">{{ item.title }}</div>
+            <div class="muted">{{ item.typeText }} · {{ item.timeText }}</div>
+            <div class="recent-meta">
+              <span class="status" :class="statusClass(item.status)">{{ statusText(item.status) }}</span>
+            </div>
+          </div>
+          <div class="recent-actions">
+            <span class="recent-tag" :class="{ 'recent-tag--dup': item.duplicate }">
+              {{ item.duplicate ? '重复' : '正常' }}
+            </span>
+            <button class="mini" @click="openRecent(item)" :disabled="!item.videoId">查看</button>
+            <button
+              v-if="item.status === 'failed'"
+              class="mini mini--warn"
+              @click="retryRecent(item)"
+              :disabled="busy || syncingRecent || item.retrying || !item.videoId"
+            >
+              {{ item.retrying ? '重试中…' : '重试处理' }}
+            </button>
+          </div>
+        </div>
+        <div v-if="filteredRecentUploads.length === 0" class="empty">当前筛选下没有记录。</div>
+      </div>
+    </div>
+
+    <div v-if="message" class="alert alert--ok">{{ message }}</div>
+    <div v-if="error" class="alert alert--bad">{{ error }}</div>
+  </div>
+</template>
+
+<script setup>
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { getVideoStatus, processVideo, uploadLocalVideo, uploadVideoUrl } from '@/api/video'
+
+const router = useRouter()
+const fileInputRef = ref(null)
+
+const file = ref(null)
+const videoUrl = ref('')
+const busy = ref(false)
+const progress = ref(0)
+const message = ref('')
+const error = ref('')
+const recentUploads = ref([])
+const syncingRecent = ref(false)
+const statusFilter = ref('all')
+
+const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
+const ALLOWED_EXTENSIONS = new Set(['mp4', 'avi', 'mov', 'mkv', 'webm'])
+const RECENT_UPLOADS_KEY = 'm_recent_uploads'
+const MAX_RECENT_UPLOADS = 8
+const STATUS_FILTERS = [
+  { value: 'all', label: '全部' },
+  { value: 'failed', label: '失败' },
+  { value: 'processing', label: '处理中' },
+  { value: 'completed', label: '已完成' }
+]
+
+const readableSize = (size) => {
+  const n = Number(size || 0)
+  if (!n) return '0 B'
+  if (n >= 1024 * 1024 * 1024) return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(2)} MB`
+  if (n >= 1024) return `${(n / 1024).toFixed(2)} KB`
+  return `${n} B`
+}
+
+const fileExt = (filename) => {
+  const name = String(filename || '').trim()
+  const idx = name.lastIndexOf('.')
+  if (idx < 0) return ''
+  return name.slice(idx + 1).toLowerCase()
+}
+
+const extractErrorMessage = (err, fallback) => {
+  const detail = err?.response?.data?.detail
+  if (Array.isArray(detail)) {
+    const first = detail.find(Boolean)
+    if (typeof first === 'string') return first
+    if (first?.msg) return first.msg
+  }
+  if (typeof detail === 'string' && detail.trim()) return detail.trim()
+  const messageText = err?.response?.data?.message || err?.response?.data?.msg
+  if (typeof messageText === 'string' && messageText.trim()) return messageText.trim()
+  return err?.message || fallback
+}
+
+const resolveVideoId = (payload) => {
+  const data = payload?.data ?? payload
+  return data?.video_id || data?.id || data?.video?.id || data?.data?.id || data?.data?.video_id
+}
+
+const normalizeStatus = (status) => {
+  const s = String(status || '').toLowerCase()
+  if (['uploaded', 'pending', 'processing', 'completed', 'failed', 'downloading', 'processed'].includes(s)) {
+    return s === 'processed' ? 'completed' : s
+  }
+  return 'unknown'
+}
+
+const statusText = (status) => {
+  const map = {
+    uploaded: '已上传',
+    pending: '排队中',
+    processing: '处理中',
+    completed: '已完成',
+    failed: '失败',
+    downloading: '下载中',
+    unknown: '未知'
+  }
+  return map[normalizeStatus(status)] || '未知'
+}
+
+const statusClass = (status) => {
+  const s = normalizeStatus(status)
+  if (s === 'completed') return 'status--ok'
+  if (s === 'failed') return 'status--bad'
+  if (['processing', 'pending', 'downloading'].includes(s)) return 'status--warn'
+  return 'status--info'
+}
+
+const formatTimeText = (isoText) => {
+  if (!isoText) return ''
+  try {
+    const d = new Date(isoText)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleString()
+  } catch {
+    return ''
+  }
+}
+
+const normalizeRecentUploads = (list) => {
+  if (!Array.isArray(list)) return []
+  return list
+    .filter(Boolean)
+    .map((item) => ({
+      key: String(item.key || `${item.videoId || 'none'}-${item.time || ''}`),
+      videoId: item.videoId ? Number(item.videoId) : null,
+      title: String(item.title || '未命名视频'),
+      typeText: String(item.typeText || '上传'),
+      time: String(item.time || ''),
+      timeText: formatTimeText(item.time),
+      duplicate: Boolean(item.duplicate),
+      status: normalizeStatus(item.status || (item.duplicate ? 'uploaded' : 'pending')),
+      retrying: false
+    }))
+    .filter((item) => item.key)
+}
+
+const filteredRecentUploads = computed(() => {
+  if (statusFilter.value === 'all') return recentUploads.value
+  return recentUploads.value.filter((item) => normalizeStatus(item.status) === statusFilter.value)
+})
+
+const loadRecentUploads = () => {
+  try {
+    const raw = localStorage.getItem(RECENT_UPLOADS_KEY)
+    recentUploads.value = normalizeRecentUploads(raw ? JSON.parse(raw) : [])
+  } catch {
+    recentUploads.value = []
+  }
+}
+
+const persistRecentUploads = () => {
+  try {
+    localStorage.setItem(RECENT_UPLOADS_KEY, JSON.stringify(recentUploads.value))
+  } catch {
+    // ignore storage errors
+  }
+}
+
+const addRecentUpload = ({ videoId, title, typeText, duplicate = false }) => {
+  const now = new Date().toISOString()
+  const item = {
+    key: `${videoId || 'none'}-${now}`,
+    videoId: videoId ? Number(videoId) : null,
+    title: String(title || '未命名视频'),
+    typeText: String(typeText || '上传'),
+    time: now,
+    timeText: formatTimeText(now),
+    duplicate: Boolean(duplicate),
+    status: normalizeStatus(duplicate ? 'uploaded' : 'pending'),
+    retrying: false
+  }
+  const merged = [item, ...recentUploads.value.filter((x) => x.videoId !== item.videoId || !item.videoId)]
+  recentUploads.value = merged.slice(0, MAX_RECENT_UPLOADS)
+  persistRecentUploads()
+}
+
+const syncRecentStatuses = async () => {
+  const targets = recentUploads.value.filter((item) => item.videoId)
+  if (targets.length === 0) return
+
+  syncingRecent.value = true
+  try {
+    const updates = await Promise.all(
+      targets.map(async (item) => {
+        try {
+          const res = await getVideoStatus(item.videoId)
+          const data = res?.data || {}
+          return { key: item.key, status: normalizeStatus(data?.status || data?.data?.status) }
+        } catch {
+          return { key: item.key, status: normalizeStatus(item.status) }
+        }
+      })
+    )
+    const statusMap = new Map(updates.map((u) => [u.key, u.status]))
+    recentUploads.value = recentUploads.value.map((item) => ({
+      ...item,
+      status: statusMap.get(item.key) || item.status
+    }))
+    persistRecentUploads()
+  } finally {
+    syncingRecent.value = false
+  }
+}
+
+const clearRecentUploads = () => {
+  if (busy.value) return
+  recentUploads.value = []
+  try {
+    localStorage.removeItem(RECENT_UPLOADS_KEY)
+  } catch {
+    // ignore storage errors
+  }
+}
+
+const openRecent = (item) => {
+  if (!item?.videoId) return
+  router.push(`/videos/${item.videoId}`)
+}
+
+const retryRecent = async (item) => {
+  if (!item?.videoId) return
+  const idx = recentUploads.value.findIndex((x) => x.key === item.key)
+  if (idx < 0) return
+
+  recentUploads.value[idx] = { ...recentUploads.value[idx], retrying: true }
+  error.value = ''
+  message.value = ''
+  try {
+    await processVideo(item.videoId)
+    recentUploads.value[idx] = {
+      ...recentUploads.value[idx],
+      status: 'pending',
+      retrying: false
+    }
+    message.value = `视频 ${item.videoId} 已重新提交处理`
+    persistRecentUploads()
+    await syncRecentStatuses()
+  } catch (e) {
+    recentUploads.value[idx] = { ...recentUploads.value[idx], retrying: false }
+    error.value = extractErrorMessage(e, '重试失败')
+  }
+}
+
+const validateVideoUrl = (url) => {
+  const value = String(url || '').trim()
+  if (!value) return '请输入视频链接'
+  const ok = /(bilibili\.com|b23\.tv|youtube\.com|youtu\.be|icourse163\.org)/i.test(value)
+  if (!ok) return '仅支持 B站 / YouTube / 中国大学慕课 链接'
+  return ''
+}
+
+const onFileChange = (e) => {
+  const selected = e?.target?.files?.[0] || null
+  error.value = ''
+  message.value = ''
+  progress.value = 0
+  if (!selected) {
+    file.value = null
+    return
+  }
+  const ext = fileExt(selected.name)
+  if (!ALLOWED_EXTENSIONS.has(ext)) {
+    file.value = null
+    if (fileInputRef.value) fileInputRef.value.value = ''
+    error.value = `不支持的文件类型：.${ext || '未知'}，请上传 ${[...ALLOWED_EXTENSIONS].join(', ')}`
+    return
+  }
+  if (Number(selected.size || 0) > MAX_UPLOAD_SIZE_BYTES) {
+    file.value = null
+    if (fileInputRef.value) fileInputRef.value.value = ''
+    error.value = `文件过大（${readableSize(selected.size)}），当前上限为 ${readableSize(MAX_UPLOAD_SIZE_BYTES)}`
+    return
+  }
+  file.value = selected
+}
+
+const resetAll = () => {
+  if (busy.value) return
+  file.value = null
+  if (fileInputRef.value) fileInputRef.value.value = ''
+  videoUrl.value = ''
+  progress.value = 0
+  message.value = ''
+  error.value = ''
+}
+
+const uploadFile = async () => {
+  if (!file.value || busy.value) return
+  busy.value = true
+  progress.value = 0
+  message.value = ''
+  error.value = ''
+  try {
+    const form = new FormData()
+    form.append('file', file.value)
+    const res = await uploadLocalVideo(form, {
+      onUploadProgress: (evt) => {
+        if (!evt.total) return
+        progress.value = Math.min(100, Math.round((evt.loaded / evt.total) * 100))
+      }
+    })
+    const data = res?.data || {}
+    const videoId = resolveVideoId(data)
+    progress.value = 100
+    message.value = data?.duplicate
+      ? (data?.message || '视频已存在，已为你跳转到详情页')
+      : (data?.message || '上传成功，已为你自动开始处理')
+    addRecentUpload({
+      videoId,
+      title: data?.data?.title || file.value?.name || '本地视频',
+      typeText: `本地文件 · ${readableSize(file.value?.size)}`,
+      duplicate: Boolean(data?.duplicate)
+    })
+    router.push(
+      videoId
+        ? { path: `/videos/${videoId}`, query: data?.duplicate ? undefined : { autostart: '1' } }
+        : '/videos'
+    )
+  } catch (e) {
+    error.value = extractErrorMessage(e, '上传失败')
+  } finally {
+    busy.value = false
+  }
+}
+
+const uploadUrl = async () => {
+  if (!videoUrl.value || busy.value) return
+  const validationError = validateVideoUrl(videoUrl.value)
+  if (validationError) {
+    error.value = validationError
+    return
+  }
+  busy.value = true
+  progress.value = 0
+  message.value = ''
+  error.value = ''
+  try {
+    const trimmedUrl = String(videoUrl.value).trim()
+    const res = await uploadVideoUrl({ url: trimmedUrl })
+    const data = res?.data || {}
+    const videoId = resolveVideoId(data)
+    message.value = data?.message || '已提交链接，已为你自动开始处理'
+    addRecentUpload({
+      videoId,
+      title: data?.data?.title || trimmedUrl,
+      typeText: '链接导入',
+      duplicate: Boolean(data?.duplicate)
+    })
+    router.push(videoId ? { path: `/videos/${videoId}`, query: { autostart: '1' } } : '/videos')
+  } catch (e) {
+    error.value = extractErrorMessage(e, '提交失败')
+  } finally {
+    busy.value = false
+  }
+}
+
+onMounted(async () => {
+  loadRecentUploads()
+  await syncRecentStatuses()
+})
+</script>
+
+<style scoped>
+.page {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 16px 16px 0;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.topbar h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.link {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-weight: 900;
+}
+
+.link--small {
+  font-size: 12px;
+}
+
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.card-title {
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.filter--active {
+  border-color: rgba(79, 70, 229, 0.35);
+  background: rgba(79, 70, 229, 0.10);
+  color: #3730a3;
+}
+
+.file {
+  width: 100%;
+}
+
+.input {
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  outline: none;
+}
+
+.btn {
+  border-radius: 14px;
+  padding: 12px;
+  font-weight: 900;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+}
+
+.btn--primary {
+  border: 0;
+  color: #fff;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+}
+
+.progress {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.muted {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.recent-list {
+  display: grid;
+  gap: 8px;
+}
+
+.recent-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+}
+
+.recent-main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.recent-title {
+  font-size: 13px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-meta {
+  margin-top: 2px;
+}
+
+.status {
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.status--ok {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+
+.status--bad {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.status--warn {
+  background: rgba(245, 158, 11, 0.14);
+  color: #92400e;
+}
+
+.status--info {
+  background: rgba(99, 102, 241, 0.12);
+  color: #3730a3;
+}
+
+.recent-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recent-tag {
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 800;
+  background: rgba(99, 102, 241, 0.12);
+  color: #3730a3;
+  white-space: nowrap;
+}
+
+.recent-tag--dup {
+  background: rgba(245, 158, 11, 0.14);
+  color: #92400e;
+}
+
+.mini {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.mini--warn {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.10);
+  color: #92400e;
+}
+
+.mini:disabled {
+  opacity: 0.6;
+}
+
+.empty {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.alert {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.alert--ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
+.alert--bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
+</style>

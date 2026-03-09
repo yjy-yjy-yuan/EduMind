@@ -1,0 +1,47 @@
+<svg width="1200" height="400" viewBox="0 0 1200 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1200" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#667EEA"/>
+      <stop offset="1" stop-color="#764BA2"/>
+    </linearGradient>
+    <filter id="s" x="-20" y="-20" width="1240" height="440" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#111827" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+  <rect x="24" y="60" width="1152" height="280" rx="24" fill="#FFFFFF" filter="url(#s)"/>
+  <rect x="60" y="110" width="160" height="180" rx="18" fill="url(#g)" opacity="0.12"/>
+  <rect x="252" y="110" width="160" height="180" rx="18" fill="url(#g)" opacity="0.12"/>
+  <rect x="444" y="110" width="160" height="180" rx="18" fill="url(#g)" opacity="0.12"/>
+  <rect x="636" y="110" width="160" height="180" rx="18" fill="url(#g)" opacity="0.12"/>
+  <rect x="828" y="110" width="160" height="180" rx="18" fill="url(#g)" opacity="0.12"/>
+  <rect x="1020" y="110" width="120" height="180" rx="18" fill="url(#g)" opacity="0.12"/>
+
+  <g font-family="Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif" fill="#111827">
+    <text x="90" y="170" font-size="18" font-weight="700">登录/注册</text>
+    <text x="88" y="200" font-size="12" fill="#6B7280">进入系统</text>
+
+    <text x="284" y="170" font-size="18" font-weight="700">上传视频</text>
+    <text x="276" y="200" font-size="12" fill="#6B7280">本地/链接</text>
+
+    <text x="476" y="170" font-size="18" font-weight="700">处理分析</text>
+    <text x="470" y="200" font-size="12" fill="#6B7280">字幕/摘要</text>
+
+    <text x="668" y="170" font-size="18" font-weight="700">观看学习</text>
+    <text x="662" y="200" font-size="12" fill="#6B7280">播放回看</text>
+
+    <text x="860" y="170" font-size="18" font-weight="700">问答&笔记</text>
+    <text x="860" y="200" font-size="12" fill="#6B7280">巩固复习</text>
+
+    <text x="1040" y="170" font-size="18" font-weight="700">总览</text>
+    <text x="1036" y="200" font-size="12" fill="#6B7280">知识点</text>
+  </g>
+
+  <g stroke="url(#g)" stroke-width="4" stroke-linecap="round">
+    <path d="M220 200H250"/>
+    <path d="M412 200H442"/>
+    <path d="M604 200H634"/>
+    <path d="M796 200H826"/>
+    <path d="M988 200H1018"/>
+  </g>
+</svg>
+
