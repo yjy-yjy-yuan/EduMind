@@ -1,19 +1,19 @@
 # EduMind 移动端模块设计提示词（先提示词，后实现）
 
-> 目标：为三端项目补齐“移动端（H5/WebView + Android 壳）”的模块划分与页面实现规范。  
+> 目标：为三端项目补齐“移动端（H5/WebView + `android-app`）”的模块划分与页面实现规范。  
 > 约束：移动端工程独立于现有 `frontend/`；仅通过 `VITE_MOBILE_API_BASE_URL` 调用“移动应用后端”；不引入/不修改本仓库 `backend/`。
 
 ---
 
 ## 1) 总提示词（模块化 + 不遮挡 + 自适应）
 
-你是资深移动端架构师 + 前端工程师。请在仓库根目录新增/完善独立移动端工程 `mobile-frontend/` 与 Android WebView 壳 `mobile-android/`。要求：
+你是资深移动端架构师 + 前端工程师。请在仓库根目录新增/完善独立移动端工程 `mobile-frontend/` 与 `android-app/` WebView 壳。要求：
 
 1. 模块化：按“路由/页面、组件、API、状态、配置、工具、样式”分层；禁止把后端逻辑写进前端（只做调用与展示）。
 2. 自适应与防遮挡：适配小屏、刘海屏、安全区、软键盘；底部 TabBar/输入框不能遮挡内容；避免 `100vh` 导致的 iOS/Android WebView 高度抖动。
 3. 交互三态：每页至少包含 loading / empty / error，并提供重试与禁用态。
 4. 端口解耦：`VITE_MOBILE_API_BASE_URL` 作为唯一后端入口；开发期可用 Vite proxy（可配置 `VITE_MOBILE_PROXY_TARGET`）。
-5. Android 壳：WebView 启用 JS/DOMStorage，支持返回键回退，debug 默认加载 `http://10.0.2.2:5173/`。
+5. `android-app`：WebView 启用 JS/DOMStorage，支持返回键回退，debug 默认加载 `http://10.0.2.2:5173/`。
 
 输出：模块清单、目录结构、各模块职责、以及落实到代码的新增/修改文件列表。
 
@@ -47,13 +47,12 @@
 
 ---
 
-## 4) Android 壳提示词（AS 操作）
+## 4) `android-app` 提示词（AS 操作）
 
-请提供一个可直接被 Android Studio 打开的工程 `mobile-android/`，满足：
+请提供一个可直接被 Android Studio 打开的工程 `android-app/`，满足：
 
 - 使用 Gradle wrapper（含 `gradle/wrapper/gradle-wrapper.jar`）
 - `INTERNET` 权限
 - WebView 加载 `BuildConfig.WEB_APP_URL`
 - debug 默认 `http://10.0.2.2:5173/`
 - release 默认 `file:///android_asset/index.html`（用于离线）
-

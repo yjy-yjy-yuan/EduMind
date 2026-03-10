@@ -14,6 +14,5 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "EduMindMobile"
+rootProject.name = "EduMindAndroid"
 include(":app")
-

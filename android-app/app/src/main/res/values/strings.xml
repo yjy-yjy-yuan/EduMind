@@ -1,5 +1,5 @@
 <resources>
-  <string name="app_name">EduMind Mobile</string>
+  <string name="app_name">EduMind Android</string>
   <string name="settings">设置</string>
   <string name="web_url">API 基地址</string>
   <string name="save">保存</string>

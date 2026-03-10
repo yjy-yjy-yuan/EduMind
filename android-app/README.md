@@ -1,4 +1,4 @@
-# EduMind Mobile Android (WebView 壳)
+# EduMind Android (`android-app`)
 
 这是一个 Android Studio 工程，用 WebView 加载 `mobile-frontend`（开发时走本地 dev server；也可配置为加载打包后的离线资源）。
 
@@ -10,8 +10,8 @@
    - `cd mobile-frontend`
    - `npm install`
    - `npm run build -- --mode android`
-   - 将 `mobile-frontend/dist/` 复制到 `mobile-android/app/src/main/assets/`
-2. Android Studio 打开本目录 `mobile-android/`，Run `app`
+   - 将 `mobile-frontend/dist/` 复制到 `android-app/app/src/main/assets/`
+2. Android Studio 打开本目录 `android-app/`，Run `app`
 3. 设置移动应用后端地址（API 基地址）：
    - Debug 下右上角齿轮 → “API 基地址”
    - 示例：`http://192.168.1.8:5002` 或 `https://api.example.com`
