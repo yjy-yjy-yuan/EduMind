@@ -1,25 +1,42 @@
 # 测试说明
 
 ## 运行测试
+
+推荐在仓库根目录执行：
+
 ```bash
-PYTHONPATH=backend python -m pytest tests/ -v
+pytest tests/ -v
 ```
 
-## 当前测试统计
-| 类别 | 数量 | 说明 |
-|------|------|------|
-| passed | 159 | API、模型、工作流测试 |
-| skipped | 18 | Chat API（蓝图未注册） |
+如果只验证 FastAPI 后端，也可以在 `backend_fastapi/` 目录执行：
 
-## 测试结构
+```bash
+cd backend_fastapi
+pytest tests/ -v
 ```
+
+## 常用测试命令
+
+```bash
+pytest -m smoke
+pytest -m unit
+pytest -m api
+pytest -m integration
+```
+
+## 当前测试结构
+
+```text
 tests/
-├── conftest.py     # fixtures 配置
-├── smoke/          # 应用启动检查
-├── unit/           # 模型单元测试
-├── api/            # API 端点测试
-└── integration/    # 工作流集成测试
+├── conftest.py
+├── smoke/
+├── unit/
+├── api/
+└── integration/
 ```
 
-## 迁移验证
-修改 `tests/conftest.py` 中注释的 FastAPI fixtures 即可验证迁移是否成功。
+## 说明
+
+- 根目录 `tests/` 主要覆盖共享后端测试。
+- `backend_fastapi/tests/` 是 FastAPI 工程内测试集。
+- 新增功能时，至少补对应的单元测试或 API 测试。

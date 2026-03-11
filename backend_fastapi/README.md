@@ -1,90 +1,66 @@
-# AI-EdVision Backend (FastAPI)
+# EduMind Backend (FastAPI)
 
-基于 FastAPI 的视频智能伴学系统后端，从 Flask 迁移而来。
-
-## 迁移收益
-
-| 收益 | 说明 |
-|------|------|
-| 异步非阻塞 | 原生 async/await，上传/下载/流式回答不卡主线程 |
-| 自动 API 文档 | Swagger UI (`/docs`) + ReDoc (`/redoc`) |
-| 类型安全 | Pydantic 自动验证请求/响应 |
-| 简化部署 | 无需 Redis/Celery，后台任务用 ProcessPoolExecutor |
-| 易于测试 | 依赖注入可替换 `get_db`，测试更方便 |
+这是当前仓库的主后端工程，负责认证、视频处理、字幕、笔记、问答和知识图谱相关接口。新功能默认优先落在 `backend_fastapi/`，旧版 `backend/` 仅保留兼容。
 
 ## 技术栈
 
 | 类别 | 技术 |
 |------|------|
-| 框架 | FastAPI + Uvicorn |
-| ORM | SQLAlchemy 2.0 + Alembic |
-| 验证 | Pydantic v2 |
+| Web | FastAPI + Uvicorn |
+| ORM | SQLAlchemy 2.0 |
+| 数据校验 | Pydantic v2 |
 | 后台任务 | ProcessPoolExecutor |
-| AI | Whisper + Ollama/Qwen API |
-| 知识图谱 | Neo4j |
+| 图谱 | Neo4j |
+| AI | Whisper、Ollama / 第三方模型接口 |
 
 ## 快速开始
 
-1. **安装依赖**: `conda activate ai-edvision && pip install -r requirements.txt`
-2. **配置环境**: `cp .env.example .env` 并编辑配置
-3. **启动服务**: `python run.py`
-4. **访问文档**: http://localhost:2004/docs
+```bash
+cd backend_fastapi
+pip install -r requirements.txt
+cp .env.example .env
+python run.py
+```
 
-## 目录结构
+默认地址：
 
-| 目录/文件 | 说明 |
-|-----------|------|
+- `http://localhost:2004/health`
+- `http://localhost:2004/docs`
+
+## 目录说明
+
+| 路径 | 说明 |
+|------|------|
 | `app/main.py` | FastAPI 应用入口 |
-| `app/core/` | 配置 (config.py)、数据库 (database.py)、执行器 (executor.py) |
-| `app/routers/` | API 路由：video, subtitle, note, qa, chat, auth, knowledge_graph |
-| `app/models/` | SQLAlchemy 模型 |
-| `app/schemas/` | Pydantic 请求/响应模型 |
-| `app/services/` | 业务逻辑层 |
-| `app/tasks/` | 后台任务 (视频处理等) |
+| `app/core/` | 配置、数据库、执行器 |
+| `app/routers/` | 路由层 |
+| `app/models/` | 数据模型 |
+| `app/schemas/` | 请求与响应模型 |
+| `app/services/` | 业务逻辑 |
+| `app/tasks/` | 耗时任务 |
 | `app/utils/` | 工具函数 |
-| `tests/` | 测试：smoke/, unit/, api/ |
-| `alembic/` | 数据库迁移 |
+| `tests/` | 后端测试 |
 
-## API 端点
+## 常用测试命令
 
-| 路由 | 说明 |
-|------|------|
-| `GET /health` | 健康检查 |
-| `GET /docs` | Swagger UI 文档 |
-| `/api/videos/*` | 视频上传、处理、列表、流式传输 |
-| `/api/subtitles/*` | 字幕提取、语义合并、编辑 |
-| `/api/notes/*` | 笔记 CRUD、时间戳管理 |
-| `/api/qa/*` | AI 问答 (流式响应) |
-| `/api/chat/*` | 聊天系统 (流式响应) |
-| `/api/auth/*` | 用户注册、登录、信息更新 |
-| `/api/knowledge-graph/*` | 知识图谱构建、查询 |
+```bash
+cd backend_fastapi
+pytest tests/ -v
+pytest -m smoke
+pytest -m api
+pytest --cov=app
+```
 
-## 测试
-
-| 命令 | 说明 |
-|------|------|
-| `pytest tests/ -v` | 运行所有测试 |
-| `pytest -m smoke` | 冒烟测试 |
-| `pytest -m unit` | 单元测试 |
-| `pytest -m api` | API 测试 |
-| `pytest --cov=app` | 覆盖率报告 |
-
-## 端口配置
+## 端口约定
 
 | 服务 | 端口 |
 |------|------|
-| FastAPI Backend | 2004 |
-| Vue Frontend | 328 |
+| FastAPI 后端 | 2004 |
+| 桌面端前端 | 328 |
 | Neo4j Browser | 7474 |
 | Neo4j Bolt | 7687 |
 
-## 与 Flask 版本对比
+## 说明
 
-| 特性 | Flask | FastAPI |
-|------|-------|---------|
-| 启动命令 | 4 条 (Flask + Celery + Redis + 前端) | 2 条 (FastAPI + 前端) |
-| 请求处理 | 同步阻塞 | 异步非阻塞 |
-| API 文档 | 无 | 自动生成 |
-| 参数验证 | 手动 | Pydantic 自动 |
-| 后台任务 | Celery + Redis | ProcessPoolExecutor |
-| 类型安全 | 无 | 完整类型注解 |
+- 如果你要改接口，优先同步更新根目录和 `docs/` 下的相关说明文档。
+- 如果你要处理移动端接口，请同时关注 `mobile-frontend/` 的字段兼容性。
