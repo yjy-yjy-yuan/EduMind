@@ -13,7 +13,7 @@
         <button class="btn btn--primary" @click="go('/upload')">开始上传视频</button>
         <button class="btn" @click="go('/videos')">浏览视频列表</button>
       </div>
-      <div class="hero-tip">提示：Android 右上角齿轮可设置“API 基地址”（移动应用后端）。</div>
+      <div class="hero-tip">提示：右上角齿轮可设置“API 基地址”（移动应用后端）。</div>
     </section>
 
     <section class="card">
@@ -172,7 +172,7 @@
             <span class="acc-title">页面打不开/白屏怎么办？</span>
           </summary>
           <div class="acc-body">
-            Android：确认离线资源已同步，并在齿轮中设置“API 基地址”。如仍失败，请检查网络与后端服务是否可达。
+            请确认网络正常、后端服务可访问，并在右上角齿轮中正确配置“API 基地址”（移动应用后端）。如仍失败，可尝试重新打开应用或清理缓存后再试。
           </div>
         </details>
       </div>

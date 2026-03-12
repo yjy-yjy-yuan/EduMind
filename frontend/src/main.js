@@ -9,7 +9,7 @@ import axios from 'axios'
 import '@fortawesome/fontawesome-free/css/all.min.css'
 
 // 配置axios
-axios.defaults.baseURL = 'http://localhost:5001'
+axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || ''
 axios.defaults.withCredentials = true
 
 const app = createApp(App)

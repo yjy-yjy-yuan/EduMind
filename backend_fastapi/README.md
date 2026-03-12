@@ -28,6 +28,7 @@ python run.py
 - `http://127.0.0.1:2004/docs`
 
 端口和主机由 `.env` 中的 `HOST`、`PORT` 控制，默认值定义在 `app/core/config.py`。
+如果你调整了前端端口，也要同步更新 `.env` 的 `CORS_ORIGINS`。
 
 ## 目录结构
 

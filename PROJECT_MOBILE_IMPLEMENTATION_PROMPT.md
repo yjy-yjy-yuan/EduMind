@@ -2,8 +2,8 @@
 
 > 文档用途：作为本项目后续研发、拆解、编码、联调、验收时统一使用的主提示词。  
 > 放置位置：仓库根目录。  
-> 适用范围：`backend_fastapi/`、`mobile-frontend/`、`android-app/`、后续新增 `mobile-ios/`。  
-> 项目目标：将当前电脑端能力逐步演进为支持 Android 与 iOS 的手机版视频分析、学习辅助与推荐系统。
+> 适用范围：`backend_fastapi/`、`mobile-frontend/`、`ios-app/` 等。  
+> 项目目标：在尽量复用现有能力的前提下，为 iOS 等移动端形态提供完整的视频分析、学习辅助与推荐体验。
 
 ---
 
@@ -14,7 +14,6 @@
 1. `frontend/`：桌面端 Vue 前端。
 2. `backend_fastapi/`：FastAPI 后端主工程。
 3. `mobile-frontend/`：独立移动端 H5/WebView 前端雏形。
-4. `android-app/`：Android WebView 容器工程。
 
 本次改造目标不是重做整套系统，而是在尽量复用现有后端与业务能力的前提下，建设一套面向手机端的学习产品闭环，覆盖以下核心模块：
 
@@ -28,7 +27,7 @@
 
 最终结果要求：
 
-1. Android 与 iOS 都能使用。
+1. iOS 端与移动 H5 能稳定使用。
 2. 先有可运行闭环，再逐步增强体验。
 3. 先实现移动端学习主链路，再实现图谱和推荐等高级能力。
 4. 所有阶段都可以单独验收，不允许只停留在概念方案。
@@ -40,16 +39,15 @@
 本项目默认采用以下路线推进：
 
 1. 保留 `frontend/` 作为桌面端，不做大拆大改。
-2. 以 `mobile-frontend/` 作为移动端主业务工程，承载 Android/iOS 共享界面与业务逻辑。
-3. 以 `android-app/` 作为 Android 容器工程。
-4. 新增 `mobile-ios/` 作为 iOS 壳工程，采用 WKWebView 装载 `mobile-frontend/`。
-5. 以后端 `backend_fastapi/` 为统一服务入口，逐步补齐移动端专用接口。
+2. 以 `mobile-frontend/` 作为移动端主业务工程，承载移动端共享界面与业务逻辑。
+3. 以 `ios-app/` 等原生工程作为 iOS 容器，采用 WKWebView 装载 `mobile-frontend/`。
+4. 以后端 `backend_fastapi/` 为统一服务入口，逐步补齐移动端专用接口。
 
 这样做的原因：
 
 1. 能最大程度复用当前 Vue 体系与后端接口。
-2. Android 与 iOS 可共享绝大多数页面和业务代码。
-3. 能先把上传、转录、分析、笔记、问答跑通，再决定是否需要原生重构。
+2. 不同 iOS 形态（独立 App、内嵌 WebView 等）可共享绝大多数页面和业务代码。
+3. 能先把上传、转录、分析、笔记、问答跑通，再决定是否需要更重的原生重构。
 4. 更适合当前阶段的业务验证节奏。
 
 除非后续明确出现以下问题，否则不建议立即切到 Flutter 或全原生：
@@ -85,7 +83,7 @@
 
 ## 四、目标系统结构
 
-建议以如下结构持续演进：
+建议以如下结构持续演进（已去掉 Android 工程，仅保留 iOS 形态）：
 
 ```text
 EduMind/
@@ -111,16 +109,14 @@ EduMind/
       types/
       utils/
       views/
-  android-app/
-  mobile-ios/
+  ios-app/
 ```
 
 模块职责：
 
 1. `backend_fastapi/`：鉴权、上传、转录、分析、笔记、问答、图谱、推荐。
 2. `mobile-frontend/`：移动端 UI、状态管理、接口对接、播放器与学习流程。
-3. `android-app/`：Android 容器、文件选择、WebView 桥接、打包。
-4. `mobile-ios/`：iOS 容器、文件选择、WKWebView 桥接、打包。
+3. `ios-app/`：iOS 容器、文件选择、WKWebView 桥接、打包。
 
 ---
 
@@ -154,7 +150,7 @@ EduMind/
 目标：
 
 1. 完成 `mobile-frontend/` 的移动端主框架。
-2. 明确 Android 与 iOS 壳工程接入方式。
+2. 明确 iOS 壳工程接入方式。
 
 必须完成：
 
@@ -164,8 +160,7 @@ EduMind/
 4. 全局错误处理。
 5. Loading、Empty、Error 三态组件。
 6. 底部导航与移动端布局规范。
-7. `android-app` 联通。
-8. iOS 壳工程初始化。
+7. iOS 壳工程初始化。
 
 建议页面优先级：
 
@@ -178,8 +173,7 @@ EduMind/
 
 1. 移动端能独立启动。
 2. 登录后能进入首页。
-3. `android-app` 能正常加载。
-4. iOS 壳工程目录已创建并能跑基础壳页面。
+3. iOS 壳工程目录已创建并能跑基础壳页面。
 
 ### 阶段 2：视频上传与播放闭环
 
@@ -360,7 +354,7 @@ EduMind/
 3. 视频首屏与缓存优化。
 4. 鉴权与接口限流。
 5. 埋点、日志、错误监控。
-6. Android 打包。
+6. iOS 打包。
 7. iOS 打包。
 
 验收标准：
@@ -518,7 +512,7 @@ EduMind/
 
 ### 主提示词正文
 
-你正在为 `EduMind` 项目实现手机版视频分析与推荐学习系统。当前仓库已存在桌面端前端 `frontend/`、FastAPI 后端 `backend_fastapi/`、移动端前端 `mobile-frontend/`、Android 容器工程 `android-app/`。你需要在尽量复用现有能力的前提下，逐步实现 Android 与 iOS 的学习产品闭环。
+你正在为 `EduMind` 项目实现手机版视频分析与推荐学习系统。当前仓库已存在桌面端前端 `frontend/`、FastAPI 后端 `backend_fastapi/`、移动端前端 `mobile-frontend/`。你需要在尽量复用现有能力的前提下，逐步实现 iOS 等移动终端的学习产品闭环。
 
 请严格遵守以下要求：
 
@@ -534,8 +528,8 @@ EduMind/
    - 性能、安全与上线
 2. 每次只推进当前阶段，不允许跳阶段。
 3. 优先复用 `backend_fastapi/` 与已有桌面端接口设计，不做无意义重写。
-4. 移动端主业务统一放在 `mobile-frontend/`，Android 与 iOS 作为容器工程承载。
-5. iOS 容器工程在仓库内尚未完善时，需要你按与 `android-app` 一致的思路补齐目录和接入方式。
+4. 移动端主业务统一放在 `mobile-frontend/`，iOS 作为容器工程承载。
+5. iOS 容器工程在仓库内尚未完善时，需要你在 `ios-app/` 目录下补齐目录和接入方式。
 6. 页面层只负责展示和调度，业务逻辑必须进入 `services/`、`stores/`、`api/`、`utils/` 等模块。
 7. API 返回结果必须统一适配后再进入页面层。
 8. 所有阶段都必须给出可运行、可联调、可验收结果。
