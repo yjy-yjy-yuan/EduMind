@@ -27,15 +27,6 @@ yarn-error.log*
 build/
 dist/
 
-# Android
-mobile-android/.gradle/
-mobile-android/.idea/
-mobile-android/local.properties
-mobile-android/**/build/
-*.apk
-*.ap_
-*.aab
-
 # Project specific
 backend/uploads/
 backend/instance/

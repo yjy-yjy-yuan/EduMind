@@ -1,5 +1,5 @@
 // API基础URL配置
-export const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:2004'
+export const baseUrl = import.meta.env.VITE_API_BASE_URL || ''
 export const API_BASE_URL = baseUrl // 添加 API_BASE_URL 导出
 
 // 其他全局配置

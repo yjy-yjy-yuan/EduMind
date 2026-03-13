@@ -1449,7 +1449,8 @@ const formatDuration = (seconds) => {
 // 获取预览图URL
 const getPreviewUrl = (video) => {
   if (!video.preview_filename) return ''
-  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:2004'
+  const baseURL = import.meta.env.VITE_API_BASE_URL || ''
+  if (!baseURL) return `/api/videos/${video.id}/preview`
   return `${baseURL}/api/videos/${video.id}/preview`
 }
 
