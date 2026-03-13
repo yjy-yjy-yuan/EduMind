@@ -68,7 +68,6 @@ const isActive = (prefix) => {
   align-items: stretch;
   gap: 8px;
   background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(16px);
 }
 
 .tab {

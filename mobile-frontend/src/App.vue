@@ -34,7 +34,6 @@ const route = useRoute()
 .bg-decor {
   position: fixed;
   pointer-events: none;
-  filter: blur(2px);
   z-index: 0;
 }
 

@@ -301,7 +301,6 @@ onMounted(reload)
   border: 1px solid rgba(255, 255, 255, 0.18);
   font-size: 11px;
   font-weight: 800;
-  backdrop-filter: blur(8px);
 }
 
 .stack-card__time {
