@@ -58,65 +58,67 @@ const isActive = (prefix) => {
   right: 0;
   bottom: 0;
   z-index: 1000;
-  padding: 0 12px calc(10px + env(safe-area-inset-bottom));
+  padding: 0 12px calc(12px + env(safe-area-inset-bottom));
 }
 
 .tabbar {
-  height: 66px;
-  padding: 8px;
+  height: 70px;
+  padding: 9px;
   display: flex;
   align-items: stretch;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.86);
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(32, 42, 55, 0.08);
+  box-shadow: 0 12px 28px rgba(23, 45, 72, 0.12);
 }
 
 .tab {
   flex: 1;
   text-decoration: none;
   color: var(--muted);
-  border-radius: 12px;
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
 }
 
 .icon {
-  width: 20px;
-  height: 20px;
+  width: 19px;
+  height: 19px;
   fill: currentColor;
 }
 
 .label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 
 .tab.active {
-  color: var(--primary);
-  background: var(--tap);
+  color: var(--primary-deep);
+  background: rgba(31, 122, 140, 0.12);
 }
 
 .tab--upload {
-  color: var(--primary-deep);
+  color: var(--primary);
 }
 
 .upload-dot {
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #8be3c2, #8fd6dd);
-  box-shadow: 0 5px 12px rgba(31, 157, 116, 0.28);
+  background: linear-gradient(135deg, #1f7a8c, #3d8da0);
+  box-shadow: 0 8px 16px rgba(31, 122, 140, 0.34);
 }
 
 .icon--upload {
-  width: 15px;
-  height: 15px;
-  fill: #0f5f45;
+  width: 16px;
+  height: 16px;
+  fill: #f7feff;
 }
 
 @media (min-width: 700px) {

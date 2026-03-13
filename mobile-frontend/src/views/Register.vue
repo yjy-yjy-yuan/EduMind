@@ -142,3 +142,38 @@ const submit = async () => {
 .alert--ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
 .alert--bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
 </style>
+<style scoped>
+.page {
+  padding-top: calc(22px + env(safe-area-inset-top));
+}
+
+.hero {
+  border-radius: 26px;
+  padding: 18px;
+  background:
+    radial-gradient(circle at right top, rgba(255, 255, 255, 0.24), transparent 44%),
+    linear-gradient(145deg, #1f7a8c, #0f5f70);
+}
+
+.title {
+  font-size: 22px;
+}
+
+.card {
+  border-radius: 24px;
+  padding: 16px;
+}
+
+.input {
+  border-radius: 14px;
+  border-color: rgba(32, 42, 55, 0.14);
+}
+
+.btn {
+  border-radius: 16px;
+}
+
+.btn--primary {
+  background: linear-gradient(145deg, #1f7a8c, #3d8da0);
+}
+</style>

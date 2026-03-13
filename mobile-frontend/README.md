@@ -16,8 +16,9 @@ npm run dev
 ```bash
 npm run dev
 npm run build
+npm run build:web
+npm run build:ios
 npm run preview
-npm run build -- --mode android
 ```
 
 ## 环境变量
@@ -25,13 +26,16 @@ npm run build -- --mode android
 `.env.example` 当前默认配置如下：
 
 - `VITE_MOBILE_API_BASE_URL=http://127.0.0.1:2004`
+- `VITE_MOBILE_UI_ONLY=true`
 - `VITE_MOBILE_PROXY_TARGET=http://127.0.0.1:2004`
 
 说明：
 
 - `VITE_MOBILE_API_BASE_URL` 用于浏览器直接请求完整后端地址
+- `VITE_MOBILE_UI_ONLY` 为 `true` 时启用纯 UI 模式，`src/api/*` 会走本地 mock 网关（保留真实接口函数签名，后续可无痛切回后端）
 - `VITE_MOBILE_PROXY_TARGET` 用于本地 Vite `/api` 代理
-- 两者都不填时，代码会退回同源 `/api/...`，而 `vite.config.js` 会继续默认代理到 `http://127.0.0.1:2004`
+- UI-only 模式下即使后端不可用也不会影响页面渲染；可通过 URL 参数 `?uiOnly=0` 临时关闭
+- 两者都不填且关闭 UI-only 时，代码会退回同源 `/api/...`，而 `vite.config.js` 会继续默认代理到 `http://127.0.0.1:2004`
 
 旧文档里出现过 `5001/5002` 的示例，那是旧后端阶段的端口，不再是当前默认值。
 
@@ -48,11 +52,17 @@ npm run build -- --mode android
 
 ## 原生容器配合方式（以 iOS 为主）
 
-如果用于 iOS / 原生容器离线资源打包，可以先构建静态资源：
+如果用于 iOS / 原生容器离线资源打包，优先使用 iOS 构建命令：
 
 ```bash
 cd mobile-frontend
-npm run build
+npm run build:ios
 ```
 
-在 iOS 工程中（例如放在本仓库的 `ios-app/` 目录下，用 Xcode 创建的工程），将 `dist/` 内容拷贝到应用 Bundle 中（如 `Assets` 或自定义资源目录），并在 `WKWebView` 中通过 `Bundle.main.url(forResource:)` 等方式加载本地 `index.html`。开发阶段也可以让 `WKWebView` 直接指向 Vite dev server 地址（如 `http://127.0.0.1:5173`），便于调试。
+在 iOS 工程中（例如放在本仓库的 `ios-app/` 目录下，用 Xcode 创建的工程），将 `dist/` 内容拷贝到应用 Bundle 中（如 `Assets` 或自定义资源目录），并在 `WKWebView` 中通过 `Bundle.main.url(forResource:)` 等方式加载本地 `index.html`。当前仓库的 iOS 容器已经固定为本地静态资源加载路径，不再依赖 `5173` dev server。
+
+如果要部署到常规 Web 服务器根路径，可使用：
+
+```bash
+npm run build:web
+```

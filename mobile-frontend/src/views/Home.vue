@@ -446,3 +446,88 @@ onMounted(reload)
   }
 }
 </style>
+<style scoped>
+.home-page {
+  display: grid;
+  gap: 14px;
+}
+
+.welcome {
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+  border-radius: 26px;
+  border: 1px solid rgba(31, 122, 140, 0.16);
+  background: linear-gradient(160deg, #ffffff 8%, #f2fbfc 92%);
+  box-shadow: 0 20px 38px rgba(31, 122, 140, 0.14);
+}
+
+.welcome::after {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  right: -70px;
+  top: -90px;
+  border-radius: 54px;
+  transform: rotate(18deg);
+  background: linear-gradient(140deg, rgba(31, 122, 140, 0.18), rgba(31, 122, 140, 0.04));
+}
+
+.welcome__top,
+.welcome__title,
+.welcome__subtitle,
+.stats {
+  position: relative;
+  z-index: 1;
+}
+
+.welcome__title {
+  font-size: 30px;
+}
+
+.guide-btn {
+  border-color: rgba(31, 122, 140, 0.3);
+  background: rgba(31, 122, 140, 0.12);
+  color: var(--primary-deep);
+}
+
+.stat-pill {
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.quick-grid {
+  gap: 12px;
+}
+
+.quick-card {
+  border-radius: 18px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.08);
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.quick-card__title {
+  color: #1f2a37;
+}
+
+.recent {
+  padding: 16px;
+  border-radius: 24px;
+}
+
+.recent__head h3 {
+  font-size: 17px;
+}
+
+.refresh-btn {
+  color: var(--primary-deep);
+}
+
+.video-item {
+  border-radius: 16px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+}
+</style>

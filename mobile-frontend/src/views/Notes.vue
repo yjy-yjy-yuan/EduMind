@@ -371,3 +371,43 @@ onMounted(reload)
   font-size: 12px;
 }
 </style>
+<style scoped>
+.page {
+  padding-top: calc(14px + env(safe-area-inset-top));
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+}
+
+.topbar h2 {
+  font-size: 18px;
+}
+
+.stack-section {
+  border-radius: 24px;
+  border-color: rgba(31, 122, 140, 0.12);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(31, 122, 140, 0.14), transparent 46%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 254, 0.98));
+}
+
+.stack-card__glow {
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.34), transparent 34%),
+    linear-gradient(145deg, #1f7a8c, #3d8da0 58%, #eb8c34);
+}
+
+.card {
+  border-radius: 18px;
+  border-color: rgba(32, 42, 55, 0.08);
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+}
+</style>

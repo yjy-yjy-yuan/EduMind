@@ -190,3 +190,36 @@ onMounted(load)
   opacity: 0.6;
 }
 </style>
+<style scoped>
+.page {
+  padding-top: calc(14px + env(safe-area-inset-top));
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 20px rgba(24, 45, 73, 0.08);
+}
+
+.card {
+  margin-top: 12px;
+  border-radius: 24px;
+  padding: 16px;
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+}
+
+.input,
+.textarea {
+  border-radius: 14px;
+  border-color: rgba(32, 42, 55, 0.14);
+}
+
+.danger {
+  border-radius: 16px;
+}
+</style>

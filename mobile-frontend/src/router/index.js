@@ -17,9 +17,10 @@ import Knowledge from '@/views/Knowledge.vue'
 import Guide from '@/views/Guide.vue'
 
 const isFileProtocol = window.location.protocol === 'file:'
+const history = isFileProtocol ? createMemoryHistory() : createWebHistory()
 
 const router = createRouter({
-  history: isFileProtocol ? createMemoryHistory() : createWebHistory(),
+  history,
   routes: [
     { path: '/', name: 'Home', component: Home, meta: { title: '首页' } },
     { path: '/videos', name: 'Videos', component: Videos, meta: { title: '视频' } },
@@ -41,7 +42,7 @@ const router = createRouter({
 })
 
 if (isFileProtocol) {
-  router.replace('/')
+  router.replace('/').catch(() => {})
 }
 
 router.beforeEach(async (to, from, next) => {
