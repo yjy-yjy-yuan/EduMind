@@ -16,7 +16,15 @@ export default defineConfig(({ mode }) => {
     build: isIOS
       ? {
           // Xcode may flatten copied resource paths; place hashed assets at bundle root for iOS build.
-          assetsDir: ''
+          assetsDir: '',
+          rollupOptions: {
+            output: {
+              // Keep stable filenames for native container integration.
+              entryFileNames: 'index.js',
+              chunkFileNames: 'chunk-[name].js',
+              assetFileNames: '[name][extname]'
+            }
+          }
         }
       : undefined,
     resolve: {
