@@ -6,13 +6,13 @@
 
 ```text
 ios-app/
+├── sync_ios_web_assets.sh      # 一键构建并同步 H5 资源到 iOS 工程
 ├── EduMindIOS/                 # Xcode 工程目录（由 Xcode 创建）
 │   ├── EduMindIOS.xcodeproj
 │   ├── EduMindIOS/
-│   │   ├── AppDelegate.swift
-│   │   ├── SceneDelegate.swift
-│   │   ├── ViewController.swift
-│   │   └── WebViewController.swift
+│   │   ├── EduMindIOSApp.swift
+│   │   ├── ContentView.swift   # 已改为 WKWebView 容器
+│   │   ├── WebAssets/          # 打包后的 H5 静态资源
 │   └── Assets.xcassets
 └── README.md                   # 本说明
 ```
@@ -61,3 +61,25 @@ if let indexURL = Bundle.main.url(forResource: "index", withExtension: "html", s
 - 开发阶段：直接复用 dev server 环境配置；
 - 发布阶段：推荐在构建前写入生产环境的 API 地址，或通过 URL 查询参数/本地配置文件传入。
 
+### 4. 一键同步命令
+
+已提供脚本：
+
+```bash
+bash ios-app/sync_ios_web_assets.sh
+```
+
+该脚本会自动执行：
+
+1. `mobile-frontend` 执行 `npm run build:ios`（使用 `./assets` 相对路径，适配 `loadFileURL`）
+2. 同步 `dist/` 到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
+
+### 5. 命令行编译（可选）
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+xcodebuild -project ios-app/EduMindIOS/EduMindIOS.xcodeproj \
+  -scheme EduMindIOS \
+  -destination 'generic/platform=iOS Simulator' \
+  build
+```
