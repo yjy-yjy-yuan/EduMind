@@ -42,6 +42,8 @@ backend/instance/
 Thumbs.db
 *.swp
 *.swo
+**/xcuserdata/
+*.xcuserstate
 
 # Logs
 *.log
