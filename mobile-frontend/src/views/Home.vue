@@ -1,63 +1,66 @@
 <template>
-  <div class="page">
-    <header class="hero">
-      <div class="title">视频智能伴学</div>
-      <div class="subtitle">移动端</div>
+  <div class="ios-page home-page">
+    <header class="welcome ios-card">
+      <div class="welcome__top">
+        <p class="welcome__label">EduMind iOS</p>
+        <button class="guide-btn" @click="go('/guide')" aria-label="打开使用指南">使用指南</button>
+      </div>
+      <h1 class="welcome__title">智能伴学中心</h1>
+      <p class="welcome__subtitle">围绕你的学习流程，快速进入视频、笔记、问答与知识梳理。</p>
+
+      <div class="stats">
+        <div class="stat-pill">
+          <span class="stat-pill__label">最近视频</span>
+          <strong class="stat-pill__value">{{ videos.length }}</strong>
+        </div>
+        <div class="stat-pill stat-pill--ok">
+          <span class="stat-pill__label">已完成</span>
+          <strong class="stat-pill__value">{{ completedCount }}</strong>
+        </div>
+        <div class="stat-pill stat-pill--warn">
+          <span class="stat-pill__label">进行中</span>
+          <strong class="stat-pill__value">{{ inProgressCount }}</strong>
+        </div>
+      </div>
     </header>
 
-    <button class="guide-dock" @click="go('/guide')" aria-label="打开使用指南">
-      <span class="guide-dock__icon">?</span>
-      <span class="guide-dock__text">指南</span>
-    </button>
-
-    <section class="grid">
-      <button class="card" @click="go('/videos')">
-        <div class="card-title">视频</div>
-        <div class="card-desc">查看与处理进度</div>
-      </button>
-      <button class="card" @click="go('/upload')">
-        <div class="card-title">上传</div>
-        <div class="card-desc">本地/链接上传</div>
-      </button>
-      <button class="card" @click="go('/notes')">
-        <div class="card-title">笔记</div>
-        <div class="card-desc">记录与整理</div>
-      </button>
-      <button class="card" @click="go('/qa')">
-        <div class="card-title">问答</div>
-        <div class="card-desc">AI 辅助学习</div>
-      </button>
-      <button class="card" @click="go('/knowledge')">
-        <div class="card-title">知识点</div>
-        <div class="card-desc">概念与关系总览</div>
-      </button>
-      <button class="card" @click="go('/learning-path')">
-        <div class="card-title">路径</div>
-        <div class="card-desc">学习规划建议</div>
+    <section class="quick-grid">
+      <button
+        v-for="item in quickActions"
+        :key="item.route"
+        class="quick-card ios-card"
+        @click="go(item.route)"
+      >
+        <span class="quick-card__tag" :class="item.tagClass">{{ item.tag }}</span>
+        <h2 class="quick-card__title">{{ item.title }}</h2>
+        <p class="quick-card__desc">{{ item.desc }}</p>
       </button>
     </section>
 
-    <section class="section">
-      <div class="section-head">
-        <h3>最近视频</h3>
-        <button class="link" @click="reload" :disabled="loading">{{ loading ? '加载中…' : '刷新' }}</button>
+    <section class="recent ios-card">
+      <div class="recent__head">
+        <h3>最近学习内容</h3>
+        <button class="refresh-btn" @click="reload" :disabled="loading">{{ loading ? '加载中…' : '刷新' }}</button>
       </div>
 
-      <div v-if="error" class="alert alert--bad">
+      <div v-if="error" class="message message--error">
         <span>{{ error }}</span>
-        <button class="link" @click="reload">重试</button>
+        <button class="message__link" @click="reload">重试</button>
       </div>
 
-      <div v-else-if="loading" class="skeleton">
-        <div v-for="i in 3" :key="i" class="sk-item"></div>
+      <div v-else-if="loading" class="skeleton-list">
+        <div v-for="i in 3" :key="i" class="skeleton-item"></div>
       </div>
 
-      <div v-else-if="videos.length === 0" class="empty">暂无视频，去上传一个吧。</div>
+      <div v-else-if="videos.length === 0" class="message">暂无视频，先上传一个开始学习吧。</div>
 
-      <div v-else class="list">
-        <button v-for="v in videos" :key="v.id" class="item" @click="go(`/videos/${v.id}`)">
-          <div class="item-title">{{ v.title || '未命名视频' }}</div>
-          <span class="badge" :class="badgeClass(v.status)">{{ statusText(v.status) }}</span>
+      <div v-else class="video-list">
+        <button v-for="video in videos" :key="video.id" class="video-item" @click="openVideo(video.id)">
+          <div class="video-item__info">
+            <p class="video-item__title">{{ video.title || '未命名视频' }}</p>
+            <span class="video-item__status" :class="statusClass(video.status)">{{ statusText(video.status) }}</span>
+          </div>
+          <span class="video-item__arrow">›</span>
         </button>
       </div>
     </section>
@@ -65,13 +68,20 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getVideoList } from '@/api/video'
 
-const router = useRouter()
-const go = (path) => router.push(path)
+const quickActions = [
+  { route: '/videos', tag: '视频', tagClass: 'tag--mint', title: '视频库', desc: '查看列表与处理状态' },
+  { route: '/upload', tag: '上传', tagClass: 'tag--teal', title: '上传中心', desc: '支持本地文件和链接' },
+  { route: '/notes', tag: '笔记', tagClass: 'tag--leaf', title: '学习笔记', desc: '随学随记，整理知识片段' },
+  { route: '/qa', tag: '问答', tagClass: 'tag--amber', title: 'AI 问答', desc: '基于课程内容即时提问' },
+  { route: '/knowledge', tag: '知识', tagClass: 'tag--mint', title: '知识图谱', desc: '回顾概念与关联关系' },
+  { route: '/learning-path', tag: '路径', tagClass: 'tag--teal', title: '学习路径', desc: '获取下一步学习建议' }
+]
 
+const router = useRouter()
 const loading = ref(false)
 const error = ref('')
 const videos = ref([])
@@ -79,19 +89,6 @@ const videos = ref([])
 const normalizeList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
   return Array.isArray(list) ? list : []
-}
-
-const reload = async () => {
-  loading.value = true
-  error.value = ''
-  try {
-    const res = await getVideoList(1, 3)
-    videos.value = normalizeList(res.data)
-  } catch (e) {
-    error.value = e?.message || '加载失败'
-  } finally {
-    loading.value = false
-  }
 }
 
 const statusText = (status) => {
@@ -107,205 +104,345 @@ const statusText = (status) => {
   return map[status] || (status || '未知')
 }
 
-const badgeClass = (status) => {
-  if (status === 'completed' || status === 'processed') return 'ok'
-  if (status === 'failed') return 'bad'
-  if (['processing', 'pending', 'downloading'].includes(status)) return 'warn'
-  return 'info'
+const statusClass = (status) => {
+  if (status === 'completed' || status === 'processed') return 'status--ok'
+  if (status === 'failed') return 'status--bad'
+  if (['processing', 'pending', 'downloading'].includes(status)) return 'status--warn'
+  return 'status--info'
+}
+
+const completedCount = computed(() =>
+  videos.value.filter((item) => item?.status === 'completed' || item?.status === 'processed').length
+)
+
+const inProgressCount = computed(() =>
+  videos.value.filter((item) => ['processing', 'pending', 'downloading'].includes(item?.status)).length
+)
+
+const reload = async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    const res = await getVideoList(1, 5)
+    videos.value = normalizeList(res.data)
+  } catch (e) {
+    error.value = e?.message || '加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+const go = (path) => router.push(path)
+
+const openVideo = (id) => {
+  if (!id) return
+  router.push(`/videos/${id}`)
 }
 
 onMounted(reload)
 </script>
 
 <style scoped>
-.page {
-  max-width: 520px;
-  margin: 0 auto;
-  padding: 16px 16px 0;
+.home-page {
+  padding-top: calc(16px + env(safe-area-inset-top));
 }
 
-.hero {
-  padding: 14px;
-  border-radius: var(--radius);
-  color: #fff;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.25);
+.welcome {
+  padding: 18px;
+  background: linear-gradient(135deg, #f9fffc, #f1fbf6);
+  animation: rise-in 360ms ease-out;
 }
 
-.title {
-  font-size: 18px;
-  font-weight: 900;
+.welcome__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.subtitle {
-  margin-top: 6px;
+.welcome__label {
+  margin: 0;
   font-size: 12px;
-  opacity: 0.9;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--primary-deep);
 }
 
-.grid {
+.guide-btn {
+  border: 1px solid rgba(31, 157, 116, 0.25);
+  border-radius: 999px;
+  background: rgba(31, 157, 116, 0.08);
+  color: var(--primary-deep);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+}
+
+.welcome__title {
+  margin: 12px 0 0;
+  font-size: 27px;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+.welcome__subtitle {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.stats {
   margin-top: 14px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.guide-dock {
-  position: fixed;
-  left: 10px;
-  top: calc(92px + env(safe-area-inset-top));
-  z-index: 50;
-  border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-sm);
-  border-radius: 999px;
-  padding: 10px 12px;
-  display: inline-flex;
-  align-items: center;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
-.guide-dock__icon {
-  height: 22px;
-  width: 22px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  background: rgba(79, 70, 229, 0.12);
-  color: var(--primary);
-  font-weight: 900;
-  line-height: 1;
+.stat-pill {
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(31, 157, 116, 0.08);
 }
 
-.guide-dock__text {
-  font-weight: 900;
-  font-size: 12px;
+.stat-pill--ok {
+  background: rgba(55, 174, 115, 0.14);
+}
+
+.stat-pill--warn {
+  background: rgba(242, 154, 74, 0.14);
+}
+
+.stat-pill__label {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.stat-pill__value {
+  margin-top: 2px;
+  display: block;
+  font-size: 18px;
   color: var(--text);
 }
 
-.card {
-  border: 0;
-  text-align: left;
-  padding: 14px;
-  border-radius: var(--radius);
-  background: var(--card);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
-}
-
-.card-title {
-  font-weight: 900;
-}
-
-.card-desc {
-  margin-top: 6px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.section {
+.quick-grid {
   margin-top: 14px;
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 14px;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
-}
-
-.section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.section-head h3 {
-  margin: 0;
-  font-size: 14px;
-}
-
-.link {
-  border: 0;
-  background: transparent;
-  color: var(--primary);
-  font-weight: 800;
-}
-
-.alert {
-  margin-top: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.quick-card {
+  text-align: left;
+  border: 1px solid var(--border);
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.quick-card__tag {
+  display: inline-block;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
   font-weight: 700;
 }
 
-.alert--bad {
-  background: rgba(239, 68, 68, 0.10);
-  color: #b91c1c;
+.tag--mint {
+  background: rgba(31, 157, 116, 0.14);
+  color: #0f6c4f;
 }
 
-.skeleton {
-  margin-top: 12px;
-  display: grid;
-  gap: 10px;
+.tag--teal {
+  background: rgba(76, 173, 195, 0.16);
+  color: #166376;
 }
 
-.sk-item {
-  height: 46px;
-  border-radius: 12px;
-  background: linear-gradient(90deg, #f3f4f6, #e5e7eb, #f3f4f6);
-  background-size: 200% 100%;
-  animation: shimmer 1.2s infinite;
+.tag--leaf {
+  background: rgba(114, 196, 106, 0.14);
+  color: #326f2e;
 }
 
-@keyframes shimmer {
-  0% { background-position: 0% 0; }
-  100% { background-position: 200% 0; }
+.tag--amber {
+  background: rgba(242, 154, 74, 0.16);
+  color: #905214;
 }
 
-.empty {
-  margin-top: 12px;
+.quick-card__title {
+  margin: 10px 0 0;
+  font-size: 16px;
+}
+
+.quick-card__desc {
+  margin: 6px 0 0;
+  font-size: 12px;
   color: var(--muted);
+  line-height: 1.5;
+}
+
+.recent {
+  margin-top: 14px;
+  padding: 14px;
+  animation: rise-in 480ms ease-out;
+}
+
+.recent__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recent__head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.refresh-btn {
+  border: 0;
+  background: transparent;
+  color: var(--primary-deep);
+  font-weight: 700;
   font-size: 13px;
 }
 
-.list {
+.message {
   margin-top: 12px;
-  display: grid;
-  gap: 10px;
-}
-
-.item {
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  background: #fff;
   border-radius: 12px;
   padding: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  text-align: left;
+  color: var(--muted);
+  font-size: 13px;
+  background: var(--card-soft);
 }
 
-.item-title {
+.message--error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #aa3232;
+  background: rgba(223, 82, 82, 0.1);
+}
+
+.message__link {
+  border: 0;
+  background: transparent;
+  color: #9a2d2d;
+  font-weight: 700;
+}
+
+.skeleton-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.skeleton-item {
+  height: 54px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #edf3f0, #e3efe9, #edf3f0);
+  background-size: 220% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+
+.video-list {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.video-item {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  padding: 10px 12px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.video-item__info {
+  min-width: 0;
+}
+
+.video-item__title {
+  margin: 0;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.badge {
-  font-size: 12px;
-  padding: 4px 10px;
+.video-item__status {
+  margin-top: 5px;
+  display: inline-block;
   border-radius: 999px;
-  white-space: nowrap;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
 }
 
-.badge.ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
-.badge.warn { background: rgba(245, 158, 11, 0.14); color: #92400e; }
-.badge.bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
-.badge.info { background: rgba(99, 102, 241, 0.12); color: #3730a3; }
+.status--ok {
+  color: #157b4f;
+  background: rgba(55, 174, 115, 0.14);
+}
+
+.status--warn {
+  color: #8f5419;
+  background: rgba(242, 154, 74, 0.14);
+}
+
+.status--bad {
+  color: #9f3535;
+  background: rgba(223, 82, 82, 0.14);
+}
+
+.status--info {
+  color: #1f6a62;
+  background: rgba(76, 173, 195, 0.14);
+}
+
+.video-item__arrow {
+  color: #9bb0ae;
+  font-size: 22px;
+  line-height: 1;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 0% 0;
+  }
+
+  to {
+    background-position: 220% 0;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 390px) {
+  .quick-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stats {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

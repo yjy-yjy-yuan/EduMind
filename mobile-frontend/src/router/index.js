@@ -1,4 +1,4 @@
-import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
+import { createMemoryHistory, createRouter, createWebHistory } from 'vue-router'
 import * as authStore from '@/store/auth'
 
 import Home from '@/views/Home.vue'
@@ -16,8 +16,10 @@ import LearningPath from '@/views/LearningPath.vue'
 import Knowledge from '@/views/Knowledge.vue'
 import Guide from '@/views/Guide.vue'
 
+const isFileProtocol = window.location.protocol === 'file:'
+
 const router = createRouter({
-  history: window.location.protocol === 'file:' ? createWebHashHistory() : createWebHistory(),
+  history: isFileProtocol ? createMemoryHistory() : createWebHistory(),
   routes: [
     { path: '/', name: 'Home', component: Home, meta: { title: '首页' } },
     { path: '/videos', name: 'Videos', component: Videos, meta: { title: '视频' } },
@@ -33,9 +35,14 @@ const router = createRouter({
     { path: '/guide', name: 'Guide', component: Guide, meta: { title: '使用指南', hideTabBar: true } },
     { path: '/profile', name: 'Profile', component: Profile, meta: { title: '我的', requiresAuth: true } },
     { path: '/login', name: 'Login', component: Login, meta: { title: '登录', hideTabBar: true } },
-    { path: '/register', name: 'Register', component: Register, meta: { title: '注册', hideTabBar: true } }
+    { path: '/register', name: 'Register', component: Register, meta: { title: '注册', hideTabBar: true } },
+    { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 })
+
+if (isFileProtocol) {
+  router.replace('/')
+}
 
 router.beforeEach(async (to, from, next) => {
   document.title = to.meta?.title ? `${to.meta.title} - EduMind Mobile` : 'EduMind Mobile'

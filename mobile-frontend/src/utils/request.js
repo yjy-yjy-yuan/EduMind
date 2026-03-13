@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { API_BASE_URL } from '@/config'
+import { storageGet } from '@/utils/storage'
 
 const DEFAULT_TIMEOUT_MS = 10000
 const DEFAULT_RETRY_COUNT = 2
@@ -47,7 +48,7 @@ service.interceptors.request.use(
       delete config.headers['Content-Type']
     }
 
-    const token = localStorage.getItem('m_token')
+    const token = storageGet('m_token')
     if (token) config.headers.Authorization = `Bearer ${token}`
 
     return config

@@ -84,6 +84,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getVideoStatus, processVideo, uploadLocalVideo, uploadVideoUrl } from '@/api/video'
+import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
 const router = useRouter()
 const fileInputRef = ref(null)
@@ -208,7 +209,7 @@ const filteredRecentUploads = computed(() => {
 
 const loadRecentUploads = () => {
   try {
-    const raw = localStorage.getItem(RECENT_UPLOADS_KEY)
+    const raw = storageGet(RECENT_UPLOADS_KEY)
     recentUploads.value = normalizeRecentUploads(raw ? JSON.parse(raw) : [])
   } catch {
     recentUploads.value = []
@@ -217,7 +218,7 @@ const loadRecentUploads = () => {
 
 const persistRecentUploads = () => {
   try {
-    localStorage.setItem(RECENT_UPLOADS_KEY, JSON.stringify(recentUploads.value))
+    storageSet(RECENT_UPLOADS_KEY, JSON.stringify(recentUploads.value))
   } catch {
     // ignore storage errors
   }
@@ -273,7 +274,7 @@ const clearRecentUploads = () => {
   if (busy.value) return
   recentUploads.value = []
   try {
-    localStorage.removeItem(RECENT_UPLOADS_KEY)
+    storageRemove(RECENT_UPLOADS_KEY)
   } catch {
     // ignore storage errors
   }
