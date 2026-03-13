@@ -1,19 +1,19 @@
 # EduMind 移动端模块设计提示词（先提示词，后实现）
 
-> 目标：为三端项目补齐“移动端（H5/WebView + `android-app`）”的模块划分与页面实现规范。  
+> 目标：为“移动端 H5 + iOS/WebView 容器”补齐模块划分与页面实现规范。  
 > 约束：移动端工程独立于现有 `frontend/`；仅通过 `VITE_MOBILE_API_BASE_URL` 调用“移动应用后端”；不引入/不修改本仓库 `backend/`。
 
 ---
 
 ## 1) 总提示词（模块化 + 不遮挡 + 自适应）
 
-你是资深移动端架构师 + 前端工程师。请在仓库根目录新增/完善独立移动端工程 `mobile-frontend/` 与 `android-app/` WebView 壳。要求：
+你是资深移动端架构师 + 前端工程师。请在仓库根目录新增/完善独立移动端工程 `mobile-frontend/`，并为 iOS 等原生容器（如 `ios-app/`）预留 WebView 集成能力。要求：
 
 1. 模块化：按“路由/页面、组件、API、状态、配置、工具、样式”分层；禁止把后端逻辑写进前端（只做调用与展示）。
-2. 自适应与防遮挡：适配小屏、刘海屏、安全区、软键盘；底部 TabBar/输入框不能遮挡内容；避免 `100vh` 导致的 iOS/Android WebView 高度抖动。
+2. 自适应与防遮挡：适配小屏、刘海屏、安全区、软键盘；底部 TabBar/输入框不能遮挡内容；避免 `100vh` 导致的 WebView 高度抖动。
 3. 交互三态：每页至少包含 loading / empty / error，并提供重试与禁用态。
 4. 端口解耦：`VITE_MOBILE_API_BASE_URL` 作为唯一后端入口；开发期可用 Vite proxy（可配置 `VITE_MOBILE_PROXY_TARGET`）。
-5. `android-app`：WebView 启用 JS/DOMStorage，支持返回键回退，debug 默认加载 `http://10.0.2.2:5173/`。
+5. 原生容器（如 iOS WebView）：启用 JS/本地存储能力，处理好返回行为（导航回退或关闭 WebView），开发期可指向本机/局域网 Vite dev server，发布期加载打包后的静态资源。
 
 输出：模块清单、目录结构、各模块职责、以及落实到代码的新增/修改文件列表。
 
@@ -47,12 +47,11 @@
 
 ---
 
-## 4) `android-app` 提示词（AS 操作）
+## 4) 原生容器提示词（以 iOS 为主）
 
-请提供一个可直接被 Android Studio 打开的工程 `android-app/`，满足：
+请提供一个可直接被 Xcode 打开的 iOS 工程（推荐放在本仓库 `ios-app/` 目录下），满足：
 
-- 使用 Gradle wrapper（含 `gradle/wrapper/gradle-wrapper.jar`）
-- `INTERNET` 权限
-- WebView 加载 `BuildConfig.WEB_APP_URL`
-- debug 默认 `http://10.0.2.2:5173/`
-- release 默认 `file:///android_asset/index.html`（用于离线）
+- 使用 `WKWebView` 加载移动端 H5 页面；
+- 开发期默认加载 `http://127.0.0.1:5173/`（或局域网地址）便于调试；
+- 发布期默认加载打包到应用 Bundle 内的 `index.html`（用于离线）；
+- 预留 API 基地址配置方式（如通过查询参数、本地配置文件等），与 `VITE_MOBILE_API_BASE_URL` 对齐。

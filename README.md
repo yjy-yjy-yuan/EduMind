@@ -1,6 +1,6 @@
 # EduMind
 
-EduMind 是一个面向教育视频学习场景的智能分析系统，当前仓库同时维护 FastAPI 主后端、Flask 旧后端、桌面端、移动端和 Android WebView 容器。
+EduMind 是一个面向教育视频学习场景的智能分析系统，当前仓库同时维护 FastAPI 主后端、Flask 旧后端、桌面端和移动端 H5 前端（可由 iOS WebView 等容器加载）。
 
 ## 仓库现状
 
@@ -10,7 +10,7 @@ EduMind/
 ├── backend/           # 旧版 Flask 后端，保留兼容
 ├── frontend/          # 桌面端 Vue 3 + Vite
 ├── mobile-frontend/   # 移动端 H5 / WebView 前端
-├── android-app/       # Android 容器工程
+├── ios-app/           # iOS WebView 容器（建议使用 Xcode 创建与维护）
 ├── docs/              # 文档、方案、提示词
 ├── tests/             # 根目录测试
 └── dev_start.py       # 一键启动旧版 backend + frontend 的开发脚本
@@ -19,13 +19,13 @@ EduMind/
 当前默认开发组合是：
 
 - 后端：`backend_fastapi/`，默认端口 `2004`
-- 桌面端：`frontend/`，Vite 默认端口 `328`
+- 桌面端：`frontend/`，Vite 默认端口 `328`（可在 `frontend/.env` 调整）
 - 移动端：`mobile-frontend/`，Vite 默认端口由 Vite 自动分配，接口默认指向 `2004`
 
 需要注意：
 
 - `dev_start.py` 目前仍面向 `backend/` + `frontend/` 的旧联调流程，不是 FastAPI 的统一启动脚本。
-- `frontend/` 大部分接口已按 `/api` 代理或 `VITE_API_BASE_URL` 访问 FastAPI，但仍残留少量直接指向旧后端 `5001` 的历史配置，桌面端联调时需要留意。
+- `frontend/` 和 `mobile-frontend/` 都支持通过 `.env` 调整后端代理目标；换电脑后如果端口不同，优先改 `.env`。
 
 ## 主要能力
 
@@ -35,7 +35,7 @@ EduMind/
 - 视频问答与历史记录
 - 学习笔记与时间点跳转
 - 知识图谱生成与查询
-- 移动端学习流程与 Android 打包
+- 移动端学习流程与 iOS/移动端 H5 集成
 
 ## 环境要求
 
@@ -65,10 +65,16 @@ python run.py
 ```bash
 cd frontend
 npm install
+cp .env.example .env
 npm run dev
 ```
 
 默认访问地址：`http://127.0.0.1:328`
+
+如需调整端口/代理，编辑 `frontend/.env`：
+
+- `VITE_FRONTEND_PORT=328`
+- `VITE_API_PROXY_TARGET=http://127.0.0.1:2004`
 
 ### 3. 启动移动端 H5
 
@@ -90,22 +96,7 @@ cp .env.example .env
 - `VITE_MOBILE_API_BASE_URL=http://127.0.0.1:2004`
 - `VITE_MOBILE_PROXY_TARGET=http://127.0.0.1:2004`
 
-### 4. 构建 Android 容器
-
-```bash
-cd android-app
-./gradlew assembleDebug
-```
-
-如果 Android 端加载离线页面，需要先执行：
-
-```bash
-cd mobile-frontend
-npm run build -- --mode android
-```
-
-然后把 `mobile-frontend/dist/` 同步到 `android-app/app/src/main/assets/`。
-
+- （可选）iOS 原生容器：推荐在 `ios-app/` 目录下使用 Xcode 创建 iOS 工程，通过 `WKWebView` 加载 `mobile-frontend` 的 H5 页面（开发期指向 Vite dev server，发布期加载打包后的静态资源）。
 ## 测试
 
 根目录 `pytest` 主要覆盖共享后端测试：
@@ -130,7 +121,6 @@ pytest tests/ -v
 1. 新后端接口优先开发在 `backend_fastapi/`
 2. 桌面端页面改动放在 `frontend/`
 3. 移动端业务放在 `mobile-frontend/`
-4. Android 仅承担 WebView 容器与离线资源集成
 5. `backend/` 仅做兼容维护，不再作为首选实现
 
 ## 相关文档
@@ -141,4 +131,4 @@ pytest tests/ -v
 - [`backend_fastapi/README_RUN.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README_RUN.md)
 - [`frontend/README.md`](/Users/yuan/final-work/EduMind/frontend/README.md)
 - [`mobile-frontend/README.md`](/Users/yuan/final-work/EduMind/mobile-frontend/README.md)
-- [`android-app/README.md`](/Users/yuan/final-work/EduMind/android-app/README.md)
+- （可选）`ios-app/`：建议在该目录下创建 Xcode 工程并编写 iOS 容器说明。

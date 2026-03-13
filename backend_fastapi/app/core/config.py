@@ -56,7 +56,9 @@ class Settings(BaseSettings):
     WHISPER_MODEL_PATH: str = os.path.expanduser("~/Desktop/File/graduation/whisper")
 
     # CORS 配置 (允许前端访问) - 使用字符串，支持逗号分隔
-    CORS_ORIGINS: Union[str, List[str]] = "http://localhost:328,http://127.0.0.1:328"
+    CORS_ORIGINS: Union[str, List[str]] = (
+        "http://localhost:328,http://127.0.0.1:328,http://localhost:5173,http://127.0.0.1:5173"
+    )
 
     # Redis 配置 (可选，保留用于生产环境)
     REDIS_URL: str = "redis://localhost:6379/0"

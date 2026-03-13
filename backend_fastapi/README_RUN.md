@@ -25,6 +25,7 @@ cp .env.example .env
 ```
 
 按实际环境修改 `.env` 中的数据库、Neo4j、模型服务和密钥配置。
+如果需要改后端端口，请同步调整 `PORT`，并把 `CORS_ORIGINS` 加上前端实际端口。
 
 ## 4. 启动依赖服务
 
@@ -64,8 +65,11 @@ curl http://localhost:2004/health
 ```bash
 cd frontend
 npm install
+cp .env.example .env
 npm run dev
 ```
+
+如果后端端口不是 `2004`，请修改 `frontend/.env` 中的 `VITE_API_PROXY_TARGET`。
 
 移动端：
 

@@ -46,13 +46,13 @@ npm run build -- --mode android
 | `src/store/` | 状态管理 |
 | `src/views/` | 页面视图 |
 
-## Android 配合方式
+## 原生容器配合方式（以 iOS 为主）
 
-如果用于 Android 离线资源打包：
+如果用于 iOS / 原生容器离线资源打包，可以先构建静态资源：
 
 ```bash
 cd mobile-frontend
-npm run build -- --mode android
+npm run build
 ```
 
-然后将 `dist/` 内容同步到 `android-app/app/src/main/assets/`。
+在 iOS 工程中（例如放在本仓库的 `ios-app/` 目录下，用 Xcode 创建的工程），将 `dist/` 内容拷贝到应用 Bundle 中（如 `Assets` 或自定义资源目录），并在 `WKWebView` 中通过 `Bundle.main.url(forResource:)` 等方式加载本地 `index.html`。开发阶段也可以让 `WKWebView` 直接指向 Vite dev server 地址（如 `http://127.0.0.1:5173`），便于调试。
