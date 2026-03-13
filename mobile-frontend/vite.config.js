@@ -3,6 +3,7 @@ import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig(({ mode }) => {
+  const isIOS = mode === 'ios'
   const env = loadEnv(mode, process.cwd(), '')
   const proxyTarget =
     env.VITE_MOBILE_PROXY_TARGET ||
@@ -10,8 +11,14 @@ export default defineConfig(({ mode }) => {
     'http://127.0.0.1:2004'
 
   return {
-    base: mode === 'android' ? './' : '/',
+    base: mode === 'android' || isIOS ? './' : '/',
     plugins: [vue()],
+    build: isIOS
+      ? {
+          // Xcode may flatten copied resource paths; place hashed assets at bundle root for iOS build.
+          assetsDir: ''
+        }
+      : undefined,
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))

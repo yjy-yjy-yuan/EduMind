@@ -1,17 +1,30 @@
 import { reactive, readonly } from 'vue'
 import * as authApi from '@/api/auth'
+import { storageGet, storageRemove, storageSet } from '@/utils/storage'
+
+const parseJSON = (text, fallback = null) => {
+  if (!text) return fallback
+  try {
+    return JSON.parse(text)
+  } catch {
+    return fallback
+  }
+}
+
+const initialUser = parseJSON(storageGet('m_user'), null)
+const initialToken = storageGet('m_token')
 
 const state = reactive({
-  user: JSON.parse(localStorage.getItem('m_user') || 'null'),
-  token: localStorage.getItem('m_token') || null,
-  isAuthenticated: Boolean(localStorage.getItem('m_user') || localStorage.getItem('m_token'))
+  user: initialUser,
+  token: initialToken || null,
+  isAuthenticated: Boolean(initialUser || initialToken)
 })
 
 const persist = () => {
-  if (state.user) localStorage.setItem('m_user', JSON.stringify(state.user))
-  else localStorage.removeItem('m_user')
-  if (state.token) localStorage.setItem('m_token', state.token)
-  else localStorage.removeItem('m_token')
+  if (state.user) storageSet('m_user', JSON.stringify(state.user))
+  else storageRemove('m_user')
+  if (state.token) storageSet('m_token', state.token)
+  else storageRemove('m_token')
   state.isAuthenticated = Boolean(state.user || state.token)
 }
 
@@ -51,4 +64,3 @@ export async function logout() {
     persist()
   }
 }
-
