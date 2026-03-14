@@ -6,8 +6,86 @@
 //
 
 import Foundation
+import OSLog
 import SwiftUI
 import WebKit
+
+private enum EduMindLogLevel {
+    case debug
+    case info
+    case notice
+    case error
+    case fault
+}
+
+private enum EduMindLog {
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "EduMindIOS",
+        category: "EduMindWeb"
+    )
+
+    private static func prefix(for level: EduMindLogLevel) -> String {
+        switch level {
+        case .debug:
+            return "[DEBUG]"
+        case .info:
+            return "[INFO]"
+        case .notice:
+            return "[NOTICE]"
+        case .error:
+            return "[ERROR]"
+        case .fault:
+            return "[FAULT]"
+        }
+    }
+
+    private static func line(for level: EduMindLogLevel, scope: String?, message: String) -> String {
+        if message.hasPrefix("[") {
+            return message
+        }
+        let scopeText = scope.map { "[\($0)]" } ?? ""
+        return "\(prefix(for: level))\(scopeText) \(message)"
+    }
+
+    static func write(_ level: EduMindLogLevel, scope: String? = nil, _ message: String) {
+        let line = line(for: level, scope: scope, message: message)
+        switch level {
+        case .debug:
+            logger.debug("\(line, privacy: .public)")
+        case .info:
+            logger.info("\(line, privacy: .public)")
+        case .notice:
+            logger.notice("\(line, privacy: .public)")
+        case .error:
+            logger.error("\(line, privacy: .public)")
+        case .fault:
+            logger.fault("\(line, privacy: .public)")
+        }
+        #if DEBUG
+        print(line)
+        #endif
+    }
+
+    static func debug(_ scope: String, _ message: String) {
+        write(.debug, scope: scope, message)
+    }
+
+    static func info(_ scope: String, _ message: String) {
+        write(.info, scope: scope, message)
+    }
+
+    static func notice(_ scope: String, _ message: String) {
+        write(.notice, scope: scope, message)
+    }
+
+    static func error(_ scope: String, _ message: String) {
+        write(.error, scope: scope, message)
+    }
+
+    static func fault(_ scope: String, _ message: String) {
+        write(.fault, scope: scope, message)
+    }
+}
 
 private enum WebAssets {
     static let indexName = "index"
@@ -70,7 +148,7 @@ private struct H5WebView: UIViewRepresentable {
 
     private func loadContent(into webView: WKWebView) {
         guard let indexURL = WebAssets.indexURL() else {
-            NSLog("[EduMindWeb] index.html not found in bundle. resourceURL=%@", Bundle.main.resourceURL?.path ?? "<nil>")
+            EduMindLog.error("WebView", "index.html not found in bundle. resourceURL=\(Bundle.main.resourceURL?.path ?? "<nil>")")
             webView.loadHTMLString(
                 "<h2 style=\"font-family:-apple-system\">未找到前端资源</h2><p style=\"font-family:-apple-system\">请执行：bash ios-app/sync_ios_web_assets.sh</p>",
                 baseURL: nil
@@ -79,12 +157,14 @@ private struct H5WebView: UIViewRepresentable {
         }
 
         let allowedPath = indexURL.deletingLastPathComponent()
-        NSLog("[EduMindWeb] loading index from %@", indexURL.path)
-        NSLog("[EduMindWeb] allowing read access to %@", allowedPath.path)
+        EduMindLog.info("WebView", "loading index from \(indexURL.path)")
+        EduMindLog.info("WebView", "allowing read access to \(allowedPath.path)")
+        EduMindLog.debug("WebView", "bundle resourceURL=\(Bundle.main.resourceURL?.path ?? "<nil>")")
         do {
             let html = try String(contentsOf: indexURL, encoding: .utf8)
+            EduMindLog.debug("WebView", "index.html chars=\(html.count)")
             if usesLegacyAbsoluteAssetPaths(in: html) {
-                NSLog("[EduMindWeb] detected legacy absolute asset paths in %@", indexURL.path)
+                EduMindLog.error("WebView", "detected legacy absolute asset paths in \(indexURL.path)")
                 webView.loadHTMLString(
                     "<h2 style=\"font-family:-apple-system\">前端资源路径不兼容</h2><p style=\"font-family:-apple-system\">请执行：bash ios-app/sync_ios_web_assets.sh</p>",
                     baseURL: nil
@@ -96,6 +176,7 @@ private struct H5WebView: UIViewRepresentable {
         }
 
         webView.loadFileURL(indexURL, allowingReadAccessTo: allowedPath)
+        EduMindLog.info("WebView", "loadFileURL requested")
     }
 
     private func usesLegacyAbsoluteAssetPaths(in html: String) -> Bool {
@@ -221,8 +302,11 @@ private struct H5WebView: UIViewRepresentable {
 
         func startLoadTimeout(for webView: WKWebView) {
             loadTimeoutWorkItem?.cancel()
+            EduMindLog.info("Lifecycle", "start load timeout watchdog")
+            EduMindLog.debug("Lifecycle", "watchdog target=\(String(describing: webView.url?.absoluteString ?? "<pending>"))")
             let work = DispatchWorkItem { [weak self, weak webView] in
                 guard let webView else { return }
+                EduMindLog.error("Lifecycle", "load timeout watchdog fired")
                 self?.showErrorPage(
                     in: webView,
                     title: "页面加载超时",
@@ -236,6 +320,7 @@ private struct H5WebView: UIViewRepresentable {
         private func finishLoad() {
             loadTimeoutWorkItem?.cancel()
             loadTimeoutWorkItem = nil
+            EduMindLog.info("Lifecycle", "finish load timeout watchdog")
         }
 
         private func scheduleBootProbes(for webView: WKWebView) {
@@ -243,6 +328,7 @@ private struct H5WebView: UIViewRepresentable {
             probeWorkItems.removeAll()
 
             let delays: [TimeInterval] = [0.2, 1.0, 2.5]
+            EduMindLog.debug("Probe", "schedule boot probes delays=\(delays.map { String($0) }.joined(separator: ","))")
             for delay in delays {
                 let work = DispatchWorkItem { [weak self, weak webView] in
                     guard let self, let webView else { return }
@@ -255,6 +341,7 @@ private struct H5WebView: UIViewRepresentable {
 
         private func runProbe(in webView: WKWebView, stage: String) {
             let escapedStage = stage.replacingOccurrences(of: "'", with: "\\'")
+            EduMindLog.debug("Probe", "run probe stage=\(stage)")
             let js = """
             (function() {
               try {
@@ -270,10 +357,27 @@ private struct H5WebView: UIViewRepresentable {
             """
             webView.evaluateJavaScript(js) { result, error in
                 if let error {
-                    NSLog("[EduMindWeb][probe.native.error] stage=%@ error=%@", stage, error.localizedDescription)
+                    EduMindLog.error("Probe", "stage=\(stage) error=\(error.localizedDescription)")
                     return
                 }
-                NSLog("[EduMindWeb][probe.native] stage=%@ payload=%@", stage, String(describing: result ?? "<nil>"))
+                EduMindLog.info("Probe", "stage=\(stage) payload=\(String(describing: result ?? "<nil>"))")
+            }
+        }
+
+        private func nativeLogLevel(for level: String) -> EduMindLogLevel {
+            switch level {
+            case "console.debug":
+                return .debug
+            case "console.info", "probe", "probe.native", "lifecycle.info":
+                return .info
+            case "console.log", "mount.watchdog":
+                return .notice
+            case "console.warn":
+                return .notice
+            case "console.error", "window.error", "unhandledrejection", "probe.error":
+                return .error
+            default:
+                return .notice
             }
         }
 
@@ -282,31 +386,32 @@ private struct H5WebView: UIViewRepresentable {
             if let body = message.body as? [String: Any] {
                 let level = String(describing: body["level"] ?? "log")
                 let payload = String(describing: body["payload"] ?? "")
-                NSLog("[EduMindWeb][%@] %@", level, payload)
+                EduMindLog.write(nativeLogLevel(for: level), payload)
                 return
             }
-            NSLog("[EduMindWeb] %@", String(describing: message.body))
+            EduMindLog.notice("Bridge", String(describing: message.body))
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             finishLoad()
-            NSLog("[EduMindWeb] didFinish navigation: %@", webView.url?.absoluteString ?? "<nil>")
+            EduMindLog.info("WebView", "didFinish navigation: \(webView.url?.absoluteString ?? "<nil>")")
             scheduleBootProbes(for: webView)
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             finishLoad()
-            NSLog("[EduMindWeb] didFail navigation: %@", error.localizedDescription)
+            EduMindLog.error("WebView", "didFail navigation: \(error.localizedDescription)")
             showErrorPage(in: webView, title: "页面加载失败", details: error.localizedDescription)
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             finishLoad()
-            NSLog("[EduMindWeb] didFailProvisionalNavigation: %@", error.localizedDescription)
+            EduMindLog.error("WebView", "didFailProvisionalNavigation: \(error.localizedDescription)")
             showErrorPage(in: webView, title: "页面初始化失败", details: error.localizedDescription)
         }
 
         private func showErrorPage(in webView: WKWebView, title: String, details: String) {
+            EduMindLog.error("WebView", "showErrorPage title=\(title) details=\(details)")
             let html = """
             <div style="font-family:-apple-system;padding:20px;color:#111827;">
               <h2 style="margin:0 0 10px;">\(title)</h2>

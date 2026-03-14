@@ -20,39 +20,9 @@
     <div v-else-if="notes.length === 0" class="empty">暂无笔记。</div>
 
     <div v-else class="content">
-      <section v-if="showStack" class="stack-section">
-        <div class="section-head">
-          <div>
-            <div class="section-title">最近笔记堆叠</div>
-            <div class="section-tip">已创建 {{ notes.length }} 条笔记，点击任意卡片继续编辑</div>
-          </div>
-        </div>
-
-        <div class="stack-shell" :style="{ height: `${stackHeight}px` }">
-          <button
-            v-for="(n, index) in stackNotes"
-            :key="n.id"
-            class="stack-card"
-            :class="{ 'stack-card--top': index === 0 }"
-            :style="stackStyle(index)"
-            @click="go(`/notes/${n.id}`)"
-          >
-            <div class="stack-card__glow"></div>
-            <div class="stack-card__body">
-              <div class="stack-card__meta">
-                <span class="stack-card__badge">笔记 {{ stackNotes.length - index }}</span>
-                <span class="stack-card__time">{{ formatTime(n.updated_at || n.created_at) }}</span>
-              </div>
-              <div class="stack-card__title">{{ n.title || '未命名笔记' }}</div>
-              <div class="stack-card__preview">{{ previewText(n.content) }}</div>
-            </div>
-          </button>
-        </div>
-      </section>
-
       <div class="section-head section-head--list">
-        <div class="section-title">全部笔记</div>
-        <div class="section-tip">按最近更新时间排序</div>
+        <div class="section-title">笔记列表</div>
+        <div class="section-tip">按最近更新时间排序，点击进入编辑</div>
       </div>
 
       <div class="list">
@@ -69,7 +39,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getNotes } from '@/api/note'
 
@@ -93,15 +63,6 @@ const sortNotes = (list) => {
   })
 }
 
-const showStack = computed(() => notes.value.length >= 2)
-const stackNotes = computed(() => notes.value.slice(0, 3))
-const stackHeight = computed(() => 212 + Math.max(stackNotes.value.length - 1, 0) * 34)
-
-const stackStyle = (index) => ({
-  transform: `translateY(${index * 34}px) scale(${1 - index * 0.04}) rotate(${index * 1.5}deg)`,
-  zIndex: stackNotes.value.length - index
-})
-
 const reload = async () => {
   loading.value = true
   error.value = ''
@@ -124,11 +85,6 @@ const formatTime = (t) => {
   } catch {
     return String(t)
   }
-}
-
-const previewText = (content) => {
-  const text = String(content || '').replace(/\s+/g, ' ').trim()
-  return text || '记录灵感、提炼重点，下一次打开时从这里继续。'
 }
 
 onMounted(reload)
@@ -207,16 +163,6 @@ onMounted(reload)
   gap: 16px;
 }
 
-.stack-section {
-  border-radius: 24px;
-  padding: 16px;
-  background:
-    radial-gradient(circle at top left, rgba(99, 102, 241, 0.18), transparent 42%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.98));
-  border: 1px solid rgba(99, 102, 241, 0.12);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
-}
-
 .section-head {
   display: flex;
   align-items: flex-start;
@@ -238,94 +184,6 @@ onMounted(reload)
   margin-top: 4px;
   font-size: 12px;
   color: #64748b;
-}
-
-.stack-shell {
-  position: relative;
-  margin-top: 14px;
-}
-
-.stack-card {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  border: 0;
-  padding: 0;
-  text-align: left;
-  border-radius: 22px;
-  overflow: hidden;
-  transform-origin: center top;
-  background: transparent;
-  transition: transform 0.22s ease, box-shadow 0.22s ease;
-}
-
-.stack-card--top {
-  box-shadow: 0 20px 36px rgba(79, 70, 229, 0.18);
-}
-
-.stack-card:active {
-  transform: translateY(2px) scale(0.99);
-}
-
-.stack-card__glow {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.38), transparent 34%),
-    linear-gradient(135deg, #6366f1, #8b5cf6 56%, #06b6d4);
-}
-
-.stack-card__body {
-  position: relative;
-  min-height: 212px;
-  padding: 18px;
-  color: #fff;
-  display: grid;
-  align-content: space-between;
-  gap: 18px;
-}
-
-.stack-card__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.stack-card__badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.stack-card__time {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.82);
-}
-
-.stack-card__title {
-  font-size: 18px;
-  font-weight: 900;
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.stack-card__preview {
-  font-size: 13px;
-  line-height: 1.7;
-  color: rgba(255, 255, 255, 0.92);
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .list {
@@ -389,20 +247,6 @@ onMounted(reload)
 
 .topbar h2 {
   font-size: 18px;
-}
-
-.stack-section {
-  border-radius: 24px;
-  border-color: rgba(31, 122, 140, 0.12);
-  background:
-    radial-gradient(circle at 12% 0%, rgba(31, 122, 140, 0.14), transparent 46%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 254, 0.98));
-}
-
-.stack-card__glow {
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.34), transparent 34%),
-    linear-gradient(145deg, #1f7a8c, #3d8da0 58%, #eb8c34);
 }
 
 .card {

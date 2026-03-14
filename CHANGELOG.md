@@ -96,3 +96,13 @@
 - 更新 [`mobile-frontend/index.html`](/Users/yuan/final-work/EduMind/mobile-frontend/index.html)：补充移动端 viewport 限制，关闭双击缩放与用户缩放，并禁用电话/邮箱自动识别，避免真机页面误放大与排版抖动。
 - 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)：重建全局字体栈为 `SF Pro Text/Display + PingFang SC`，统一正文与标题字重、字距、行高；同时补充 `100% text-size-adjust`、流式边距、媒体元素自适应和小屏幕断点，修复页面贴边、挤压和横向溢出问题。
 - 更新 [`mobile-frontend/src/App.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/App.vue)：外层壳布局改为 `100dvh` 移动端高度模型，并收紧内容区与背景装饰在小屏设备上的占位，提升 iPhone 真机上的首屏适配性与观感一致性。
+
+### Xcode 控制台分级日志增强
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：新增基于 `OSLog.Logger` 的原生日志封装，将 `WKWebView` 生命周期、probe、watchdog 和错误输出映射为 `info / debug / notice / error / fault` 分级日志，便于在 Xcode 控制台筛选查看。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：前端通过 `window.webkit.messageHandlers.edumindLog` 回传的 `console.info()`、`console.warn()`、`console.error()` 现在会按级别写入原生控制台，不再全部混成同一种日志。
+- 更新 [`mobile-frontend/src/main.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/main.js)：补充 `console.info` 启动摘要和挂载成功信息，确保 Xcode 里能直接看到关键 `info` 日志节点。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)、[`mobile-frontend/src/main.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/main.js)：新增显式 `DEBUG` 前缀和 `console.debug()` 启动日志，便于在 Xcode 控制台直接搜索 `DEBUG` 查看调试链路。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)、[`mobile-frontend/src/main.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/main.js)：将原生与前端桥接日志统一为结构化格式，如 `[DEBUG][Bootstrap] ...`、`[INFO][WebView] ...`、`[ERROR][Router] ...`，降低控制台阅读成本。
+
+### 笔记页交互简化
+- 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：移除“最近笔记堆叠”区域及其旋转/缩放卡片交互，改为仅保留稳定的普通笔记列表，提升真机点按与滚动操作的可用性。

@@ -7,14 +7,23 @@ window.__edumindBootStarted = true
 window.__edumindBootMounted = false
 window.__edumindBootTrace = window.__edumindBootTrace || []
 
-const pushBootTrace = (label, details = '') => {
+const emitBootLog = (level, scope, label, details = '') => {
   const entry = details ? `${label} | ${details}` : label
+  console[level](`[${String(level).toUpperCase()}][${scope}] ${entry}`)
+  return entry
+}
+
+const pushBootTrace = (label, details = '') => {
+  const entry = emitBootLog('log', 'Trace', label, details)
   window.__edumindBootTrace.push(entry)
   if (window.__edumindBootTrace.length > 40) {
     window.__edumindBootTrace = window.__edumindBootTrace.slice(-40)
   }
-  console.log(`[EduMindBoot] ${entry}`)
 }
+
+const pushBootInfo = (scope, label, details = '') => emitBootLog('info', scope, label, details)
+const pushBootDebug = (scope, label, details = '') => emitBootLog('debug', scope, label, details)
+const pushBootError = (scope, label, details = '') => emitBootLog('error', scope, label, details)
 
 const renderBootError = (title, details) => {
   const root = document.getElementById('app') || document.body
@@ -29,13 +38,17 @@ const renderBootError = (title, details) => {
 
 pushBootTrace('main:module-start', `protocol=${window.location.protocol}`)
 pushBootTrace('document:readyState', document.readyState)
+pushBootInfo('Bootstrap', 'started', `href=${window.location.href}`)
+pushBootDebug('Bootstrap', 'user-agent', navigator.userAgent)
 
 document.addEventListener('DOMContentLoaded', () => {
   pushBootTrace('document:DOMContentLoaded', describeContainer())
+  pushBootDebug('Bootstrap', 'DOMContentLoaded', `title=${document.title || '<empty>'}`)
 })
 
 window.addEventListener('load', () => {
   pushBootTrace('window:load', describeContainer())
+  pushBootDebug('Bootstrap', 'window-load', `readyState=${document.readyState}`)
 })
 
 const describeContainer = () => {
@@ -49,6 +62,7 @@ const waitForMountTarget = () =>
     const existing = document.getElementById('app')
     if (existing) {
       pushBootTrace('mount-target:ready', describeContainer())
+      pushBootDebug('Bootstrap', 'mount-target:ready', `readyState=${document.readyState}`)
       resolve(existing)
       return
     }
@@ -58,6 +72,7 @@ const waitForMountTarget = () =>
     const onReady = () => {
       const root = document.getElementById('app')
       pushBootTrace('mount-target:dom-ready', describeContainer())
+      pushBootDebug('Bootstrap', 'mount-target:dom-ready', `hasRoot=${Boolean(root)}`)
       if (root) {
         resolve(root)
         return
@@ -81,6 +96,7 @@ const waitForMountTarget = () =>
 window.addEventListener('error', (event) => {
   const msg = event?.error?.stack || event?.message || 'Unknown runtime error'
   pushBootTrace('window:error', msg)
+  pushBootError('Bootstrap', 'window-error', msg)
   renderBootError('页面启动异常', msg)
 })
 
@@ -88,6 +104,7 @@ window.addEventListener('unhandledrejection', (event) => {
   const reason = event?.reason
   const msg = reason?.stack || String(reason || 'Unknown rejection')
   pushBootTrace('window:unhandledrejection', msg)
+  pushBootError('Bootstrap', 'unhandledrejection', msg)
   renderBootError('页面启动异常（Promise）', msg)
 })
 
@@ -109,21 +126,28 @@ try {
       }
 
       pushBootTrace('app:mount:start', describeContainer())
+      pushBootInfo('Bootstrap', 'app:mount:start', describeContainer())
+      pushBootDebug('Router', 'current-route', router.currentRoute.value.fullPath)
       app.mount(root)
       pushBootTrace('app:mount:end', describeContainer())
+      pushBootDebug('Bootstrap', 'app:mount:end', describeContainer())
       window.requestAnimationFrame(() => {
         const containerState = describeContainer()
         window.__edumindBootMounted = true
         pushBootTrace('app:mounted:raf', `${router.currentRoute.value.fullPath} | ${containerState}`)
+        pushBootInfo('Bootstrap', 'app:mounted', `${router.currentRoute.value.fullPath} | ${containerState}`)
+        pushBootDebug('Bootstrap', 'trace-size', String(window.__edumindBootTrace.length))
       })
     })
     .catch((error) => {
       const msg = error?.stack || String(error || 'Unknown router bootstrap error')
       pushBootTrace('router:isReady:rejected', msg)
+      pushBootError('Router', 'isReady:rejected', msg)
       renderBootError('页面路由初始化失败', msg)
     })
 } catch (error) {
   const msg = error?.stack || String(error || 'Unknown bootstrap error')
   pushBootTrace('app:create-failed', msg)
+  pushBootError('Bootstrap', 'create-failed', msg)
   renderBootError('页面初始化失败', msg)
 }
