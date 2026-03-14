@@ -21,8 +21,13 @@
 
     <div v-else class="card">
       <div class="hero">
-        <img v-if="!thumbBroken" class="thumb" :src="previewUrl" alt="preview" @error="thumbBroken = true" />
-        <div v-else class="thumb-fallback">无预览</div>
+        <div class="hero-shell" :class="heroClass">
+          <div class="hero-shell__badge">{{ UI_ONLY_MODE ? 'UI ONLY' : 'LIVE' }}</div>
+          <div class="hero-shell__initial">{{ heroInitial }}</div>
+          <div class="hero-shell__caption">
+            {{ UI_ONLY_MODE ? '当前阶段仅构建界面，封面与播放器资源后续通过预留接口接入。' : '视频预览由后端接口提供。' }}
+          </div>
+        </div>
       </div>
 
       <h2 class="title">{{ video.title || '未命名视频' }}</h2>
@@ -60,7 +65,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { withBase } from '@/config'
+import { UI_ONLY_MODE } from '@/config'
 import { deleteVideo, getVideo, getVideoStatus, processVideo } from '@/api/video'
 
 const route = useRoute()
@@ -71,17 +76,15 @@ const loading = ref(false)
 const error = ref('')
 const video = ref(null)
 const statusInfo = ref({ status: '', progress: 0, current_step: '' })
-const thumbBroken = ref(false)
 const autoStarting = ref(false)
 const retrying = ref(false)
 
 let pollTimer = null
 
-const previewUrl = computed(() => withBase(`/api/videos/${id.value}/preview`))
-
 const statusValue = computed(() => statusInfo.value.status || video.value?.status || '')
 const progressValue = computed(() => Number(statusInfo.value.progress ?? 0) || 0)
 const stepValue = computed(() => statusInfo.value.current_step || '')
+const heroInitial = computed(() => String(video.value?.title || 'V').trim().slice(0, 1).toUpperCase() || 'V')
 
 const isInProgress = (status) => ['processing', 'pending', 'downloading'].includes(status)
 
@@ -126,6 +129,13 @@ const badgeClass = (status) => {
   if (isInProgress(status)) return 'warn'
   return 'info'
 }
+
+const heroClass = computed(() => {
+  if (statusValue.value === 'completed' || statusValue.value === 'processed') return 'hero-shell--ok'
+  if (statusValue.value === 'failed') return 'hero-shell--bad'
+  if (isInProgress(statusValue.value)) return 'hero-shell--warn'
+  return 'hero-shell--idle'
+})
 
 const fetchStatus = async () => {
   const res = await getVideoStatus(id.value)
@@ -349,22 +359,88 @@ onUnmounted(() => clearInterval(pollTimer))
   border-radius: 14px;
   overflow: hidden;
   background: rgba(0, 0, 0, 0.05);
-  height: 180px;
+  min-height: 180px;
 }
 
-.thumb {
-  width: 100%;
-  height: 180px;
-  object-fit: cover;
-  display: block;
-}
-
-.thumb-fallback {
-  height: 180px;
+.hero-shell {
+  position: relative;
+  min-height: 180px;
+  padding: 18px;
   display: grid;
-  place-items: center;
-  color: var(--muted);
-  font-weight: 800;
+  align-content: space-between;
+  gap: 14px;
+  color: #fff;
+  overflow: hidden;
+}
+
+.hero-shell::before,
+.hero-shell::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  opacity: 0.26;
+}
+
+.hero-shell::before {
+  width: 156px;
+  height: 156px;
+  top: -44px;
+  right: -30px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.hero-shell::after {
+  width: 112px;
+  height: 112px;
+  left: -24px;
+  bottom: -26px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.hero-shell--idle {
+  background: linear-gradient(145deg, #1f7a8c, #0f5f70);
+}
+
+.hero-shell--warn {
+  background: linear-gradient(145deg, #d97706, #b45309);
+}
+
+.hero-shell--ok {
+  background: linear-gradient(145deg, #159a72, #0f766e);
+}
+
+.hero-shell--bad {
+  background: linear-gradient(145deg, #c2410c, #991b1b);
+}
+
+.hero-shell__badge,
+.hero-shell__initial,
+.hero-shell__caption {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-shell__badge {
+  justify-self: start;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.hero-shell__initial {
+  font-size: 66px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.hero-shell__caption {
+  max-width: 260px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.94);
 }
 
 .title {
@@ -480,5 +556,53 @@ onUnmounted(() => clearInterval(pollTimer))
   border-radius: 14px;
   padding: 12px;
   font-weight: 900;
+}
+</style>
+<style scoped>
+.page {
+  padding-top: calc(14px + env(safe-area-inset-top));
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 20px rgba(24, 45, 73, 0.08);
+}
+
+.card {
+  margin-top: 12px;
+  border-radius: 24px;
+  border: 1px solid rgba(32, 42, 55, 0.09);
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+  box-shadow: 0 16px 30px rgba(24, 45, 73, 0.1);
+  padding: 16px;
+}
+
+.hero,
+.hero-shell {
+  height: 200px;
+}
+
+.title {
+  font-size: 19px;
+  line-height: 1.35;
+}
+
+.block {
+  border-top-color: rgba(32, 42, 55, 0.08);
+}
+
+.btn {
+  border-radius: 16px;
+  padding: 11px 10px;
+}
+
+.btn--primary {
+  background: linear-gradient(135deg, #1f7a8c, #3d8da0);
 }
 </style>

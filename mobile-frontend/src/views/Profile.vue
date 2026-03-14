@@ -160,3 +160,40 @@ onMounted(() => {
 
 .alert--bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
 </style>
+<style scoped>
+.page {
+  padding-top: calc(14px + env(safe-area-inset-top));
+}
+
+.topbar {
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+}
+
+.topbar h2 {
+  font-size: 18px;
+}
+
+.card {
+  margin-top: 12px;
+  border-radius: 24px;
+  padding: 16px;
+  background: linear-gradient(180deg, #ffffff, #f8fbfd);
+}
+
+.avatar {
+  border-radius: 16px;
+  background: linear-gradient(145deg, #1f7a8c, #3d8da0);
+}
+
+.btn {
+  border-radius: 16px;
+}
+
+.danger {
+  border-radius: 16px;
+}
+</style>

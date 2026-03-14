@@ -2,10 +2,12 @@
   <div class="ios-page home-page">
     <header class="welcome ios-card">
       <div class="welcome__top">
-        <p class="welcome__label">EduMind iOS</p>
+        <div class="welcome__brand">
+          <BrandLogo :width="138" compact />
+        </div>
         <button class="guide-btn" @click="go('/guide')" aria-label="打开使用指南">使用指南</button>
       </div>
-      <h1 class="welcome__title">智能伴学中心</h1>
+      <h1 class="welcome__title gradient-text">智能伴学中心</h1>
       <p class="welcome__subtitle">围绕你的学习流程，快速进入视频、笔记、问答与知识梳理。</p>
 
       <div class="stats">
@@ -70,6 +72,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import BrandLogo from '@/components/BrandLogo.vue'
 import { getVideoList } from '@/api/video'
 
 const quickActions = [
@@ -158,15 +161,14 @@ onMounted(reload)
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
-.welcome__label {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--primary-deep);
+.welcome__brand {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 132px;
 }
 
 .guide-btn {
@@ -177,6 +179,7 @@ onMounted(reload)
   font-size: 12px;
   font-weight: 700;
   padding: 6px 12px;
+  flex: 0 0 auto;
 }
 
 .welcome__title {
@@ -184,6 +187,7 @@ onMounted(reload)
   font-size: 27px;
   line-height: 1.2;
   letter-spacing: 0.01em;
+  text-shadow: 0 8px 22px rgba(22, 117, 190, 0.12);
 }
 
 .welcome__subtitle {
@@ -191,6 +195,24 @@ onMounted(reload)
   color: var(--muted);
   font-size: 13px;
   line-height: 1.5;
+}
+
+@media (max-width: 390px) {
+  .welcome__top {
+    align-items: flex-start;
+  }
+
+  .welcome__brand {
+    min-width: 120px;
+  }
+
+  .guide-btn {
+    margin-left: auto;
+  }
+
+  .welcome__title {
+    font-size: 24px;
+  }
 }
 
 .stats {
@@ -444,5 +466,90 @@ onMounted(reload)
   .stats {
     grid-template-columns: 1fr;
   }
+}
+</style>
+<style scoped>
+.home-page {
+  display: grid;
+  gap: 14px;
+}
+
+.welcome {
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+  border-radius: 26px;
+  border: 1px solid rgba(31, 122, 140, 0.16);
+  background: linear-gradient(160deg, #ffffff 8%, #f2fbfc 92%);
+  box-shadow: 0 20px 38px rgba(31, 122, 140, 0.14);
+}
+
+.welcome::after {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  right: -70px;
+  top: -90px;
+  border-radius: 54px;
+  transform: rotate(18deg);
+  background: linear-gradient(140deg, rgba(31, 122, 140, 0.18), rgba(31, 122, 140, 0.04));
+}
+
+.welcome__top,
+.welcome__title,
+.welcome__subtitle,
+.stats {
+  position: relative;
+  z-index: 1;
+}
+
+.welcome__title {
+  font-size: 30px;
+}
+
+.guide-btn {
+  border-color: rgba(31, 122, 140, 0.3);
+  background: rgba(31, 122, 140, 0.12);
+  color: var(--primary-deep);
+}
+
+.stat-pill {
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.quick-grid {
+  gap: 12px;
+}
+
+.quick-card {
+  border-radius: 18px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.08);
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.quick-card__title {
+  color: #1f2a37;
+}
+
+.recent {
+  padding: 16px;
+  border-radius: 24px;
+}
+
+.recent__head h3 {
+  font-size: 17px;
+}
+
+.refresh-btn {
+  color: var(--primary-deep);
+}
+
+.video-item {
+  border-radius: 16px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
 }
 </style>

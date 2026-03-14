@@ -537,3 +537,81 @@ onUnmounted(() => {
   color: var(--text);
 }
 </style>
+<style scoped>
+.page {
+  padding-top: calc(14px + env(safe-area-inset-top));
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+}
+
+.topbar h2 {
+  font-size: 18px;
+}
+
+.polling-tip {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px dashed rgba(31, 122, 140, 0.28);
+  background: rgba(31, 122, 140, 0.08);
+}
+
+.list {
+  margin-top: 10px;
+  gap: 12px;
+}
+
+.card {
+  border-radius: 20px;
+  border: 1px solid rgba(32, 42, 55, 0.09);
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+  box-shadow: 0 12px 24px rgba(24, 45, 73, 0.08);
+}
+
+.card-main {
+  padding: 16px;
+  gap: 11px;
+}
+
+.title {
+  font-size: 15px;
+}
+
+.badge.ok {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.badge.warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.badge.bad {
+  background: var(--bad-bg);
+  color: var(--bad-text);
+}
+
+.badge.info {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
+.bar {
+  background: linear-gradient(90deg, #1f7a8c, #3d8da0);
+}
+
+.load-more {
+  border-color: rgba(31, 122, 140, 0.22);
+  color: var(--primary-deep);
+}
+</style>

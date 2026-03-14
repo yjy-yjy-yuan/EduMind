@@ -210,3 +210,46 @@ const goBack = () => {
   opacity: 0.6;
 }
 </style>
+<style scoped>
+.page {
+  padding-top: calc(12px + env(safe-area-inset-top));
+}
+
+.topbar {
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 20px rgba(24, 45, 73, 0.08);
+}
+
+.chat {
+  margin-top: 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: linear-gradient(180deg, #ffffff, #f8fbfd);
+  padding: 14px;
+}
+
+.msg.user .bubble {
+  background: linear-gradient(135deg, rgba(31, 122, 140, 0.14), rgba(31, 122, 140, 0.08));
+}
+
+.msg.ai .bubble {
+  background: rgba(32, 42, 55, 0.08);
+}
+
+.inputbar {
+  background: transparent;
+}
+
+.input {
+  border-radius: 16px;
+  border-color: rgba(32, 42, 55, 0.14);
+}
+
+.send {
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1f7a8c, #3d8da0);
+}
+</style>

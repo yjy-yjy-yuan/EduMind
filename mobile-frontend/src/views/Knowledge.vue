@@ -10,7 +10,7 @@
         <input class="input" v-model.trim="keyword" placeholder="搜索知识点…" />
         <button class="btn" @click="refresh">搜索</button>
       </div>
-      <div class="muted">该页仅实现移动端固定布局；数据由移动应用后端通过接口提供。</div>
+      <div class="muted">当前仅实现页面布局与搜索交互占位；知识点数据后续通过预留接口接入。</div>
     </div>
 
     <div class="list">
@@ -30,7 +30,7 @@ const keyword = ref('')
 const items = ref([])
 
 const refresh = () => {
-  // 占位：后续接入移动后端查询接口
+  // 占位：后续接入知识点查询接口
   items.value = []
 }
 </script>
@@ -124,5 +124,39 @@ const refresh = () => {
 .title {
   font-weight: 900;
   font-size: 13px;
+}
+</style>
+<style scoped>
+.page {
+  padding-top: calc(14px + env(safe-area-inset-top));
+}
+
+.topbar {
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+}
+
+.topbar h2 {
+  font-size: 18px;
+}
+
+.card,
+.item {
+  border-radius: 20px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+}
+
+.btn {
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1f7a8c, #3d8da0);
+}
+
+.input {
+  border-radius: 14px;
+  border-color: rgba(32, 42, 55, 0.14);
 }
 </style>

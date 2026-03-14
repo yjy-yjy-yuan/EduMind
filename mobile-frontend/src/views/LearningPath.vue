@@ -7,7 +7,7 @@
 
     <div class="card">
       <div class="card-title">推荐路径（布局）</div>
-      <div class="muted">该页仅实现移动端固定布局；推荐数据由移动应用后端通过接口提供。</div>
+      <div class="muted">当前仅实现页面布局与步骤卡片；推荐结果后续通过预留接口接入。</div>
     </div>
 
     <div class="list">
@@ -33,7 +33,7 @@ const steps = ref([
 ])
 
 const refresh = () => {
-  // 占位：后续接入移动端后端推荐结果
+  // 占位：后续接入学习路径推荐接口
 }
 </script>
 
@@ -115,5 +115,34 @@ const refresh = () => {
 .title {
   font-weight: 900;
   font-size: 13px;
+}
+</style>
+<style scoped>
+.page {
+  padding-top: calc(14px + env(safe-area-inset-top));
+}
+
+.topbar {
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+}
+
+.topbar h2 {
+  font-size: 18px;
+}
+
+.card,
+.step {
+  border-radius: 20px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+}
+
+.badge {
+  background: rgba(31, 122, 140, 0.16);
+  color: var(--primary-deep);
 }
 </style>

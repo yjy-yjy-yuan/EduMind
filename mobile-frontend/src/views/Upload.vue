@@ -673,3 +673,86 @@ onMounted(async () => {
 .alert--ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
 .alert--bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
 </style>
+<style scoped>
+.page {
+  padding-top: calc(14px + env(safe-area-inset-top));
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+}
+
+.topbar h2 {
+  font-size: 18px;
+}
+
+.card {
+  border-radius: 22px;
+  padding: 16px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+  box-shadow: 0 14px 26px rgba(24, 45, 73, 0.08);
+}
+
+.card-title {
+  font-size: 15px;
+  color: #1f2a37;
+}
+
+.input {
+  border-radius: 14px;
+  border-color: rgba(32, 42, 55, 0.14);
+  padding: 12px;
+}
+
+.btn {
+  border-radius: 16px;
+}
+
+.btn--primary {
+  background: linear-gradient(135deg, #1f7a8c, #3d8da0);
+}
+
+.bar {
+  background: linear-gradient(90deg, #1f7a8c, #3d8da0);
+}
+
+.recent-item {
+  border-radius: 15px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: #fff;
+}
+
+.filter--active {
+  border-color: rgba(31, 122, 140, 0.36);
+  background: rgba(31, 122, 140, 0.1);
+  color: var(--primary-deep);
+}
+
+.status--ok {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.status--bad {
+  background: var(--bad-bg);
+  color: var(--bad-text);
+}
+
+.status--warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.status--info {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+</style>

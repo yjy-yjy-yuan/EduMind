@@ -13,17 +13,19 @@
         <button class="btn btn--primary" @click="go('/upload')">开始上传视频</button>
         <button class="btn" @click="go('/videos')">浏览视频列表</button>
       </div>
-      <div class="hero-tip">提示：右上角齿轮可设置“API 基地址”（移动应用后端）。</div>
+      <div class="hero-tip">当前阶段仅实现 UI 页面与交互占位；真实功能将在后续通过预留接口接入。</div>
     </section>
 
     <section class="card">
       <div class="title">使用流程</div>
-      <img class="workflow" src="@/assets/workflow.svg" alt="使用流程" />
+      <div class="workflow-flow" aria-label="使用流程图">
+        <div v-for="step in flowSteps" :key="step" class="workflow-flow__step">{{ step }}</div>
+      </div>
       <ol class="ol">
         <li>登录/注册后进入系统</li>
         <li>上传本地视频或粘贴链接</li>
-        <li>等待系统处理完成（字幕/摘要/标签）</li>
-        <li>进入视频详情，点击播放进行学习</li>
+        <li>当前版本用占位数据模拟处理流程与状态变化</li>
+        <li>进入视频详情和播放器页查看完整 UI 流程</li>
         <li>使用问答与笔记巩固学习效果</li>
       </ol>
     </section>
@@ -57,9 +59,9 @@
           <div class="acc-body">
             <ol class="ol">
               <li>进入“上传”页，选择本地上传或链接导入</li>
-              <li>上传完成后系统自动开始分析</li>
-              <li>在“视频”列表或详情页查看处理进度</li>
-              <li>完成后状态显示“已完成”，即可播放学习</li>
+              <li>当前阶段用本地 mock 数据驱动上传与分析状态</li>
+              <li>在“视频”列表或详情页查看占位进度与状态</li>
+              <li>后续接入真实接口后可无缝替换为正式处理流程</li>
             </ol>
             <div class="acc-actions">
               <button class="btn btn--primary" @click="go('/upload')">前往上传</button>
@@ -76,8 +78,8 @@
           <div class="acc-body">
             <ol class="ol">
               <li>在“视频”列表中选择一个“已完成”的视频进入详情</li>
-              <li>点击“播放”进入播放页开始学习</li>
-              <li>如后端提供字幕（VTT），播放器将自动加载字幕轨</li>
+              <li>点击“播放”进入播放器页面查看布局与交互占位</li>
+              <li>真实视频流、字幕轨与播放状态将在后续接入接口</li>
             </ol>
             <div class="acc-actions">
               <button class="btn" @click="go('/videos')">浏览视频列表</button>
@@ -116,7 +118,7 @@
             <div class="acc-actions">
               <button class="btn btn--primary" @click="go('/notes')">前往笔记</button>
             </div>
-            <div class="acc-note">如移动应用后端提供“导出”能力，可在此基础上增加导出入口。</div>
+            <div class="acc-note">当前优先完成页面结构，导出等能力后续通过接口扩展。</div>
           </div>
         </details>
 
@@ -129,7 +131,7 @@
             <ol class="ol">
               <li>进入“知识点总览”浏览系统提取的关键知识点</li>
               <li>进入“学习路径”查看学习步骤与规划建议</li>
-              <li>数据由移动应用后端提供，本页负责展示与交互</li>
+              <li>当前展示静态或 mock 内容，后续切换为真实接口数据</li>
             </ol>
             <div class="acc-actions">
               <button class="btn" @click="go('/knowledge')">知识点总览</button>
@@ -156,7 +158,7 @@
             <span class="acc-title">视频处理需要多长时间？</span>
           </summary>
           <div class="acc-body">
-            处理时间取决于视频长度与服务器负载；可在“视频”列表/详情查看进度。
+            当前为 UI-only 阶段，页面使用本地 mock 数据模拟处理时间与状态变化。
           </div>
         </details>
         <details class="acc">
@@ -164,7 +166,7 @@
             <span class="acc-title">如何使用 AI 问答功能？</span>
           </summary>
           <div class="acc-body">
-            打开“问答”页面输入问题即可；从视频详情进入可带上 videoId 做视频问答。
+            当前问答页使用占位回复演示交互；后续会切换到正式问答接口。
           </div>
         </details>
         <details class="acc">
@@ -172,7 +174,7 @@
             <span class="acc-title">页面打不开/白屏怎么办？</span>
           </summary>
           <div class="acc-body">
-            请确认网络正常、后端服务可访问，并在右上角齿轮中正确配置“API 基地址”（移动应用后端）。如仍失败，可尝试重新打开应用或清理缓存后再试。
+            当前版本默认是 UI-only 模式，不依赖真实后端。若页面异常，请优先检查前端资源是否已重新构建并同步到 iOS 容器。
           </div>
         </details>
       </div>
@@ -184,6 +186,7 @@
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
+const flowSteps = ['登录', '上传', '分析', '播放', '问答', '笔记', '总览']
 const goBack = () => {
   if (window.history.length > 1) router.back()
   else router.replace('/')
@@ -257,6 +260,24 @@ const go = (path) => router.push(path)
   margin-top: 10px;
   font-size: 12px;
   opacity: 0.92;
+}
+
+.workflow-flow {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.workflow-flow__step {
+  position: relative;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(31, 122, 140, 0.12), rgba(61, 141, 160, 0.2));
+  color: #0f4c5c;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
 }
 
 .btn {
@@ -366,5 +387,37 @@ const go = (path) => router.push(path)
   margin-top: 10px;
   color: var(--muted);
   font-size: 12px;
+}
+</style>
+<style scoped>
+.hero {
+  background:
+    radial-gradient(circle at right top, rgba(255, 255, 255, 0.24), transparent 44%),
+    linear-gradient(145deg, #1f7a8c, #0f5f70);
+}
+
+.btn--primary {
+  background: linear-gradient(145deg, #1f7a8c, #3d8da0);
+}
+
+.workflow {
+  border-radius: 18px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: #fff;
+}
+
+.acc {
+  border-color: rgba(32, 42, 55, 0.1);
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+}
+
+.acc-badge {
+  background: rgba(31, 122, 140, 0.14);
+  color: var(--primary-deep);
+}
+
+.acc-note {
+  background: rgba(31, 122, 140, 0.08);
+  color: var(--primary-deep);
 }
 </style>
