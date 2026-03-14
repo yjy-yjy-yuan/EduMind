@@ -31,6 +31,11 @@
 
 ## 2026-03-13
 
+### 上传视频功能联调（按 VIDEO_UPLOAD_IMPLEMENTATION / DATABASE_SETUP / 主提示词）
+- 更新 [`mobile-frontend/src/api/video.js`](mobile-frontend/src/api/video.js)：移除上传请求中显式 `Content-Type: multipart/form-data`，由 axios 对 FormData 自动设置 boundary，与后端 `File(...)` 兼容。
+- 更新 [`mobile-frontend/.env.example`](mobile-frontend/.env.example)：补充真机=前端、端口连调说明及 `VITE_MOBILE_UI_ONLY` 注释（false 时走真实上传/登录）。
+- 更新 [`backend_fastapi/.env.example`](backend_fastapi/.env.example)：补充真机连调说明（HOST=0.0.0.0、CORS 加入本机 IP:5173）。
+
 ### iOS 空白页修复
 - 更新 [`mobile-frontend/vite.config.js`](/Users/yuan/final-work/EduMind/mobile-frontend/vite.config.js)：`ios` 模式增加 `build.assetsDir = ''`，避免 Xcode 复制资源平铺后导致 `index.html` 仍引用 `./assets/*` 而白屏。
 - 更新 [`mobile-frontend/vite.config.js`](/Users/yuan/final-work/EduMind/mobile-frontend/vite.config.js)：`ios` 模式输出改为固定文件名（如 `index.js`、`index.css`），避免哈希文件名变化引发容器资源引用错位。
@@ -131,3 +136,13 @@
 - 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)：强化 logo 容器的固定比例与非压缩布局，避免在主页面顶部被按钮或窄屏挤压变形。
 - 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)：新增全局 `gradient-text` 渐变文字样式。
 - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Login.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Login.vue)、[`mobile-frontend/src/views/Register.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Register.vue)：将主标题改为渐变文字，并调整品牌区域布局，避免 logo 出现压缩、挤压。
+
+### 视频上传闭环收口
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/app/tasks/video_download.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_download.py)、[`backend_fastapi/app/models/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/video.py)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)：本地视频上传改为分块落盘并按 `MAX_CONTENT_LENGTH` 限制体积；链接上传改为立即返回 `downloading` 记录并交由后台任务下载；列表/状态接口补齐 `process_progress`、`current_step`、`error_message`。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/services/videoStatus.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/videoStatus.js)：移动端接入新的下载中状态，链接上传后会在下载完成时自动发起处理，最近上传卡片的状态归一和筛选逻辑同步调整。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)、[`docs/VIDEO_UPLOAD_IMPLEMENTATION.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_UPLOAD_IMPLEMENTATION.md)：补充上传相关 API 测试，并在实现文档中追加本次收口说明。
+
+### iOS 视频上传崩溃修复
+- 更新 [`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：补充 `NSCameraUsageDescription`、`NSMicrophoneUsageDescription`、`NSPhotoLibraryUsageDescription`，修复 iOS 在点击视频上传控件时触发 `TCC_CRASHING_DUE_TO_PRIVACY_VIOLATION`。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：将上传控件的 `accept` 从 `video/*` 改为明确的视频扩展名列表，降低系统优先走“拍摄视频”分支的概率。
+- 更新 [`ios-app/README.md`](/Users/yuan/final-work/EduMind/ios-app/README.md)：补充 iOS 视频上传权限说明与排查要点。

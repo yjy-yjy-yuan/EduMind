@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 import traceback
 from typing import Optional
 
@@ -12,9 +13,12 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.video import Video
 from app.models.video import VideoStatus
+from app.schemas.video import VideoDetail
+from app.schemas.video import VideoListResponse
 from app.schemas.video import VideoProcessRequest
 from app.schemas.video import VideoUploadResponse
 from app.schemas.video import VideoUploadURL
+from app.schemas.video import VideoStatusResponse
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import File
@@ -30,7 +34,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-ALLOWED_EXTENSIONS = {"mp4", "avi", "mov", "mkv", "webm"}
+ALLOWED_EXTENSIONS = {ext.lower() for ext in settings.ALLOWED_EXTENSIONS}
+UPLOAD_CHUNK_SIZE = 1024 * 1024
 
 
 def allowed_file(filename: str) -> bool:
@@ -45,6 +50,62 @@ def secure_filename_with_chinese(filename: str) -> str:
     return filename
 
 
+def build_local_video_path(original_filename: str) -> tuple[str, str, str]:
+    """构建本地上传视频的标题、文件名和落盘路径"""
+    name, ext = os.path.splitext(original_filename)
+    cleaned_name = secure_filename_with_chinese(name) or "video"
+    title = f"local-{cleaned_name}"
+    filename = f"{title}{ext.lower()}"
+    file_path = os.path.join(settings.UPLOAD_FOLDER, filename)
+
+    if os.path.exists(file_path):
+        import time
+
+        title = f"{title}_{int(time.time())}"
+        filename = f"{title}{ext.lower()}"
+        file_path = os.path.join(settings.UPLOAD_FOLDER, filename)
+
+    return title, filename, file_path
+
+
+async def save_upload_to_temp(file: UploadFile) -> tuple[str, str, int]:
+    """分块写入临时文件并计算 MD5"""
+    os.makedirs(settings.TEMP_FOLDER, exist_ok=True)
+    suffix = os.path.splitext(file.filename or "")[1]
+    temp_file = tempfile.NamedTemporaryFile(delete=False, dir=settings.TEMP_FOLDER, suffix=suffix)
+    digest = hashlib.md5()
+    total_size = 0
+
+    try:
+        while True:
+            chunk = await file.read(UPLOAD_CHUNK_SIZE)
+            if not chunk:
+                break
+
+            total_size += len(chunk)
+            if total_size > settings.MAX_CONTENT_LENGTH:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"文件过大，当前上限为 {settings.MAX_CONTENT_LENGTH // (1024 * 1024)}MB",
+                )
+
+            digest.update(chunk)
+            temp_file.write(chunk)
+
+        if total_size <= 0:
+            raise HTTPException(status_code=400, detail="上传文件为空")
+
+        temp_file.flush()
+        return temp_file.name, digest.hexdigest(), total_size
+    except Exception:
+        if os.path.exists(temp_file.name):
+            os.remove(temp_file.name)
+        raise
+    finally:
+        temp_file.close()
+        await file.seek(0)
+
+
 @router.post("/upload", response_model=VideoUploadResponse)
 async def upload_video(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """上传视频文件"""
@@ -53,16 +114,18 @@ async def upload_video(file: UploadFile = File(...), db: Session = Depends(get_d
     if not file.filename or not allowed_file(file.filename):
         raise HTTPException(status_code=400, detail="不支持的文件类型")
 
+    temp_path = None
     try:
-        # 读取文件内容计算 MD5
-        content = await file.read()
-        file_md5 = hashlib.md5(content).hexdigest()
-        await file.seek(0)
+        os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
+        temp_path, file_md5, file_size = await save_upload_to_temp(file)
         logger.info(f"文件MD5: {file_md5}")
 
         # 检查重复
         existing_video = db.query(Video).filter(Video.md5 == file_md5).first()
         if existing_video:
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
+                temp_path = None
             return VideoUploadResponse(
                 id=existing_video.id,
                 status=(
@@ -75,45 +138,39 @@ async def upload_video(file: UploadFile = File(...), db: Session = Depends(get_d
                 data=existing_video.to_dict(),
             )
 
-        # 确保上传目录存在
-        os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)
-
-        # 处理文件名
-        original_filename = file.filename
-        name, ext = os.path.splitext(original_filename)
-        cleaned_name = secure_filename_with_chinese(name)
-        title = f"local-{cleaned_name}"
-        filename = f"{title}{ext}"
-        file_path = os.path.join(settings.UPLOAD_FOLDER, filename)
-
-        # 如果文件已存在，添加时间戳
-        if os.path.exists(file_path):
-            import time
-
-            title = f"{title}_{int(time.time())}"
-            filename = f"{title}{ext}"
-            file_path = os.path.join(settings.UPLOAD_FOLDER, filename)
-
-        # 保存文件
-        with open(file_path, "wb") as f:
-            f.write(content)
+        title, filename, file_path = build_local_video_path(file.filename)
+        os.replace(temp_path, file_path)
+        temp_path = None
 
         # 创建数据库记录
-        video = Video(filename=filename, filepath=file_path, title=title, status=VideoStatus.UPLOADED, md5=file_md5)
+        video = Video(
+            filename=filename,
+            filepath=file_path,
+            title=title,
+            status=VideoStatus.UPLOADED,
+            md5=file_md5,
+            process_progress=0.0,
+            current_step="已上传，等待处理",
+        )
         db.add(video)
         db.commit()
         db.refresh(video)
 
-        logger.info(f"视频上传成功: ID={video.id}")
+        logger.info(f"视频上传成功: ID={video.id}, size={file_size}")
 
         return VideoUploadResponse(
             id=video.id, status="uploaded", message="视频上传成功", duplicate=False, data=video.to_dict()
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"上传错误: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="上传失败，请重试")
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 @router.post("/upload-url", response_model=VideoUploadResponse)
@@ -130,8 +187,24 @@ async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
     if not (is_bilibili or is_youtube or is_mooc):
         raise HTTPException(status_code=400, detail="目前仅支持B站、YouTube和中国大学慕课视频")
 
+    existing_video = (
+        db.query(Video)
+        .filter(Video.url == video_url, Video.status != VideoStatus.FAILED)
+        .order_by(Video.upload_time.desc())
+        .first()
+    )
+    if existing_video:
+        return VideoUploadResponse(
+            id=existing_video.id,
+            status=existing_video.status.value if hasattr(existing_video.status, "value") else str(existing_video.status),
+            message="该视频链接已提交过",
+            duplicate=True,
+            data=existing_video.to_dict(),
+        )
+
     video_id = None
     title = None
+    source_type = "video"
 
     if is_bilibili:
         bv_match = re.search(r"BV[0-9A-Za-z]+", video_url)
@@ -144,6 +217,7 @@ async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
             title = f"bilibili-{video_id}"
         else:
             raise HTTPException(status_code=400, detail="无效的B站视频链接")
+        source_type = "bilibili"
     elif is_youtube:
         if "youtube.com" in video_url:
             match = re.search(r"v=([^&]+)", video_url)
@@ -154,6 +228,7 @@ async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
         if not video_id:
             raise HTTPException(status_code=400, detail="无效的YouTube视频链接")
         title = f"youtube-{video_id}"
+        source_type = "youtube"
     elif is_mooc:
         course_match = re.search(r"learn/([^-]+)-(\d+)", video_url)
         if course_match:
@@ -162,66 +237,41 @@ async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
             video_id = course_id
         else:
             raise HTTPException(status_code=400, detail="无效的慕课视频链接")
+        source_type = "mooc"
 
-    # 创建临时视频记录
-    temp_video = Video(title=title, url=video_url, status=VideoStatus.DOWNLOADING)
+    temp_video = Video(
+        title=title,
+        url=video_url,
+        status=VideoStatus.DOWNLOADING,
+        process_progress=0.0,
+        current_step="已提交，等待下载",
+    )
     db.add(temp_video)
     db.commit()
     db.refresh(temp_video)
 
     try:
-        # 使用 yt-dlp 下载视频
-        import yt_dlp
+        from app.core.executor import submit_task
+        from app.tasks.video_download import download_video_from_url_task
 
-        download_folder = settings.UPLOAD_FOLDER
-        os.makedirs(download_folder, exist_ok=True)
-
-        ydl_opts = {
-            "outtmpl": os.path.join(download_folder, "%(title)s.%(ext)s"),
-            "merge_output_format": "mp4",
-            "quiet": True,
-            "no_warnings": True,
-        }
-
-        if is_youtube:
-            ydl_opts["proxy"] = "http://127.0.0.1:7890"
-            ydl_opts["cookiesfrombrowser"] = ("chrome",)
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
-            video_title = secure_filename_with_chinese(info.get("title", "未知标题"))
-            prefix = "bilibili-" if is_bilibili else ("youtube-" if is_youtube else "mooc-")
-            title = f"{prefix}{video_title}"
-
-            ydl_opts["outtmpl"] = os.path.join(download_folder, f"{title}.%(ext)s")
-
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl2:
-                ydl2.download([video_url])
-
-            filename = f"{title}.mp4"
-            filepath = os.path.join(download_folder, filename)
-
-            if not os.path.exists(filepath):
-                raise FileNotFoundError(f"下载的视频文件不存在: {filepath}")
-
-        # 更新视频记录
-        temp_video.filename = filename
-        temp_video.filepath = filepath
-        temp_video.title = title
-        temp_video.status = VideoStatus.UPLOADED
-        db.commit()
-
-        return VideoUploadResponse(id=temp_video.id, status="uploaded", message="视频上传成功")
-
-    except Exception as e:
-        logger.error(f"下载视频失败: {str(e)}")
+        submit_task(download_video_from_url_task, temp_video.id, video_url, source_type)
+        return VideoUploadResponse(
+            id=temp_video.id,
+            status="downloading",
+            message="链接已提交，正在后台下载，下载完成后可自动开始处理",
+            duplicate=False,
+            data=temp_video.to_dict(),
+        )
+    except Exception as exc:
+        logger.error(f"提交下载任务失败: {str(exc)}")
         temp_video.status = VideoStatus.FAILED
-        temp_video.error_message = str(e)
+        temp_video.current_step = "下载任务提交失败"
+        temp_video.error_message = str(exc)
         db.commit()
-        raise HTTPException(status_code=500, detail=f"下载视频失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="提交链接下载任务失败，请稍后重试")
 
 
-@router.get("/list")
+@router.get("/list", response_model=VideoListResponse)
 async def get_video_list(
     page: int = Query(1, ge=1), per_page: int = Query(5, ge=1, le=100), db: Session = Depends(get_db)
 ):
@@ -253,6 +303,10 @@ async def get_video_list(
                     "fps": video.fps,
                     "summary": video.summary,
                     "tags": tags,
+                    "url": video.url,
+                    "process_progress": video.process_progress or 0,
+                    "current_step": video.current_step,
+                    "error_message": video.error_message,
                 }
                 result.append(video_data)
             except Exception as e:
@@ -277,7 +331,7 @@ async def get_video_list(
         raise HTTPException(status_code=500, detail=f"获取视频列表失败: {str(e)}")
 
 
-@router.get("/{video_id}")
+@router.get("/{video_id}", response_model=VideoDetail)
 async def get_video(video_id: int, db: Session = Depends(get_db)):
     """获取视频详情"""
     video = db.query(Video).filter(Video.id == video_id).first()
@@ -286,7 +340,7 @@ async def get_video(video_id: int, db: Session = Depends(get_db)):
     return video.to_dict()
 
 
-@router.get("/{video_id}/status")
+@router.get("/{video_id}/status", response_model=VideoStatusResponse)
 async def get_video_status(video_id: int, db: Session = Depends(get_db)):
     """获取视频状态"""
     video = db.query(Video).filter(Video.id == video_id).first()
@@ -301,6 +355,7 @@ async def get_video_status(video_id: int, db: Session = Depends(get_db)):
         "progress": video.process_progress or 0,
         "current_step": video.current_step or "",
         "task_id": video.task_id,
+        "error_message": video.error_message,
     }
 
 

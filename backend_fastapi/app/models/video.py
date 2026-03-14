@@ -92,6 +92,7 @@ class Video(Base):
             "filename": self.filename,
             "filepath": self.filepath,
             "title": self.title,
+            "url": self.url,
             "status": self.status.value if isinstance(self.status, VideoStatus) else self.status,
             "upload_time": self.upload_time.isoformat() if self.upload_time else None,
             "duration": self.duration,

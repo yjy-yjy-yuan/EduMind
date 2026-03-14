@@ -7,7 +7,14 @@
 
     <div class="card">
       <div class="card-title">本地视频</div>
-      <input ref="fileInputRef" class="file" type="file" accept="video/*" @change="onFileChange" :disabled="busy" />
+      <input
+        ref="fileInputRef"
+        class="file"
+        type="file"
+        accept=".mp4,.avi,.mov,.mkv,.webm,.flv"
+        @change="onFileChange"
+        :disabled="busy"
+      />
       <div v-if="file" class="muted">已选择：{{ file.name }}（{{ readableSize(file.size) }}）</div>
       <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
         {{ busy ? '上传中…' : '开始上传' }}
@@ -84,6 +91,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getVideoStatus, processVideo, uploadLocalVideo, uploadVideoUrl } from '@/api/video'
+import { normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
 const router = useRouter()
@@ -100,13 +108,13 @@ const syncingRecent = ref(false)
 const statusFilter = ref('all')
 
 const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
-const ALLOWED_EXTENSIONS = new Set(['mp4', 'avi', 'mov', 'mkv', 'webm'])
+const ALLOWED_EXTENSIONS = new Set(['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'])
 const RECENT_UPLOADS_KEY = 'm_recent_uploads'
 const MAX_RECENT_UPLOADS = 8
 const STATUS_FILTERS = [
   { value: 'all', label: '全部' },
   { value: 'failed', label: '失败' },
-  { value: 'processing', label: '处理中' },
+  { value: 'active', label: '进行中' },
   { value: 'completed', label: '已完成' }
 ]
 
@@ -144,32 +152,13 @@ const resolveVideoId = (payload) => {
   return data?.video_id || data?.id || data?.video?.id || data?.data?.id || data?.data?.video_id
 }
 
-const normalizeStatus = (status) => {
-  const s = String(status || '').toLowerCase()
-  if (['uploaded', 'pending', 'processing', 'completed', 'failed', 'downloading', 'processed'].includes(s)) {
-    return s === 'processed' ? 'completed' : s
-  }
-  return 'unknown'
-}
-
-const statusText = (status) => {
-  const map = {
-    uploaded: '已上传',
-    pending: '排队中',
-    processing: '处理中',
-    completed: '已完成',
-    failed: '失败',
-    downloading: '下载中',
-    unknown: '未知'
-  }
-  return map[normalizeStatus(status)] || '未知'
-}
+const statusText = videoStatusText
 
 const statusClass = (status) => {
-  const s = normalizeStatus(status)
-  if (s === 'completed') return 'status--ok'
-  if (s === 'failed') return 'status--bad'
-  if (['processing', 'pending', 'downloading'].includes(s)) return 'status--warn'
+  const tone = videoStatusTone(status)
+  if (tone === 'ok') return 'status--ok'
+  if (tone === 'bad') return 'status--bad'
+  if (tone === 'warn') return 'status--warn'
   return 'status--info'
 }
 
@@ -196,7 +185,7 @@ const normalizeRecentUploads = (list) => {
       time: String(item.time || ''),
       timeText: formatTimeText(item.time),
       duplicate: Boolean(item.duplicate),
-      status: normalizeStatus(item.status || (item.duplicate ? 'uploaded' : 'pending')),
+      status: normalizeVideoStatus(item.status || (item.duplicate ? 'uploaded' : 'pending')),
       retrying: false
     }))
     .filter((item) => item.key)
@@ -204,7 +193,10 @@ const normalizeRecentUploads = (list) => {
 
 const filteredRecentUploads = computed(() => {
   if (statusFilter.value === 'all') return recentUploads.value
-  return recentUploads.value.filter((item) => normalizeStatus(item.status) === statusFilter.value)
+  if (statusFilter.value === 'active') {
+    return recentUploads.value.filter((item) => ['pending', 'processing', 'downloading'].includes(normalizeVideoStatus(item.status)))
+  }
+  return recentUploads.value.filter((item) => normalizeVideoStatus(item.status) === statusFilter.value)
 })
 
 const loadRecentUploads = () => {
@@ -224,7 +216,7 @@ const persistRecentUploads = () => {
   }
 }
 
-const addRecentUpload = ({ videoId, title, typeText, duplicate = false }) => {
+const addRecentUpload = ({ videoId, title, typeText, duplicate = false, status = 'pending' }) => {
   const now = new Date().toISOString()
   const item = {
     key: `${videoId || 'none'}-${now}`,
@@ -234,7 +226,7 @@ const addRecentUpload = ({ videoId, title, typeText, duplicate = false }) => {
     time: now,
     timeText: formatTimeText(now),
     duplicate: Boolean(duplicate),
-    status: normalizeStatus(duplicate ? 'uploaded' : 'pending'),
+    status: normalizeVideoStatus(duplicate ? 'uploaded' : status),
     retrying: false
   }
   const merged = [item, ...recentUploads.value.filter((x) => x.videoId !== item.videoId || !item.videoId)]
@@ -253,9 +245,9 @@ const syncRecentStatuses = async () => {
         try {
           const res = await getVideoStatus(item.videoId)
           const data = res?.data || {}
-          return { key: item.key, status: normalizeStatus(data?.status || data?.data?.status) }
+          return { key: item.key, status: normalizeVideoStatus(data?.status || data?.data?.status) }
         } catch {
-          return { key: item.key, status: normalizeStatus(item.status) }
+          return { key: item.key, status: normalizeVideoStatus(item.status) }
         }
       })
     )
@@ -377,7 +369,8 @@ const uploadFile = async () => {
       videoId,
       title: data?.data?.title || file.value?.name || '本地视频',
       typeText: `本地文件 · ${readableSize(file.value?.size)}`,
-      duplicate: Boolean(data?.duplicate)
+      duplicate: Boolean(data?.duplicate),
+      status: data?.status || 'uploaded'
     })
     router.push(
       videoId
@@ -407,14 +400,19 @@ const uploadUrl = async () => {
     const res = await uploadVideoUrl({ url: trimmedUrl })
     const data = res?.data || {}
     const videoId = resolveVideoId(data)
-    message.value = data?.message || '已提交链接，已为你自动开始处理'
+    message.value = data?.message || '已提交链接，下载完成后会自动开始处理'
     addRecentUpload({
       videoId,
       title: data?.data?.title || trimmedUrl,
       typeText: '链接导入',
-      duplicate: Boolean(data?.duplicate)
+      duplicate: Boolean(data?.duplicate),
+      status: data?.status || 'downloading'
     })
-    router.push(videoId ? { path: `/videos/${videoId}`, query: { autostart: '1' } } : '/videos')
+    router.push(
+      videoId
+        ? { path: `/videos/${videoId}`, query: data?.duplicate ? undefined : { autostart: '1' } }
+        : '/videos'
+    )
   } catch (e) {
     error.value = extractErrorMessage(e, '提交失败')
   } finally {

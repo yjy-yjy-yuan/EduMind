@@ -43,8 +43,7 @@ export function uploadLocalVideo(formData, { onUploadProgress } = {}) {
     data: formData,
     onUploadProgress,
     timeout: 600000,
-    retry: 0,
-    headers: { 'Content-Type': 'multipart/form-data' }
+    retry: 0
   })
 }
 

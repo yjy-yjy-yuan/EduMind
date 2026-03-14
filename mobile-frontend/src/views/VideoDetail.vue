@@ -67,6 +67,17 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { UI_ONLY_MODE } from '@/config'
 import { deleteVideo, getVideo, getVideoStatus, processVideo } from '@/api/video'
+import {
+  canAutoStartVideoProcessing,
+  canPlayVideo,
+  canRetryVideoProcessing,
+  createFixedIntervalPoller,
+  isActiveVideoStatus,
+  isCompletedVideoStatus,
+  normalizeVideoStatus,
+  videoStatusText,
+  videoStatusTone
+} from '@/services/videoStatus'
 
 const route = useRoute()
 const router = useRouter()
@@ -79,22 +90,23 @@ const statusInfo = ref({ status: '', progress: 0, current_step: '' })
 const autoStarting = ref(false)
 const retrying = ref(false)
 
-let pollTimer = null
+let statusPoller = null
 
 const statusValue = computed(() => statusInfo.value.status || video.value?.status || '')
 const progressValue = computed(() => Number(statusInfo.value.progress ?? 0) || 0)
 const stepValue = computed(() => statusInfo.value.current_step || '')
 const heroInitial = computed(() => String(video.value?.title || 'V').trim().slice(0, 1).toUpperCase() || 'V')
 
-const isInProgress = (status) => ['processing', 'pending', 'downloading'].includes(status)
+const isInProgress = isActiveVideoStatus
+const statusText = videoStatusText
 
-const canPlay = computed(() => ['completed', 'processed'].includes(statusValue.value))
-const canRetry = computed(() => statusValue.value === 'failed')
+const canPlay = computed(() => canPlayVideo(statusValue.value))
+const canRetry = computed(() => canRetryVideoProcessing(statusValue.value))
 const processDisabled = computed(
-  () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(statusValue.value)
+  () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(normalizeVideoStatus(statusValue.value))
 )
 const deleteDisabled = computed(
-  () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(statusValue.value)
+  () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(normalizeVideoStatus(statusValue.value))
 )
 
 const extractErrorMessage = (err, fallback) => {
@@ -110,30 +122,15 @@ const extractErrorMessage = (err, fallback) => {
   return err?.message || fallback
 }
 
-const statusText = (status) => {
-  const map = {
-    uploaded: '已上传',
-    pending: '排队中',
-    processing: '处理中',
-    completed: '已完成',
-    failed: '失败',
-    downloading: '下载中',
-    processed: '已完成'
-  }
-  return map[status] || (status || '未知')
-}
-
 const badgeClass = (status) => {
-  if (status === 'completed' || status === 'processed') return 'ok'
-  if (status === 'failed') return 'bad'
-  if (isInProgress(status)) return 'warn'
-  return 'info'
+  return videoStatusTone(status)
 }
 
 const heroClass = computed(() => {
-  if (statusValue.value === 'completed' || statusValue.value === 'processed') return 'hero-shell--ok'
-  if (statusValue.value === 'failed') return 'hero-shell--bad'
-  if (isInProgress(statusValue.value)) return 'hero-shell--warn'
+  const tone = videoStatusTone(statusValue.value)
+  if (tone === 'ok') return 'hero-shell--ok'
+  if (tone === 'bad') return 'hero-shell--bad'
+  if (tone === 'warn') return 'hero-shell--warn'
   return 'hero-shell--idle'
 })
 
@@ -157,47 +154,68 @@ const clearAutoStartQuery = async () => {
 const shouldAutoStart = () => String(route.query?.autostart || '') === '1'
 
 const tryAutoStartProcessing = async () => {
-  if (!shouldAutoStart()) return
+  if (!shouldAutoStart() || autoStarting.value || retrying.value) return
 
-  if (isInProgress(statusValue.value) || ['completed', 'processed'].includes(statusValue.value)) {
+  const currentStatus = normalizeVideoStatus(statusValue.value)
+  if (isCompletedVideoStatus(currentStatus)) {
     await clearAutoStartQuery()
     return
   }
 
-  if (!['uploaded', 'failed'].includes(statusValue.value)) {
+  if (isActiveVideoStatus(currentStatus)) {
+    return
+  }
+
+  if (!canAutoStartVideoProcessing(currentStatus)) {
     await clearAutoStartQuery()
     return
   }
 
   autoStarting.value = true
   error.value = ''
+  let attempted = false
   try {
+    attempted = true
     await processVideo(id.value)
     await fetchStatus()
     startPollingIfNeeded()
   } catch (e) {
-    error.value = e?.response?.data?.detail || e?.message || '自动开始处理失败'
+    error.value = extractErrorMessage(e, '自动开始处理失败')
   } finally {
     autoStarting.value = false
-    await clearAutoStartQuery()
+    if (attempted) await clearAutoStartQuery()
   }
 }
 
-const startPollingIfNeeded = () => {
-  clearInterval(pollTimer)
-  pollTimer = null
-  if (!isInProgress(statusValue.value)) return
-  pollTimer = setInterval(async () => {
-    try {
-      await fetchStatus()
-      if (!isInProgress(statusValue.value)) {
-        clearInterval(pollTimer)
-        pollTimer = null
+const ensureStatusPoller = () => {
+  if (statusPoller) return statusPoller
+
+  statusPoller = createFixedIntervalPoller({
+    intervalMs: 2000,
+    shouldPoll: () => isActiveVideoStatus(statusValue.value) || shouldAutoStart(),
+    onTick: async () => {
+      try {
+        await fetchStatus()
+        await tryAutoStartProcessing()
+        if (!isActiveVideoStatus(statusValue.value) && !shouldAutoStart()) {
+          statusPoller.stop()
+        }
+      } catch {
+        // ignore transient polling failures
       }
-    } catch {
-      // ignore
     }
-  }, 2000)
+  })
+
+  return statusPoller
+}
+
+const startPollingIfNeeded = () => {
+  const poller = ensureStatusPoller()
+  if (!isActiveVideoStatus(statusValue.value) && !shouldAutoStart()) {
+    poller.stop()
+    return
+  }
+  poller.start()
 }
 
 const normalizeVideo = (payload) => payload?.video || payload?.data || payload || null
@@ -260,7 +278,7 @@ const remove = async () => {
 }
 
 onMounted(reload)
-onUnmounted(() => clearInterval(pollTimer))
+onUnmounted(() => statusPoller?.stop())
 </script>
 
 <style scoped>

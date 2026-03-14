@@ -96,6 +96,7 @@ class VideoStatusResponse(BaseModel):
     progress: float = 0
     current_step: str = ""
     task_id: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 class VideoListResponse(BaseModel):
