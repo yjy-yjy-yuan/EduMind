@@ -106,3 +106,28 @@
 
 ### 笔记页交互简化
 - 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：移除“最近笔记堆叠”区域及其旋转/缩放卡片交互，改为仅保留稳定的普通笔记列表，提升真机点按与滚动操作的可用性。
+
+### 全局背景视觉替换
+- 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)、[`mobile-frontend/src/App.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/App.vue)：将应用全局背景调整为参考示意图的柔雾渐变风格，以暖米色、淡紫和蜜桃色大面积模糊色块替换原有背景装饰，便于在真机上预览新氛围效果。
+
+### 全局背景视觉调整（冷蓝渐变）
+- 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)、[`mobile-frontend/src/App.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/App.vue)：将应用背景由暖色柔雾切换为参考示意图的冷蓝抽象渐变风格，使用浅雾蓝底色、青蓝色大面积模糊光斑与右上深蓝主视觉区块，便于真机预览新的整体氛围。
+
+### 全局背景视觉微调（冷蓝渐变二次优化）
+- 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)、[`mobile-frontend/src/App.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/App.vue)：进一步强化右上深蓝主视觉区、左侧白雾纵向光带和整体卡片透明度，使应用背景更贴近参考图的冷蓝抽象渐变效果。
+
+### 品牌 Logo 接入
+- 新增 [`mobile-frontend/src/assets/edumind-logo.svg`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo.svg)、[`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)：新增 EduMind 品牌 logo 资源与可复用展示组件。
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Login.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Login.vue)、[`mobile-frontend/src/views/Register.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Register.vue)：将首页与登录/注册页的品牌展示替换为新的 EduMind logo。
+
+### iOS 原生 App 图标替换
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/Contents.json`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/Contents.json)：为 iOS 18 风格的 light/dark/tinted 三个通用图标位绑定实际文件名。
+- 新增 [`AppIcon-1024.png`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png)、[`AppIcon-1024-dark.png`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024-dark.png)、[`AppIcon-1024-tinted.png`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024-tinted.png)：将新的 EduMind logo 写入原生 App 图标资源。
+
+### 对 2026-03-14 App 图标记录的更正说明
+- 更正 [`ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/Contents.json`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/Contents.json)：当前先收敛为单一 1024x1024 主图标 `AppIcon-1024.png`，未继续保留 dark/tinted 变体文件，优先保证原生 App 图标替换稳定生效。
+
+### Logo 布局与渐变文字优化
+- 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)：强化 logo 容器的固定比例与非压缩布局，避免在主页面顶部被按钮或窄屏挤压变形。
+- 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)：新增全局 `gradient-text` 渐变文字样式。
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Login.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Login.vue)、[`mobile-frontend/src/views/Register.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Register.vue)：将主标题改为渐变文字，并调整品牌区域布局，避免 logo 出现压缩、挤压。

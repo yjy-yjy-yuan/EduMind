@@ -1,7 +1,10 @@
 <template>
   <div class="page">
     <header class="hero">
-      <div class="title">创建账号</div>
+      <div class="hero__logo">
+        <BrandLogo :width="188" />
+      </div>
+      <div class="title gradient-text">创建账号</div>
       <div class="subtitle">移动端注册</div>
     </header>
 
@@ -24,6 +27,7 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import BrandLogo from '@/components/BrandLogo.vue'
 import * as authStore from '@/store/auth'
 
 const router = useRouter()
@@ -71,9 +75,16 @@ const submit = async () => {
   box-shadow: 0 10px 30px rgba(102, 126, 234, 0.25);
 }
 
+.hero__logo {
+  margin-bottom: 12px;
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
 .title {
   font-size: 18px;
   font-weight: 900;
+  text-shadow: 0 8px 22px rgba(16, 101, 132, 0.16);
 }
 
 .subtitle {
