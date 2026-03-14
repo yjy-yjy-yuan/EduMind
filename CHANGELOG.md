@@ -91,3 +91,8 @@
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：移除 dev server 加载分支，iOS 容器固定只加载包内 `WebAssets/index.html`；同步修正 watchdog 提示文案与 probe 容错。
 - 更新 [`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：移除 `INFOPLIST_KEY_EDUMIND_DEV_SERVER_URL` 预留项，避免后续误切到 `5173` 路径。
 - 更新 [`ios-app/README.md`](/Users/yuan/final-work/EduMind/ios-app/README.md)、[`mobile-frontend/README.md`](/Users/yuan/final-work/EduMind/mobile-frontend/README.md)、[`docs/MOBILE_MODULE_PROMPTS.md`](/Users/yuan/final-work/EduMind/docs/MOBILE_MODULE_PROMPTS.md)：文档统一为“当前 iOS 仅加载本地静态 UI 资源”，消除旧版 `5173` 示例带来的误导。
+
+### 移动端页面适配与字体优化
+- 更新 [`mobile-frontend/index.html`](/Users/yuan/final-work/EduMind/mobile-frontend/index.html)：补充移动端 viewport 限制，关闭双击缩放与用户缩放，并禁用电话/邮箱自动识别，避免真机页面误放大与排版抖动。
+- 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)：重建全局字体栈为 `SF Pro Text/Display + PingFang SC`，统一正文与标题字重、字距、行高；同时补充 `100% text-size-adjust`、流式边距、媒体元素自适应和小屏幕断点，修复页面贴边、挤压和横向溢出问题。
+- 更新 [`mobile-frontend/src/App.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/App.vue)：外层壳布局改为 `100dvh` 移动端高度模型，并收紧内容区与背景装饰在小屏设备上的占位，提升 iPhone 真机上的首屏适配性与观感一致性。
