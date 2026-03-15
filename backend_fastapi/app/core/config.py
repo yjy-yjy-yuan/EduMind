@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     HOST: str = "127.0.0.1"
     PORT: int = 2004  # FastAPI 端口
     SECRET_KEY: str = "dev-secret-key-change-in-production"
+    AUTO_CREATE_TABLES: bool = False
 
     # 数据库配置 (MySQL)
     DATABASE_URL: str = "mysql+pymysql://root:password@localhost:3306/ai_edvision"

@@ -299,6 +299,9 @@ onUnmounted(() => statusPoller?.stop())
 .topbar-title {
   text-align: center;
   font-weight: 900;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .back {
@@ -328,6 +331,8 @@ onUnmounted(() => statusPoller?.stop())
   justify-content: space-between;
   gap: 10px;
   font-weight: 700;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .alert--bad {
@@ -455,16 +460,20 @@ onUnmounted(() => statusPoller?.stop())
 }
 
 .hero-shell__caption {
-  max-width: 260px;
+  max-width: min(100%, 260px);
   font-size: 12px;
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.94);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .title {
   margin: 12px 0 0;
   font-size: 16px;
   font-weight: 900;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .meta {
@@ -478,13 +487,16 @@ onUnmounted(() => statusPoller?.stop())
 .muted {
   color: var(--muted);
   font-size: 12px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .badge {
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 999px;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
 }
 
 .badge.ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
@@ -521,6 +533,8 @@ onUnmounted(() => statusPoller?.stop())
   color: #374151;
   font-size: 13px;
   line-height: 1.6;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .actions {
@@ -537,6 +551,8 @@ onUnmounted(() => statusPoller?.stop())
   padding: 10px 10px;
   font-weight: 900;
   font-size: 12px;
+  min-width: 0;
+  text-align: center;
 }
 
 .btn--primary {
@@ -574,6 +590,20 @@ onUnmounted(() => statusPoller?.stop())
   border-radius: 14px;
   padding: 12px;
   font-weight: 900;
+}
+
+@media (max-width: 420px) {
+  .topbar {
+    grid-template-columns: 40px minmax(0, 1fr) minmax(52px, auto);
+  }
+
+  .actions {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-shell__caption {
+    max-width: 100%;
+  }
 }
 </style>
 <style scoped>

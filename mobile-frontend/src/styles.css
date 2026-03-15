@@ -92,6 +92,13 @@ select {
   font-family: inherit;
 }
 
+button,
+a {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 img,
 svg,
 video,
@@ -148,6 +155,11 @@ textarea {
   min-width: 0;
 }
 
+.ios-page :where(.alert, .muted, .title, .card-title, .topbar-title, .badge, .status-chip) {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -170,11 +182,15 @@ h6 {
   line-height: 1.22;
   letter-spacing: -0.015em;
   color: var(--text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 p {
   margin: 0;
   color: var(--text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .gradient-text {

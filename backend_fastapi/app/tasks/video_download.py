@@ -137,6 +137,8 @@ def download_video_from_url_task(video_id: int, video_url: str, source_type: str
     try:
         import yt_dlp
 
+        from app.tasks.video_processing import process_video_task
+
         update_video_status(video_id, VideoStatus.DOWNLOADING, DOWNLOAD_PREPARE_PROGRESS, "准备下载")
 
         download_folder = settings.UPLOAD_FOLDER
@@ -166,6 +168,8 @@ def download_video_from_url_task(video_id: int, video_url: str, source_type: str
             title=output_title,
             md5=md5,
         )
+        update_video_status(video_id, VideoStatus.PENDING, 0.0, "下载完成，准备处理")
+        process_video_task(video_id, "zh", settings.WHISPER_MODEL)
         logger.info("链接视频下载完成: id=%s path=%s", video_id, downloaded_path)
     except Exception as exc:
         logger.error("链接视频下载失败: id=%s error=%s", video_id, exc)

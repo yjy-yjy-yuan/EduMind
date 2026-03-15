@@ -85,6 +85,45 @@ def resolve_upload_source_value(video: Video) -> Optional[str]:
     return video.filename
 
 
+def submit_video_processing(
+    video: Video,
+    db: Session,
+    *,
+    language: str = "zh",
+    model: Optional[str] = None,
+    raise_on_error: bool = False,
+) -> bool:
+    """提交视频处理任务并将状态写回当前视频记录。"""
+    previous_status = video.status
+    previous_progress = video.process_progress or 0.0
+    previous_step = video.current_step
+    previous_error = video.error_message
+
+    video.status = VideoStatus.PENDING
+    video.process_progress = 0.0
+    video.current_step = "已提交，等待处理"
+    video.error_message = None
+    db.commit()
+
+    try:
+        from app.core.executor import submit_task
+        from app.tasks.video_processing import process_video_task
+
+        submit_task(process_video_task, video.id, language, model or settings.WHISPER_MODEL)
+        return True
+    except Exception as exc:
+        logger.error("提交视频处理任务失败 | video_id=%s | error=%s", video.id, exc)
+        video.status = previous_status
+        video.process_progress = previous_progress
+        video.current_step = previous_step
+        video.error_message = str(exc)[:1000] if str(exc).strip() else previous_error
+        db.commit()
+
+        if raise_on_error:
+            raise HTTPException(status_code=500, detail="提交视频处理任务失败，请稍后重试")
+        return False
+
+
 async def save_upload_to_temp(file: UploadFile) -> tuple[str, str, int]:
     """分块写入临时文件并计算 MD5"""
     os.makedirs(settings.TEMP_FOLDER, exist_ok=True)
@@ -174,10 +213,17 @@ async def upload_video(file: UploadFile = File(...), db: Session = Depends(get_d
         db.commit()
         db.refresh(video)
 
+        task_submitted = submit_video_processing(video, db)
+        db.refresh(video)
+
         logger.info(f"视频上传成功: ID={video.id}, size={file_size}")
 
         return VideoUploadResponse(
-            id=video.id, status="uploaded", message="视频上传成功", duplicate=False, data=video.to_dict()
+            id=video.id,
+            status=video.status.value if hasattr(video.status, "value") else str(video.status),
+            message="视频上传成功，已开始后台处理" if task_submitted else "视频上传成功，请手动开始处理",
+            duplicate=False,
+            data=video.to_dict(),
         )
 
     except HTTPException:
@@ -391,19 +437,8 @@ async def process_video_route(video_id: int, request: VideoProcessRequest, db: S
     if video.status not in allowed_statuses:
         raise HTTPException(status_code=400, detail=f"视频状态不正确: {video.status}")
 
-    video.status = VideoStatus.PENDING
-    db.commit()
-
-    # 提交到后台进程池执行
     whisper_language = "en" if request.language == "English" else "zh"
-
-    try:
-        from app.core.executor import submit_task
-        from app.tasks.video_processing import process_video_task
-
-        submit_task(process_video_task, video.id, whisper_language, request.model)
-    except ImportError:
-        logger.warning("视频处理任务未实现")
+    submit_video_processing(video, db, language=whisper_language, model=request.model, raise_on_error=True)
 
     return {"status": "success", "message": "视频处理已开始"}
 
@@ -426,7 +461,8 @@ async def delete_video(video_id: int, db: Session = Depends(get_db)):
         from app.tasks.video_processing import cleanup_video_task
 
         submit_task(cleanup_video_task, video.id)
-    except ImportError:
+    except Exception as exc:
+        logger.warning("提交视频清理任务失败，改为同步删除 | video_id=%s | error=%s", video.id, exc)
         # 直接删除文件
         if video.filepath and os.path.exists(video.filepath):
             os.remove(video.filepath)

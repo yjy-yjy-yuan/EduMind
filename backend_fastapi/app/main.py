@@ -21,9 +21,11 @@ async def lifespan(app: FastAPI):
     # 启动时执行
     logger.info("启动 AI-EdVision API...")
 
-    # 创建数据库表
-    Base.metadata.create_all(bind=engine)
-    logger.info("数据库表创建成功")
+    if settings.AUTO_CREATE_TABLES:
+        Base.metadata.create_all(bind=engine)
+        logger.info("数据库表创建成功")
+    else:
+        logger.info("已跳过自动建表；如需初始化数据库，请运行 backend_fastapi/scripts/init_db.py")
 
     # 确保上传目录存在
     os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)

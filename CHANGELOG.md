@@ -157,9 +157,15 @@
 - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页统计卡改为 `button + router.push` 明确跳转；补充点击日志 `[INFO][Home] stat-card-click ...`；增强层级与触摸可达性（统计区 z-index 提升、装饰层 `pointer-events: none`），避免被视觉层遮挡导致点击无效。
 - 更新 [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：新增 iOS WebView 验收硬规则，要求交互改动必须在容器内验证路由跳转和目标页渲染，且每次改动后必须同步最新 `mobile-frontend/dist` 到 iOS 资源。
 
-## 2026-03-15
-
 ### iOS-only 项目结构收敛
 - 新增仓库外备份目录 `../EduMind_backup_20260315_ios_only/`：在删除旧模块前完成整仓复制，便于回滚。
 - 删除旧模块与旧脚本：移除 `frontend/`、`backend/`、`android-app/`、根目录 `tests/`、`test_src/` 以及旧启动脚本，仓库只保留 `backend_fastapi/`、`mobile-frontend/`、`ios-app/` 三段式 iOS 链路。
 - 更新 [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：统一为 MacBook Pro 开发、iOS `WKWebView` 容器、FastAPI 后端、MySQL 持久化的唯一实现方向。
+
+### MySQL 视频处理与转录落库收口
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：本地视频上传成功后立即提交后台处理任务；手动处理接口改为统一走任务提交逻辑，并把状态、进度、错误信息写回当前 `videos` 记录。
+- 更新 [`backend_fastapi/app/tasks/video_processing.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_processing.py)：移除对不存在字段 `processed` 的写入；处理完成后将预览图、视频信息、字幕文件路径写回 `videos`，并在现有 `subtitles` 表可用时写入 Whisper 分段结果；若数据库未启用该表则跳过，不自动建表、不让任务失败。
+- 更新 [`backend_fastapi/app/tasks/video_download.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_download.py)：链接视频下载完成后在同一后台任务内继续执行转录处理，避免依赖前端页面停留才能继续推进。
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：新增 `AUTO_CREATE_TABLES=false` 默认配置，关闭启动时自动建表，避免运行服务时擅自变更现有 MySQL 表结构。
+- 更新 [`backend_fastapi/app/models/user.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/user.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：密码哈希显式固定为 `pbkdf2:sha256`，兼容当前 Python 运行时；删除视频时若进程池不可用则回退为同步清理，避免测试和受限环境直接报错。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)、[`backend_fastapi/tests/unit/test_video_processing_task.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_processing_task.py)：补充自动提交处理任务与转录结果落库测试，覆盖 `videos/subtitles` 现有表的写回行为。

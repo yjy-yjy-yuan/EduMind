@@ -61,6 +61,17 @@ class TestVideoAPI:
 
         monkeypatch.setattr(settings, "UPLOAD_FOLDER", str(tmp_path / "uploads"))
         monkeypatch.setattr(settings, "TEMP_FOLDER", str(tmp_path / "temp"))
+        monkeypatch.setattr(settings, "WHISPER_MODEL", "turbo")
+
+        submitted = {}
+
+        def fake_submit_task(task_func, *args, **kwargs):
+            submitted["name"] = task_func.__name__
+            submitted["args"] = args
+            submitted["kwargs"] = kwargs
+            return None
+
+        monkeypatch.setattr("app.core.executor.submit_task", fake_submit_task)
 
         response = client.post(
             "/api/videos/upload",
@@ -69,14 +80,18 @@ class TestVideoAPI:
         assert response.status_code == 200
 
         payload = response.json()
-        assert payload["status"] == "uploaded"
+        assert payload["status"] == "pending"
         assert payload["duplicate"] is False
         assert payload["data"]["filename"] == "local-lesson.mp4"
         assert os.path.exists(payload["data"]["filepath"])
+        assert payload["message"] == "视频上传成功，已开始后台处理"
 
         videos = db.query(Video).all()
         assert len(videos) == 1
-        assert videos[0].current_step == "已上传，等待处理"
+        assert videos[0].status.value == "pending"
+        assert videos[0].current_step == "已提交，等待处理"
+        assert submitted["name"] == "process_video_task"
+        assert submitted["args"][0] == videos[0].id
 
     def test_upload_video_file_duplicate(self, client, db, tmp_path, monkeypatch):
         """测试重复上传同一视频"""

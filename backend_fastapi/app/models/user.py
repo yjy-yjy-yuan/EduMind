@@ -58,7 +58,7 @@ class User(Base):
 
     def set_password(self, password: str) -> None:
         """设置密码"""
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = generate_password_hash(password, method="pbkdf2:sha256")
 
     def check_password(self, password: str) -> bool:
         """验证密码"""

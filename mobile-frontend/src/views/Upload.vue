@@ -440,7 +440,9 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   margin-bottom: 10px;
+  gap: 8px;
 }
 
 .topbar h2 {
@@ -479,12 +481,15 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .card-head-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .filters {
@@ -527,6 +532,8 @@ onMounted(async () => {
   font-weight: 900;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: #fff;
+  width: 100%;
+  text-align: center;
 }
 
 .btn--primary {
@@ -554,6 +561,8 @@ onMounted(async () => {
 .muted {
   font-size: 12px;
   color: var(--muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .recent-list {
@@ -567,10 +576,11 @@ onMounted(async () => {
   background: #fff;
   padding: 10px 12px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   text-align: left;
+  flex-wrap: wrap;
 }
 
 .recent-main {
@@ -582,9 +592,9 @@ onMounted(async () => {
 .recent-title {
   font-size: 13px;
   font-weight: 800;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .recent-meta {
@@ -622,6 +632,9 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
 }
 
 .recent-tag {
@@ -631,7 +644,8 @@ onMounted(async () => {
   font-weight: 800;
   background: rgba(99, 102, 241, 0.12);
   color: #3730a3;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
 }
 
 .recent-tag--dup {
@@ -647,6 +661,7 @@ onMounted(async () => {
   font-size: 12px;
   font-weight: 800;
   color: var(--text);
+  text-align: center;
 }
 
 .mini--warn {
@@ -669,6 +684,8 @@ onMounted(async () => {
   border-radius: 12px;
   font-weight: 800;
   margin-bottom: 12px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .alert--ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
@@ -715,6 +732,20 @@ onMounted(async () => {
 
 .btn {
   border-radius: 16px;
+}
+
+@media (max-width: 480px) {
+  .recent-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  .mini,
+  .recent-tag,
+  .link--small {
+    max-width: 100%;
+  }
 }
 
 .btn--primary {

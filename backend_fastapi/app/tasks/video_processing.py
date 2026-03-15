@@ -15,6 +15,8 @@ import os
 import subprocess
 import time
 
+from sqlalchemy import inspect
+
 logger = logging.getLogger(__name__)
 
 
@@ -202,6 +204,69 @@ def save_subtitles(result: dict, srt_path: str, txt_path: str):
         return False
 
 
+def sync_subtitles_to_db(db, video_id: int, result: dict, language: str) -> int:
+    """将 Whisper 分段结果写入字幕表。
+
+    若当前数据库未启用 subtitles 表，则跳过，不影响主处理流程。
+    """
+    from app.models.subtitle import Subtitle
+
+    segments = result.get("segments") or []
+    if not segments:
+        logger.warning("转录结果不包含 segments，跳过字幕落库 | video_id=%s", video_id)
+        return 0
+
+    bind = db.get_bind()
+    if bind is None:
+        logger.warning("当前数据库连接不可用，跳过字幕落库 | video_id=%s", video_id)
+        return 0
+
+    try:
+        if not inspect(bind).has_table(Subtitle.__tablename__):
+            logger.warning("数据库缺少 subtitles 表，跳过字幕落库 | video_id=%s", video_id)
+            return 0
+    except Exception as exc:
+        logger.warning("检查 subtitles 表失败，跳过字幕落库 | video_id=%s | error=%s", video_id, exc)
+        return 0
+
+    subtitle_rows = []
+    for segment in segments:
+        text = str(segment.get("text") or "").strip()
+        if not text:
+            continue
+
+        start_time = float(segment.get("start") or 0.0)
+        end_time = float(segment.get("end") or start_time)
+        if end_time < start_time:
+            end_time = start_time
+
+        subtitle_rows.append(
+            Subtitle(
+                video_id=video_id,
+                start_time=start_time,
+                end_time=end_time,
+                text=text,
+                source="asr",
+                language=language or "zh",
+            )
+        )
+
+    if not subtitle_rows:
+        logger.warning("未生成有效字幕分段，跳过字幕落库 | video_id=%s", video_id)
+        return 0
+
+    try:
+        db.query(Subtitle).filter(Subtitle.video_id == video_id).delete()
+        db.add_all(subtitle_rows)
+        db.commit()
+        logger.info("字幕已写入数据库 | video_id=%s | count=%s", video_id, len(subtitle_rows))
+        return len(subtitle_rows)
+    except Exception as exc:
+        db.rollback()
+        logger.error("字幕写入数据库失败 | video_id=%s | error=%s", video_id, exc)
+        return 0
+
+
 def update_video_status(video_id: int, status: str, progress: float, step: str, **kwargs):
     """更新视频状态 (在子进程中创建新的数据库连接)"""
     # 动态导入以避免跨进程问题
@@ -273,12 +338,12 @@ def process_video_task(video_id: int, language: str = "zh", model: str = "base")
             return {"status": "failed", "message": "视频不存在"}
 
         video_path = video.filepath
-        filename = video.filename
 
         # 更新状态为处理中
         video.status = VideoStatus.PROCESSING
         video.process_progress = 0.0
         video.current_step = "初始化处理"
+        video.error_message = None
         db.commit()
 
         # 检查是否为占位文件
@@ -341,7 +406,6 @@ def process_video_task(video_id: int, language: str = "zh", model: str = "base")
         # 如果是占位文件，直接完成
         if is_placeholder:
             video.status = VideoStatus.COMPLETED
-            video.processed = True
             video.process_progress = 100.0
             video.current_step = "完成"
             db.commit()
@@ -392,6 +456,8 @@ def process_video_task(video_id: int, language: str = "zh", model: str = "base")
         else:
             logger.warning("保存字幕失败，但继续完成处理")
 
+        sync_subtitles_to_db(db, video_id, result, language)
+
         # 清理临时音频文件
         if input_file != video_path and os.path.exists(input_file):
             try:
@@ -401,9 +467,9 @@ def process_video_task(video_id: int, language: str = "zh", model: str = "base")
 
         # 完成
         video.status = VideoStatus.COMPLETED
-        video.processed = True
         video.process_progress = 100.0
         video.current_step = "处理完成"
+        video.error_message = None
         db.commit()
 
         logger.info(f"视频处理完成 | ID: {video_id}")

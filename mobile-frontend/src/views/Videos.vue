@@ -387,13 +387,16 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   margin-bottom: 10px;
+  gap: 8px;
 }
 
 .top-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .topbar h2 {
@@ -409,6 +412,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .scope-switch {
@@ -452,6 +456,8 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 10px;
   font-weight: 700;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .alert--bad {
@@ -519,7 +525,7 @@ onUnmounted(() => {
 
 .row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 }
@@ -527,33 +533,40 @@ onUnmounted(() => {
 .title {
   font-size: 14px;
   font-weight: 900;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .arrow {
   color: #9ca3af;
   font-style: normal;
   font-size: 22px;
+  flex-shrink: 0;
 }
 
 .meta {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .muted {
   color: var(--muted);
   font-size: 12px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .badge {
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 999px;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
 }
 
 .badge.ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
@@ -581,6 +594,7 @@ onUnmounted(() => {
   font-size: 12px;
   font-weight: 800;
   color: var(--text);
+  text-align: center;
 }
 
 .mini--warn {
@@ -606,6 +620,22 @@ onUnmounted(() => {
   padding: 10px 14px;
   font-weight: 900;
   color: var(--text);
+}
+
+@media (max-width: 420px) {
+  .top-actions,
+  .polling-tip,
+  .card-actions {
+    width: 100%;
+  }
+
+  .top-actions {
+    justify-content: flex-start;
+  }
+
+  .card-actions {
+    justify-content: flex-start;
+  }
 }
 </style>
 <style scoped>
