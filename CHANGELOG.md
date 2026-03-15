@@ -156,3 +156,10 @@
 ### 首页统计卡点击跳转修正与 iOS 验收约束补充
 - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页统计卡改为 `button + router.push` 明确跳转；补充点击日志 `[INFO][Home] stat-card-click ...`；增强层级与触摸可达性（统计区 z-index 提升、装饰层 `pointer-events: none`），避免被视觉层遮挡导致点击无效。
 - 更新 [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：新增 iOS WebView 验收硬规则，要求交互改动必须在容器内验证路由跳转和目标页渲染，且每次改动后必须同步最新 `mobile-frontend/dist` 到 iOS 资源。
+
+## 2026-03-15
+
+### iOS-only 项目结构收敛
+- 新增仓库外备份目录 `../EduMind_backup_20260315_ios_only/`：在删除旧模块前完成整仓复制，便于回滚。
+- 删除旧模块与旧脚本：移除 `frontend/`、`backend/`、`android-app/`、根目录 `tests/`、`test_src/` 以及旧启动脚本，仓库只保留 `backend_fastapi/`、`mobile-frontend/`、`ios-app/` 三段式 iOS 链路。
+- 更新 [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：统一为 MacBook Pro 开发、iOS `WKWebView` 容器、FastAPI 后端、MySQL 持久化的唯一实现方向。
