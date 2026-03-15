@@ -5,8 +5,8 @@ import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
 export default defineConfig(({ command, mode }) => {
-  const isIOS = mode === 'ios'
-  const isNativeBuild = command === 'build' && mode !== 'web'
+  const isWebBuild = mode === 'web'
+  const isNativeBuild = command === 'build' && !isWebBuild
   const env = loadEnv(mode, process.cwd(), '')
   const proxyTarget =
     env.VITE_MOBILE_PROXY_TARGET ||
@@ -16,7 +16,7 @@ export default defineConfig(({ command, mode }) => {
   const iosClassicScriptPlugin = {
     name: 'ios-classic-script',
     closeBundle() {
-      if (!isIOS) return
+      if (!isNativeBuild) return
       const htmlPath = path.resolve(process.cwd(), 'dist/index.html')
       if (!fs.existsSync(htmlPath)) return
 
@@ -43,7 +43,7 @@ export default defineConfig(({ command, mode }) => {
     // Use relative asset paths for packaged builds (file:// in WebView).
     base: isNativeBuild ? './' : '/',
     plugins: [vue(), iosClassicScriptPlugin],
-    build: isIOS
+    build: isNativeBuild
       ? {
           modulePreload: false,
           cssCodeSplit: false,

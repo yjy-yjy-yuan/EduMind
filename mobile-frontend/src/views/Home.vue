@@ -11,18 +11,18 @@
       <p class="welcome__subtitle">围绕你的学习流程，快速进入视频、笔记、问答与知识梳理。</p>
 
       <div class="stats">
-        <div class="stat-pill">
+        <button type="button" class="stat-pill stat-pill--link" @click="goStat('recent')">
           <span class="stat-pill__label">最近视频</span>
-          <strong class="stat-pill__value">{{ videos.length }}</strong>
-        </div>
-        <div class="stat-pill stat-pill--ok">
+          <strong class="stat-pill__value">{{ recentCount }}</strong>
+        </button>
+        <button type="button" class="stat-pill stat-pill--link stat-pill--ok" @click="goStat('completed')">
           <span class="stat-pill__label">已完成</span>
           <strong class="stat-pill__value">{{ completedCount }}</strong>
-        </div>
-        <div class="stat-pill stat-pill--warn">
+        </button>
+        <button type="button" class="stat-pill stat-pill--link stat-pill--warn" @click="goStat('active')">
           <span class="stat-pill__label">进行中</span>
           <strong class="stat-pill__value">{{ inProgressCount }}</strong>
-        </div>
+        </button>
       </div>
     </header>
 
@@ -54,10 +54,10 @@
         <div v-for="i in 3" :key="i" class="skeleton-item"></div>
       </div>
 
-      <div v-else-if="videos.length === 0" class="message">暂无视频，先上传一个开始学习吧。</div>
+      <div v-else-if="allVideos.length === 0" class="message">暂无视频，先上传一个开始学习吧。</div>
 
       <div v-else class="video-list">
-        <button v-for="video in videos" :key="video.id" class="video-item" @click="openVideo(video.id)">
+        <button v-for="video in recentVideos" :key="video.id" class="video-item" @click="openVideo(video.id)">
           <div class="video-item__info">
             <p class="video-item__title">{{ video.title || '未命名视频' }}</p>
             <span class="video-item__status" :class="statusClass(video.status)">{{ statusText(video.status) }}</span>
@@ -74,6 +74,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BrandLogo from '@/components/BrandLogo.vue'
 import { getVideoList } from '@/api/video'
+import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
 const quickActions = [
   { route: '/videos', tag: '视频', tagClass: 'tag--mint', title: '视频库', desc: '查看列表与处理状态' },
@@ -87,47 +88,61 @@ const quickActions = [
 const router = useRouter()
 const loading = ref(false)
 const error = ref('')
-const videos = ref([])
+const allVideos = ref([])
 
 const normalizeList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
   return Array.isArray(list) ? list : []
 }
 
-const statusText = (status) => {
-  const map = {
-    uploaded: '已上传',
-    pending: '排队中',
-    processing: '处理中',
-    completed: '已完成',
-    failed: '失败',
-    downloading: '下载中',
-    processed: '已完成'
-  }
-  return map[status] || (status || '未知')
-}
+const statusText = videoStatusText
 
 const statusClass = (status) => {
-  if (status === 'completed' || status === 'processed') return 'status--ok'
-  if (status === 'failed') return 'status--bad'
-  if (['processing', 'pending', 'downloading'].includes(status)) return 'status--warn'
+  const tone = videoStatusTone(status)
+  if (tone === 'ok') return 'status--ok'
+  if (tone === 'bad') return 'status--bad'
+  if (tone === 'warn') return 'status--warn'
   return 'status--info'
 }
 
-const completedCount = computed(() =>
-  videos.value.filter((item) => item?.status === 'completed' || item?.status === 'processed').length
-)
+const recentVideos = computed(() => allVideos.value.slice(0, 5))
+const recentCount = computed(() => allVideos.value.length)
+const completedCount = computed(() => allVideos.value.filter((item) => isCompletedVideoStatus(item?.status)).length)
+const inProgressCount = computed(() => allVideos.value.filter((item) => isActiveVideoStatus(item?.status)).length)
 
-const inProgressCount = computed(() =>
-  videos.value.filter((item) => ['processing', 'pending', 'downloading'].includes(item?.status)).length
-)
+const mergeVideosById = (items) => {
+  const map = new Map()
+  for (const item of items) {
+    if (!item?.id) continue
+    map.set(Number(item.id), item)
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    const ta = new Date(a?.upload_time || 0).getTime()
+    const tb = new Date(b?.upload_time || 0).getTime()
+    return tb - ta
+  })
+}
+
+const fetchAllVideos = async () => {
+  const first = await getVideoList(1, 100)
+  const firstPayload = first?.data || {}
+  const firstList = normalizeList(firstPayload)
+  const totalPages = Math.max(1, Number(firstPayload?.total_pages || 1))
+  if (totalPages <= 1) return firstList
+
+  const all = [...firstList]
+  for (let p = 2; p <= totalPages; p += 1) {
+    const res = await getVideoList(p, 100)
+    all.push(...normalizeList(res?.data || {}))
+  }
+  return all
+}
 
 const reload = async () => {
   loading.value = true
   error.value = ''
   try {
-    const res = await getVideoList(1, 5)
-    videos.value = normalizeList(res.data)
+    allVideos.value = mergeVideosById(await fetchAllVideos())
   } catch (e) {
     error.value = e?.message || '加载失败'
   } finally {
@@ -136,6 +151,10 @@ const reload = async () => {
 }
 
 const go = (path) => router.push(path)
+const goStat = (scope) => {
+  console.info(`[INFO][Home] stat-card-click scope=${scope}`)
+  router.push({ path: '/videos', query: { scope } })
+}
 
 const openVideo = (id) => {
   if (!id) return
@@ -220,12 +239,29 @@ onMounted(reload)
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+  position: relative;
+  z-index: 3;
 }
 
 .stat-pill {
+  width: 100%;
+  border: 0;
+  appearance: none;
+  text-align: left;
+  cursor: pointer;
   border-radius: 12px;
   padding: 10px;
   background: rgba(31, 157, 116, 0.08);
+  position: relative;
+  z-index: 4;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.stat-pill--link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
 }
 
 .stat-pill--ok {
@@ -494,6 +530,7 @@ onMounted(reload)
   border-radius: 54px;
   transform: rotate(18deg);
   background: linear-gradient(140deg, rgba(31, 122, 140, 0.18), rgba(31, 122, 140, 0.04));
+  pointer-events: none;
 }
 
 .welcome__top,
