@@ -72,14 +72,14 @@ UPLOAD_FOLDER=/your/custom/uploads
   - `conda activate edumind`（或项目约定环境）
   - `python run.py` 或 `uvicorn app.main:app --reload --port 2004`
 - 确认启动日志中有「上传目录已就绪: …」，确认该目录存在且可写。
-- 如需从本机或局域网访问，确保 `HOST=0.0.0.0` 或已绑定到目标 IP，并在 `CORS_ORIGINS` 中加入移动端/WebView 访问的 Origin（如 `http://192.168.x.x:5173`、`http://localhost:5173`）。
+- 如需从本机或局域网访问，确保 `HOST=0.0.0.0`，并在 `CORS_ORIGINS` 中加入移动端 Origin，例如 `http://192.168.1.10:5173`（将 `192.168.1.10` 改为你 Mac 的局域网 IP：终端执行 `ipconfig getifaddr en0` 可得）。
 
 ### 2. 移动端 H5 配置（关闭 UI 仅展示、指向后端）
 
 - 在 `mobile-frontend` 的 `.env`（或构建时环境变量）中：
   - `VITE_MOBILE_UI_ONLY=false`（关闭纯 UI 模式，走真实接口）。
   - `VITE_MOBILE_API_BASE_URL=http://<后端地址>:2004`  
-    例如本机：`http://127.0.0.1:2004`；真机访问本机后端：`http://192.168.x.x:2004`（替换为你的 Mac 局域网 IP）。
+    本机浏览器：`http://127.0.0.1:2004`；真机连调：`http://<Mac的局域网IP>:2004`（Mac 终端执行 `ipconfig getifaddr en0` 得到 IP，例如 `http://192.168.1.10:2004`）。
 - 重新构建或启动 dev：`npm run dev` / `npm run build:ios` 等，确保请求会发到上述基地址。
 
 ### 3. 上传流程核对（无需改代码即可联调）
@@ -94,7 +94,7 @@ UPLOAD_FOLDER=/your/custom/uploads
 ### 4. iOS 真机 / WebView 注意点
 
 - 若 H5 在 WebView 中打开，`<input type="file" accept="video/*">` 会调起系统相册/文件选择，选中的文件会由前端通过 FormData 发给当前配置的 `API_BASE_URL`。
-- 真机要能访问后端：`VITE_MOBILE_API_BASE_URL` 需为 Mac 的局域网地址（如 `http://192.168.1.x:2004`），且手机与电脑在同一局域网；后端 CORS 需允许该 Origin。
+- 真机要能访问后端：`VITE_MOBILE_API_BASE_URL` 改为 Mac 的局域网地址（如 `http://192.168.1.10:2004`，IP 在 Mac 上执行 `ipconfig getifaddr en0` 获取），手机与电脑同一 Wi‑Fi；后端 `HOST=0.0.0.0` 且 `CORS_ORIGINS` 包含 `http://<该IP>:5173`。
 
 ### 5. 可选增强（按需做）
 

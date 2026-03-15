@@ -47,9 +47,9 @@
    - 前端只负责展示、交互与发起 HTTP 请求，不实现业务规则或直接读写服务器数据库。
 
 3. **前后端通过端口连调**  
-   - 前端通过「API 基地址」（如 `http://<本机IP>:2004`）访问后端，即通过**端口**进行前后端联调。  
+   - 前端通过「API 基地址」（如 `http://127.0.0.1:2004` 或真机时 `http://<Mac的局域网IP>:2004`）访问后端，即通过**端口**进行前后端联调。  
    - 本机浏览器调试：`VITE_MOBILE_API_BASE_URL=http://127.0.0.1:2004`。  
-   - 真机调试：同一局域网内，真机须能访问运行后端的机器，例如 `VITE_MOBILE_API_BASE_URL=http://192.168.x.x:2004`；后端须监听 `0.0.0.0` 或对应网卡，且 CORS 放行该前端 Origin。
+   - 真机调试：同一局域网内，`VITE_MOBILE_API_BASE_URL=http://<Mac的局域网IP>:2004`（Mac 上执行 `ipconfig getifaddr en0` 可得 IP，例如 192.168.1.10）；后端 `HOST=0.0.0.0`，且 CORS 放行 `http://<该IP>:5173`。
 
 凡涉及联调、接口约定、环境配置的提示词，均以本条逻辑为准。
 
@@ -62,7 +62,7 @@
 - **前端（真机/浏览器）**：用户在 H5 上传页选择本地视频或填写视频链接，点击上传；`mobile-frontend` 将请求发往 `API_BASE_URL`（即上述端口连调地址）。  
 - **请求**：`POST {API_BASE_URL}/api/videos/upload`（FormData 字段 `file`）或 `POST {API_BASE_URL}/api/videos/upload-url`（JSON body `{ url }`）。  
 - **后端**：在 `backend_fastapi` 端口 2004 上接收请求，保存文件到 `UPLOAD_FOLDER`（默认 `backend_fastapi/uploads/`），并在数据库 `videos` 表插入记录；返回 `id`、`status` 等。  
-- **真机连调要点**：`VITE_MOBILE_API_BASE_URL` 设为 Mac 本机局域网 IP（如 `http://192.168.1.10:2004`）；后端 `.env` 中 `CORS_ORIGINS` 包含该 Origin，`HOST=0.0.0.0` 以便真机访问。
+- **真机连调要点**：`VITE_MOBILE_API_BASE_URL` 设为 `http://<Mac的局域网IP>:2004`（Mac 终端执行 `ipconfig getifaddr en0` 得到 IP，例如 192.168.1.10）；后端 `.env` 中 `HOST=0.0.0.0`，`CORS_ORIGINS` 包含 `http://<该IP>:5173`。
 
 ### 登录
 
@@ -555,7 +555,7 @@ EduMind/
 
 请严格遵守以下要求：
 
-0. **连调逻辑**：本项目为移动端应用开发。真机（或浏览器中的 H5）= 前端；业务功能在后端 `backend_fastapi/`（端口 2004）；前后端通过 API 基地址（端口）连调。真机调试时前端须配置为后端所在机器的局域网 IP（如 `http://192.168.x.x:2004`），后端须监听 `0.0.0.0` 并配置 CORS。凡涉及联调、上传、登录的接口与配置，均以此为准。
+0. **连调逻辑**：本项目为移动端应用开发。真机（或浏览器中的 H5）= 前端；业务功能在后端 `backend_fastapi/`（端口 2004）；前后端通过 API 基地址（端口）连调。真机调试时前端须配置为后端所在机器的局域网 IP（在 Mac 上执行 `ipconfig getifaddr en0` 可得，例如 `http://192.168.1.10:2004`），后端须 `HOST=0.0.0.0` 并配置 CORS 包含 `http://<该IP>:5173`。凡涉及联调、上传、登录的接口与配置，均以此为准。
 1. 实现顺序必须为：
    - 现状梳理与接口冻结
    - 移动端基础架构
