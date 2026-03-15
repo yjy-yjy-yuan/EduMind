@@ -1,6 +1,7 @@
 """API 测试 - 视频接口"""
 
 import io
+import os
 
 import pytest
 
@@ -52,6 +53,94 @@ class TestVideoAPI:
         data = response.json()
         assert "status" in data
         assert "progress" in data
+
+    def test_upload_video_file(self, client, db, tmp_path, monkeypatch):
+        """测试本地视频上传"""
+        from app.core.config import settings
+        from app.models.video import Video
+
+        monkeypatch.setattr(settings, "UPLOAD_FOLDER", str(tmp_path / "uploads"))
+        monkeypatch.setattr(settings, "TEMP_FOLDER", str(tmp_path / "temp"))
+
+        response = client.post(
+            "/api/videos/upload",
+            files={"file": ("lesson.mp4", io.BytesIO(b"fake-video-content"), "video/mp4")},
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["status"] == "uploaded"
+        assert payload["duplicate"] is False
+        assert payload["data"]["filename"] == "local-lesson.mp4"
+        assert os.path.exists(payload["data"]["filepath"])
+
+        videos = db.query(Video).all()
+        assert len(videos) == 1
+        assert videos[0].current_step == "已上传，等待处理"
+
+    def test_upload_video_file_duplicate(self, client, db, tmp_path, monkeypatch):
+        """测试重复上传同一视频"""
+        from app.core.config import settings
+        from app.models.video import Video
+
+        monkeypatch.setattr(settings, "UPLOAD_FOLDER", str(tmp_path / "uploads"))
+        monkeypatch.setattr(settings, "TEMP_FOLDER", str(tmp_path / "temp"))
+
+        files = {"file": ("duplicate.mp4", io.BytesIO(b"same-video"), "video/mp4")}
+        first = client.post("/api/videos/upload", files=files)
+        assert first.status_code == 200
+
+        second = client.post(
+            "/api/videos/upload",
+            files={"file": ("duplicate.mp4", io.BytesIO(b"same-video"), "video/mp4")},
+        )
+        assert second.status_code == 200
+
+        payload = second.json()
+        assert payload["duplicate"] is True
+        assert payload["message"] == "视频已存在"
+        assert db.query(Video).count() == 1
+
+    def test_upload_video_invalid_extension(self, client):
+        """测试上传不支持的文件类型"""
+        response = client.post(
+            "/api/videos/upload",
+            files={"file": ("document.txt", io.BytesIO(b"not-a-video"), "text/plain")},
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "不支持的文件类型"
+
+    def test_upload_video_url_creates_downloading_record(self, client, db, monkeypatch):
+        """测试链接上传会立即创建下载中记录"""
+        from app.models.video import Video
+
+        submitted = {}
+
+        def fake_submit_task(task_func, *args, **kwargs):
+            submitted["name"] = task_func.__name__
+            submitted["args"] = args
+            submitted["kwargs"] = kwargs
+            return None
+
+        monkeypatch.setattr("app.core.executor.submit_task", fake_submit_task)
+
+        response = client.post(
+            "/api/videos/upload-url",
+            json={"url": "https://www.bilibili.com/video/BV1xx411c7mD"},
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["status"] == "downloading"
+        assert payload["duplicate"] is False
+        assert payload["data"]["status"] == "downloading"
+
+        video = db.query(Video).filter(Video.id == payload["id"]).first()
+        assert video is not None
+        assert video.status.value == "downloading"
+        assert video.current_step == "已提交，等待下载"
+        assert submitted["name"] == "download_video_from_url_task"
+        assert submitted["args"][0] == video.id
 
 
 @pytest.mark.api

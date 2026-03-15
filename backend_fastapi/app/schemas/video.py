@@ -84,6 +84,9 @@ class VideoDetail(BaseModel):
     process_progress: Optional[float] = None
     current_step: Optional[str] = None
     error_message: Optional[str] = None
+    upload_source: Optional[str] = None
+    upload_source_label: Optional[str] = None
+    upload_source_value: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -96,6 +99,7 @@ class VideoStatusResponse(BaseModel):
     progress: float = 0
     current_step: str = ""
     task_id: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 class VideoListResponse(BaseModel):

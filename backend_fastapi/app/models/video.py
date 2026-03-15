@@ -85,6 +85,20 @@ class Video(Base):
     def __repr__(self) -> str:
         return f"<Video {self.title or self.filename}>"
 
+    def get_upload_source(self) -> str:
+        """上传来源标识：本地文件或链接导入"""
+        return "url_import" if self.url else "local_file"
+
+    def get_upload_source_label(self) -> str:
+        """上传来源中文标签"""
+        return "链接导入" if self.url else "本地上传"
+
+    def get_upload_source_value(self) -> Optional[str]:
+        """上传来源值：链接导入保存 URL，本地上传保存文件名"""
+        if self.url:
+            return self.url
+        return self.filename
+
     def to_dict(self) -> dict:
         """转换为字典表示"""
         return {
@@ -92,6 +106,7 @@ class Video(Base):
             "filename": self.filename,
             "filepath": self.filepath,
             "title": self.title,
+            "url": self.url,
             "status": self.status.value if isinstance(self.status, VideoStatus) else self.status,
             "upload_time": self.upload_time.isoformat() if self.upload_time else None,
             "duration": self.duration,
@@ -107,4 +122,7 @@ class Video(Base):
             "process_progress": self.process_progress,
             "current_step": self.current_step,
             "error_message": self.error_message,
+            "upload_source": self.get_upload_source(),
+            "upload_source_label": self.get_upload_source_label(),
+            "upload_source_value": self.get_upload_source_value(),
         }

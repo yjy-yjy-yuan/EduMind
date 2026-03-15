@@ -106,3 +106,13 @@ xcodebuild -project ios-app/EduMindIOS/EduMindIOS.xcodeproj \
   -destination 'generic/platform=iOS Simulator' \
   build
 ```
+
+### 7. 视频上传权限说明
+
+iOS 容器当前依赖 `WKWebView` 默认文件选择能力。由于 iPhone 上点击视频上传控件时，系统可能同时提供“拍摄视频 / 相册 / 文件”等入口，因此工程必须保留以下隐私说明，避免上传视频时触发系统权限崩溃：
+
+- `NSCameraUsageDescription`
+- `NSMicrophoneUsageDescription`
+- `NSPhotoLibraryUsageDescription`
+
+移动端 H5 侧也已将上传控件的 `accept` 从 `video/*` 收敛为明确的视频扩展名列表，以降低系统直接走相机分支的概率；如果后续恢复媒体通配类型或接入拍摄视频，不要删除这些键。

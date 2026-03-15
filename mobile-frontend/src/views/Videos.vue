@@ -1,7 +1,7 @@
 <template>
   <div class="page">
     <header class="topbar">
-      <h2>视频</h2>
+      <h2>{{ scopeTitle }}</h2>
       <div class="top-actions">
         <button
           v-if="failedVideos.length > 1"
@@ -16,6 +16,18 @@
         </button>
       </div>
     </header>
+
+    <div class="scope-switch">
+      <button
+        v-for="item in scopeTabs"
+        :key="item.value"
+        class="scope-pill"
+        :class="{ 'scope-pill--active': scope === item.value }"
+        @click="setScope(item.value)"
+      >
+        {{ item.label }}
+      </button>
+    </div>
 
     <div v-if="hasActiveTasks" class="polling-tip">
       <span>{{ pollStatusText }}</span>
@@ -33,13 +45,13 @@
       <div v-for="i in 6" :key="i" class="sk-card"></div>
     </div>
 
-    <div v-else-if="videos.length === 0" class="empty">
-      暂无视频。
+    <div v-else-if="filteredVideos.length === 0" class="empty">
+      {{ emptyText }}
       <button class="link" @click="go('/upload')">去上传</button>
     </div>
 
     <div v-else class="list">
-      <div v-for="v in videos" :key="v.id" class="card">
+      <div v-for="v in filteredVideos" :key="v.id" class="card">
         <button class="card-main" @click="go(`/videos/${v.id}`)">
           <div class="row">
             <div class="title" :title="v.title || ''">{{ v.title || '未命名视频' }}</div>
@@ -76,9 +88,11 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { getVideoList, processVideo } from '@/api/video'
+import { isActiveVideoStatus, normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
+const route = useRoute()
 const router = useRouter()
 const go = (path) => router.push(path)
 
@@ -97,16 +111,45 @@ const POLL_FAILURE_LIMIT = 5
 const pollFailureCount = ref(0)
 const pollDelayMs = ref(POLL_BASE_INTERVAL_MS)
 let pollTimer = null
+const scopeTabs = [
+  { value: 'recent', label: '最近视频' },
+  { value: 'completed', label: '已完成' },
+  { value: 'active', label: '进行中' }
+]
+const validScopes = new Set(scopeTabs.map((item) => item.value))
+
+const scope = computed(() => {
+  const raw = String(route.query.scope || 'recent').toLowerCase()
+  return validScopes.has(raw) ? raw : 'recent'
+})
+
+const scopeTitle = computed(() => {
+  if (scope.value === 'completed') return '已完成视频'
+  if (scope.value === 'active') return '进行中视频'
+  return '最近视频'
+})
 
 const normalizeList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
   return Array.isArray(list) ? list : []
 }
 
-const failedVideos = computed(() => videos.value.filter((item) => String(item?.status || '') === 'failed'))
-const isInProgress = (status) => ['processing', 'pending', 'downloading'].includes(status)
+const filteredVideos = computed(() => {
+  if (scope.value === 'completed') return videos.value.filter((item) => normalizeVideoStatus(item?.status) === 'completed')
+  if (scope.value === 'active') return videos.value.filter((item) => isActiveVideoStatus(item?.status))
+  return videos.value
+})
+
+const emptyText = computed(() => {
+  if (scope.value === 'completed') return '暂无已完成视频。'
+  if (scope.value === 'active') return '暂无进行中的视频。'
+  return '暂无视频。'
+})
+
+const failedVideos = computed(() => filteredVideos.value.filter((item) => normalizeVideoStatus(item?.status) === 'failed'))
+const isInProgress = (status) => isActiveVideoStatus(status)
 const hasActiveTasks = computed(() =>
-  videos.value.some((item) => isInProgress(String(item?.status || '').toLowerCase()))
+  filteredVideos.value.some((item) => isInProgress(item?.status))
 )
 const pollPaused = computed(() => pollFailureCount.value >= POLL_FAILURE_LIMIT)
 const pollStatusText = computed(() => {
@@ -293,30 +336,35 @@ const loadMore = async () => {
   await reload(false)
 }
 
-const statusText = (status) => {
-  const map = {
-    uploaded: '已上传',
-    pending: '排队中',
-    processing: '处理中',
-    completed: '已完成',
-    failed: '失败',
-    downloading: '下载中',
-    processed: '已完成'
-  }
-  return map[status] || (status || '未知')
-}
+const statusText = videoStatusText
 
 const badgeClass = (status) => {
-  if (status === 'completed' || status === 'processed') return 'ok'
-  if (status === 'failed') return 'bad'
-  if (isInProgress(status)) return 'warn'
+  const tone = videoStatusTone(status)
+  if (tone === 'ok') return 'ok'
+  if (tone === 'bad') return 'bad'
+  if (tone === 'warn') return 'warn'
   return 'info'
+}
+
+const setScope = (nextScope) => {
+  if (!validScopes.has(nextScope)) return
+  router.push({ path: '/videos', query: { scope: nextScope } })
 }
 
 watch(hasActiveTasks, () => {
   if (!hasActiveTasks.value) resetPollBackoff()
   startPollingIfNeeded()
 })
+
+watch(
+  () => route.query.scope,
+  () => {
+    if (!validScopes.has(String(route.query.scope || 'recent').toLowerCase())) {
+      router.replace({ path: '/videos', query: { scope: 'recent' } })
+    }
+  },
+  { immediate: true }
+)
 
 onMounted(async () => {
   await reload(true)
@@ -361,6 +409,29 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+}
+
+.scope-switch {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 10px;
+}
+
+.scope-pill {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.scope-pill--active {
+  border-color: rgba(31, 122, 140, 0.36);
+  background: rgba(31, 122, 140, 0.1);
+  color: var(--primary-deep);
 }
 
 .link {

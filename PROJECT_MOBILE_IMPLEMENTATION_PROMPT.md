@@ -34,7 +34,54 @@
 
 ---
 
-## 二、技术路线原则
+## 二、移动端连调逻辑（必须遵守）
+
+**本项目为移动端应用开发，所有提示词与联调均遵循以下逻辑：**
+
+1. **真机 = 前端**  
+   - 在真机（iPhone/iPad）上运行的是「前端」：即 iOS App 内的 WKWebView 所加载的 H5（来自 `mobile-frontend/` 构建产物），以及该 H5 内的全部 UI、请求与状态。  
+   - 真机不运行后端代码；真机上看到的页面、点击、表单提交、上传、登录等，均视为前端行为。
+
+2. **功能实现在后端**  
+   - 业务逻辑、数据持久化、鉴权、视频处理、笔记与问答等，均在服务端实现，即 `backend_fastapi/`（FastAPI，默认端口 **2004**）。  
+   - 前端只负责展示、交互与发起 HTTP 请求，不实现业务规则或直接读写服务器数据库。
+
+3. **前后端通过端口连调**  
+   - 前端通过「API 基地址」（如 `http://127.0.0.1:2004` 或真机时 `http://<Mac的局域网IP>:2004`）访问后端，即通过**端口**进行前后端联调。  
+   - 本机浏览器调试：`VITE_MOBILE_API_BASE_URL=http://127.0.0.1:2004`。  
+   - 真机调试：同一局域网内，`VITE_MOBILE_API_BASE_URL=http://<Mac的局域网IP>:2004`（Mac 上执行 `ipconfig getifaddr en0` 可得 IP，例如 192.168.1.10）；后端 `HOST=0.0.0.0`，且 CORS 放行 `http://<该IP>:5173`。
+
+凡涉及联调、接口约定、环境配置的提示词，均以本条逻辑为准。
+
+---
+
+## 三、在此逻辑下的视频上传与登录
+
+### 视频上传
+
+- **前端（真机/浏览器）**：用户在 H5 上传页选择本地视频或填写视频链接，点击上传；`mobile-frontend` 将请求发往 `API_BASE_URL`（即上述端口连调地址）。  
+- **请求**：`POST {API_BASE_URL}/api/videos/upload`（FormData 字段 `file`）或 `POST {API_BASE_URL}/api/videos/upload-url`（JSON body `{ url }`）。  
+- **后端**：在 `backend_fastapi` 端口 2004 上接收请求，保存文件到 `UPLOAD_FOLDER`（默认 `backend_fastapi/uploads/`），并在数据库 `videos` 表插入记录；返回 `id`、`status` 等。  
+- **真机连调要点**：`VITE_MOBILE_API_BASE_URL` 设为 `http://<Mac的局域网IP>:2004`（Mac 终端执行 `ipconfig getifaddr en0` 得到 IP，例如 192.168.1.10）；后端 `.env` 中 `HOST=0.0.0.0`，`CORS_ORIGINS` 包含 `http://<该IP>:5173`。
+
+### 登录
+
+- **前端（真机/浏览器）**：用户在登录页输入账号密码，提交；`mobile-frontend` 将请求发往 `API_BASE_URL`。  
+- **请求**：`POST {API_BASE_URL}/api/auth/login`，body `{ username, password }`。  
+- **后端**：在端口 2004 上校验用户，返回 `token`、`user` 等；前端将 token 存入本地（如 `localStorage`），后续请求在 Header 中携带 `Authorization: Bearer <token>`。  
+- **真机连调要点**：与视频上传相同，确保真机可访问后端端口且 CORS 正确。
+
+### 后端固定域名（换 Wi‑Fi/换地点不失效）
+
+若后端使用**固定域名**（如 `https://api.yourdomain.com`），前端构建时将该地址写入 `VITE_MOBILE_API_BASE_URL`，则换 Wi‑Fi、换地点后请求仍发往该域名，无需改配置。
+
+- **后端**：部署到有公网或内网域名的机器，通过 Nginx 等反向代理暴露固定域名（建议 HTTPS）。`.env` 中 `CORS_ORIGINS` 设为前端实际来源（如 `https://h5.yourdomain.com`）。
+- **前端**：构建前设置 `VITE_MOBILE_API_BASE_URL=https://api.yourdomain.com`、`VITE_MOBILE_UI_ONLY=false`（可新建 `.env.production` 或 `.env.ios` 写入这两项，再执行 `npm run build` 或 `npm run build:ios`）。本地开发仍用 `.env` 与本机 IP。
+- **验收**：`curl -I https://api.yourdomain.com/health` 返回 200；前端构建产物中请求为 `https://api.yourdomain.com/api/...`；换网络后真机访问正常。
+
+---
+
+## 四、技术路线原则
 
 本项目默认采用以下路线推进：
 
@@ -58,7 +105,7 @@
 
 ---
 
-## 三、必须坚持的总实施顺序
+## 五、必须坚持的总实施顺序
 
 实现顺序必须严格遵守，不能跳阶段：
 
@@ -81,7 +128,7 @@
 
 ---
 
-## 四、目标系统结构
+## 六、目标系统结构
 
 建议以如下结构持续演进（已去掉 Android 工程，仅保留 iOS 形态）：
 
@@ -120,7 +167,7 @@ EduMind/
 
 ---
 
-## 五、按阶段逐步实现方案
+## 七、按阶段逐步实现方案
 
 ### 阶段 0：现状梳理与接口冻结
 
@@ -365,7 +412,7 @@ EduMind/
 
 ---
 
-## 六、前后端实现顺序细化
+## 八、前后端实现顺序细化
 
 ### 1. 后端优先级
 
@@ -403,7 +450,7 @@ EduMind/
 
 ---
 
-## 七、专属代码规范
+## 九、专属代码规范
 
 以下规范必须被视为强约束，而不是建议。
 
@@ -488,7 +535,7 @@ EduMind/
 
 ---
 
-## 八、每个阶段的固定交付格式
+## 十、每个阶段的固定交付格式
 
 后续每次执行某一阶段时，必须按照以下固定格式输出，不允许只给思路不给结果：
 
@@ -506,7 +553,7 @@ EduMind/
 
 ---
 
-## 九、给代码助手的主执行提示词
+## 十一、给代码助手的主执行提示词
 
 下面这段内容是后续可以直接复用的主提示词：
 
@@ -516,6 +563,7 @@ EduMind/
 
 请严格遵守以下要求：
 
+0. **连调逻辑**：本项目为移动端应用开发。真机（或浏览器中的 H5）= 前端；业务功能在后端 `backend_fastapi/`（端口 2004）；前后端通过 API 基地址（端口）连调。真机调试时前端须配置为后端所在机器的局域网 IP（在 Mac 上执行 `ipconfig getifaddr en0` 可得，例如 `http://192.168.1.10:2004`），后端须 `HOST=0.0.0.0` 并配置 CORS 包含 `http://<该IP>:5173`。凡涉及联调、上传、登录的接口与配置，均以此为准。
 1. 实现顺序必须为：
    - 现状梳理与接口冻结
    - 移动端基础架构
@@ -554,7 +602,7 @@ EduMind/
 
 ---
 
-## 十、执行要求补充
+## 十二、执行要求补充
 
 1. 不允许为了追求一次性完整而把所有模块混在一起开发。
 2. 不允许把上传、分析、笔记、问答、推荐全部塞进一个页面或一个 store。
