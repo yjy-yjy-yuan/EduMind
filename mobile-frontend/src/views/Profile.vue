@@ -19,6 +19,13 @@
       <button class="danger" @click="doLogout" :disabled="loading">退出登录</button>
     </div>
 
+    <div class="card card--muted">
+      <div class="card-title">开发设置</div>
+      <p class="muted" style="margin: 0 0 8px; font-size: 12px;">换 Wi‑Fi 或换地点后若请求失败，可在此填写当前后端地址（如 http://192.168.1.10:2004）</p>
+      <input v-model.trim="apiBaseInput" class="input" placeholder="http://127.0.0.1:2004" style="margin-bottom: 8px;" />
+      <button class="btn btn--small" @click="saveApiBase" :disabled="saving">{{ saving ? '已保存' : '保存后端地址' }}</button>
+    </div>
+
     <div v-if="error" class="alert alert--bad">{{ error }}</div>
   </div>
 </template>
@@ -26,9 +33,12 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { getApiBaseUrl, setApiBaseUrl } from '@/config'
 import * as authStore from '@/store/auth'
 
 const router = useRouter()
+const apiBaseInput = ref(getApiBaseUrl())
+const saving = ref(false)
 const state = computed(() => authStore.getState())
 const loading = ref(false)
 const error = ref('')
@@ -61,7 +71,15 @@ const doLogout = async () => {
   }
 }
 
+const saveApiBase = () => {
+  const url = apiBaseInput.value
+  setApiBaseUrl(url || '')
+  saving.value = true
+  setTimeout(() => { saving.value = false }, 1500)
+}
+
 onMounted(() => {
+  apiBaseInput.value = getApiBaseUrl()
   refresh()
 })
 </script>
@@ -100,6 +118,22 @@ onMounted(() => {
   border: 1px solid var(--border);
   display: grid;
   gap: 10px;
+}
+
+.card--muted {
+  background: rgba(0, 0, 0, 0.03);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.card-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.btn--small {
+  padding: 8px 12px;
+  font-size: 13px;
 }
 
 .user {

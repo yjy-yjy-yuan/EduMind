@@ -68,6 +68,23 @@ def build_local_video_path(original_filename: str) -> tuple[str, str, str]:
     return title, filename, file_path
 
 
+def resolve_upload_source(video: Video) -> str:
+    """计算上传来源标识"""
+    return "url_import" if video.url else "local_file"
+
+
+def resolve_upload_source_label(video: Video) -> str:
+    """计算上传来源中文标签"""
+    return "链接导入" if video.url else "本地上传"
+
+
+def resolve_upload_source_value(video: Video) -> Optional[str]:
+    """计算上传来源值：链接导入为 URL，本地上传为文件名"""
+    if video.url:
+        return video.url
+    return video.filename
+
+
 async def save_upload_to_temp(file: UploadFile) -> tuple[str, str, int]:
     """分块写入临时文件并计算 MD5"""
     os.makedirs(settings.TEMP_FOLDER, exist_ok=True)
@@ -147,6 +164,7 @@ async def upload_video(file: UploadFile = File(...), db: Session = Depends(get_d
             filename=filename,
             filepath=file_path,
             title=title,
+            url=None,
             status=VideoStatus.UPLOADED,
             md5=file_md5,
             process_progress=0.0,
@@ -304,6 +322,9 @@ async def get_video_list(
                     "summary": video.summary,
                     "tags": tags,
                     "url": video.url,
+                    "upload_source": resolve_upload_source(video),
+                    "upload_source_label": resolve_upload_source_label(video),
+                    "upload_source_value": resolve_upload_source_value(video),
                     "process_progress": video.process_progress or 0,
                     "current_step": video.current_step,
                     "error_message": video.error_message,

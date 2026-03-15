@@ -66,3 +66,16 @@ npm run build:ios
 ```bash
 npm run build:web
 ```
+
+## 固定域名构建（后端使用固定域名，换 Wi‑Fi/换地点不失效）
+
+后端使用固定域名（如 `https://api.yourdomain.com`）时，构建前设置该地址，请求会始终发往该域名：
+
+```bash
+cp .env.production.example .env.production
+# 编辑 .env.production，将 https://api.yourdomain.com 改为实际后端固定域名
+npm run build
+# iOS 打包（会读 .env.ios）：cp .env.production.example .env.ios && 编辑域名 && npm run build:ios
+```
+
+详见仓库根目录 `docs/BACKEND_FIXED_DOMAIN.md`。

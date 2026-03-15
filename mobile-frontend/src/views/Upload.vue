@@ -16,6 +16,9 @@
         :disabled="busy"
       />
       <div v-if="file" class="muted">已选择：{{ file.name }}（{{ readableSize(file.size) }}）</div>
+      <div v-else-if="savedFileMeta" class="muted">
+        上次选择：{{ savedFileMeta.name }}（{{ readableSize(savedFileMeta.size) }}，返回后需重新选择文件才能再次上传）
+      </div>
       <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
         {{ busy ? '上传中…' : '开始上传' }}
       </button>

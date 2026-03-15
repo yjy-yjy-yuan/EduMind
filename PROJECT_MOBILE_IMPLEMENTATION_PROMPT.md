@@ -71,6 +71,14 @@
 - **后端**：在端口 2004 上校验用户，返回 `token`、`user` 等；前端将 token 存入本地（如 `localStorage`），后续请求在 Header 中携带 `Authorization: Bearer <token>`。  
 - **真机连调要点**：与视频上传相同，确保真机可访问后端端口且 CORS 正确。
 
+### 后端固定域名（换 Wi‑Fi/换地点不失效）
+
+若后端使用**固定域名**（如 `https://api.yourdomain.com`），前端构建时将该地址写入 `VITE_MOBILE_API_BASE_URL`，则换 Wi‑Fi、换地点后请求仍发往该域名，无需改配置。
+
+- **后端**：部署到有公网或内网域名的机器，通过 Nginx 等反向代理暴露固定域名（建议 HTTPS）。`.env` 中 `CORS_ORIGINS` 设为前端实际来源（如 `https://h5.yourdomain.com`）。
+- **前端**：构建前设置 `VITE_MOBILE_API_BASE_URL=https://api.yourdomain.com`、`VITE_MOBILE_UI_ONLY=false`（可新建 `.env.production` 或 `.env.ios` 写入这两项，再执行 `npm run build` 或 `npm run build:ios`）。本地开发仍用 `.env` 与本机 IP。
+- **验收**：`curl -I https://api.yourdomain.com/health` 返回 200；前端构建产物中请求为 `https://api.yourdomain.com/api/...`；换网络后真机访问正常。
+
 ---
 
 ## 四、技术路线原则

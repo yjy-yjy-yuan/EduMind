@@ -30,6 +30,10 @@ dist/
 # Project specific
 backend/uploads/
 backend/instance/
+backend_fastapi/uploads/
+
+# Local model/cache artifacts
+.cache/
 
 # Databases and local runtime files
 *.db

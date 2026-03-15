@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { API_BASE_URL } from '@/config'
+import { getApiBaseUrl } from '@/config'
 import { storageGet } from '@/utils/storage'
 
 const DEFAULT_TIMEOUT_MS = 10000
@@ -35,13 +35,14 @@ const shouldRetryRequest = (error) => {
 }
 
 const service = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: '',
   timeout: DEFAULT_TIMEOUT_MS,
   withCredentials: true
 })
 
 service.interceptors.request.use(
   (config) => {
+    config.baseURL = getApiBaseUrl()
     config.timeout = Number(config.timeout) > 0 ? Number(config.timeout) : DEFAULT_TIMEOUT_MS
 
     if (config.data instanceof FormData) {
@@ -56,16 +57,35 @@ service.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
+const networkErrorDetail =
+  '网络不可达，请检查是否与后端在同一 Wi‑Fi，或更换网络/重新配置后端地址后重试。'
+
+function normalizeNetworkError(error) {
+  if (error?.response?.data != null) return
+  const code = String(error?.code || '')
+  const msg = String(error?.message || '')
+  if (code === 'ERR_NETWORK' || code === 'ETIMEDOUT' || code === 'ECONNABORTED' || msg.includes('Network')) {
+    error.response = error.response || {}
+    error.response.data = error.response.data || { detail: networkErrorDetail }
+  }
+}
+
 service.interceptors.response.use(
   (response) => ({ data: response.data, status: response.status, headers: response.headers }),
   async (error) => {
-    if (!shouldRetryRequest(error)) return Promise.reject(error)
+    if (!shouldRetryRequest(error)) {
+      normalizeNetworkError(error)
+      return Promise.reject(error)
+    }
 
     const config = error.config || {}
     const retryCount = toPositiveInt(config.retry, DEFAULT_RETRY_COUNT)
     config.__retryCount = toPositiveInt(config.__retryCount, 0)
 
-    if (config.__retryCount >= retryCount) return Promise.reject(error)
+    if (config.__retryCount >= retryCount) {
+      normalizeNetworkError(error)
+      return Promise.reject(error)
+    }
 
     config.__retryCount += 1
     const retryDelay = toPositiveInt(config.retryDelay, DEFAULT_RETRY_DELAY_MS)
