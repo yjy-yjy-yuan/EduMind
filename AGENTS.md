@@ -22,3 +22,8 @@ Recent history uses short imperative subjects, often with `chore:` prefixes or c
 
 ## Configuration & Safety
 Do not commit real secrets from `.env` files or machine-local platform settings. When changing API contracts, update the related docs and prompt files in the same patch so mobile and backend work stay aligned.
+
+## iOS WebView Validation Rules
+- For `mobile-frontend/` interaction changes, validation must include iOS container behavior (WKWebView), not only desktop browser build output.
+- After frontend changes, rebuild `mobile-frontend` and ensure latest `dist/` is copied into iOS app Web assets before claiming the fix is complete.
+- For tap/click features, verify route transition and target page rendering in iOS runtime logs and UI (for example `/videos?scope=...` from home stat cards).

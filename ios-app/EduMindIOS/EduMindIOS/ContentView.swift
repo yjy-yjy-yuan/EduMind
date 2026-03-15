@@ -171,6 +171,14 @@ private struct H5WebView: UIViewRepresentable {
                 )
                 return
             }
+            if usesWebBuildAssetLayout(in: html) {
+                EduMindLog.error("WebView", "detected web build asset layout in \(indexURL.path)")
+                webView.loadHTMLString(
+                    "<h2 style=\"font-family:-apple-system\">检测到错误的前端构建产物</h2><p style=\"font-family:-apple-system\">当前 iOS 容器需要 index.js/index.css 结构，请执行：bash ios-app/sync_ios_web_assets.sh</p>",
+                    baseURL: nil
+                )
+                return
+            }
         } catch {
             // Ignore and continue with direct file loading.
         }
@@ -181,6 +189,10 @@ private struct H5WebView: UIViewRepresentable {
 
     private func usesLegacyAbsoluteAssetPaths(in html: String) -> Bool {
         html.contains("src=\"/") || html.contains("href=\"/") || html.contains("src='/") || html.contains("href='/")
+    }
+
+    private func usesWebBuildAssetLayout(in html: String) -> Bool {
+        html.contains("src=\"./assets/index-") || html.contains("src='./assets/index-")
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
