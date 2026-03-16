@@ -2,6 +2,8 @@ import request from '@/utils/request'
 import { shouldUseMockApi } from '@/config'
 import {
   mockDeleteVideo,
+  mockGenerateVideoSummary,
+  mockGenerateVideoTags,
   mockGetVideo,
   mockGetVideoList,
   mockGetVideoStatus,
@@ -25,9 +27,9 @@ export function getVideoStatus(videoId) {
   return request({ url: `/api/videos/${videoId}/status`, method: 'get' })
 }
 
-export function processVideo(videoId, language = 'Other', model = 'base') {
-  if (shouldUseMockApi()) return mockProcessVideo(videoId, language, model)
-  return request({ url: `/api/videos/${videoId}/process`, method: 'post', data: { language, model } })
+export function processVideo(videoId, options = {}) {
+  if (shouldUseMockApi()) return mockProcessVideo(videoId, options)
+  return request({ url: `/api/videos/${videoId}/process`, method: 'post', data: options })
 }
 
 export function deleteVideo(videoId) {
@@ -50,4 +52,14 @@ export function uploadLocalVideo(formData, { onUploadProgress } = {}) {
 export function uploadVideoUrl(data) {
   if (shouldUseMockApi()) return mockUploadVideoUrl(data)
   return request({ url: '/api/videos/upload-url', method: 'post', data, timeout: 600000, retry: 0 })
+}
+
+export function generateVideoSummary(videoId, data = {}) {
+  if (shouldUseMockApi()) return mockGenerateVideoSummary(videoId, data)
+  return request({ url: `/api/videos/${videoId}/generate-summary`, method: 'post', data, timeout: 120000, retry: 0 })
+}
+
+export function generateVideoTags(videoId, data = {}) {
+  if (shouldUseMockApi()) return mockGenerateVideoTags(videoId, data)
+  return request({ url: `/api/videos/${videoId}/generate-tags`, method: 'post', data, timeout: 120000, retry: 0 })
 }

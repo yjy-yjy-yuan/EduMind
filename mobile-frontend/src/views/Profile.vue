@@ -20,6 +20,43 @@
     </div>
 
     <div class="card card--muted">
+      <div class="card-title">处理设置</div>
+      <p class="muted" style="margin: 0 0 8px; font-size: 12px;">这些设置会用于新上传视频、详情页重新处理，以及失败任务重试。</p>
+      <label class="field">
+        <span class="field-label">识别语言</span>
+        <select v-model="processingForm.language" class="input">
+          <option v-for="option in LANGUAGE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">Whisper 模型</span>
+        <select v-model="processingForm.model" class="input">
+          <option v-for="option in WHISPER_MODEL_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">摘要风格</span>
+        <select v-model="processingForm.summaryStyle" class="input">
+          <option v-for="option in SUMMARY_STYLE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+      </label>
+      <label class="toggle">
+        <input v-model="processingForm.autoGenerateSummary" type="checkbox" />
+        <span>处理完成后自动生成摘要</span>
+      </label>
+      <label class="toggle">
+        <input v-model="processingForm.autoGenerateTags" type="checkbox" />
+        <span>处理完成后自动提取标签</span>
+      </label>
+      <div class="row-actions">
+        <button class="btn btn--small" @click="saveProcessing" :disabled="savingProcessing">
+          {{ savingProcessing ? '已保存' : '保存处理设置' }}
+        </button>
+        <button class="btn btn--ghost btn--small" @click="resetProcessingDefaults">恢复默认</button>
+      </div>
+    </div>
+
+    <div class="card card--muted">
       <div class="card-title">开发设置</div>
       <p class="muted" style="margin: 0 0 8px; font-size: 12px;">真机默认会优先使用原生注入的后端地址。若你修改了后端地址或端口，可在此覆盖当前值（例如 {{ suggestedApiBase }}）。</p>
       <input v-model.trim="apiBaseInput" class="input" :placeholder="apiBasePlaceholder" style="margin-bottom: 8px;" />
@@ -31,14 +68,24 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getApiBaseUrl, setApiBaseUrl } from '@/config'
+import {
+  LANGUAGE_OPTIONS,
+  PROCESSING_DEFAULTS,
+  SUMMARY_STYLE_OPTIONS,
+  WHISPER_MODEL_OPTIONS,
+  getProcessingSettings,
+  saveProcessingSettings
+} from '@/services/processingSettings'
 import * as authStore from '@/store/auth'
 
 const router = useRouter()
 const apiBaseInput = ref(getApiBaseUrl())
 const saving = ref(false)
+const savingProcessing = ref(false)
+const processingForm = ref(getProcessingSettings())
 const state = computed(() => authStore.getState())
 const loading = ref(false)
 const error = ref('')
@@ -87,8 +134,35 @@ const saveApiBase = () => {
   setTimeout(() => { saving.value = false }, 1500)
 }
 
+const saveProcessing = () => {
+  processingForm.value = saveProcessingSettings(processingForm.value)
+  savingProcessing.value = true
+  setTimeout(() => { savingProcessing.value = false }, 1500)
+}
+
+const resetProcessingDefaults = () => {
+  processingForm.value = saveProcessingSettings(PROCESSING_DEFAULTS)
+  savingProcessing.value = true
+  setTimeout(() => { savingProcessing.value = false }, 1500)
+}
+
+watch(
+  () => processingForm.value.autoGenerateTags,
+  (enabled) => {
+    if (enabled) processingForm.value.autoGenerateSummary = true
+  }
+)
+
+watch(
+  () => processingForm.value.autoGenerateSummary,
+  (enabled) => {
+    if (!enabled) processingForm.value.autoGenerateTags = false
+  }
+)
+
 onMounted(() => {
   apiBaseInput.value = getApiBaseUrl()
+  processingForm.value = getProcessingSettings()
   refresh()
 })
 </script>
@@ -143,6 +217,49 @@ onMounted(() => {
 .btn--small {
   padding: 8px 12px;
   font-size: 13px;
+}
+
+.btn--ghost {
+  background: transparent;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.input {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  padding: 12px;
+  font: inherit;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .user {

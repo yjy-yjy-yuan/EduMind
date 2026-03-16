@@ -132,7 +132,17 @@ def mark_download_failed(video_id: int, error_message: str):
     )
 
 
-def download_video_from_url_task(video_id: int, video_url: str, source_type: str):
+def download_video_from_url_task(
+    video_id: int,
+    video_url: str,
+    source_type: str,
+    *,
+    auto_generate_summary: bool = True,
+    auto_generate_tags: bool = True,
+    summary_style: str = "study",
+    model: Optional[str] = None,
+    language: str = "zh",
+):
     """下载远程视频到本地上传目录"""
     try:
         import yt_dlp
@@ -169,7 +179,14 @@ def download_video_from_url_task(video_id: int, video_url: str, source_type: str
             md5=md5,
         )
         update_video_status(video_id, VideoStatus.PENDING, 0.0, "下载完成，准备处理")
-        process_video_task(video_id, "zh", settings.WHISPER_MODEL)
+        process_video_task(
+            video_id,
+            language,
+            model or settings.WHISPER_MODEL,
+            auto_generate_summary=auto_generate_summary,
+            auto_generate_tags=auto_generate_tags,
+            summary_style=summary_style,
+        )
         logger.info("链接视频下载完成: id=%s path=%s", video_id, downloaded_path)
     except Exception as exc:
         logger.error("链接视频下载失败: id=%s error=%s", video_id, exc)

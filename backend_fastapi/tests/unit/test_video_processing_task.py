@@ -1,5 +1,6 @@
 """视频处理任务测试"""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -76,13 +77,28 @@ def test_process_video_task_updates_video_and_subtitles(tmp_path, monkeypatch):
         txt.write_text("第一句\n第二句\n", encoding="utf-8")
         return True
 
+    def fake_generate_summary(_video_id, _subtitle_path="", **_kwargs):
+        return {"success": True, "summary": "学习重点：\n1. 第一条。\n2. 第二条。"}
+
+    def fake_generate_tags(_video_id, _summary, **_kwargs):
+        return {"success": True, "tags": ["重点一", "重点二", "重点三"]}
+
     monkeypatch.setattr("app.tasks.video_processing.generate_preview_image", fake_generate_preview_image)
     monkeypatch.setattr("app.tasks.video_processing.generate_video_info", fake_generate_video_info)
     monkeypatch.setattr("app.tasks.video_processing.extract_audio", fake_extract_audio)
     monkeypatch.setattr("app.tasks.video_processing.transcribe_with_whisper", fake_transcribe)
     monkeypatch.setattr("app.tasks.video_processing.save_subtitles", fake_save_subtitles)
+    monkeypatch.setattr("app.services.video_content_service.generate_video_summary", fake_generate_summary)
+    monkeypatch.setattr("app.services.video_content_service.generate_video_tags", fake_generate_tags)
 
-    result = process_video_task(video_id, "zh", "turbo")
+    result = process_video_task(
+        video_id,
+        "zh",
+        "turbo",
+        auto_generate_summary=True,
+        auto_generate_tags=True,
+        summary_style="study",
+    )
 
     assert result["status"] == "success"
 
@@ -97,6 +113,8 @@ def test_process_video_task_updates_video_and_subtitles(tmp_path, monkeypatch):
     assert stored_video.current_step == "处理完成"
     assert stored_video.process_progress == 100.0
     assert stored_video.subtitle_filepath is not None
+    assert stored_video.summary == "学习重点：\n1. 第一条。\n2. 第二条。"
+    assert json.loads(stored_video.tags) == ["重点一", "重点二", "重点三"]
     assert Path(stored_video.subtitle_filepath).exists()
     assert len(stored_subtitles) == 2
     assert stored_subtitles[0].text == "第一句"

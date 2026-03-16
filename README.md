@@ -24,7 +24,7 @@ EduMind/
 ## 架构原则
 
 - 前端只负责 UI、交互、请求发送
-- 后端负责真实功能：上传、音视频提取、转录、数据库写入、分析
+- 后端负责真实功能：上传、音视频提取、转录、摘要生成、标签提取、数据库写入、分析
 - 前后端通过端口联调
 - 数据库必须是 MySQL
 - 尽量适配现有表结构，不随意改表或加表
@@ -81,6 +81,40 @@ bash ios-app/sync_ios_web_assets.sh
 1. 构建 `mobile-frontend`
 2. 读取 `backend_fastapi/.env` 中的 `PORT`，自动刷新 iOS 真机默认后端地址
 3. 将最新 `dist/` 同步到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
+
+## 摘要生成与处理设置
+
+当前视频处理链路已经包含真实摘要生成，不再停留在 UI-only 占位：
+
+1. 上传或链接导入视频
+2. 后端完成音频提取与 Whisper 转录
+3. 后端写回字幕文件和 `subtitles` 表
+4. 后端继续生成课程摘要并写回 `videos.summary`
+5. 后端继续提取学习标签并写回 `videos.tags`
+
+处理设置入口在 iOS 端“我的”页面，当前会影响：
+
+1. 新上传视频
+2. 链接导入视频
+3. 视频详情页重新处理
+4. 失败任务重试
+
+当前可配置项：
+
+1. 识别语言
+2. Whisper 模型
+3. 摘要风格：`brief` / `study` / `detailed`
+4. 是否在处理完成后自动生成摘要
+5. 是否在处理完成后自动提取标签
+
+如果在线大模型不可用，后端会自动回退到本地摘要与关键词提取逻辑，保证 `videos.summary` 与 `videos.tags` 仍可生成。
+
+手动补生成接口：
+
+```bash
+POST /api/videos/{video_id}/generate-summary
+POST /api/videos/{video_id}/generate-tags
+```
 
 ## MySQL 表管理
 

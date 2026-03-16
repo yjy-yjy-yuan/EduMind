@@ -9,12 +9,14 @@
 """
 
 import gc
+import json
 import logging
 import os
 import subprocess
 import threading
 import time
 
+from app.services.video_content_service import extract_transcript_text
 from sqlalchemy import inspect
 
 logger = logging.getLogger(__name__)
@@ -402,7 +404,15 @@ def update_video_status(video_id: int, status: str, progress: float, step: str, 
         engine.dispose()
 
 
-def process_video_task(video_id: int, language: str = "zh", model: str = "base"):
+def process_video_task(
+    video_id: int,
+    language: str = "zh",
+    model: str = "base",
+    *,
+    auto_generate_summary: bool = True,
+    auto_generate_tags: bool = True,
+    summary_style: str = "study",
+):
     """
     视频处理任务（在后台执行器中执行）
 
@@ -414,7 +424,15 @@ def process_video_task(video_id: int, language: str = "zh", model: str = "base")
     Returns:
         dict: 处理结果
     """
-    logger.info(f"开始处理视频 | ID: {video_id} | 语言: {language} | 模型: {model}")
+    logger.info(
+        "开始处理视频 | ID: %s | 语言: %s | 模型: %s | auto_summary=%s | auto_tags=%s | summary_style=%s",
+        video_id,
+        language,
+        model,
+        auto_generate_summary,
+        auto_generate_tags,
+        summary_style,
+    )
 
     # 动态导入以避免跨进程问题
     from app.core.config import settings
@@ -445,6 +463,10 @@ def process_video_task(video_id: int, language: str = "zh", model: str = "base")
         video.process_progress = 0.0
         video.current_step = "初始化处理"
         video.error_message = None
+        if auto_generate_summary:
+            video.summary = None
+        if auto_generate_tags:
+            video.tags = None
         db.commit()
 
         # 检查是否为占位文件
@@ -549,6 +571,8 @@ def process_video_task(video_id: int, language: str = "zh", model: str = "base")
             db.commit()
             return {"status": "failed", "message": "转录失败"}
 
+        transcript_text = extract_transcript_text(result)
+
         # Step 5: 保存字幕 (85-95%)
         video.process_progress = 85.0
         video.current_step = "生成字幕文件"
@@ -565,6 +589,50 @@ def process_video_task(video_id: int, language: str = "zh", model: str = "base")
             logger.warning("保存字幕失败，但继续完成处理")
 
         sync_subtitles_to_db(db, video_id, result, language)
+
+        if auto_generate_summary or auto_generate_tags:
+            from app.services.video_content_service import generate_video_summary
+            from app.services.video_content_service import generate_video_tags
+            from app.services.video_content_service import normalize_summary_style
+
+            normalized_summary_style = normalize_summary_style(summary_style)
+            if auto_generate_summary or auto_generate_tags:
+                video.process_progress = 92.0
+                video.current_step = f"生成摘要（{normalized_summary_style}）"
+                db.commit()
+
+                summary_result = generate_video_summary(
+                    video_id,
+                    video.subtitle_filepath or "",
+                    transcript_text=transcript_text,
+                    title=video.title or "",
+                    style=normalized_summary_style,
+                )
+                if summary_result.get("success"):
+                    video.summary = summary_result["summary"]
+                    db.commit()
+                else:
+                    logger.warning(
+                        "摘要生成失败，跳过写回 | video_id=%s | error=%s",
+                        video_id,
+                        summary_result.get("error"),
+                    )
+
+            if auto_generate_tags and video.summary:
+                video.process_progress = 97.0
+                video.current_step = "提取学习标签"
+                db.commit()
+
+                tag_result = generate_video_tags(video_id, video.summary, title=video.title or "")
+                if tag_result.get("success"):
+                    video.tags = json.dumps(tag_result["tags"], ensure_ascii=False)
+                    db.commit()
+                else:
+                    logger.warning(
+                        "标签生成失败，跳过写回 | video_id=%s | error=%s",
+                        video_id,
+                        tag_result.get("error"),
+                    )
 
         # 清理临时音频文件
         if input_file != video_path and os.path.exists(input_file):

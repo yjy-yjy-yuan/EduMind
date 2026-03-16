@@ -22,6 +22,7 @@
       <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
         {{ busy ? '上传中…' : '开始上传' }}
       </button>
+      <div class="muted">当前处理：{{ processingSettingsSummary }}</div>
 
       <div v-if="busy" class="progress">
         <div class="bar" :style="{ width: `${progress}%` }"></div>
@@ -34,6 +35,7 @@
       <input class="input" v-model.trim="videoUrl" placeholder="请输入视频链接（B站/YouTube等）" :disabled="busy" />
       <button class="btn" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交链接' }}</button>
       <div class="muted">支持：B站、YouTube、中国大学慕课（icourse163）</div>
+      <div class="muted">将沿用当前处理设置：{{ processingSettingsSummary }}</div>
     </div>
 
     <div v-if="recentUploads.length > 0" class="card">
@@ -100,6 +102,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getVideoStatus, processVideo, uploadLocalVideo, uploadVideoUrl } from '@/api/video'
+import { buildProcessPayload, getProcessingSettings, languageLabel, summaryStyleLabel, whisperModelLabel, appendProcessingSettingsToFormData } from '@/services/processingSettings'
 import { normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
@@ -107,6 +110,7 @@ const router = useRouter()
 const fileInputRef = ref(null)
 
 const file = ref(null)
+const savedFileMeta = ref(null)
 const videoUrl = ref('')
 const busy = ref(false)
 const progress = ref(0)
@@ -116,6 +120,7 @@ const recentUploads = ref([])
 const syncingRecent = ref(false)
 const statusFilter = ref('all')
 let recentStatusTimer = null
+const processingSettings = ref(getProcessingSettings())
 
 const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
 const ALLOWED_EXTENSIONS = new Set(['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'])
@@ -127,6 +132,18 @@ const STATUS_FILTERS = [
   { value: 'active', label: '进行中' },
   { value: 'completed', label: '已完成' }
 ]
+
+const processingSettingsSummary = computed(() => {
+  const current = processingSettings.value || getProcessingSettings()
+  const parts = [
+    `${whisperModelLabel(current.model)} 模型`,
+    languageLabel(current.language),
+    `${summaryStyleLabel(current.summaryStyle)}摘要`
+  ]
+  if (current.autoGenerateSummary) parts.push('自动摘要')
+  if (current.autoGenerateTags) parts.push('自动标签')
+  return parts.join(' · ')
+})
 
 const readableSize = (size) => {
   const n = Number(size || 0)
@@ -339,7 +356,8 @@ const retryRecent = async (item) => {
   error.value = ''
   message.value = ''
   try {
-    await processVideo(item.videoId)
+    processingSettings.value = getProcessingSettings()
+    await processVideo(item.videoId, buildProcessPayload(processingSettings.value))
     recentUploads.value[idx] = {
       ...recentUploads.value[idx],
       status: 'pending',
@@ -387,11 +405,13 @@ const onFileChange = (e) => {
     return
   }
   file.value = selected
+  savedFileMeta.value = { name: selected.name, size: Number(selected.size || 0) }
 }
 
 const resetAll = () => {
   if (busy.value) return
   file.value = null
+  savedFileMeta.value = null
   if (fileInputRef.value) fileInputRef.value.value = ''
   videoUrl.value = ''
   progress.value = 0
@@ -408,6 +428,8 @@ const uploadFile = async () => {
   try {
     const form = new FormData()
     form.append('file', file.value)
+    processingSettings.value = getProcessingSettings()
+    appendProcessingSettingsToFormData(form, processingSettings.value)
     const res = await uploadLocalVideo(form, {
       onUploadProgress: (evt) => {
         if (!evt.total) return
@@ -452,7 +474,8 @@ const uploadUrl = async () => {
   error.value = ''
   try {
     const trimmedUrl = String(videoUrl.value).trim()
-    const res = await uploadVideoUrl({ url: trimmedUrl })
+    processingSettings.value = getProcessingSettings()
+    const res = await uploadVideoUrl({ url: trimmedUrl, ...buildProcessPayload(processingSettings.value) })
     const data = res?.data || {}
     const videoId = resolveVideoId(data)
     message.value = data?.message || '已提交链接，下载完成后会自动开始处理'
@@ -476,6 +499,7 @@ const uploadUrl = async () => {
 }
 
 onMounted(async () => {
+  processingSettings.value = getProcessingSettings()
   loadRecentUploads()
   await syncRecentStatuses()
   scheduleRecentStatusSync()

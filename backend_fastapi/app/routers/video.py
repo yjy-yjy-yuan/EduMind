@@ -17,12 +17,17 @@ from app.models.video import VideoStatus
 from app.schemas.video import VideoDetail
 from app.schemas.video import VideoListResponse
 from app.schemas.video import VideoProcessRequest
+from app.schemas.video import VideoSummaryRequest
+from app.schemas.video import VideoTagRequest
 from app.schemas.video import VideoUploadResponse
 from app.schemas.video import VideoUploadURL
 from app.schemas.video import VideoStatusResponse
+from app.services.video_content_service import normalize_summary_style
+from app.services.video_content_service import read_subtitle_text
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import File
+from fastapi import Form
 from fastapi import HTTPException
 from fastapi import Query
 from fastapi import Request
@@ -158,12 +163,44 @@ def iter_file_chunk(filepath: str, start: int = 0, end: Optional[int] = None):
                 remaining -= len(chunk)
 
 
+def build_processing_options(
+    *,
+    language: str = "Other",
+    model: Optional[str] = None,
+    auto_generate_summary: bool = True,
+    auto_generate_tags: bool = True,
+    summary_style: str = "study",
+) -> dict:
+    """规范化视频处理参数。"""
+    whisper_language = "en" if str(language or "").strip() == "English" else "zh"
+    auto_tags = bool(auto_generate_tags)
+    return {
+        "language": whisper_language,
+        "model": str(model or settings.WHISPER_MODEL).strip() or settings.WHISPER_MODEL,
+        "auto_generate_summary": bool(auto_generate_summary or auto_tags),
+        "auto_generate_tags": auto_tags,
+        "summary_style": normalize_summary_style(summary_style),
+    }
+
+
+def extract_video_transcript_text(video: Video) -> str:
+    """优先从字幕表读取纯文本，缺失时回退到字幕文件。"""
+    subtitle_rows = getattr(video, "subtitles", None) or []
+    subtitle_texts = [str(row.text or "").strip() for row in subtitle_rows if str(row.text or "").strip()]
+    if subtitle_texts:
+        return " ".join(subtitle_texts)
+    return read_subtitle_text(video.subtitle_filepath or "")
+
+
 def submit_video_processing(
     video: Video,
     db: Session,
     *,
     language: str = "zh",
     model: Optional[str] = None,
+    auto_generate_summary: bool = True,
+    auto_generate_tags: bool = True,
+    summary_style: str = "study",
     raise_on_error: bool = False,
 ) -> bool:
     """提交视频处理任务并将状态写回当前视频记录。"""
@@ -182,7 +219,15 @@ def submit_video_processing(
         from app.core.executor import submit_task
         from app.tasks.video_processing import process_video_task
 
-        submit_task(process_video_task, video.id, language, model or settings.WHISPER_MODEL)
+        submit_task(
+            process_video_task,
+            video.id,
+            language,
+            model or settings.WHISPER_MODEL,
+            auto_generate_summary=auto_generate_summary,
+            auto_generate_tags=auto_generate_tags,
+            summary_style=normalize_summary_style(summary_style),
+        )
         return True
     except Exception as exc:
         logger.error("提交视频处理任务失败 | video_id=%s | error=%s", video.id, exc)
@@ -236,7 +281,15 @@ async def save_upload_to_temp(file: UploadFile) -> tuple[str, str, int]:
 
 
 @router.post("/upload", response_model=VideoUploadResponse)
-async def upload_video(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def upload_video(
+    file: UploadFile = File(...),
+    language: str = Form("Other"),
+    model: str = Form("base"),
+    auto_generate_summary: bool = Form(True),
+    auto_generate_tags: bool = Form(True),
+    summary_style: str = Form("study"),
+    db: Session = Depends(get_db),
+):
     """上传视频文件"""
     logger.info(f"收到文件上传请求: {file.filename}")
 
@@ -286,7 +339,15 @@ async def upload_video(file: UploadFile = File(...), db: Session = Depends(get_d
         db.commit()
         db.refresh(video)
 
-        task_submitted = submit_video_processing(video, db)
+        process_options = build_processing_options(
+            language=language,
+            model=model,
+            auto_generate_summary=auto_generate_summary,
+            auto_generate_tags=auto_generate_tags,
+            summary_style=summary_style,
+        )
+
+        task_submitted = submit_video_processing(video, db, **process_options)
         db.refresh(video)
 
         logger.info(f"视频上传成功: ID={video.id}, size={file_size}")
@@ -391,7 +452,14 @@ async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
         from app.core.executor import submit_task
         from app.tasks.video_download import download_video_from_url_task
 
-        submit_task(download_video_from_url_task, temp_video.id, video_url, source_type)
+        process_options = build_processing_options(
+            language=data.language,
+            model=data.model,
+            auto_generate_summary=data.auto_generate_summary,
+            auto_generate_tags=data.auto_generate_tags,
+            summary_style=data.summary_style,
+        )
+        submit_task(download_video_from_url_task, temp_video.id, video_url, source_type, **process_options)
         return VideoUploadResponse(
             id=temp_video.id,
             status="downloading",
@@ -510,8 +578,14 @@ async def process_video_route(video_id: int, request: VideoProcessRequest, db: S
     if video.status not in allowed_statuses:
         raise HTTPException(status_code=400, detail=f"视频状态不正确: {video.status}")
 
-    whisper_language = "en" if request.language == "English" else "zh"
-    submit_video_processing(video, db, language=whisper_language, model=request.model, raise_on_error=True)
+    process_options = build_processing_options(
+        language=request.language,
+        model=request.model,
+        auto_generate_summary=request.auto_generate_summary,
+        auto_generate_tags=request.auto_generate_tags,
+        summary_style=request.summary_style,
+    )
+    submit_video_processing(video, db, raise_on_error=True, **process_options)
 
     return {"status": "success", "message": "视频处理已开始"}
 
@@ -629,7 +703,7 @@ async def get_subtitle(video_id: int, format: str = "srt", download: bool = Fals
 
 
 @router.post("/{video_id}/generate-summary")
-async def generate_summary(video_id: int, db: Session = Depends(get_db)):
+async def generate_summary(video_id: int, request: VideoSummaryRequest, db: Session = Depends(get_db)):
     """为视频生成内容摘要"""
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
@@ -638,26 +712,36 @@ async def generate_summary(video_id: int, db: Session = Depends(get_db)):
     if video.status != VideoStatus.COMPLETED:
         raise HTTPException(status_code=400, detail="视频尚未处理完成，请先处理视频")
 
-    if not video.subtitle_filepath or not os.path.exists(video.subtitle_filepath):
-        raise HTTPException(status_code=400, detail="字幕文件不存在")
+    transcript_text = extract_video_transcript_text(video)
+    if not transcript_text:
+        raise HTTPException(status_code=400, detail="字幕内容不存在，无法生成摘要")
 
     try:
-        from services.summary_generator import generate_video_summary
+        from app.services.video_content_service import generate_video_summary
 
-        result = generate_video_summary(video_id, video.subtitle_filepath)
+        result = generate_video_summary(
+            video_id,
+            video.subtitle_filepath or "",
+            transcript_text=transcript_text,
+            title=video.title or "",
+            style=request.style,
+        )
         if not result["success"]:
             raise HTTPException(status_code=500, detail=f"生成摘要失败: {result['error']}")
 
         video.summary = result["summary"]
         db.commit()
 
-        return {"success": True, "summary": result["summary"]}
-    except ImportError:
-        raise HTTPException(status_code=500, detail="摘要生成服务未配置")
+        return {"success": True, "summary": result["summary"], "style": result.get("style")}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("生成视频摘要失败 | video_id=%s | error=%s", video_id, exc)
+        raise HTTPException(status_code=500, detail="摘要生成失败，请稍后重试")
 
 
 @router.post("/{video_id}/generate-tags")
-async def generate_tags(video_id: int, db: Session = Depends(get_db)):
+async def generate_tags(video_id: int, request: VideoTagRequest, db: Session = Depends(get_db)):
     """为视频生成标签"""
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
@@ -670,9 +754,9 @@ async def generate_tags(video_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="视频没有摘要，请先生成摘要")
 
     try:
-        from services.tag_generator import generate_video_tags
+        from app.services.video_content_service import generate_video_tags
 
-        result = generate_video_tags(video_id, video.summary)
+        result = generate_video_tags(video_id, video.summary, title=video.title or "", max_tags=request.max_tags)
         if not result["success"]:
             raise HTTPException(status_code=500, detail=f"生成标签失败: {result['error']}")
 
@@ -680,5 +764,8 @@ async def generate_tags(video_id: int, db: Session = Depends(get_db)):
         db.commit()
 
         return {"success": True, "tags": result["tags"]}
-    except ImportError:
-        raise HTTPException(status_code=500, detail="标签生成服务未配置")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("生成视频标签失败 | video_id=%s | error=%s", video_id, exc)
+        raise HTTPException(status_code=500, detail="标签生成失败，请稍后重试")

@@ -90,6 +90,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getVideoList, processVideo } from '@/api/video'
+import { buildProcessPayload, getProcessingSettings } from '@/services/processingSettings'
 import { isActiveVideoStatus, normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
 const route = useRoute()
@@ -210,7 +211,7 @@ const retryFailed = async (video) => {
   error.value = ''
   message.value = ''
   try {
-    await processVideo(videoId)
+    await processVideo(videoId, buildProcessPayload(getProcessingSettings()))
     setLocalStatus(videoId, 'pending')
     message.value = `视频 ${videoId} 已重新提交处理`
     await reload(true)
@@ -239,7 +240,7 @@ const retryAllFailed = async () => {
 
     const results = await Promise.allSettled(
       targets.map(async (id) => {
-        await processVideo(id)
+        await processVideo(id, buildProcessPayload(getProcessingSettings()))
         return id
       })
     )

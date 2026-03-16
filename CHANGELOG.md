@@ -2,6 +2,13 @@
 
 ## 2026-03-16
 
+### 摘要生成与处理设置收口
+- 新增 [`backend_fastapi/app/services/video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_content_service.py)：新增真实视频内容分析服务，在字幕写回后生成摘要与标签；优先走在线大模型或 Ollama，失败时回退到本地摘要与关键词提取，避免功能停留在占位态。
+- 更新 [`backend_fastapi/app/tasks/video_processing.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_processing.py)、[`backend_fastapi/app/tasks/video_download.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_download.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)：视频处理、链接导入、手动重处理三条链路统一支持 `language`、`model`、`summary_style`、`auto_generate_summary`、`auto_generate_tags` 参数，并将摘要写入 `videos.summary`、标签写入 `videos.tags`。
+- 新增 [`backend_fastapi/tests/unit/test_video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_content_service.py)，更新 [`backend_fastapi/tests/unit/test_video_processing_task.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_processing_task.py)：补充摘要回退、标签回退和处理完成后摘要/标签写回数据库的单测覆盖。
+- 新增 [`mobile-frontend/src/services/processingSettings.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/processingSettings.js)，更新 [`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：新增“处理设置”入口，统一管理识别语言、Whisper 模型、摘要风格、自动摘要、自动标签，并将其用于新上传、链接导入、详情页重处理和失败任务重试；详情页新增摘要生成与标签提取入口。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：同步当前摘要链路、处理设置作用范围和后端职责边界。
+
 ### iOS 真机播放与视频处理链路修复
 - 更新 [`backend_fastapi/app/core/executor.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/executor.py)：本地开发默认改用 `ThreadPoolExecutor` 执行后台任务，补充任务完成/异常日志与失败状态回写，修复视频处理任务长时间停留在“已提交，等待处理”的假死问题。
 - 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)：新增后台任务执行器类型与并发数配置项，便于后续按环境切换。
