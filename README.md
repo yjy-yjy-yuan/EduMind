@@ -1,58 +1,53 @@
 # EduMind
 
-EduMind 是一个面向教育视频学习场景的智能分析系统，当前仓库同时维护 FastAPI 主后端、Flask 旧后端、桌面端和移动端 H5 前端（可由 iOS WebView 等容器加载）。
+EduMind 现已收敛为 iOS-only 移动学习项目。唯一有效工程链路如下：
 
-## 仓库现状
+1. `backend_fastapi/`：真实后端能力与 MySQL 数据写入
+2. `mobile-frontend/`：移动端 H5 UI
+3. `ios-app/`：iOS `WKWebView` 容器
+
+不再维护桌面网页版、旧 Flask 后端或 Android 工程。
+
+## 当前结构
 
 ```text
 EduMind/
-├── backend_fastapi/   # 当前主后端，新接口优先放这里
-├── backend/           # 旧版 Flask 后端，保留兼容
-├── frontend/          # 桌面端 Vue 3 + Vite
-├── mobile-frontend/   # 移动端 H5 / WebView 前端
-├── ios-app/           # iOS WebView 容器（建议使用 Xcode 创建与维护）
-├── docs/              # 文档、方案、提示词
-├── tests/             # 根目录测试
-└── dev_start.py       # 一键启动旧版 backend + frontend 的开发脚本
+├── backend_fastapi/   # 唯一后端
+├── mobile-frontend/   # 唯一前端
+├── ios-app/           # iOS 容器
+├── docs/              # iOS 链路相关文档
+├── AGENTS.md
+├── PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md
+└── CHANGELOG.md
 ```
 
-当前默认开发组合是：
+## 架构原则
 
-- 后端：`backend_fastapi/`，默认端口 `2004`
-- 桌面端：`frontend/`，Vite 默认端口 `328`（可在 `frontend/.env` 调整）
-- 移动端：`mobile-frontend/`，Vite 默认端口由 Vite 自动分配，接口默认指向 `2004`
-
-需要注意：
-
-- `dev_start.py` 目前仍面向 `backend/` + `frontend/` 的旧联调流程，不是 FastAPI 的统一启动脚本。
-- `frontend/` 和 `mobile-frontend/` 都支持通过 `.env` 调整后端代理目标；换电脑后如果端口不同，优先改 `.env`。
-
-## 主要能力
-
-- 视频上传、转码与处理状态跟踪
-- Whisper 转录与字幕管理
-- 视频摘要、标签、知识点分析
-- 视频问答与历史记录
-- 学习笔记与时间点跳转
-- 知识图谱生成与查询
-- 移动端学习流程与 iOS/移动端 H5 集成
+- 前端只负责 UI、交互、请求发送
+- 后端负责真实功能：上传、音视频提取、转录、摘要生成、标签提取、数据库写入、分析
+- 前后端通过端口联调
+- 数据库必须是 MySQL
+- 尽量适配现有表结构，不随意改表或加表
 
 ## 环境要求
 
-- Python `3.10+`
-- Node.js `16+`
-- npm
-- 按功能启用的外部依赖：MySQL、Neo4j、Redis、FFmpeg、Ollama
+- MacBook Pro 开发环境
+- Python 3.10+
+- Node.js 16+
+- MySQL
+- FFmpeg
+- 按功能启用 Neo4j、Redis、Ollama
 
 ## 快速开始
 
-### 1. 启动主后端
+### 1. 创建虚拟环境并启动后端
 
 ```bash
-cd backend_fastapi
-pip install -r requirements.txt
-cp .env.example .env
-python run.py
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r backend_fastapi/requirements.txt
+cp backend_fastapi/.env.example backend_fastapi/.env
+python backend_fastapi/run.py
 ```
 
 默认地址：
@@ -60,75 +55,131 @@ python run.py
 - 健康检查：`http://127.0.0.1:2004/health`
 - API 文档：`http://127.0.0.1:2004/docs`
 
-### 2. 启动桌面端
+### 2. 启动移动端前端
 
 ```bash
-cd frontend
+cd mobile-frontend
 npm install
 cp .env.example .env
 npm run dev
 ```
 
-默认访问地址：`http://127.0.0.1:328`
+说明：
 
-如需调整端口/代理，编辑 `frontend/.env`：
+- 浏览器仅用于开发调试
+- 实际交付端是 iOS `WKWebView`
+- 默认接口地址指向 `http://127.0.0.1:2004`
 
-- `VITE_FRONTEND_PORT=328`
-- `VITE_API_PROXY_TARGET=http://127.0.0.1:2004`
-
-### 3. 启动移动端 H5
-
-```bash
-cd mobile-frontend
-npm install
-npm run dev
-```
-
-推荐先复制环境变量模板：
+### 3. 构建并同步到 iOS 容器
 
 ```bash
-cd mobile-frontend
-cp .env.example .env
+bash ios-app/sync_ios_web_assets.sh
 ```
 
-默认配置项：
+该脚本会：
 
-- `VITE_MOBILE_API_BASE_URL=http://127.0.0.1:2004`
-- `VITE_MOBILE_PROXY_TARGET=http://127.0.0.1:2004`
+1. 构建 `mobile-frontend`
+2. 读取 `backend_fastapi/.env` 中的 `PORT`，自动刷新 iOS 真机默认后端地址
+3. 将最新 `dist/` 同步到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
 
-- （可选）iOS 原生容器：推荐在 `ios-app/` 目录下使用 Xcode 创建 iOS 工程，通过 `WKWebView` 加载 `mobile-frontend` 的 H5 页面（开发期指向 Vite dev server，发布期加载打包后的静态资源）。
+## 摘要生成与处理设置
+
+当前视频处理链路已经包含真实摘要生成，不再停留在 UI-only 占位：
+
+1. 上传或链接导入视频
+2. 后端完成音频提取与 Whisper 转录
+3. 后端写回字幕文件和 `subtitles` 表
+4. 后端继续生成课程摘要并写回 `videos.summary`
+5. 后端继续提取学习标签并写回 `videos.tags`
+
+处理设置入口在 iOS 端“我的”页面，当前会影响：
+
+1. 新上传视频
+2. 链接导入视频
+3. 视频详情页重新处理
+4. 失败任务重试
+
+当前可配置项：
+
+1. 识别语言
+2. Whisper 模型
+3. 摘要风格：`brief` / `study` / `detailed`
+4. 是否在处理完成后自动生成摘要
+5. 是否在处理完成后自动提取标签
+
+如果在线大模型不可用，后端会自动回退到本地摘要与关键词提取逻辑，保证 `videos.summary` 与 `videos.tags` 仍可生成。
+
+手动补生成接口：
+
+```bash
+POST /api/videos/{video_id}/generate-summary
+POST /api/videos/{video_id}/generate-tags
+```
+
+## MySQL 表管理
+
+当前后端显式管理的业务表只有 6 张：
+
+1. `users`
+2. `videos`
+3. `notes`
+4. `questions`
+5. `subtitles`
+6. `note_timestamps`
+
+查看当前脚本管理的表结构：
+
+```bash
+. .venv/bin/activate
+python backend_fastapi/scripts/init_db.py --info
+```
+
+只补创建缺失表，不删除现有数据：
+
+```bash
+. .venv/bin/activate
+python backend_fastapi/scripts/init_db.py --create
+```
+
+删除并重建当前后端管理的表：
+
+```bash
+. .venv/bin/activate
+python backend_fastapi/scripts/init_db.py --reset
+```
+
+导出可直接在 Navicat 执行的 MySQL SQL：
+
+```bash
+. .venv/bin/activate
+python backend_fastapi/scripts/init_db.py --emit-sql backend_fastapi/scripts/mysql_managed_schema.sql
+```
+
+默认导出的 SQL 文件位置：
+
+- [`backend_fastapi/scripts/mysql_managed_schema.sql`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/mysql_managed_schema.sql)
+
+当前默认数据库名已统一为 `edumind`。
+
 ## 测试
 
-根目录 `pytest` 主要覆盖共享后端测试：
-
 ```bash
-pytest
-pytest -m smoke
-pytest -m unit
-pytest -m api
-pytest -m integration
+. .venv/bin/activate
+pytest backend_fastapi/tests/ -v
 ```
 
-FastAPI 子项目也可以单独执行：
+## 开发约束
 
-```bash
-cd backend_fastapi
-pytest tests/ -v
-```
-
-## 开发建议
-
-1. 新后端接口优先开发在 `backend_fastapi/`
-2. 桌面端页面改动放在 `frontend/`
-3. 移动端业务放在 `mobile-frontend/`
-5. `backend/` 仅做兼容维护，不再作为首选实现
+1. 真实功能只写在 `backend_fastapi/`
+2. `mobile-frontend/` 不直接实现业务规则或数据库逻辑
+3. 前端改动后必须同步 iOS `WebAssets`
+4. 文档规范以 `AGENTS.md` 与 `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md` 为准
 
 ## 相关文档
 
 - [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)
-- [`CHANGELOG.md`](/Users/yuan/final-work/EduMind/CHANGELOG.md)
+- [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)
 - [`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)
 - [`backend_fastapi/README_RUN.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README_RUN.md)
-- [`frontend/README.md`](/Users/yuan/final-work/EduMind/frontend/README.md)
 - [`mobile-frontend/README.md`](/Users/yuan/final-work/EduMind/mobile-frontend/README.md)
-- （可选）`ios-app/`：建议在该目录下创建 Xcode 工程并编写 iOS 容器说明。
+- [`ios-app/README.md`](/Users/yuan/final-work/EduMind/ios-app/README.md)

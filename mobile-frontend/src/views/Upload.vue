@@ -22,6 +22,7 @@
       <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
         {{ busy ? '上传中…' : '开始上传' }}
       </button>
+      <div class="muted">当前处理：{{ processingSettingsSummary }}</div>
 
       <div v-if="busy" class="progress">
         <div class="bar" :style="{ width: `${progress}%` }"></div>
@@ -34,6 +35,7 @@
       <input class="input" v-model.trim="videoUrl" placeholder="请输入视频链接（B站/YouTube等）" :disabled="busy" />
       <button class="btn" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交链接' }}</button>
       <div class="muted">支持：B站、YouTube、中国大学慕课（icourse163）</div>
+      <div class="muted">将沿用当前处理设置：{{ processingSettingsSummary }}</div>
     </div>
 
     <div v-if="recentUploads.length > 0" class="card">
@@ -65,6 +67,12 @@
             <div class="recent-meta">
               <span class="status" :class="statusClass(item.status)">{{ statusText(item.status) }}</span>
             </div>
+            <div v-if="isActiveStatus(item.status)" class="recent-progress">
+              <div class="recent-progress__text">{{ displayProgress(item.progress) }}% · {{ item.currentStep || '处理中' }}</div>
+              <div class="progress progress--compact">
+                <div class="bar" :style="{ width: `${displayProgress(item.progress)}%` }"></div>
+              </div>
+            </div>
           </div>
           <div class="recent-actions">
             <span class="recent-tag" :class="{ 'recent-tag--dup': item.duplicate }">
@@ -91,9 +99,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getVideoStatus, processVideo, uploadLocalVideo, uploadVideoUrl } from '@/api/video'
+import { buildProcessPayload, getProcessingSettings, languageLabel, summaryStyleLabel, whisperModelLabel, appendProcessingSettingsToFormData } from '@/services/processingSettings'
 import { normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
@@ -101,6 +110,7 @@ const router = useRouter()
 const fileInputRef = ref(null)
 
 const file = ref(null)
+const savedFileMeta = ref(null)
 const videoUrl = ref('')
 const busy = ref(false)
 const progress = ref(0)
@@ -109,6 +119,8 @@ const error = ref('')
 const recentUploads = ref([])
 const syncingRecent = ref(false)
 const statusFilter = ref('all')
+let recentStatusTimer = null
+const processingSettings = ref(getProcessingSettings())
 
 const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
 const ALLOWED_EXTENSIONS = new Set(['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'])
@@ -120,6 +132,18 @@ const STATUS_FILTERS = [
   { value: 'active', label: '进行中' },
   { value: 'completed', label: '已完成' }
 ]
+
+const processingSettingsSummary = computed(() => {
+  const current = processingSettings.value || getProcessingSettings()
+  const parts = [
+    `${whisperModelLabel(current.model)} 模型`,
+    languageLabel(current.language),
+    `${summaryStyleLabel(current.summaryStyle)}摘要`
+  ]
+  if (current.autoGenerateSummary) parts.push('自动摘要')
+  if (current.autoGenerateTags) parts.push('自动标签')
+  return parts.join(' · ')
+})
 
 const readableSize = (size) => {
   const n = Number(size || 0)
@@ -156,6 +180,12 @@ const resolveVideoId = (payload) => {
 }
 
 const statusText = videoStatusText
+const isActiveStatus = (status) => ['pending', 'processing', 'downloading'].includes(normalizeVideoStatus(status))
+const displayProgress = (value) => {
+  const numeric = Number(value || 0)
+  if (!Number.isFinite(numeric)) return 0
+  return Math.max(0, Math.min(100, Math.round(numeric)))
+}
 
 const statusClass = (status) => {
   const tone = videoStatusTone(status)
@@ -189,10 +219,14 @@ const normalizeRecentUploads = (list) => {
       timeText: formatTimeText(item.time),
       duplicate: Boolean(item.duplicate),
       status: normalizeVideoStatus(item.status || (item.duplicate ? 'uploaded' : 'pending')),
+      progress: displayProgress(item.progress),
+      currentStep: String(item.currentStep || ''),
       retrying: false
     }))
     .filter((item) => item.key)
 }
+
+const hasActiveRecentUploads = computed(() => recentUploads.value.some((item) => isActiveStatus(item.status)))
 
 const filteredRecentUploads = computed(() => {
   if (statusFilter.value === 'all') return recentUploads.value
@@ -221,6 +255,7 @@ const persistRecentUploads = () => {
 
 const addRecentUpload = ({ videoId, title, typeText, duplicate = false, status = 'pending' }) => {
   const now = new Date().toISOString()
+  const normalizedStatus = normalizeVideoStatus(duplicate ? 'uploaded' : status)
   const item = {
     key: `${videoId || 'none'}-${now}`,
     videoId: videoId ? Number(videoId) : null,
@@ -229,12 +264,30 @@ const addRecentUpload = ({ videoId, title, typeText, duplicate = false, status =
     time: now,
     timeText: formatTimeText(now),
     duplicate: Boolean(duplicate),
-    status: normalizeVideoStatus(duplicate ? 'uploaded' : status),
+    status: normalizedStatus,
+    progress: 0,
+    currentStep: normalizedStatus === 'downloading' ? '已提交，等待下载' : '已提交，等待处理',
     retrying: false
   }
   const merged = [item, ...recentUploads.value.filter((x) => x.videoId !== item.videoId || !item.videoId)]
   recentUploads.value = merged.slice(0, MAX_RECENT_UPLOADS)
   persistRecentUploads()
+  scheduleRecentStatusSync()
+}
+
+const clearRecentStatusSync = () => {
+  if (recentStatusTimer == null) return
+  window.clearTimeout(recentStatusTimer)
+  recentStatusTimer = null
+}
+
+const scheduleRecentStatusSync = () => {
+  clearRecentStatusSync()
+  if (busy.value || syncingRecent.value || !hasActiveRecentUploads.value) return
+  recentStatusTimer = window.setTimeout(async () => {
+    recentStatusTimer = null
+    await syncRecentStatuses()
+  }, 3000)
 }
 
 const syncRecentStatuses = async () => {
@@ -248,25 +301,39 @@ const syncRecentStatuses = async () => {
         try {
           const res = await getVideoStatus(item.videoId)
           const data = res?.data || {}
-          return { key: item.key, status: normalizeVideoStatus(data?.status || data?.data?.status) }
+          return {
+            key: item.key,
+            status: normalizeVideoStatus(data?.status || data?.data?.status),
+            progress: displayProgress(data?.progress ?? data?.data?.progress),
+            currentStep: String(data?.current_step || data?.data?.current_step || '')
+          }
         } catch {
-          return { key: item.key, status: normalizeVideoStatus(item.status) }
+          return {
+            key: item.key,
+            status: normalizeVideoStatus(item.status),
+            progress: displayProgress(item.progress),
+            currentStep: String(item.currentStep || '')
+          }
         }
       })
     )
-    const statusMap = new Map(updates.map((u) => [u.key, u.status]))
+    const statusMap = new Map(updates.map((u) => [u.key, u]))
     recentUploads.value = recentUploads.value.map((item) => ({
       ...item,
-      status: statusMap.get(item.key) || item.status
+      status: statusMap.get(item.key)?.status || item.status,
+      progress: statusMap.get(item.key)?.progress ?? item.progress,
+      currentStep: statusMap.get(item.key)?.currentStep ?? item.currentStep
     }))
     persistRecentUploads()
   } finally {
     syncingRecent.value = false
+    scheduleRecentStatusSync()
   }
 }
 
 const clearRecentUploads = () => {
   if (busy.value) return
+  clearRecentStatusSync()
   recentUploads.value = []
   try {
     storageRemove(RECENT_UPLOADS_KEY)
@@ -289,10 +356,13 @@ const retryRecent = async (item) => {
   error.value = ''
   message.value = ''
   try {
-    await processVideo(item.videoId)
+    processingSettings.value = getProcessingSettings()
+    await processVideo(item.videoId, buildProcessPayload(processingSettings.value))
     recentUploads.value[idx] = {
       ...recentUploads.value[idx],
       status: 'pending',
+      progress: 0,
+      currentStep: '已提交，等待处理',
       retrying: false
     }
     message.value = `视频 ${item.videoId} 已重新提交处理`
@@ -335,11 +405,13 @@ const onFileChange = (e) => {
     return
   }
   file.value = selected
+  savedFileMeta.value = { name: selected.name, size: Number(selected.size || 0) }
 }
 
 const resetAll = () => {
   if (busy.value) return
   file.value = null
+  savedFileMeta.value = null
   if (fileInputRef.value) fileInputRef.value.value = ''
   videoUrl.value = ''
   progress.value = 0
@@ -356,6 +428,8 @@ const uploadFile = async () => {
   try {
     const form = new FormData()
     form.append('file', file.value)
+    processingSettings.value = getProcessingSettings()
+    appendProcessingSettingsToFormData(form, processingSettings.value)
     const res = await uploadLocalVideo(form, {
       onUploadProgress: (evt) => {
         if (!evt.total) return
@@ -400,7 +474,8 @@ const uploadUrl = async () => {
   error.value = ''
   try {
     const trimmedUrl = String(videoUrl.value).trim()
-    const res = await uploadVideoUrl({ url: trimmedUrl })
+    processingSettings.value = getProcessingSettings()
+    const res = await uploadVideoUrl({ url: trimmedUrl, ...buildProcessPayload(processingSettings.value) })
     const data = res?.data || {}
     const videoId = resolveVideoId(data)
     message.value = data?.message || '已提交链接，下载完成后会自动开始处理'
@@ -424,8 +499,14 @@ const uploadUrl = async () => {
 }
 
 onMounted(async () => {
+  processingSettings.value = getProcessingSettings()
   loadRecentUploads()
   await syncRecentStatuses()
+  scheduleRecentStatusSync()
+})
+
+onUnmounted(() => {
+  clearRecentStatusSync()
 })
 </script>
 
@@ -440,7 +521,9 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
   margin-bottom: 10px;
+  gap: 8px;
 }
 
 .topbar h2 {
@@ -479,12 +562,15 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .card-head-actions {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .filters {
@@ -527,6 +613,8 @@ onMounted(async () => {
   font-weight: 900;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: #fff;
+  width: 100%;
+  text-align: center;
 }
 
 .btn--primary {
@@ -554,6 +642,8 @@ onMounted(async () => {
 .muted {
   font-size: 12px;
   color: var(--muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .recent-list {
@@ -567,10 +657,11 @@ onMounted(async () => {
   background: #fff;
   padding: 10px 12px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
   text-align: left;
+  flex-wrap: wrap;
 }
 
 .recent-main {
@@ -582,13 +673,30 @@ onMounted(async () => {
 .recent-title {
   font-size: 13px;
   font-weight: 800;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .recent-meta {
   margin-top: 2px;
+}
+
+.recent-progress {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.recent-progress__text {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.progress--compact {
+  height: 6px;
 }
 
 .status {
@@ -622,6 +730,9 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
 }
 
 .recent-tag {
@@ -631,7 +742,8 @@ onMounted(async () => {
   font-weight: 800;
   background: rgba(99, 102, 241, 0.12);
   color: #3730a3;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
 }
 
 .recent-tag--dup {
@@ -647,6 +759,7 @@ onMounted(async () => {
   font-size: 12px;
   font-weight: 800;
   color: var(--text);
+  text-align: center;
 }
 
 .mini--warn {
@@ -669,6 +782,8 @@ onMounted(async () => {
   border-radius: 12px;
   font-weight: 800;
   margin-bottom: 12px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .alert--ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
@@ -715,6 +830,20 @@ onMounted(async () => {
 
 .btn {
   border-radius: 16px;
+}
+
+@media (max-width: 480px) {
+  .recent-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  .mini,
+  .recent-tag,
+  .link--small {
+    max-width: 100%;
+  }
 }
 
 .btn--primary {

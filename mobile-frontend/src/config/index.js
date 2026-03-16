@@ -17,6 +17,15 @@ const fromStorage = (() => {
   }
 })()
 
+const fromNative = (() => {
+  try {
+    const value = window.__edumindNativeConfig?.apiBaseUrl
+    return value ? String(value).trim() : ''
+  } catch {
+    return ''
+  }
+})()
+
 const fromUiOnlyQuery = (() => {
   try {
     const url = new URL(window.location.href)
@@ -36,8 +45,16 @@ const toBool = (value, fallback = false) => {
 }
 
 export const API_BASE_URL = String(
-  fromQuery || fromStorage || import.meta.env.VITE_MOBILE_API_BASE_URL || ''
+  fromQuery || fromStorage || fromNative || import.meta.env.VITE_MOBILE_API_BASE_URL || ''
 ).replace(/\/+$/, '')
+
+if (!fromStorage && fromNative) {
+  try {
+    localStorage.setItem('m_api_base_url', fromNative.replace(/\/+$/, ''))
+  } catch {
+    // Ignore storage write failures in restricted WebView contexts.
+  }
+}
 
 /** 运行时设置 API 基地址（换 Wi‑Fi/换地点后可用，避免因本机 IP 变化导致请求失败） */
 export function setApiBaseUrl(url) {
@@ -60,7 +77,8 @@ export function getApiBaseUrl() {
       ? new URLSearchParams(window.location.search).get('apiBase') || ''
       : ''
     const s = typeof localStorage !== 'undefined' ? localStorage.getItem('m_api_base_url') || '' : ''
-    return String(q || s || import.meta.env.VITE_MOBILE_API_BASE_URL || '').replace(/\/+$/, '')
+    const n = window.__edumindNativeConfig?.apiBaseUrl || ''
+    return String(q || s || n || import.meta.env.VITE_MOBILE_API_BASE_URL || '').replace(/\/+$/, '')
   } catch {
     return API_BASE_URL
   }
@@ -70,6 +88,8 @@ export const UI_ONLY_MODE = toBool(
   fromUiOnlyQuery || import.meta.env.VITE_MOBILE_UI_ONLY,
   true
 )
+
+export const shouldUseMockApi = () => UI_ONLY_MODE && !getApiBaseUrl()
 
 export const withBase = (path) => {
   const p = String(path || '')

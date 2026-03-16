@@ -54,6 +54,42 @@ class TestVideoAPI:
         assert "status" in data
         assert "progress" in data
 
+    def test_stream_video_file_supports_full_content(self, client, db, sample_video, tmp_path):
+        """测试视频全量流接口"""
+        content = b"0123456789abcdef"
+        video_path = tmp_path / "stream-full.mp4"
+        video_path.write_bytes(content)
+
+        sample_video.filepath = str(video_path)
+        sample_video.filename = "stream-full.mp4"
+        db.commit()
+
+        response = client.get(f"/api/videos/{sample_video.id}/stream")
+        assert response.status_code == 200
+        assert response.content == content
+        assert response.headers["accept-ranges"] == "bytes"
+        assert response.headers["content-length"] == str(len(content))
+
+    def test_stream_video_file_supports_range_requests(self, client, db, sample_video, tmp_path):
+        """测试视频流接口支持 Range，便于 iOS 播放器拖动和断点加载"""
+        content = b"0123456789abcdef"
+        video_path = tmp_path / "stream-range.mp4"
+        video_path.write_bytes(content)
+
+        sample_video.filepath = str(video_path)
+        sample_video.filename = "stream-range.mp4"
+        db.commit()
+
+        response = client.get(
+            f"/api/videos/{sample_video.id}/stream",
+            headers={"Range": "bytes=2-7"},
+        )
+        assert response.status_code == 206
+        assert response.content == content[2:8]
+        assert response.headers["accept-ranges"] == "bytes"
+        assert response.headers["content-range"] == f"bytes 2-7/{len(content)}"
+        assert response.headers["content-length"] == "6"
+
     def test_upload_video_file(self, client, db, tmp_path, monkeypatch):
         """测试本地视频上传"""
         from app.core.config import settings
@@ -61,6 +97,17 @@ class TestVideoAPI:
 
         monkeypatch.setattr(settings, "UPLOAD_FOLDER", str(tmp_path / "uploads"))
         monkeypatch.setattr(settings, "TEMP_FOLDER", str(tmp_path / "temp"))
+        monkeypatch.setattr(settings, "WHISPER_MODEL", "turbo")
+
+        submitted = {}
+
+        def fake_submit_task(task_func, *args, **kwargs):
+            submitted["name"] = task_func.__name__
+            submitted["args"] = args
+            submitted["kwargs"] = kwargs
+            return None
+
+        monkeypatch.setattr("app.core.executor.submit_task", fake_submit_task)
 
         response = client.post(
             "/api/videos/upload",
@@ -69,14 +116,18 @@ class TestVideoAPI:
         assert response.status_code == 200
 
         payload = response.json()
-        assert payload["status"] == "uploaded"
+        assert payload["status"] == "pending"
         assert payload["duplicate"] is False
         assert payload["data"]["filename"] == "local-lesson.mp4"
         assert os.path.exists(payload["data"]["filepath"])
+        assert payload["message"] == "视频上传成功，已开始后台处理"
 
         videos = db.query(Video).all()
         assert len(videos) == 1
-        assert videos[0].current_step == "已上传，等待处理"
+        assert videos[0].status.value == "pending"
+        assert videos[0].current_step == "已提交，等待处理"
+        assert submitted["name"] == "process_video_task"
+        assert submitted["args"][0] == videos[0].id
 
     def test_upload_video_file_duplicate(self, client, db, tmp_path, monkeypatch):
         """测试重复上传同一视频"""

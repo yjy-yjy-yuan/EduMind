@@ -28,13 +28,33 @@ class VideoUploadURL(BaseModel):
     """URL 上传请求"""
 
     url: str = Field(..., description="视频链接 (B站/YouTube/慕课)")
+    language: str = Field(default="Other", description="视频语言")
+    model: str = Field(default="base", description="Whisper 模型")
+    auto_generate_summary: bool = Field(default=True, description="处理完成后自动生成摘要")
+    auto_generate_tags: bool = Field(default=True, description="处理完成后自动生成标签")
+    summary_style: str = Field(default="study", description="摘要风格: brief/study/detailed")
 
 
 class VideoProcessRequest(BaseModel):
     """视频处理请求"""
 
     language: str = Field(default="Other", description="视频语言")
-    model: str = Field(default="turbo", description="Whisper 模型")
+    model: str = Field(default="base", description="Whisper 模型")
+    auto_generate_summary: bool = Field(default=True, description="处理完成后自动生成摘要")
+    auto_generate_tags: bool = Field(default=True, description="处理完成后自动生成标签")
+    summary_style: str = Field(default="study", description="摘要风格: brief/study/detailed")
+
+
+class VideoSummaryRequest(BaseModel):
+    """摘要生成请求"""
+
+    style: str = Field(default="study", description="摘要风格: brief/study/detailed")
+
+
+class VideoTagRequest(BaseModel):
+    """标签生成请求"""
+
+    max_tags: int = Field(default=6, ge=1, le=12, description="最大标签数")
 
 
 # ============ 响应 Schema ============

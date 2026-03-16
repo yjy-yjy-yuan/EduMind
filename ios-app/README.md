@@ -46,8 +46,28 @@ if let indexURL = Bundle.main.url(forResource: "index", withExtension: "html", s
 `mobile-frontend` 默认通过环境变量（如 `VITE_MOBILE_API_BASE_URL`）访问 FastAPI 后端。  
 在 iOS WebView 中：
 
-- 当前 UI-only 阶段：默认 `VITE_MOBILE_UI_ONLY=true`，页面走本地 mock 数据，不依赖后端；
-- 后续接入真实接口时：推荐在构建前写入生产/测试 API 地址，或通过 URL 查询参数/本地配置文件传入。
+- H5 启动时会优先读取原生注入的 `window.__edumindNativeConfig.apiBaseUrl`；
+- 原生注入值来自 Info.plist / Build Settings 中的 `EDUMIND_API_BASE_URL`；
+- 若 H5 本地还没有保存过后端地址，会自动把该值落到 `localStorage`，首次安装也能直接连到 FastAPI；
+- 若换了 Wi‑Fi 或 Mac 局域网 IP 变化，仍可在“我的”页面手动覆盖。
+
+当前工程已在 Build Settings 中预留：
+
+- `INFOPLIST_KEY_EDUMIND_API_BASE_URL = http://yuandeMacBook-Pro.local:2004`
+
+现在执行 `bash ios-app/sync_ios_web_assets.sh` 时，脚本会自动：
+
+1. 读取 `backend_fastapi/.env` 里的 `PORT`
+2. 读取当前 Mac 的 `LocalHostName`
+3. 将 `EDUMIND_API_BASE_URL` 刷新成 `http://<LocalHostName>.local:<PORT>`
+4. 再同步最新 `mobile-frontend/dist` 到 `WebAssets`
+
+推荐优先使用 `.local` 主机名而不是 IP。对于当前这台机器，主机名可写成：
+
+- `http://yuandeMacBook-Pro.local:2004`
+
+这样换 Wi‑Fi 后只要 iPhone 和 Mac 仍在同一局域网，地址通常不需要跟着改。
+如果你需要“跨网络、跨地点也完全不变”，则不要再依赖局域网主机名，直接使用固定域名或反向隧道，见 [`docs/BACKEND_FIXED_DOMAIN.md`](/Users/yuan/final-work/EduMind/docs/BACKEND_FIXED_DOMAIN.md)。
 
 ### 4. 强制更新（无需卸载 App）
 
@@ -95,7 +115,8 @@ bash ios-app/sync_ios_web_assets.sh
 该脚本会自动执行：
 
 1. `mobile-frontend` 执行 `npm run build:ios`（生成相对路径资源，适配 `loadFileURL`）
-2. 同步 `dist/` 到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
+2. 根据 `backend_fastapi/.env` 的 `PORT` 和当前 Mac 主机名刷新 iOS 原生默认后端地址
+3. 同步 `dist/` 到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
 
 ### 6. 命令行编译（可选）
 
@@ -112,6 +133,7 @@ xcodebuild -project ios-app/EduMindIOS/EduMindIOS.xcodeproj \
 iOS 容器当前依赖 `WKWebView` 默认文件选择能力。由于 iPhone 上点击视频上传控件时，系统可能同时提供“拍摄视频 / 相册 / 文件”等入口，因此工程必须保留以下隐私说明，避免上传视频时触发系统权限崩溃：
 
 - `NSCameraUsageDescription`
+- `NSLocalNetworkUsageDescription`
 - `NSMicrophoneUsageDescription`
 - `NSPhotoLibraryUsageDescription`
 

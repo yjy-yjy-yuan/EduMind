@@ -2,12 +2,15 @@
 
 import os
 from functools import lru_cache
+from pathlib import Path
 from typing import List
 from typing import Set
 from typing import Union
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
+
+ENV_FILE_PATH = str(Path(__file__).resolve().parents[2] / ".env")
 
 
 class Settings(BaseSettings):
@@ -19,12 +22,15 @@ class Settings(BaseSettings):
     # 应用配置
     APP_NAME: str = "AI-EdVision"
     DEBUG: bool = True
-    HOST: str = "127.0.0.1"
+    HOST: str = "0.0.0.0"
     PORT: int = 2004  # FastAPI 端口
     SECRET_KEY: str = "dev-secret-key-change-in-production"
+    AUTO_CREATE_TABLES: bool = False
+    BACKGROUND_TASK_EXECUTOR: str = "auto"
+    BACKGROUND_TASK_WORKERS: int = 2
 
     # 数据库配置 (MySQL)
-    DATABASE_URL: str = "mysql+pymysql://root:password@localhost:3306/ai_edvision"
+    DATABASE_URL: str = "mysql+pymysql://root:password@127.0.0.1:3306/edumind"
 
     # Neo4j 配置
     NEO4J_URI: str = "bolt://localhost:7687"
@@ -52,12 +58,12 @@ class Settings(BaseSettings):
     ALLOWED_EXTENSIONS: Set[str] = {"mp4", "avi", "mov", "mkv", "webm", "flv"}
 
     # Whisper 配置 (可选: tiny, base, small, medium, large, turbo)
-    WHISPER_MODEL: str = "turbo"
+    WHISPER_MODEL: str = "base"
     WHISPER_MODEL_PATH: str = os.path.expanduser("~/Desktop/File/graduation/whisper")
 
     # CORS 配置 (允许前端访问) - 使用字符串，支持逗号分隔
     CORS_ORIGINS: Union[str, List[str]] = (
-        "http://localhost:328,http://127.0.0.1:328,http://localhost:5173,http://127.0.0.1:5173"
+        "null,http://localhost:328,http://127.0.0.1:328,http://localhost:5173,http://127.0.0.1:5173"
     )
 
     # Redis 配置 (可选，保留用于生产环境)
@@ -68,11 +74,15 @@ class Settings(BaseSettings):
     def parse_cors_origins(cls, v):
         """解析 CORS_ORIGINS，支持逗号分隔的字符串或列表"""
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+            origins = [origin.strip() for origin in v.split(",") if origin.strip()]
+        else:
+            origins = list(v)
+        if "null" not in origins:
+            origins.append("null")
+        return origins
 
     class Config:
-        env_file = ".env"
+        env_file = ENV_FILE_PATH
         case_sensitive = True
         extra = "ignore"
 

@@ -1,5 +1,23 @@
 # 变更日志
 
+## 2026-03-16
+
+### 摘要生成与处理设置收口
+- 新增 [`backend_fastapi/app/services/video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_content_service.py)：新增真实视频内容分析服务，在字幕写回后生成摘要与标签；优先走在线大模型或 Ollama，失败时回退到本地摘要与关键词提取，避免功能停留在占位态。
+- 更新 [`backend_fastapi/app/tasks/video_processing.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_processing.py)、[`backend_fastapi/app/tasks/video_download.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_download.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)：视频处理、链接导入、手动重处理三条链路统一支持 `language`、`model`、`summary_style`、`auto_generate_summary`、`auto_generate_tags` 参数，并将摘要写入 `videos.summary`、标签写入 `videos.tags`。
+- 新增 [`backend_fastapi/tests/unit/test_video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_content_service.py)，更新 [`backend_fastapi/tests/unit/test_video_processing_task.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_processing_task.py)：补充摘要回退、标签回退和处理完成后摘要/标签写回数据库的单测覆盖。
+- 新增 [`mobile-frontend/src/services/processingSettings.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/processingSettings.js)，更新 [`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：新增“处理设置”入口，统一管理识别语言、Whisper 模型、摘要风格、自动摘要、自动标签，并将其用于新上传、链接导入、详情页重处理和失败任务重试；详情页新增摘要生成与标签提取入口。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：同步当前摘要链路、处理设置作用范围和后端职责边界。
+
+### iOS 真机播放与视频处理链路修复
+- 更新 [`backend_fastapi/app/core/executor.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/executor.py)：本地开发默认改用 `ThreadPoolExecutor` 执行后台任务，补充任务完成/异常日志与失败状态回写，修复视频处理任务长时间停留在“已提交，等待处理”的假死问题。
+- 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)：新增后台任务执行器类型与并发数配置项，便于后续按环境切换。
+- 更新 [`backend_fastapi/app/tasks/video_processing.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_processing.py)：为 Whisper 转录阶段增加持续进度回写与耗时提示，避免长视频在 60% 附近长时间无变化。
+- 更新 [`backend_fastapi/.env`](/Users/yuan/final-work/EduMind/backend_fastapi/.env)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)、[`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)：默认 Whisper 模型从 `turbo` 调整为 `base`，避免本地开发因损坏的 `turbo` 缓存触发 1.51GB 模型重下载而长时间卡住。
+- 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：处理中视频不再禁用播放按钮，改为允许进入播放器播放原始视频文件。
+- 更新 [`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)：播放器增加视频处理状态提示，明确当前是否在播放处理中原视频。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：最近上传列表新增自动刷新处理进度条与当前步骤显示，便于真机直接观察后台处理进度。
+
 ## 2026-03-11
 
 ### 文档对齐
@@ -146,3 +164,57 @@
 - 更新 [`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：补充 `NSCameraUsageDescription`、`NSMicrophoneUsageDescription`、`NSPhotoLibraryUsageDescription`，修复 iOS 在点击视频上传控件时触发 `TCC_CRASHING_DUE_TO_PRIVACY_VIOLATION`。
 - 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：将上传控件的 `accept` 从 `video/*` 改为明确的视频扩展名列表，降低系统优先走“拍摄视频”分支的概率。
 - 更新 [`ios-app/README.md`](/Users/yuan/final-work/EduMind/ios-app/README.md)：补充 iOS 视频上传权限说明与排查要点。
+
+## 2026-03-15
+
+### 首页统计与视频页联动优化
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：首页“最近视频/已完成/进行中”改为基于全量视频统计，修复统计数与实际处理数不一致的问题；三个统计卡片支持点击跳转至视频页对应筛选视图。
+- 更新 [`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：新增最近视频/已完成/进行中三类筛选视图；对应页面展示视频名称卡片，点击卡片继续进入视频详情页查看具体信息。
+
+### 首页统计卡点击跳转修正与 iOS 验收约束补充
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页统计卡改为 `button + router.push` 明确跳转；补充点击日志 `[INFO][Home] stat-card-click ...`；增强层级与触摸可达性（统计区 z-index 提升、装饰层 `pointer-events: none`），避免被视觉层遮挡导致点击无效。
+- 更新 [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：新增 iOS WebView 验收硬规则，要求交互改动必须在容器内验证路由跳转和目标页渲染，且每次改动后必须同步最新 `mobile-frontend/dist` 到 iOS 资源。
+
+### iOS-only 项目结构收敛
+- 新增仓库外备份目录 `../EduMind_backup_20260315_ios_only/`：在删除旧模块前完成整仓复制，便于回滚。
+- 删除旧模块与旧脚本：移除 `frontend/`、`backend/`、`android-app/`、根目录 `tests/`、`test_src/` 以及旧启动脚本，仓库只保留 `backend_fastapi/`、`mobile-frontend/`、`ios-app/` 三段式 iOS 链路。
+- 更新 [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：统一为 MacBook Pro 开发、iOS `WKWebView` 容器、FastAPI 后端、MySQL 持久化的唯一实现方向。
+
+### MySQL 视频处理与转录落库收口
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：本地视频上传成功后立即提交后台处理任务；手动处理接口改为统一走任务提交逻辑，并把状态、进度、错误信息写回当前 `videos` 记录。
+- 更新 [`backend_fastapi/app/tasks/video_processing.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_processing.py)：移除对不存在字段 `processed` 的写入；处理完成后将预览图、视频信息、字幕文件路径写回 `videos`，并在现有 `subtitles` 表可用时写入 Whisper 分段结果；若数据库未启用该表则跳过，不自动建表、不让任务失败。
+- 更新 [`backend_fastapi/app/tasks/video_download.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_download.py)：链接视频下载完成后在同一后台任务内继续执行转录处理，避免依赖前端页面停留才能继续推进。
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：新增 `AUTO_CREATE_TABLES=false` 默认配置，关闭启动时自动建表，避免运行服务时擅自变更现有 MySQL 表结构。
+- 更新 [`backend_fastapi/app/models/user.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/user.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：密码哈希显式固定为 `pbkdf2:sha256`，兼容当前 Python 运行时；删除视频时若进程池不可用则回退为同步清理，避免测试和受限环境直接报错。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)、[`backend_fastapi/tests/unit/test_video_processing_task.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_processing_task.py)：补充自动提交处理任务与转录结果落库测试，覆盖 `videos/subtitles` 现有表的写回行为。
+### 2026-03-15 真机视频播放链路修复
+
+- `backend_fastapi` 视频流接口补充 `Range` 支持，适配 iOS `WKWebView` 的分段加载、拖动和断点请求。
+- `mobile-frontend` 新增真实视频播放页状态展示与重载能力；只要配置了后端地址，视频相关接口会优先走 FastAPI，不再被 UI-only mock 固定拦截。
+- `ios-app` 的 `WKWebView` 开启 inline media playback / AirPlay / PiP，并放开 Web 内容本地网络访问策略，保证真机可通过局域网地址访问 FastAPI 视频流。
+- `ios-app` 新增 `EDUMIND_API_BASE_URL` 原生注入；H5 启动时会自动读取并保存默认后端地址，避免真机首次安装仍停留在 `UI ONLY` 页面。
+- 修正本地真机联调配置：`backend_fastapi/.env` 改为监听 `0.0.0.0`、修复 MySQL `DATABASE_URL` 格式、允许 `Origin: null`；iOS 默认后端地址从易变的 IP 改为 `.local` 主机名。
+- MySQL 认证补充 `cryptography` 依赖，兼容 `sha256_password` / `caching_sha2_password`；播放器页改为优先展示后端返回的明确错误，方便定位数据库或视频接口异常。
+
+## 2026-03-16
+
+### MySQL 受控重建脚本与 Navicat 导入 SQL
+
+- 更新 [`backend_fastapi/scripts/init_db.py`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/init_db.py)：将数据库脚本改为只管理当前 FastAPI 实际使用的 6 张业务表（`users`、`videos`、`notes`、`questions`、`subtitles`、`note_timestamps`），新增 `--create`、`--reset`、`--emit-sql` 能力，支持受控删表重建与 SQL 导出。
+- 新增 [`backend_fastapi/scripts/mysql_managed_schema.sql`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/mysql_managed_schema.sql)：生成可直接在 Navicat 执行的 MySQL 重建脚本，包含 `DROP TABLE IF EXISTS` 与完整 `CREATE TABLE` 语句。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)：补充后端 MySQL 表管理命令、Navicat 导入入口和当前受控表清单。
+- 更新 [`backend_fastapi/.env`](/Users/yuan/final-work/EduMind/backend_fastapi/.env)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`docs/DATABASE_SETUP.md`](/Users/yuan/final-work/EduMind/docs/DATABASE_SETUP.md)：将默认数据库名从 `ai_edvision` 统一调整为项目名 `edumind`，便于在 Navicat 中与项目名称保持一致。
+
+### 真机地址与端口自动同步
+
+- 更新 [`ios-app/sync_ios_web_assets.sh`](/Users/yuan/final-work/EduMind/ios-app/sync_ios_web_assets.sh)：构建 iOS 资源前自动读取 `backend_fastapi/.env` 中的 `PORT` 与当前 Mac `LocalHostName`，同步刷新 iOS 原生默认后端地址，避免端口变化后还要手工修改 Xcode Build Settings。
+- 更新 [`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)：开发设置页改为展示当前建议后端地址，不再写死 `2004` 和局域网 IP 示例。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`ios-app/README.md`](/Users/yuan/final-work/EduMind/ios-app/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：将真机默认地址说明统一为 `.local + backend_fastapi/.env PORT` 的单点配置链路。
+
+### 数据库配置加载路径修复
+
+- 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)：将 `BaseSettings` 的 `env_file` 改为固定读取 `backend_fastapi/.env` 的绝对路径，避免从仓库根目录执行脚本时退回默认 `DATABASE_URL`（`root:password`）导致 MySQL `1045 Access denied`。
+
+### 仓库忽略规则补强
+
+- 更新 [`.gitignore`](/Users/yuan/final-work/EduMind/.gitignore)：补充 `*.sqlite`、`*.db-journal`、`*.sqlite-shm`、`*.sqlite-wal` 等本地数据库运行产物忽略规则，并新增 `**/.idea/` 与仓库根误生成目录 `~/` 的忽略，减少本地大文件或无关缓存被错误纳入版本控制的风险。

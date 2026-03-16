@@ -106,6 +106,12 @@ private enum WebAssets {
 }
 
 private struct H5WebView: UIViewRepresentable {
+    private static let nativeConfigScript = """
+        (function() {
+          window.__edumindNativeConfig = Object.assign({}, window.__edumindNativeConfig || {}, \(nativeConfigJSONString()));
+        })();
+    """
+
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
@@ -113,7 +119,16 @@ private struct H5WebView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        configuration.allowsInlineMediaPlayback = true
+        configuration.allowsAirPlayForMediaPlayback = true
+        configuration.allowsPictureInPictureMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.userContentController.add(context.coordinator, name: Coordinator.logHandlerName)
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: Self.nativeConfigScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
         configuration.userContentController.addUserScript(WKUserScript(
             source: Coordinator.consoleBridgeScript,
             injectionTime: .atDocumentStart,
@@ -171,6 +186,14 @@ private struct H5WebView: UIViewRepresentable {
                 )
                 return
             }
+            if usesWebBuildAssetLayout(in: html) {
+                EduMindLog.error("WebView", "detected web build asset layout in \(indexURL.path)")
+                webView.loadHTMLString(
+                    "<h2 style=\"font-family:-apple-system\">检测到错误的前端构建产物</h2><p style=\"font-family:-apple-system\">当前 iOS 容器需要 index.js/index.css 结构，请执行：bash ios-app/sync_ios_web_assets.sh</p>",
+                    baseURL: nil
+                )
+                return
+            }
         } catch {
             // Ignore and continue with direct file loading.
         }
@@ -179,8 +202,36 @@ private struct H5WebView: UIViewRepresentable {
         EduMindLog.info("WebView", "loadFileURL requested")
     }
 
+    private static func nativeConfigJSONString() -> String {
+        let configuredAPIBase = (
+            Bundle.main.object(forInfoDictionaryKey: "EDUMIND_API_BASE_URL") as? String
+        )?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let apiBase = configuredAPIBase.isEmpty ? "http://yuandeMacBook-Pro.local:2004" : configuredAPIBase
+        EduMindLog.info(
+            "WebView",
+            "native api base=\(apiBase) | source=\(configuredAPIBase.isEmpty ? "fallback-local-hostname" : "info-plist")"
+        )
+
+        let payload: [String: String] = [
+            "apiBaseUrl": apiBase
+        ]
+
+        guard
+            let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
+            let text = String(data: data, encoding: .utf8)
+        else {
+            return #"{"apiBaseUrl":""}"#
+        }
+        return text
+    }
+
     private func usesLegacyAbsoluteAssetPaths(in html: String) -> Bool {
         html.contains("src=\"/") || html.contains("href=\"/") || html.contains("src='/") || html.contains("href='/")
+    }
+
+    private func usesWebBuildAssetLayout(in html: String) -> Bool {
+        html.contains("src=\"./assets/index-") || html.contains("src='./assets/index-")
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {

@@ -22,10 +22,10 @@
     <div v-else class="card">
       <div class="hero">
         <div class="hero-shell" :class="heroClass">
-          <div class="hero-shell__badge">{{ UI_ONLY_MODE ? 'UI ONLY' : 'LIVE' }}</div>
+          <div class="hero-shell__badge">{{ usingMockGateway ? 'UI ONLY' : 'LIVE' }}</div>
           <div class="hero-shell__initial">{{ heroInitial }}</div>
           <div class="hero-shell__caption">
-            {{ UI_ONLY_MODE ? '当前阶段仅构建界面，封面与播放器资源后续通过预留接口接入。' : '视频预览由后端接口提供。' }}
+            {{ usingMockGateway ? '当前阶段仅构建界面，封面与播放器资源后续通过预留接口接入。' : '视频预览与播放资源由后端接口提供。' }}
           </div>
         </div>
       </div>
@@ -42,14 +42,33 @@
         <div class="bar" :style="{ width: `${progressValue}%` }"></div>
       </div>
 
-      <div v-if="video.summary" class="block">
-        <div class="block-title">摘要</div>
-        <div class="block-body">{{ video.summary }}</div>
+      <div v-if="canOpenPlayerWhileProcessing" class="inline-tip">
+        后台处理中仍可进入播放器，当前播放原始视频文件。
+      </div>
+
+      <div v-if="canShowAnalysisBlock" class="block">
+        <div class="block-head">
+          <div class="block-title">智能摘要</div>
+          <div class="block-actions">
+            <button class="mini" @click="createSummary" :disabled="!canGenerateSummary || summaryGenerating || tagGenerating">
+              {{ summaryGenerating ? '生成中…' : (video.summary ? '重生成摘要' : '生成摘要') }}
+            </button>
+            <button class="mini" @click="createTags" :disabled="!canGenerateTags || summaryGenerating || tagGenerating">
+              {{ tagGenerating ? '提取中…' : (tagList.length > 0 ? '重提标签' : '提取标签') }}
+            </button>
+          </div>
+        </div>
+        <div class="setting-hint">当前摘要设置：{{ summaryStyleText }}</div>
+        <div v-if="video.summary" class="block-body block-body--prewrap">{{ video.summary }}</div>
+        <div v-else class="block-placeholder">处理完成后可在此生成课程摘要。</div>
+        <div v-if="tagList.length > 0" class="tag-list">
+          <span v-for="tag in tagList" :key="tag" class="tag-pill">{{ tag }}</span>
+        </div>
       </div>
 
       <div class="actions">
         <button class="btn" @click="startProcess" :disabled="processDisabled">开始处理</button>
-        <button class="btn btn--primary" @click="play" :disabled="!canPlay">播放</button>
+        <button class="btn btn--primary" @click="play" :disabled="!canOpenPlayerWhileProcessing">{{ playLabel }}</button>
         <button class="btn" @click="qa">问答</button>
       </div>
 
@@ -65,11 +84,11 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { UI_ONLY_MODE } from '@/config'
-import { deleteVideo, getVideo, getVideoStatus, processVideo } from '@/api/video'
+import { shouldUseMockApi } from '@/config'
+import { deleteVideo, generateVideoSummary, generateVideoTags, getVideo, getVideoStatus, processVideo } from '@/api/video'
+import { buildProcessPayload, getProcessingSettings, summaryStyleLabel } from '@/services/processingSettings'
 import {
   canAutoStartVideoProcessing,
-  canPlayVideo,
   canRetryVideoProcessing,
   createFixedIntervalPoller,
   isActiveVideoStatus,
@@ -89,8 +108,12 @@ const video = ref(null)
 const statusInfo = ref({ status: '', progress: 0, current_step: '' })
 const autoStarting = ref(false)
 const retrying = ref(false)
+const summaryGenerating = ref(false)
+const tagGenerating = ref(false)
+const processingSettings = ref(getProcessingSettings())
 
 let statusPoller = null
+const usingMockGateway = computed(() => shouldUseMockApi())
 
 const statusValue = computed(() => statusInfo.value.status || video.value?.status || '')
 const progressValue = computed(() => Number(statusInfo.value.progress ?? 0) || 0)
@@ -100,8 +123,19 @@ const heroInitial = computed(() => String(video.value?.title || 'V').trim().slic
 const isInProgress = isActiveVideoStatus
 const statusText = videoStatusText
 
-const canPlay = computed(() => canPlayVideo(statusValue.value))
 const canRetry = computed(() => canRetryVideoProcessing(statusValue.value))
+const canOpenPlayerWhileProcessing = computed(() => {
+  const normalizedStatus = normalizeVideoStatus(statusValue.value)
+  return Boolean(video.value?.filepath) && normalizedStatus !== 'downloading'
+})
+const playLabel = computed(() => (isInProgress(statusValue.value) ? '播放原视频' : '播放'))
+const tagList = computed(() => (Array.isArray(video.value?.tags) ? video.value.tags : []))
+const canShowAnalysisBlock = computed(
+  () => Boolean(video.value) && (normalizeVideoStatus(statusValue.value) === 'completed' || Boolean(video.value?.summary) || tagList.value.length > 0)
+)
+const canGenerateSummary = computed(() => normalizeVideoStatus(statusValue.value) === 'completed')
+const canGenerateTags = computed(() => normalizeVideoStatus(statusValue.value) === 'completed' && Boolean(video.value?.summary))
+const summaryStyleText = computed(() => `${summaryStyleLabel(processingSettings.value.summaryStyle)}风格`)
 const processDisabled = computed(
   () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(normalizeVideoStatus(statusValue.value))
 )
@@ -135,12 +169,18 @@ const heroClass = computed(() => {
 })
 
 const fetchStatus = async () => {
+  const previousStatus = normalizeVideoStatus(statusValue.value)
   const res = await getVideoStatus(id.value)
   const p = res.data || {}
   statusInfo.value = {
     status: p.status || p.data?.status || '',
     progress: p.progress ?? p.data?.progress ?? 0,
     current_step: p.current_step || p.data?.current_step || ''
+  }
+  const nextStatus = normalizeVideoStatus(statusInfo.value.status)
+  if (previousStatus && isActiveVideoStatus(previousStatus) && !isActiveVideoStatus(nextStatus)) {
+    const detailRes = await getVideo(id.value)
+    video.value = normalizeVideo(detailRes.data)
   }
 }
 
@@ -176,7 +216,8 @@ const tryAutoStartProcessing = async () => {
   let attempted = false
   try {
     attempted = true
-    await processVideo(id.value)
+    processingSettings.value = getProcessingSettings()
+    await processVideo(id.value, buildProcessPayload(processingSettings.value))
     await fetchStatus()
     startPollingIfNeeded()
   } catch (e) {
@@ -218,12 +259,20 @@ const startPollingIfNeeded = () => {
   poller.start()
 }
 
-const normalizeVideo = (payload) => payload?.video || payload?.data || payload || null
+const normalizeVideo = (payload) => {
+  const current = payload?.video || payload?.data || payload || null
+  if (!current) return null
+  return {
+    ...current,
+    tags: Array.isArray(current.tags) ? current.tags : []
+  }
+}
 
 const reload = async () => {
   loading.value = true
   error.value = ''
   try {
+    processingSettings.value = getProcessingSettings()
     const res = await getVideo(id.value)
     video.value = normalizeVideo(res.data)
     await fetchStatus()
@@ -238,7 +287,8 @@ const reload = async () => {
 
 const startProcess = async () => {
   try {
-    await processVideo(id.value)
+    processingSettings.value = getProcessingSettings()
+    await processVideo(id.value, buildProcessPayload(processingSettings.value))
     await reload()
   } catch (e) {
     error.value = extractErrorMessage(e, '提交失败')
@@ -250,7 +300,8 @@ const retryProcess = async () => {
   retrying.value = true
   error.value = ''
   try {
-    await processVideo(id.value)
+    processingSettings.value = getProcessingSettings()
+    await processVideo(id.value, buildProcessPayload(processingSettings.value))
     await reload()
   } catch (e) {
     error.value = extractErrorMessage(e, '重试失败')
@@ -260,8 +311,37 @@ const retryProcess = async () => {
 }
 
 const play = () => {
-  if (!canPlay.value) return
+  if (!canOpenPlayerWhileProcessing.value) return
   router.push(`/player/${id.value}`)
+}
+
+const createSummary = async () => {
+  if (!canGenerateSummary.value || summaryGenerating.value || tagGenerating.value) return
+  summaryGenerating.value = true
+  error.value = ''
+  try {
+    processingSettings.value = getProcessingSettings()
+    await generateVideoSummary(id.value, { style: processingSettings.value.summaryStyle })
+    await reload()
+  } catch (e) {
+    error.value = extractErrorMessage(e, '生成摘要失败')
+  } finally {
+    summaryGenerating.value = false
+  }
+}
+
+const createTags = async () => {
+  if (!canGenerateTags.value || summaryGenerating.value || tagGenerating.value) return
+  tagGenerating.value = true
+  error.value = ''
+  try {
+    await generateVideoTags(id.value, { max_tags: 6 })
+    await reload()
+  } catch (e) {
+    error.value = extractErrorMessage(e, '提取标签失败')
+  } finally {
+    tagGenerating.value = false
+  }
 }
 
 const qa = () => router.push({ path: '/qa', query: { videoId: String(id.value) } })
@@ -299,6 +379,9 @@ onUnmounted(() => statusPoller?.stop())
 .topbar-title {
   text-align: center;
   font-weight: 900;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .back {
@@ -328,6 +411,8 @@ onUnmounted(() => statusPoller?.stop())
   justify-content: space-between;
   gap: 10px;
   font-weight: 700;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .alert--bad {
@@ -455,16 +540,20 @@ onUnmounted(() => statusPoller?.stop())
 }
 
 .hero-shell__caption {
-  max-width: 260px;
+  max-width: min(100%, 260px);
   font-size: 12px;
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.94);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .title {
   margin: 12px 0 0;
   font-size: 16px;
   font-weight: 900;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .meta {
@@ -478,13 +567,16 @@ onUnmounted(() => statusPoller?.stop())
 .muted {
   color: var(--muted);
   font-size: 12px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .badge {
   font-size: 12px;
   padding: 4px 10px;
   border-radius: 999px;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
 }
 
 .badge.ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
@@ -505,10 +597,33 @@ onUnmounted(() => statusPoller?.stop())
   background: linear-gradient(90deg, #667eea, #764ba2);
 }
 
+.inline-tip {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .block {
   margin-top: 14px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   padding-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.block-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .block-title {
@@ -521,6 +636,56 @@ onUnmounted(() => statusPoller?.stop())
   color: #374151;
   font-size: 13px;
   line-height: 1.6;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.block-body--prewrap {
+  white-space: pre-wrap;
+}
+
+.block-placeholder {
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(15, 118, 110, 0.08);
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.setting-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-pill {
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(15, 118, 110, 0.12);
+  color: #0f766e;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.mini {
+  border: 0;
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: rgba(15, 118, 110, 0.12);
+  color: #0f766e;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.mini:disabled {
+  opacity: 0.6;
 }
 
 .actions {
@@ -537,6 +702,8 @@ onUnmounted(() => statusPoller?.stop())
   padding: 10px 10px;
   font-weight: 900;
   font-size: 12px;
+  min-width: 0;
+  text-align: center;
 }
 
 .btn--primary {
@@ -574,6 +741,20 @@ onUnmounted(() => statusPoller?.stop())
   border-radius: 14px;
   padding: 12px;
   font-weight: 900;
+}
+
+@media (max-width: 420px) {
+  .topbar {
+    grid-template-columns: 40px minmax(0, 1fr) minmax(52px, auto);
+  }
+
+  .actions {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-shell__caption {
+    max-width: 100%;
+  }
 }
 </style>
 <style scoped>

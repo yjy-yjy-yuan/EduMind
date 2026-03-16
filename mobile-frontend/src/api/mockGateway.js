@@ -17,6 +17,7 @@ const videos = [
     process_progress: 100,
     current_step: '分析完成',
     summary: '本节梳理导数定义、几何意义与常见求导法则。',
+    tags: ['导数定义', '几何意义', '求导法则'],
     created_at: nowISO(),
     updated_at: nowISO()
   },
@@ -27,6 +28,7 @@ const videos = [
     process_progress: 42,
     current_step: '语音识别中',
     summary: '',
+    tags: [],
     created_at: nowISO(),
     updated_at: nowISO()
   },
@@ -37,6 +39,7 @@ const videos = [
     process_progress: 18,
     current_step: '处理失败',
     summary: '',
+    tags: [],
     created_at: nowISO(),
     updated_at: nowISO()
   },
@@ -47,6 +50,7 @@ const videos = [
     process_progress: 0,
     current_step: '排队中',
     summary: '',
+    tags: [],
     created_at: nowISO(),
     updated_at: nowISO()
   },
@@ -57,6 +61,7 @@ const videos = [
     process_progress: 0,
     current_step: '已上传',
     summary: '',
+    tags: [],
     created_at: nowISO(),
     updated_at: nowISO()
   }
@@ -111,6 +116,7 @@ const tickVideoProgress = (video) => {
     video.current_step = '分析完成'
     video.summary =
       video.summary || 'UI 模式示例摘要：本视频已完成转写、摘要与标签提取，可继续播放与问答。'
+    video.tags = Array.isArray(video.tags) && video.tags.length > 0 ? video.tags : ['课程重点', '字幕转写', '学习复盘']
     video.updated_at = nowISO()
     return
   }
@@ -175,6 +181,8 @@ export const mockProcessVideo = (videoId) => {
   video.status = 'pending'
   video.process_progress = 3
   video.current_step = '排队中'
+  video.summary = ''
+  video.tags = []
   video.updated_at = nowISO()
   return mockResponse({ success: true, message: 'UI 模式：已提交处理任务', video_id: video.id })
 }
@@ -209,6 +217,7 @@ export const mockUploadLocalVideo = (formData, { onUploadProgress } = {}) =>
         process_progress: 0,
         current_step: '已上传',
         summary: '',
+        tags: [],
         created_at: nowISO(),
         updated_at: nowISO()
       }
@@ -237,11 +246,28 @@ export const mockUploadVideoUrl = (payload) => {
     process_progress: 0,
     current_step: '排队中',
     summary: '',
+    tags: [],
     created_at: nowISO(),
     updated_at: nowISO()
   }
   videos.unshift(created)
   return mockResponse({ success: true, message: 'UI 模式：链接提交成功', video_id: id, data: clone(created) })
+}
+
+export const mockGenerateVideoSummary = (videoId) => {
+  const video = findVideo(videoId)
+  if (!video) return Promise.reject(new Error('视频不存在（UI 模式）'))
+  video.summary = video.summary || 'UI 模式摘要：本视频已完成重点提炼，可继续查看标签与问答。'
+  video.updated_at = nowISO()
+  return mockResponse({ success: true, summary: video.summary })
+}
+
+export const mockGenerateVideoTags = (videoId) => {
+  const video = findVideo(videoId)
+  if (!video) return Promise.reject(new Error('视频不存在（UI 模式）'))
+  video.tags = Array.isArray(video.tags) && video.tags.length > 0 ? video.tags : ['重点知识', '视频复盘', '学习标签']
+  video.updated_at = nowISO()
+  return mockResponse({ success: true, tags: clone(video.tags) })
 }
 
 export const mockGetNotes = () => mockResponse({ notes: clone(sortByUpdatedDesc(notes)) })
