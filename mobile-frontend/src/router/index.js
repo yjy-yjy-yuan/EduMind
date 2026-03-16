@@ -13,7 +13,6 @@ import NoteEdit from '@/views/NoteEdit.vue'
 import QA from '@/views/QA.vue'
 import Profile from '@/views/Profile.vue'
 import LearningPath from '@/views/LearningPath.vue'
-import Knowledge from '@/views/Knowledge.vue'
 import Guide from '@/views/Guide.vue'
 
 const isFileProtocol = window.location.protocol === 'file:'
@@ -32,7 +31,6 @@ const router = createRouter({
     { path: '/notes/:id', name: 'NoteEdit', component: NoteEdit, meta: { title: '编辑笔记', hideTabBar: true, requiresAuth: true } },
     { path: '/qa', name: 'QA', component: QA, meta: { title: 'AI 问答', hideTabBar: true } },
     { path: '/learning-path', name: 'LearningPath', component: LearningPath, meta: { title: '学习路径' } },
-    { path: '/knowledge', name: 'Knowledge', component: Knowledge, meta: { title: '知识点总览' } },
     { path: '/guide', name: 'Guide', component: Guide, meta: { title: '使用指南', hideTabBar: true } },
     { path: '/profile', name: 'Profile', component: Profile, meta: { title: '我的', requiresAuth: true } },
     { path: '/login', name: 'Login', component: Login, meta: { title: '登录', hideTabBar: true } },

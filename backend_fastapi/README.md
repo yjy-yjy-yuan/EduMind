@@ -1,6 +1,6 @@
 # EduMind Backend (FastAPI)
 
-`backend_fastapi/` 是当前仓库的主后端。认证、视频、字幕、笔记、问答、知识图谱等新接口应优先落在这里。
+`backend_fastapi/` 是当前仓库的主后端。认证、视频、字幕、笔记、问答等新接口应优先落在这里。
 
 ## 技术栈
 
@@ -10,7 +10,6 @@
 | ORM | SQLAlchemy 2.0 |
 | 数据校验 | Pydantic v2 |
 | 后台任务 | ProcessPoolExecutor |
-| 图谱 | Neo4j |
 | AI | Whisper、Ollama / 外部模型服务 |
 
 ## 快速开始
@@ -50,7 +49,6 @@ python run.py
 按功能启用以下服务：
 
 - MySQL
-- Neo4j
 - Redis
 - FFmpeg
 - Ollama
@@ -73,9 +71,6 @@ pytest --cov=app
 |------|---------|
 | FastAPI 后端 | 2004 |
 | 桌面端 Vite | 328 |
-| Neo4j Browser | 7474 |
-| Neo4j Bolt | 7687 |
-
 ## 开发说明
 
 - 修改接口时，同时检查根目录 README 和 `docs/` 中是否需要同步更新。

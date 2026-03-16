@@ -218,3 +218,19 @@
 ### 仓库忽略规则补强
 
 - 更新 [`.gitignore`](/Users/yuan/final-work/EduMind/.gitignore)：补充 `*.sqlite`、`*.db-journal`、`*.sqlite-shm`、`*.sqlite-wal` 等本地数据库运行产物忽略规则，并新增 `**/.idea/` 与仓库根误生成目录 `~/` 的忽略，减少本地大文件或无关缓存被错误纳入版本控制的风险。
+
+## 2026-03-16
+
+### 知识图谱可读性测试页
+
+- 新增 [`mobile-frontend/src/tests/knowledgeGraphFixture.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/tests/knowledgeGraphFixture.js)、[`mobile-frontend/src/tests/KnowledgeGraphPreview.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/tests/KnowledgeGraphPreview.vue)：补充仅供测试使用的 mock 知识图谱页面，内置“宽松/标准/拥挤”密度、字号倍率、缩略图开关、自动避让与重排布局，用于观察移动端知识图谱是否出现节点遮挡、字号过小或缩略图堆叠遮蔽。
+- 更新 [`mobile-frontend/src/views/Knowledge.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Knowledge.vue)：将现有知识页改为测试承载页，直接加载 `src/tests/` 下的知识图谱预览组件，便于从当前应用入口进入检查页面效果。
+
+## 2026-03-16
+
+### 删除知识图谱功能与测试页
+
+- 删除 [`mobile-frontend/src/views/Knowledge.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Knowledge.vue)、[`mobile-frontend/src/tests/KnowledgeGraphPreview.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/tests/KnowledgeGraphPreview.vue)、[`mobile-frontend/src/tests/knowledgeGraphFixture.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/tests/knowledgeGraphFixture.js)：移除前端知识图谱页面及其测试用 mock 图谱预览文件。
+- 更新 [`mobile-frontend/src/router/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/router/index.js)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Guide.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Guide.vue)：删除 `/knowledge` 路由、首页快捷入口和使用指南中的知识图谱入口与文案。
+- 删除 [`backend_fastapi/app/routers/knowledge_graph.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/knowledge_graph.py)、[`backend_fastapi/app/routers/knowledge_graph_integration.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/knowledge_graph_integration.py)、[`backend_fastapi/app/schemas/knowledge_graph.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/knowledge_graph.py)、[`backend_fastapi/app/utils/knowledge_graph_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/knowledge_graph_utils.py)：移除后端知识图谱 API、Schema 和 Neo4j 管理逻辑。
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/requirements.txt`](/Users/yuan/final-work/EduMind/backend_fastapi/requirements.txt)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：移除知识图谱路由注册、Neo4j 配置项和 `neo4j` 依赖。

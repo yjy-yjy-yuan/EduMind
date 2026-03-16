@@ -96,8 +96,6 @@ app.add_middleware(
 # 注册路由
 from app.routers import auth
 from app.routers import chat
-from app.routers import knowledge_graph
-from app.routers import knowledge_graph_integration
 from app.routers import note
 from app.routers import qa
 from app.routers import subtitle
@@ -109,12 +107,6 @@ app.include_router(note.router, prefix="/api/notes", tags=["笔记管理"])
 app.include_router(qa.router, prefix="/api/qa", tags=["问答系统"])
 app.include_router(chat.router, prefix="/api/chat", tags=["聊天系统"])
 app.include_router(auth.router, prefix="/api/auth", tags=["用户认证"])
-app.include_router(knowledge_graph.router, prefix="/api/knowledge-graph", tags=["知识图谱"])
-app.include_router(
-    knowledge_graph_integration.router,
-    prefix="/api/knowledge-graph/integration",
-    tags=["知识图谱整合"],
-)
 
 
 # 根路由
@@ -127,4 +119,4 @@ async def root():
 @app.get("/health")
 @app.get("/api/health")
 async def health():
-    return {"status": "healthy", "services": {"database": "connected", "neo4j": "connected"}}
+    return {"status": "healthy", "services": {"database": "connected"}}
