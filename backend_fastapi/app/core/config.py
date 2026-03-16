@@ -32,11 +32,6 @@ class Settings(BaseSettings):
     # 数据库配置 (MySQL)
     DATABASE_URL: str = "mysql+pymysql://root:password@127.0.0.1:3306/edumind"
 
-    # Neo4j 配置
-    NEO4J_URI: str = "bolt://localhost:7687"
-    NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = "password"
-
     # LLM API 配置 (通义千问/OpenAI兼容)
     # 注意: 敏感密钥请在 .env 文件中配置，不要硬编码
     OPENAI_API_KEY: str = ""

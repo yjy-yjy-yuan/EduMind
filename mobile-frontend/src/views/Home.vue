@@ -81,7 +81,6 @@ const quickActions = [
   { route: '/upload', tag: '上传', tagClass: 'tag--teal', title: '上传中心', desc: '支持本地文件和链接' },
   { route: '/notes', tag: '笔记', tagClass: 'tag--leaf', title: '学习笔记', desc: '随学随记，整理知识片段' },
   { route: '/qa', tag: '问答', tagClass: 'tag--amber', title: 'AI 问答', desc: '基于课程内容即时提问' },
-  { route: '/knowledge', tag: '知识', tagClass: 'tag--mint', title: '知识图谱', desc: '回顾概念与关联关系' },
   { route: '/learning-path', tag: '路径', tagClass: 'tag--teal', title: '学习路径', desc: '获取下一步学习建议' }
 ]
 

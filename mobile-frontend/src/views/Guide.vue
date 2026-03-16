@@ -8,7 +8,7 @@
 
     <section class="hero">
       <div class="hero-title">快速掌握核心功能</div>
-      <div class="hero-subtitle">上传 → 分析 → 观看 → 提问 → 记笔记 → 总览知识点</div>
+      <div class="hero-subtitle">上传 → 分析 → 观看 → 提问 → 记笔记 → 规划学习路径</div>
       <div class="hero-actions">
         <button class="btn btn--primary" @click="go('/upload')">开始上传视频</button>
         <button class="btn" @click="go('/videos')">浏览视频列表</button>
@@ -125,16 +125,15 @@
         <details class="acc">
           <summary class="acc-summary">
             <span class="acc-badge">06</span>
-            <span class="acc-title">知识点总览与学习路径</span>
+            <span class="acc-title">学习路径</span>
           </summary>
           <div class="acc-body">
             <ol class="ol">
-              <li>进入“知识点总览”浏览系统提取的关键知识点</li>
-              <li>进入“学习路径”查看学习步骤与规划建议</li>
+              <li>进入“学习路径”查看当前建议的学习步骤与规划</li>
+              <li>根据建议继续进入视频、问答或笔记页完成复习</li>
               <li>当前展示静态或 mock 内容，后续切换为真实接口数据</li>
             </ol>
             <div class="acc-actions">
-              <button class="btn" @click="go('/knowledge')">知识点总览</button>
               <button class="btn" @click="go('/learning-path')">学习路径</button>
             </div>
           </div>
@@ -186,7 +185,7 @@
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const flowSteps = ['登录', '上传', '分析', '播放', '问答', '笔记', '总览']
+const flowSteps = ['登录', '上传', '分析', '播放', '问答', '笔记', '路径']
 const goBack = () => {
   if (window.history.length > 1) router.back()
   else router.replace('/')

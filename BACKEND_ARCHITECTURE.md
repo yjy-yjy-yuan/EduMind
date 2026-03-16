@@ -1,5 +1,8 @@
 # EduMind Backend Architecture Overview
 
+> Note
+> This document contains legacy Flask-era architecture notes. Knowledge graph and Neo4j-related sections are obsolete and were removed from the active FastAPI/iOS product chain on 2026-03-16.
+
 ## Executive Summary
 
 EduMind is an intelligent educational video processing and knowledge extraction platform built with Flask, featuring automated video transcription, knowledge graph generation, and AI-powered question-answering capabilities. The backend uses Celery for async task processing, Neo4j for knowledge graph storage, and multiple LLM integrations for content analysis.

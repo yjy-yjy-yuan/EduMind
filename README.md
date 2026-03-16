@@ -36,7 +36,7 @@ EduMind/
 - Node.js 16+
 - MySQL
 - FFmpeg
-- 按功能启用 Neo4j、Redis、Ollama
+- 按功能启用 Redis、Ollama
 
 ## 快速开始
 

@@ -330,22 +330,6 @@ class LLMSimilarityService:
         # 首先尝试直接计算整体相似度，这样更快
         return self.calculate_tag_sets_similarity_direct(tags1, tags2)
 
-    def can_combine_knowledge_graphs(self, tags1: List[str], tags2: List[str], threshold: float = 0.7) -> bool:
-        """
-        判断两组标签是否足够相似，可以合并知识图谱
-
-        Args:
-            tags1: 第一组标签
-            tags2: 第二组标签
-            threshold: 相似度阈值，默认0.7
-
-        Returns:
-            是否可以合并
-        """
-        similarity = self.calculate_tag_sets_similarity(tags1, tags2)
-        logger.info(f"标签组相似度: {similarity}, 阈值: {threshold}")
-        return similarity >= threshold
-
     def find_similar_videos(
         self, target_tags: List[str], all_videos: List[Dict[str, Any]], threshold: float = 0.7, limit: int = 5
     ) -> List[Dict[str, Any]]:

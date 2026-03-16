@@ -35,11 +35,11 @@ isort app/ tests/
 | `app/core/config.py` | Pydantic Settings 配置 |
 | `app/core/database.py` | SQLAlchemy 2.0 连接和 get_db 依赖 |
 | `app/core/executor.py` | ProcessPoolExecutor 后台任务 |
-| `app/routers/*.py` | API 路由 (video, subtitle, note, qa, chat, auth, knowledge_graph) |
+| `app/routers/*.py` | API 路由 (video, subtitle, note, qa, chat, auth) |
 | `app/models/*.py` | SQLAlchemy 2.0 模型 (Mapped[] 类型注解) |
 | `app/schemas/*.py` | Pydantic 请求/响应模型 |
 | `app/tasks/video_processing.py` | 视频处理后台任务 |
-| `app/utils/*.py` | 工具函数 (chat, qa, semantic, knowledge_graph) |
+| `app/utils/*.py` | 工具函数 (chat, qa, semantic) |
 
 ## Code Style
 
@@ -69,8 +69,6 @@ async def get_video(video_id: int, db: Session = Depends(get_db)):
 | `/api/qa` | AI 问答 (流式响应) |
 | `/api/chat` | 聊天系统 (流式响应) |
 | `/api/auth` | 用户注册、登录、信息更新 |
-| `/api/knowledge-graph` | 知识图谱构建、查询 |
-
 ## Testing
 
 ```bash
@@ -93,7 +91,6 @@ conda activate ai-edvision
 # 端口
 # Backend: 2004
 # Frontend: 328
-# Neo4j: 7474/7687
 ```
 
 ## Key Differences from Flask
