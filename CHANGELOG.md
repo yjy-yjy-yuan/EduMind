@@ -219,6 +219,19 @@
 
 - 更新 [`.gitignore`](/Users/yuan/final-work/EduMind/.gitignore)：补充 `*.sqlite`、`*.db-journal`、`*.sqlite-shm`、`*.sqlite-wal` 等本地数据库运行产物忽略规则，并新增 `**/.idea/` 与仓库根误生成目录 `~/` 的忽略，减少本地大文件或无关缓存被错误纳入版本控制的风险。
 
+### 视频问答 RAG 联调打通
+
+- 更新 [`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/app/schemas/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/qa.py)、[`backend_fastapi/app/utils/qa_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/qa_utils.py)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：视频问答改为真实后端 RAG，实现“字幕/摘要/标签检索 + 通义千问或 DeepSeek 在线回答”，新增 `QA_DEFAULT_PROVIDER`、`QWEN_QA_MODEL`、`DEEPSEEK_QA_MODEL`、`DEEPSEEK_REASONER_MODEL` 等配置；问答链路不再要求前端传 `api_key/use_ollama`，并移除 Ollama 作为上下文问答主路径。
+- 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：移动端问答页接入新的真实问答协议，新增通义千问 / DeepSeek provider 切换、后端错误透传和引用片段展示。
+- 新增 [`backend_fastapi/tests/api/test_qa_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_qa_api.py)、[`backend_fastapi/tests/unit/test_qa_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_qa_utils.py)：补充视频问答接口与 RAG 检索逻辑测试，覆盖问答落库、上下文不足校验和 DeepSeek reasoner 选择。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：同步视频上下文问答只允许通义千问 / DeepSeek、问答必须走后端真实 RAG、结果写入现有 `questions` 表的实现边界。
+
+### 在线问答上下文记忆增强
+
+- 更新 [`backend_fastapi/app/schemas/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/qa.py)、[`backend_fastapi/app/utils/qa_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/qa_utils.py)、[`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：新增 `history` 问答历史入参和 `QA_MAX_HISTORY_MESSAGES` / `QA_MAX_HISTORY_CHARS` 配置，后端在做视频检索时会结合最近对话历史改写检索 query，并把历史轮次一并交给通义千问 / DeepSeek，提升连续追问时的上下文记忆稳定性。
+- 更新 [`backend_fastapi/app/schemas/chat.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/chat.py)、[`backend_fastapi/app/utils/chat_system.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/chat_system.py)、[`backend_fastapi/app/routers/chat.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/chat.py)：聊天接口收敛为在线 provider-only，只保留通义千问 / DeepSeek 两类在线模型，不再暴露 `use_ollama`。
+- 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：前端问答页提交最近 8 条对话历史，支持后端在连续追问时保持更稳定的上下文记忆。
+
 ## 2026-03-16
 
 ### 知识图谱可读性测试页

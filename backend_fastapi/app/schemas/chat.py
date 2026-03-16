@@ -18,9 +18,8 @@ class ChatRequest(BaseModel):
     """聊天请求"""
 
     messages: List[ChatMessage]
-    api_key: Optional[str] = None
-    use_ollama: bool = Field(default=False, description="是否使用本地 Ollama")
     stream: bool = Field(default=True, description="是否流式返回")
+    provider: str = Field(default="qwen", description="模型提供方: qwen, deepseek")
     model: Optional[str] = None
 
 

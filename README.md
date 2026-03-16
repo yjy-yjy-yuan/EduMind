@@ -36,7 +36,7 @@ EduMind/
 - Node.js 16+
 - MySQL
 - FFmpeg
-- 按功能启用 Redis、Ollama
+- 通义千问或 DeepSeek API Key
 
 ## 快速开始
 
@@ -114,6 +114,33 @@ bash ios-app/sync_ios_web_assets.sh
 ```bash
 POST /api/videos/{video_id}/generate-summary
 POST /api/videos/{video_id}/generate-tags
+```
+
+## 视频上下文问答
+
+当前视频问答已经接入真实后端 RAG，不再依赖前端占位回复：
+
+1. 前端向 `POST /api/qa/ask` 提交 `video_id`、`question`、`provider`
+2. 后端基于现有 `subtitles`、`videos.summary`、`videos.tags` 组装检索上下文
+3. 后端对字幕片段做轻量召回，再调用通义千问或 DeepSeek 生成回答
+4. 问答记录写入现有 `questions` 表，不新增平行问答表
+
+为保证连续追问时的上下文记忆，移动端会把最近几轮问答一并提交给后端，后端再结合视频字幕检索结果组织最终提示词；因此“它 / 这个 / 上一题提到的第二点”这类追问不再只靠当前一句话硬猜。
+
+当前问答提供方只支持：
+
+1. `qwen`
+2. `deepseek`
+
+相关配置位于 `backend_fastapi/.env`：
+
+```bash
+QA_DEFAULT_PROVIDER=qwen
+QWEN_QA_MODEL=qwen-plus
+DEEPSEEK_QA_MODEL=deepseek-chat
+DEEPSEEK_REASONER_MODEL=deepseek-reasoner
+QA_MAX_HISTORY_MESSAGES=8
+QA_MAX_HISTORY_CHARS=2200
 ```
 
 ## MySQL 表管理
