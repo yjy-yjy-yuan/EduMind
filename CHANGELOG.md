@@ -1,5 +1,16 @@
 # 变更日志
 
+## 2026-03-16
+
+### iOS 真机播放与视频处理链路修复
+- 更新 [`backend_fastapi/app/core/executor.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/executor.py)：本地开发默认改用 `ThreadPoolExecutor` 执行后台任务，补充任务完成/异常日志与失败状态回写，修复视频处理任务长时间停留在“已提交，等待处理”的假死问题。
+- 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)：新增后台任务执行器类型与并发数配置项，便于后续按环境切换。
+- 更新 [`backend_fastapi/app/tasks/video_processing.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_processing.py)：为 Whisper 转录阶段增加持续进度回写与耗时提示，避免长视频在 60% 附近长时间无变化。
+- 更新 [`backend_fastapi/.env`](/Users/yuan/final-work/EduMind/backend_fastapi/.env)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)、[`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)：默认 Whisper 模型从 `turbo` 调整为 `base`，避免本地开发因损坏的 `turbo` 缓存触发 1.51GB 模型重下载而长时间卡住。
+- 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：处理中视频不再禁用播放按钮，改为允许进入播放器播放原始视频文件。
+- 更新 [`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)：播放器增加视频处理状态提示，明确当前是否在播放处理中原视频。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：最近上传列表新增自动刷新处理进度条与当前步骤显示，便于真机直接观察后台处理进度。
+
 ## 2026-03-11
 
 ### 文档对齐
@@ -187,6 +198,16 @@
 - 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)：补充后端 MySQL 表管理命令、Navicat 导入入口和当前受控表清单。
 - 更新 [`backend_fastapi/.env`](/Users/yuan/final-work/EduMind/backend_fastapi/.env)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`docs/DATABASE_SETUP.md`](/Users/yuan/final-work/EduMind/docs/DATABASE_SETUP.md)：将默认数据库名从 `ai_edvision` 统一调整为项目名 `edumind`，便于在 Navicat 中与项目名称保持一致。
 
+### 真机地址与端口自动同步
+
+- 更新 [`ios-app/sync_ios_web_assets.sh`](/Users/yuan/final-work/EduMind/ios-app/sync_ios_web_assets.sh)：构建 iOS 资源前自动读取 `backend_fastapi/.env` 中的 `PORT` 与当前 Mac `LocalHostName`，同步刷新 iOS 原生默认后端地址，避免端口变化后还要手工修改 Xcode Build Settings。
+- 更新 [`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)：开发设置页改为展示当前建议后端地址，不再写死 `2004` 和局域网 IP 示例。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`ios-app/README.md`](/Users/yuan/final-work/EduMind/ios-app/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：将真机默认地址说明统一为 `.local + backend_fastapi/.env PORT` 的单点配置链路。
+
 ### 数据库配置加载路径修复
 
 - 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)：将 `BaseSettings` 的 `env_file` 改为固定读取 `backend_fastapi/.env` 的绝对路径，避免从仓库根目录执行脚本时退回默认 `DATABASE_URL`（`root:password`）导致 MySQL `1045 Access denied`。
+
+### 仓库忽略规则补强
+
+- 更新 [`.gitignore`](/Users/yuan/final-work/EduMind/.gitignore)：补充 `*.sqlite`、`*.db-journal`、`*.sqlite-shm`、`*.sqlite-wal` 等本地数据库运行产物忽略规则，并新增 `**/.idea/` 与仓库根误生成目录 `~/` 的忽略，减少本地大文件或无关缓存被错误纳入版本控制的风险。

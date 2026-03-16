@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     PORT: int = 2004  # FastAPI 端口
     SECRET_KEY: str = "dev-secret-key-change-in-production"
     AUTO_CREATE_TABLES: bool = False
+    BACKGROUND_TASK_EXECUTOR: str = "auto"
+    BACKGROUND_TASK_WORKERS: int = 2
 
     # 数据库配置 (MySQL)
     DATABASE_URL: str = "mysql+pymysql://root:password@127.0.0.1:3306/edumind"
@@ -56,7 +58,7 @@ class Settings(BaseSettings):
     ALLOWED_EXTENSIONS: Set[str] = {"mp4", "avi", "mov", "mkv", "webm", "flv"}
 
     # Whisper 配置 (可选: tiny, base, small, medium, large, turbo)
-    WHISPER_MODEL: str = "turbo"
+    WHISPER_MODEL: str = "base"
     WHISPER_MODEL_PATH: str = os.path.expanduser("~/Desktop/File/graduation/whisper")
 
     # CORS 配置 (允许前端访问) - 使用字符串，支持逗号分隔

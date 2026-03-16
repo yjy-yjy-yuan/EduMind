@@ -37,17 +37,25 @@ backend_fastapi/uploads/
 
 # Databases and local runtime files
 *.db
+*.db-journal
+*.sqlite
 *.sqlite3
+*.sqlite-shm
+*.sqlite-wal
 
 # IDE / OS
 .vscode/
 .idea/
+**/.idea/
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
 **/xcuserdata/
 *.xcuserstate
+
+# Accidental local directories
+~/
 
 # Logs
 *.log

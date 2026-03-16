@@ -25,7 +25,7 @@ export function getVideoStatus(videoId) {
   return request({ url: `/api/videos/${videoId}/status`, method: 'get' })
 }
 
-export function processVideo(videoId, language = 'Other', model = 'turbo') {
+export function processVideo(videoId, language = 'Other', model = 'base') {
   if (shouldUseMockApi()) return mockProcessVideo(videoId, language, model)
   return request({ url: `/api/videos/${videoId}/process`, method: 'post', data: { language, model } })
 }

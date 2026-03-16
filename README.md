@@ -79,7 +79,8 @@ bash ios-app/sync_ios_web_assets.sh
 该脚本会：
 
 1. 构建 `mobile-frontend`
-2. 将最新 `dist/` 同步到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
+2. 读取 `backend_fastapi/.env` 中的 `PORT`，自动刷新 iOS 真机默认后端地址
+3. 将最新 `dist/` 同步到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
 
 ## MySQL 表管理
 

@@ -55,6 +55,13 @@ if let indexURL = Bundle.main.url(forResource: "index", withExtension: "html", s
 
 - `INFOPLIST_KEY_EDUMIND_API_BASE_URL = http://yuandeMacBook-Pro.local:2004`
 
+现在执行 `bash ios-app/sync_ios_web_assets.sh` 时，脚本会自动：
+
+1. 读取 `backend_fastapi/.env` 里的 `PORT`
+2. 读取当前 Mac 的 `LocalHostName`
+3. 将 `EDUMIND_API_BASE_URL` 刷新成 `http://<LocalHostName>.local:<PORT>`
+4. 再同步最新 `mobile-frontend/dist` 到 `WebAssets`
+
 推荐优先使用 `.local` 主机名而不是 IP。对于当前这台机器，主机名可写成：
 
 - `http://yuandeMacBook-Pro.local:2004`
@@ -108,7 +115,8 @@ bash ios-app/sync_ios_web_assets.sh
 该脚本会自动执行：
 
 1. `mobile-frontend` 执行 `npm run build:ios`（生成相对路径资源，适配 `loadFileURL`）
-2. 同步 `dist/` 到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
+2. 根据 `backend_fastapi/.env` 的 `PORT` 和当前 Mac 主机名刷新 iOS 原生默认后端地址
+3. 同步 `dist/` 到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
 
 ### 6. 命令行编译（可选）
 

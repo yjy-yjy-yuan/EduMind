@@ -34,7 +34,7 @@ class VideoProcessRequest(BaseModel):
     """视频处理请求"""
 
     language: str = Field(default="Other", description="视频语言")
-    model: str = Field(default="turbo", description="Whisper 模型")
+    model: str = Field(default="base", description="Whisper 模型")
 
 
 # ============ 响应 Schema ============

@@ -65,6 +65,12 @@
             <div class="recent-meta">
               <span class="status" :class="statusClass(item.status)">{{ statusText(item.status) }}</span>
             </div>
+            <div v-if="isActiveStatus(item.status)" class="recent-progress">
+              <div class="recent-progress__text">{{ displayProgress(item.progress) }}% · {{ item.currentStep || '处理中' }}</div>
+              <div class="progress progress--compact">
+                <div class="bar" :style="{ width: `${displayProgress(item.progress)}%` }"></div>
+              </div>
+            </div>
           </div>
           <div class="recent-actions">
             <span class="recent-tag" :class="{ 'recent-tag--dup': item.duplicate }">
@@ -91,7 +97,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getVideoStatus, processVideo, uploadLocalVideo, uploadVideoUrl } from '@/api/video'
 import { normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
@@ -109,6 +115,7 @@ const error = ref('')
 const recentUploads = ref([])
 const syncingRecent = ref(false)
 const statusFilter = ref('all')
+let recentStatusTimer = null
 
 const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
 const ALLOWED_EXTENSIONS = new Set(['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'])
@@ -156,6 +163,12 @@ const resolveVideoId = (payload) => {
 }
 
 const statusText = videoStatusText
+const isActiveStatus = (status) => ['pending', 'processing', 'downloading'].includes(normalizeVideoStatus(status))
+const displayProgress = (value) => {
+  const numeric = Number(value || 0)
+  if (!Number.isFinite(numeric)) return 0
+  return Math.max(0, Math.min(100, Math.round(numeric)))
+}
 
 const statusClass = (status) => {
   const tone = videoStatusTone(status)
@@ -189,10 +202,14 @@ const normalizeRecentUploads = (list) => {
       timeText: formatTimeText(item.time),
       duplicate: Boolean(item.duplicate),
       status: normalizeVideoStatus(item.status || (item.duplicate ? 'uploaded' : 'pending')),
+      progress: displayProgress(item.progress),
+      currentStep: String(item.currentStep || ''),
       retrying: false
     }))
     .filter((item) => item.key)
 }
+
+const hasActiveRecentUploads = computed(() => recentUploads.value.some((item) => isActiveStatus(item.status)))
 
 const filteredRecentUploads = computed(() => {
   if (statusFilter.value === 'all') return recentUploads.value
@@ -221,6 +238,7 @@ const persistRecentUploads = () => {
 
 const addRecentUpload = ({ videoId, title, typeText, duplicate = false, status = 'pending' }) => {
   const now = new Date().toISOString()
+  const normalizedStatus = normalizeVideoStatus(duplicate ? 'uploaded' : status)
   const item = {
     key: `${videoId || 'none'}-${now}`,
     videoId: videoId ? Number(videoId) : null,
@@ -229,12 +247,30 @@ const addRecentUpload = ({ videoId, title, typeText, duplicate = false, status =
     time: now,
     timeText: formatTimeText(now),
     duplicate: Boolean(duplicate),
-    status: normalizeVideoStatus(duplicate ? 'uploaded' : status),
+    status: normalizedStatus,
+    progress: 0,
+    currentStep: normalizedStatus === 'downloading' ? '已提交，等待下载' : '已提交，等待处理',
     retrying: false
   }
   const merged = [item, ...recentUploads.value.filter((x) => x.videoId !== item.videoId || !item.videoId)]
   recentUploads.value = merged.slice(0, MAX_RECENT_UPLOADS)
   persistRecentUploads()
+  scheduleRecentStatusSync()
+}
+
+const clearRecentStatusSync = () => {
+  if (recentStatusTimer == null) return
+  window.clearTimeout(recentStatusTimer)
+  recentStatusTimer = null
+}
+
+const scheduleRecentStatusSync = () => {
+  clearRecentStatusSync()
+  if (busy.value || syncingRecent.value || !hasActiveRecentUploads.value) return
+  recentStatusTimer = window.setTimeout(async () => {
+    recentStatusTimer = null
+    await syncRecentStatuses()
+  }, 3000)
 }
 
 const syncRecentStatuses = async () => {
@@ -248,25 +284,39 @@ const syncRecentStatuses = async () => {
         try {
           const res = await getVideoStatus(item.videoId)
           const data = res?.data || {}
-          return { key: item.key, status: normalizeVideoStatus(data?.status || data?.data?.status) }
+          return {
+            key: item.key,
+            status: normalizeVideoStatus(data?.status || data?.data?.status),
+            progress: displayProgress(data?.progress ?? data?.data?.progress),
+            currentStep: String(data?.current_step || data?.data?.current_step || '')
+          }
         } catch {
-          return { key: item.key, status: normalizeVideoStatus(item.status) }
+          return {
+            key: item.key,
+            status: normalizeVideoStatus(item.status),
+            progress: displayProgress(item.progress),
+            currentStep: String(item.currentStep || '')
+          }
         }
       })
     )
-    const statusMap = new Map(updates.map((u) => [u.key, u.status]))
+    const statusMap = new Map(updates.map((u) => [u.key, u]))
     recentUploads.value = recentUploads.value.map((item) => ({
       ...item,
-      status: statusMap.get(item.key) || item.status
+      status: statusMap.get(item.key)?.status || item.status,
+      progress: statusMap.get(item.key)?.progress ?? item.progress,
+      currentStep: statusMap.get(item.key)?.currentStep ?? item.currentStep
     }))
     persistRecentUploads()
   } finally {
     syncingRecent.value = false
+    scheduleRecentStatusSync()
   }
 }
 
 const clearRecentUploads = () => {
   if (busy.value) return
+  clearRecentStatusSync()
   recentUploads.value = []
   try {
     storageRemove(RECENT_UPLOADS_KEY)
@@ -293,6 +343,8 @@ const retryRecent = async (item) => {
     recentUploads.value[idx] = {
       ...recentUploads.value[idx],
       status: 'pending',
+      progress: 0,
+      currentStep: '已提交，等待处理',
       retrying: false
     }
     message.value = `视频 ${item.videoId} 已重新提交处理`
@@ -426,6 +478,11 @@ const uploadUrl = async () => {
 onMounted(async () => {
   loadRecentUploads()
   await syncRecentStatuses()
+  scheduleRecentStatusSync()
+})
+
+onUnmounted(() => {
+  clearRecentStatusSync()
 })
 </script>
 
@@ -599,6 +656,23 @@ onMounted(async () => {
 
 .recent-meta {
   margin-top: 2px;
+}
+
+.recent-progress {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.recent-progress__text {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.progress--compact {
+  height: 6px;
 }
 
 .status {

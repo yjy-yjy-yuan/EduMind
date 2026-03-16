@@ -13,6 +13,7 @@
 
     <div class="status-row">
       <span class="badge">{{ useMockPlayer ? 'UI ONLY' : 'LIVE' }}</span>
+      <span v-if="videoStatusText" class="badge badge--status">{{ videoStatusText }}</span>
       <span class="muted">{{ playerStateText }}</span>
       <span v-if="durationText" class="muted">{{ durationText }}</span>
     </div>
@@ -85,6 +86,18 @@ const useMockPlayer = computed(() => shouldUseMockApi())
 const streamUrl = computed(() => withBase(`/api/videos/${id.value}/stream`))
 const subtitleUrl = computed(() => (useMockPlayer.value ? '' : withBase(`/api/videos/${id.value}/subtitle?format=vtt`)))
 const posterUrl = computed(() => (useMockPlayer.value ? '' : withBase(`/api/videos/${id.value}/preview`)))
+const videoStatus = computed(() => String(videoMeta.value?.status || '').trim().toLowerCase())
+const videoStatusText = computed(() => {
+  const map = {
+    uploaded: '已上传',
+    pending: '排队中',
+    processing: '处理中',
+    completed: '已完成',
+    failed: '处理失败',
+    downloading: '下载中'
+  }
+  return map[videoStatus.value] || ''
+})
 const playerStateText = computed(() => playerState.value)
 const durationText = computed(() => {
   const seconds = Number(durationSeconds.value || videoMeta.value?.duration || 0)
@@ -103,6 +116,9 @@ const tipText = computed(() => {
   }
   if (pageError.value) {
     return '播放器已切到真实接口。若仍失败，优先检查后端地址、同一 Wi‑Fi、MySQL 是否可连、以及该视频是否已处理完成。'
+  }
+  if (['pending', 'processing'].includes(videoStatus.value)) {
+    return '当前播放原始视频文件，后台仍在处理字幕与分析结果；处理完成后无需重新上传。'
   }
   return '真机播放依赖 FastAPI 视频流接口和 iOS WebView 媒体配置，当前页面已启用原生 controls、inline 播放和字幕轨。'
 })
@@ -245,6 +261,11 @@ onMounted(loadVideoMeta)
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.04em;
+}
+
+.badge--status {
+  background: rgba(15, 118, 110, 0.12);
+  color: #0f766e;
 }
 
 .muted {

@@ -77,13 +77,19 @@
 
 - 本机开发默认：
   - 前端调试地址：Vite dev server
-  - 后端地址：`http://127.0.0.1:2004`
+  - 后端地址：`http://127.0.0.1:<backend_fastapi/.env 的 PORT>`
 - 真机调试默认：
-  - 后端地址：`http://<Mac局域网IP>:2004`
+  - 后端地址：`http://<Mac LocalHostName>.local:<backend_fastapi/.env 的 PORT>`
 
 ### 2. 后端端口是唯一真实能力入口
 
 所有上传、处理、状态查询、字幕查询、视频详情、问答等请求，都必须走 `backend_fastapi` 端口。
+
+### 2.1 真机默认地址必须跟随后端端口
+
+- 修改 `backend_fastapi/.env` 中的 `PORT` 后，执行 `bash ios-app/sync_ios_web_assets.sh`
+- 同步脚本必须将 iOS 原生默认后端地址刷新为 `http://<Mac LocalHostName>.local:<PORT>`
+- 不允许继续手工在多个页面、多个文档、多个原生配置里散落改端口
 
 ### 3. UI-only 只能作为临时占位
 

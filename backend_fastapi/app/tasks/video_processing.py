@@ -1,6 +1,5 @@
 """
 视频处理后台任务 - FastAPI 版本
-使用 ProcessPoolExecutor 替代 Celery
 
 主要功能：
 1. 视频预览图生成
@@ -13,11 +12,16 @@ import gc
 import logging
 import os
 import subprocess
+import threading
 import time
 
 from sqlalchemy import inspect
 
 logger = logging.getLogger(__name__)
+
+TRANSCRIPTION_PROGRESS_START = 60.0
+TRANSCRIPTION_PROGRESS_END = 84.0
+TRANSCRIPTION_POLL_SECONDS = 2.0
 
 
 def get_device():
@@ -53,6 +57,33 @@ def clear_gpu_cache():
     except Exception as e:
         logger.warning(f"清理 GPU 缓存时出错: {str(e)}")
     gc.collect()
+
+
+def format_elapsed_label(seconds: float) -> str:
+    total = max(0, int(seconds))
+    minutes, remain = divmod(total, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours > 0:
+        return f"{hours:02d}:{minutes:02d}:{remain:02d}"
+    return f"{minutes:02d}:{remain:02d}"
+
+
+def estimate_transcription_seconds(duration_seconds: float, model_name: str) -> float:
+    """估算转录耗时，用于提供连续进度反馈。"""
+    duration = max(0.0, float(duration_seconds or 0.0))
+    normalized_model = str(model_name or "").strip().lower()
+
+    multiplier_map = {
+        "tiny": 0.35,
+        "base": 0.55,
+        "small": 0.9,
+        "medium": 1.4,
+        "large": 2.0,
+        "turbo": 0.45,
+    }
+    multiplier = multiplier_map.get(normalized_model, 0.75)
+    estimated = duration * multiplier
+    return max(estimated, 20.0)
 
 
 def generate_video_info(video_path: str) -> dict:
@@ -149,12 +180,32 @@ def extract_audio(video_path: str, audio_path: str) -> bool:
         return False
 
 
-def transcribe_with_whisper(audio_path: str, model_name: str, language: str, model_path: str) -> dict:
+def should_retry_transcribe_on_cpu(device: str, error: Exception) -> bool:
+    if device != "mps":
+        return False
+    message = str(error)
+    fallback_markers = (
+        "SparseMPS",
+        "sparse_coo_tensor",
+        "not implemented for the 'MPS' backend",
+        "Could not run",
+    )
+    return any(marker in message for marker in fallback_markers)
+
+
+def transcribe_with_whisper(
+    audio_path: str,
+    model_name: str,
+    language: str,
+    model_path: str,
+    *,
+    force_device: str = "",
+) -> dict:
     """使用 Whisper 转录音频"""
+    device = force_device or get_device()
     try:
         import whisper
 
-        device = get_device()
         logger.info(f"加载 Whisper 模型: {model_name} (设备: {device})")
 
         # 加载模型
@@ -182,7 +233,57 @@ def transcribe_with_whisper(audio_path: str, model_name: str, language: str, mod
     except Exception as e:
         logger.error(f"转录失败: {str(e)}")
         clear_gpu_cache()
+        if should_retry_transcribe_on_cpu(device, e):
+            logger.warning("MPS 转录失败，自动切换到 CPU 重试 | model=%s", model_name)
+            return transcribe_with_whisper(
+                audio_path,
+                model_name,
+                language,
+                model_path,
+                force_device="cpu",
+            )
         return None
+
+
+def transcribe_with_live_progress(
+    *,
+    video_id: int,
+    audio_path: str,
+    model_name: str,
+    language: str,
+    model_path: str,
+    duration_seconds: float,
+):
+    """执行 Whisper 转录，并在长阶段内持续回写进度。"""
+    result_holder = {"result": None, "error": None}
+    estimated_seconds = estimate_transcription_seconds(duration_seconds, model_name)
+    started_at = time.time()
+
+    def worker():
+        try:
+            result_holder["result"] = transcribe_with_whisper(audio_path, model_name, language, model_path)
+        except Exception as exc:  # pragma: no cover - 保护线程内异常
+            result_holder["error"] = exc
+
+    thread = threading.Thread(target=worker, name=f"whisper-transcribe-{video_id}", daemon=True)
+    thread.start()
+
+    update_video_status(video_id, "processing", 62.0, "语音识别中")
+
+    while thread.is_alive():
+        elapsed = time.time() - started_at
+        progress_ratio = min(elapsed / estimated_seconds, 1.0)
+        progress = TRANSCRIPTION_PROGRESS_START + (TRANSCRIPTION_PROGRESS_END - TRANSCRIPTION_PROGRESS_START) * progress_ratio
+        step = f"语音识别中（已运行 {format_elapsed_label(elapsed)}）"
+        update_video_status(video_id, "processing", round(min(progress, TRANSCRIPTION_PROGRESS_END), 1), step)
+        thread.join(timeout=TRANSCRIPTION_POLL_SECONDS)
+
+    thread.join()
+
+    if result_holder["error"] is not None:
+        raise result_holder["error"]
+
+    return result_holder["result"]
 
 
 def save_subtitles(result: dict, srt_path: str, txt_path: str):
@@ -303,7 +404,7 @@ def update_video_status(video_id: int, status: str, progress: float, step: str, 
 
 def process_video_task(video_id: int, language: str = "zh", model: str = "base"):
     """
-    视频处理任务（在 ProcessPoolExecutor 中执行）
+    视频处理任务（在后台执行器中执行）
 
     Args:
         video_id: 视频ID
@@ -429,11 +530,18 @@ def process_video_task(video_id: int, language: str = "zh", model: str = "base")
             logger.warning("音频提取失败，使用原视频文件")
 
         # Step 4: 转录 (60-85%)
-        video.process_progress = 60.0
-        video.current_step = f"加载 {model} 模型"
+        video.process_progress = TRANSCRIPTION_PROGRESS_START
+        video.current_step = f"准备语音识别（{model}）"
         db.commit()
 
-        result = transcribe_with_whisper(input_file, model, language, settings.WHISPER_MODEL_PATH)
+        result = transcribe_with_live_progress(
+            video_id=video_id,
+            audio_path=input_file,
+            model_name=model,
+            language=language,
+            model_path=settings.WHISPER_MODEL_PATH,
+            duration_seconds=video.duration or 0.0,
+        )
 
         if not result:
             video.status = VideoStatus.FAILED

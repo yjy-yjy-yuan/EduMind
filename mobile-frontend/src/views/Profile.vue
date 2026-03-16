@@ -21,8 +21,8 @@
 
     <div class="card card--muted">
       <div class="card-title">开发设置</div>
-      <p class="muted" style="margin: 0 0 8px; font-size: 12px;">换 Wi‑Fi 或换地点后若请求失败，可在此填写当前后端地址（如 http://192.168.1.10:2004）</p>
-      <input v-model.trim="apiBaseInput" class="input" placeholder="http://127.0.0.1:2004" style="margin-bottom: 8px;" />
+      <p class="muted" style="margin: 0 0 8px; font-size: 12px;">真机默认会优先使用原生注入的后端地址。若你修改了后端地址或端口，可在此覆盖当前值（例如 {{ suggestedApiBase }}）。</p>
+      <input v-model.trim="apiBaseInput" class="input" :placeholder="apiBasePlaceholder" style="margin-bottom: 8px;" />
       <button class="btn btn--small" @click="saveApiBase" :disabled="saving">{{ saving ? '已保存' : '保存后端地址' }}</button>
     </div>
 
@@ -44,6 +44,15 @@ const loading = ref(false)
 const error = ref('')
 
 const avatarText = computed(() => String(state.value.user?.username || 'U').slice(0, 1).toUpperCase())
+const suggestedApiBase = computed(() => {
+  try {
+    const nativeValue = window.__edumindNativeConfig?.apiBaseUrl
+    return apiBaseInput.value || getApiBaseUrl() || (nativeValue ? String(nativeValue).trim() : '') || 'http://<Mac主机名>.local:<后端端口>'
+  } catch {
+    return apiBaseInput.value || getApiBaseUrl() || 'http://<Mac主机名>.local:<后端端口>'
+  }
+})
+const apiBasePlaceholder = computed(() => suggestedApiBase.value || 'http://<Mac主机名>.local:<后端端口>')
 const go = (path) => router.push(path)
 
 const refresh = async () => {

@@ -5,14 +5,45 @@ import os
 from contextlib import asynccontextmanager
 
 from app.core.config import settings
+from app.core.database import SessionLocal
 from app.core.database import engine
 from app.models.base import Base
+from app.models.video import Video
+from app.models.video import VideoStatus
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # 配置日志
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+
+def recover_interrupted_video_tasks():
+    """将服务重启前中断的后台任务转为失败，避免状态永久卡住。"""
+    db = SessionLocal()
+    try:
+        interrupted_statuses = [VideoStatus.PENDING, VideoStatus.PROCESSING, VideoStatus.DOWNLOADING]
+        interrupted_videos = db.query(Video).filter(Video.status.in_(interrupted_statuses)).all()
+        if not interrupted_videos:
+            return
+
+        for video in interrupted_videos:
+            previous_status = video.status
+            video.status = VideoStatus.FAILED
+            video.process_progress = 0.0
+            video.error_message = "服务重启后检测到后台任务已中断，请重新提交处理。"
+            if previous_status == VideoStatus.DOWNLOADING:
+                video.current_step = "下载任务已中断，请重新提交"
+            else:
+                video.current_step = "处理任务已中断，请重新提交"
+
+        db.commit()
+        logger.warning("已恢复中断的视频任务 | count=%s", len(interrupted_videos))
+    except Exception as exc:
+        db.rollback()
+        logger.error("恢复中断的视频任务失败 | error=%s", exc)
+    finally:
+        db.close()
 
 
 @asynccontextmanager
@@ -26,6 +57,8 @@ async def lifespan(app: FastAPI):
         logger.info("数据库表创建成功")
     else:
         logger.info("已跳过自动建表；如需初始化数据库，请运行 backend_fastapi/scripts/init_db.py")
+
+    recover_interrupted_video_tasks()
 
     # 确保上传目录存在
     os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)

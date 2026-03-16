@@ -42,6 +42,10 @@
         <div class="bar" :style="{ width: `${progressValue}%` }"></div>
       </div>
 
+      <div v-if="canOpenPlayerWhileProcessing" class="inline-tip">
+        后台处理中仍可进入播放器，当前播放原始视频文件。
+      </div>
+
       <div v-if="video.summary" class="block">
         <div class="block-title">摘要</div>
         <div class="block-body">{{ video.summary }}</div>
@@ -49,7 +53,7 @@
 
       <div class="actions">
         <button class="btn" @click="startProcess" :disabled="processDisabled">开始处理</button>
-        <button class="btn btn--primary" @click="play" :disabled="!canPlay">播放</button>
+        <button class="btn btn--primary" @click="play" :disabled="!canOpenPlayerWhileProcessing">{{ playLabel }}</button>
         <button class="btn" @click="qa">问答</button>
       </div>
 
@@ -69,7 +73,6 @@ import { shouldUseMockApi } from '@/config'
 import { deleteVideo, getVideo, getVideoStatus, processVideo } from '@/api/video'
 import {
   canAutoStartVideoProcessing,
-  canPlayVideo,
   canRetryVideoProcessing,
   createFixedIntervalPoller,
   isActiveVideoStatus,
@@ -101,8 +104,12 @@ const heroInitial = computed(() => String(video.value?.title || 'V').trim().slic
 const isInProgress = isActiveVideoStatus
 const statusText = videoStatusText
 
-const canPlay = computed(() => canPlayVideo(statusValue.value))
 const canRetry = computed(() => canRetryVideoProcessing(statusValue.value))
+const canOpenPlayerWhileProcessing = computed(() => {
+  const normalizedStatus = normalizeVideoStatus(statusValue.value)
+  return Boolean(video.value?.filepath) && normalizedStatus !== 'downloading'
+})
+const playLabel = computed(() => (isInProgress(statusValue.value) ? '播放原视频' : '播放'))
 const processDisabled = computed(
   () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(normalizeVideoStatus(statusValue.value))
 )
@@ -261,7 +268,7 @@ const retryProcess = async () => {
 }
 
 const play = () => {
-  if (!canPlay.value) return
+  if (!canOpenPlayerWhileProcessing.value) return
   router.push(`/player/${id.value}`)
 }
 
@@ -516,6 +523,13 @@ onUnmounted(() => statusPoller?.stop())
 .bar {
   height: 100%;
   background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.inline-tip {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .block {
