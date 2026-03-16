@@ -169,3 +169,24 @@
 - 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：新增 `AUTO_CREATE_TABLES=false` 默认配置，关闭启动时自动建表，避免运行服务时擅自变更现有 MySQL 表结构。
 - 更新 [`backend_fastapi/app/models/user.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/user.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：密码哈希显式固定为 `pbkdf2:sha256`，兼容当前 Python 运行时；删除视频时若进程池不可用则回退为同步清理，避免测试和受限环境直接报错。
 - 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)、[`backend_fastapi/tests/unit/test_video_processing_task.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_processing_task.py)：补充自动提交处理任务与转录结果落库测试，覆盖 `videos/subtitles` 现有表的写回行为。
+### 2026-03-15 真机视频播放链路修复
+
+- `backend_fastapi` 视频流接口补充 `Range` 支持，适配 iOS `WKWebView` 的分段加载、拖动和断点请求。
+- `mobile-frontend` 新增真实视频播放页状态展示与重载能力；只要配置了后端地址，视频相关接口会优先走 FastAPI，不再被 UI-only mock 固定拦截。
+- `ios-app` 的 `WKWebView` 开启 inline media playback / AirPlay / PiP，并放开 Web 内容本地网络访问策略，保证真机可通过局域网地址访问 FastAPI 视频流。
+- `ios-app` 新增 `EDUMIND_API_BASE_URL` 原生注入；H5 启动时会自动读取并保存默认后端地址，避免真机首次安装仍停留在 `UI ONLY` 页面。
+- 修正本地真机联调配置：`backend_fastapi/.env` 改为监听 `0.0.0.0`、修复 MySQL `DATABASE_URL` 格式、允许 `Origin: null`；iOS 默认后端地址从易变的 IP 改为 `.local` 主机名。
+- MySQL 认证补充 `cryptography` 依赖，兼容 `sha256_password` / `caching_sha2_password`；播放器页改为优先展示后端返回的明确错误，方便定位数据库或视频接口异常。
+
+## 2026-03-16
+
+### MySQL 受控重建脚本与 Navicat 导入 SQL
+
+- 更新 [`backend_fastapi/scripts/init_db.py`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/init_db.py)：将数据库脚本改为只管理当前 FastAPI 实际使用的 6 张业务表（`users`、`videos`、`notes`、`questions`、`subtitles`、`note_timestamps`），新增 `--create`、`--reset`、`--emit-sql` 能力，支持受控删表重建与 SQL 导出。
+- 新增 [`backend_fastapi/scripts/mysql_managed_schema.sql`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/mysql_managed_schema.sql)：生成可直接在 Navicat 执行的 MySQL 重建脚本，包含 `DROP TABLE IF EXISTS` 与完整 `CREATE TABLE` 语句。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)：补充后端 MySQL 表管理命令、Navicat 导入入口和当前受控表清单。
+- 更新 [`backend_fastapi/.env`](/Users/yuan/final-work/EduMind/backend_fastapi/.env)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`docs/DATABASE_SETUP.md`](/Users/yuan/final-work/EduMind/docs/DATABASE_SETUP.md)：将默认数据库名从 `ai_edvision` 统一调整为项目名 `edumind`，便于在 Navicat 中与项目名称保持一致。
+
+### 数据库配置加载路径修复
+
+- 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)：将 `BaseSettings` 的 `env_file` 改为固定读取 `backend_fastapi/.env` 的绝对路径，避免从仓库根目录执行脚本时退回默认 `DATABASE_URL`（`root:password`）导致 MySQL `1045 Access denied`。

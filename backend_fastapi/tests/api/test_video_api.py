@@ -54,6 +54,42 @@ class TestVideoAPI:
         assert "status" in data
         assert "progress" in data
 
+    def test_stream_video_file_supports_full_content(self, client, db, sample_video, tmp_path):
+        """测试视频全量流接口"""
+        content = b"0123456789abcdef"
+        video_path = tmp_path / "stream-full.mp4"
+        video_path.write_bytes(content)
+
+        sample_video.filepath = str(video_path)
+        sample_video.filename = "stream-full.mp4"
+        db.commit()
+
+        response = client.get(f"/api/videos/{sample_video.id}/stream")
+        assert response.status_code == 200
+        assert response.content == content
+        assert response.headers["accept-ranges"] == "bytes"
+        assert response.headers["content-length"] == str(len(content))
+
+    def test_stream_video_file_supports_range_requests(self, client, db, sample_video, tmp_path):
+        """测试视频流接口支持 Range，便于 iOS 播放器拖动和断点加载"""
+        content = b"0123456789abcdef"
+        video_path = tmp_path / "stream-range.mp4"
+        video_path.write_bytes(content)
+
+        sample_video.filepath = str(video_path)
+        sample_video.filename = "stream-range.mp4"
+        db.commit()
+
+        response = client.get(
+            f"/api/videos/{sample_video.id}/stream",
+            headers={"Range": "bytes=2-7"},
+        )
+        assert response.status_code == 206
+        assert response.content == content[2:8]
+        assert response.headers["accept-ranges"] == "bytes"
+        assert response.headers["content-range"] == f"bytes 2-7/{len(content)}"
+        assert response.headers["content-length"] == "6"
+
     def test_upload_video_file(self, client, db, tmp_path, monkeypatch):
         """测试本地视频上传"""
         from app.core.config import settings

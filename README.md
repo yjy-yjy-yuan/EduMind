@@ -81,6 +81,51 @@ bash ios-app/sync_ios_web_assets.sh
 1. 构建 `mobile-frontend`
 2. 将最新 `dist/` 同步到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
 
+## MySQL 表管理
+
+当前后端显式管理的业务表只有 6 张：
+
+1. `users`
+2. `videos`
+3. `notes`
+4. `questions`
+5. `subtitles`
+6. `note_timestamps`
+
+查看当前脚本管理的表结构：
+
+```bash
+. .venv/bin/activate
+python backend_fastapi/scripts/init_db.py --info
+```
+
+只补创建缺失表，不删除现有数据：
+
+```bash
+. .venv/bin/activate
+python backend_fastapi/scripts/init_db.py --create
+```
+
+删除并重建当前后端管理的表：
+
+```bash
+. .venv/bin/activate
+python backend_fastapi/scripts/init_db.py --reset
+```
+
+导出可直接在 Navicat 执行的 MySQL SQL：
+
+```bash
+. .venv/bin/activate
+python backend_fastapi/scripts/init_db.py --emit-sql backend_fastapi/scripts/mysql_managed_schema.sql
+```
+
+默认导出的 SQL 文件位置：
+
+- [`backend_fastapi/scripts/mysql_managed_schema.sql`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/mysql_managed_schema.sql)
+
+当前默认数据库名已统一为 `edumind`。
+
 ## 测试
 
 ```bash

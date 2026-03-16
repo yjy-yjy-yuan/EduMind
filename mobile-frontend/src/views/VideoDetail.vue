@@ -22,10 +22,10 @@
     <div v-else class="card">
       <div class="hero">
         <div class="hero-shell" :class="heroClass">
-          <div class="hero-shell__badge">{{ UI_ONLY_MODE ? 'UI ONLY' : 'LIVE' }}</div>
+          <div class="hero-shell__badge">{{ usingMockGateway ? 'UI ONLY' : 'LIVE' }}</div>
           <div class="hero-shell__initial">{{ heroInitial }}</div>
           <div class="hero-shell__caption">
-            {{ UI_ONLY_MODE ? '当前阶段仅构建界面，封面与播放器资源后续通过预留接口接入。' : '视频预览由后端接口提供。' }}
+            {{ usingMockGateway ? '当前阶段仅构建界面，封面与播放器资源后续通过预留接口接入。' : '视频预览与播放资源由后端接口提供。' }}
           </div>
         </div>
       </div>
@@ -65,7 +65,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { UI_ONLY_MODE } from '@/config'
+import { shouldUseMockApi } from '@/config'
 import { deleteVideo, getVideo, getVideoStatus, processVideo } from '@/api/video'
 import {
   canAutoStartVideoProcessing,
@@ -91,6 +91,7 @@ const autoStarting = ref(false)
 const retrying = ref(false)
 
 let statusPoller = null
+const usingMockGateway = computed(() => shouldUseMockApi())
 
 const statusValue = computed(() => statusInfo.value.status || video.value?.status || '')
 const progressValue = computed(() => Number(statusInfo.value.progress ?? 0) || 0)

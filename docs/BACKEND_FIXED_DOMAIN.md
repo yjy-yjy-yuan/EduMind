@@ -135,3 +135,19 @@ server {
 - **固定域名**：后端通过域名（如 `https://api.yourdomain.com`）对外提供服务，前端构建时将该地址写入 `VITE_MOBILE_API_BASE_URL`。  
 - **可实行步骤**：后端部署 + Nginx（可选）+ `.env` 的 CORS/HOST；前端 `.env.production` + 构建命令；验收时换网络验证。  
 - **提示词**：见上文第六节，复制给 AI 或执行者即可按文档落实配置与示例，无需改业务代码。
+
+---
+
+## 八、MacBook 本地开发的无 IP 方案
+
+如果当前阶段仍然是“MacBook 跑 `backend_fastapi`，iPhone 真机调试”，又不想继续依赖局域网 IP，可分成两档：
+
+1. 同一局域网内稳定：
+   - 直接使用 macOS 的 `LocalHostName.local`
+   - 例如本机名为 `yuandeMacBook-Pro`，则地址可写为 `http://yuandeMacBook-Pro.local:2004`
+   - 后端必须监听 `0.0.0.0`，并允许 `Origin: null`（iOS `WKWebView` 本地资源远程请求通常如此）
+
+2. 跨网络、跨地点完全稳定：
+   - 必须使用固定域名或稳定隧道
+   - 例如 `https://api.edumind.com`
+   - 这是唯一真正意义上“地址完全不变”的方案

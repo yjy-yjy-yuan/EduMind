@@ -106,6 +106,12 @@ private enum WebAssets {
 }
 
 private struct H5WebView: UIViewRepresentable {
+    private static let nativeConfigScript = """
+        (function() {
+          window.__edumindNativeConfig = Object.assign({}, window.__edumindNativeConfig || {}, \(nativeConfigJSONString()));
+        })();
+    """
+
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
@@ -113,7 +119,16 @@ private struct H5WebView: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        configuration.allowsInlineMediaPlayback = true
+        configuration.allowsAirPlayForMediaPlayback = true
+        configuration.allowsPictureInPictureMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.userContentController.add(context.coordinator, name: Coordinator.logHandlerName)
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: Self.nativeConfigScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
         configuration.userContentController.addUserScript(WKUserScript(
             source: Coordinator.consoleBridgeScript,
             injectionTime: .atDocumentStart,
@@ -185,6 +200,30 @@ private struct H5WebView: UIViewRepresentable {
 
         webView.loadFileURL(indexURL, allowingReadAccessTo: allowedPath)
         EduMindLog.info("WebView", "loadFileURL requested")
+    }
+
+    private static func nativeConfigJSONString() -> String {
+        let configuredAPIBase = (
+            Bundle.main.object(forInfoDictionaryKey: "EDUMIND_API_BASE_URL") as? String
+        )?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let apiBase = configuredAPIBase.isEmpty ? "http://yuandeMacBook-Pro.local:2004" : configuredAPIBase
+        EduMindLog.info(
+            "WebView",
+            "native api base=\(apiBase) | source=\(configuredAPIBase.isEmpty ? "fallback-local-hostname" : "info-plist")"
+        )
+
+        let payload: [String: String] = [
+            "apiBaseUrl": apiBase
+        ]
+
+        guard
+            let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
+            let text = String(data: data, encoding: .utf8)
+        else {
+            return #"{"apiBaseUrl":""}"#
+        }
+        return text
     }
 
     private func usesLegacyAbsoluteAssetPaths(in html: String) -> Bool {

@@ -3,6 +3,7 @@
 import hashlib
 import json
 import logging
+import mimetypes
 import os
 import re
 import tempfile
@@ -24,6 +25,7 @@ from fastapi import Depends
 from fastapi import File
 from fastapi import HTTPException
 from fastapi import Query
+from fastapi import Request
 from fastapi import UploadFile
 from fastapi.responses import FileResponse
 from fastapi.responses import Response
@@ -36,6 +38,8 @@ router = APIRouter()
 
 ALLOWED_EXTENSIONS = {ext.lower() for ext in settings.ALLOWED_EXTENSIONS}
 UPLOAD_CHUNK_SIZE = 1024 * 1024
+STREAM_CHUNK_SIZE = 1024 * 1024
+BYTE_RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
 
 
 def allowed_file(filename: str) -> bool:
@@ -83,6 +87,75 @@ def resolve_upload_source_value(video: Video) -> Optional[str]:
     if video.url:
         return video.url
     return video.filename
+
+
+def resolve_video_media_type(video: Video) -> str:
+    """根据文件名推断媒体类型，默认回退到 MP4。"""
+    media_type, _ = mimetypes.guess_type(video.filename or video.filepath or "")
+    return media_type or "video/mp4"
+
+
+def parse_byte_range(range_header: Optional[str], file_size: int) -> Optional[tuple[int, int]]:
+    """解析 HTTP Range 头，支持 bytes=start-end 与 bytes=-suffix。"""
+    if not range_header:
+        return None
+
+    match = BYTE_RANGE_RE.fullmatch(range_header.strip())
+    if not match:
+        raise HTTPException(
+            status_code=416,
+            detail="无效的 Range 请求",
+            headers={"Content-Range": f"bytes */{file_size}"},
+        )
+
+    start_text, end_text = match.groups()
+    if not start_text and not end_text:
+        raise HTTPException(
+            status_code=416,
+            detail="无效的 Range 请求",
+            headers={"Content-Range": f"bytes */{file_size}"},
+        )
+
+    if not start_text:
+        suffix_size = int(end_text)
+        if suffix_size <= 0:
+            raise HTTPException(
+                status_code=416,
+                detail="无效的 Range 请求",
+                headers={"Content-Range": f"bytes */{file_size}"},
+            )
+        start = max(file_size - suffix_size, 0)
+        end = file_size - 1
+    else:
+        start = int(start_text)
+        end = int(end_text) if end_text else file_size - 1
+
+    if start < 0 or start >= file_size or end < start:
+        raise HTTPException(
+            status_code=416,
+            detail="无效的 Range 请求",
+            headers={"Content-Range": f"bytes */{file_size}"},
+        )
+
+    return start, min(end, file_size - 1)
+
+
+def iter_file_chunk(filepath: str, start: int = 0, end: Optional[int] = None):
+    """按范围分块读取视频文件，供 StreamingResponse 使用。"""
+    with open(filepath, "rb") as file_obj:
+        file_obj.seek(start)
+        remaining = None if end is None else end - start + 1
+
+        while True:
+            chunk_size = STREAM_CHUNK_SIZE if remaining is None else min(STREAM_CHUNK_SIZE, remaining)
+            if chunk_size <= 0:
+                break
+            chunk = file_obj.read(chunk_size)
+            if not chunk:
+                break
+            yield chunk
+            if remaining is not None:
+                remaining -= len(chunk)
 
 
 def submit_video_processing(
@@ -476,7 +549,7 @@ async def delete_video(video_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{video_id}/stream")
-async def get_video_stream(video_id: int, db: Session = Depends(get_db)):
+async def get_video_stream(video_id: int, request: Request, db: Session = Depends(get_db)):
     """流式传输视频"""
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
@@ -486,16 +559,31 @@ async def get_video_stream(video_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="视频文件不存在")
 
     file_size = os.path.getsize(video.filepath)
+    media_type = resolve_video_media_type(video)
+    byte_range = parse_byte_range(request.headers.get("range"), file_size)
 
-    def iterfile():
-        with open(video.filepath, "rb") as f:
-            while chunk := f.read(8192):
-                yield chunk
+    headers = {"Accept-Ranges": "bytes"}
+    if byte_range is None:
+        headers["Content-Length"] = str(file_size)
+        return StreamingResponse(
+            iter_file_chunk(video.filepath),
+            media_type=media_type,
+            headers=headers,
+        )
 
+    start, end = byte_range
+    content_length = end - start + 1
+    headers.update(
+        {
+            "Content-Length": str(content_length),
+            "Content-Range": f"bytes {start}-{end}/{file_size}",
+        }
+    )
     return StreamingResponse(
-        iterfile(),
-        media_type="video/mp4",
-        headers={"Accept-Ranges": "bytes", "Content-Length": str(file_size)},
+        iter_file_chunk(video.filepath, start=start, end=end),
+        media_type=media_type,
+        status_code=206,
+        headers=headers,
     )
 
 
