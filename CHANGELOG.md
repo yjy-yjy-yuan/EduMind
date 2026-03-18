@@ -7,6 +7,8 @@
 - 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：问答页改为接入后端阶段进度流，新增顶部 AI 进度条与消息内进度条；DeepSeek `先思考再回答` 模式下，用户现在可以明确看到“已提交、检索中、推理中、整理中、已完成”的实时状态，不再只看到空白等待态。
 - 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：补充问答流式阶段进度的实现边界与当前行为说明。
 - 更新 [`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：移除顶部独立进度卡片，仅保留消息内进度；问答输入区取消吸底布局，改为紧跟内容区，避免空页面时输入框被压到最底部；DeepSeek 的“先思考再回答”按钮文案同步改为“深度思考”。
+- 更新 [`backend_fastapi/app/models/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/qa.py)、[`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/app/schemas/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/qa.py)、[`backend_fastapi/scripts/mysql_managed_schema.sql`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/mysql_managed_schema.sql)：视频问答改为按 `user_id + provider + mode + video_id` 做同表隔离；`questions` 表新增 `user_id / provider / mode / model` 作用域字段，视频问答续聊改为优先使用数据库中同一作用域下的历史，避免通义千问与 DeepSeek 在同一视频下串历史；旧未标注记录不会自动混入新 provider 空间。
+- 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：前端视频问答页按 `user + provider + mode + videoId` 切分内存状态与本地缓存，切换通义千问 / DeepSeek 时会分别恢复各自历史，不再共用同一个 `messages` 数组。
 
 ## 2026-03-16
 

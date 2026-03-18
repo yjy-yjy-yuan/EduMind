@@ -4,6 +4,7 @@ import { storageGet } from '@/utils/storage'
 import { mockAskQuestion } from '@/api/mockGateway'
 
 export function askQuestion({
+  user_id,
   question,
   video_id,
   mode = 'free',
@@ -13,12 +14,12 @@ export function askQuestion({
   history = []
 }) {
   if (shouldUseMockApi()) {
-    return mockAskQuestion({ question, video_id, mode, provider, model, deep_thinking, history, stream: false })
+    return mockAskQuestion({ user_id, question, video_id, mode, provider, model, deep_thinking, history, stream: false })
   }
   return request({
     url: '/api/qa/ask',
     method: 'post',
-    data: { question, video_id, mode, provider, model, deep_thinking, history, stream: false }
+    data: { user_id, question, video_id, mode, provider, model, deep_thinking, history, stream: false }
   })
 }
 
@@ -108,10 +109,10 @@ const dispatchMockStream = async (payload, onEvent) => {
 }
 
 export async function askQuestionStream(
-  { question, video_id, mode = 'free', provider = 'qwen', model = '', deep_thinking = false, history = [] },
+  { user_id, question, video_id, mode = 'free', provider = 'qwen', model = '', deep_thinking = false, history = [] },
   { onEvent } = {}
 ) {
-  const payload = { question, video_id, mode, provider, model, deep_thinking, history, stream: true }
+  const payload = { user_id, question, video_id, mode, provider, model, deep_thinking, history, stream: true }
 
   if (shouldUseMockApi()) {
     return dispatchMockStream(payload, onEvent)
@@ -184,4 +185,25 @@ export async function askQuestionStream(
   }
 
   return finalEvent
+}
+
+export function getQuestionHistory({ user_id, video_id, provider, mode = 'video' }) {
+  if (shouldUseMockApi()) {
+    return Promise.resolve({
+      data: {
+        message: 'UI 模式历史为空',
+        total: 0,
+        questions: [],
+        messages: []
+      },
+      status: 200,
+      headers: { 'x-edumind-ui-only': 'true' }
+    })
+  }
+
+  return request({
+    url: `/api/qa/history/${video_id}`,
+    method: 'get',
+    params: { user_id, provider, mode }
+  })
 }

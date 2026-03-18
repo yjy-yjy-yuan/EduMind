@@ -133,12 +133,12 @@ POST /api/videos/{video_id}/generate-tags
 2. 选择 `DeepSeek` 进行在线问答
 3. 当选择 `DeepSeek` 时，可进一步切换：
 4. `直接回答`：优先返回速度
-5. `先思考再回答`：优先多步推理质量，通常更慢
+5. `深度思考`：优先多步推理质量，通常更慢
 
 当前 `DeepSeek` 的两种模式分别对应：
 
 1. `直接回答` -> `deepseek-chat`
-2. `先思考再回答` -> `deepseek-reasoner`
+2. `深度思考` -> `deepseek-reasoner`
 
 当前问答页在真实后端模式下还会显示阶段进度，便于区分“还在推理中”还是“已经完成回答”。`POST /api/qa/ask` 在传入 `stream=true` 时会按顺序返回可解析的进度事件，当前至少包含：
 
@@ -147,6 +147,13 @@ POST /api/videos/{video_id}/generate-tags
 3. `reasoning` / `answering`：正在调用 DeepSeek 或通义千问
 4. `organizing`：正在整理回答与引用片段
 5. `completed`：最终回答已生成
+
+当前视频问答还按 `user_id + provider + mode + video_id` 做了空间隔离：
+
+1. 切到 `通义千问` 时，只恢复并续写通义千问自己的视频问答历史
+2. 切到 `DeepSeek` 时，只恢复并续写 DeepSeek 自己的视频问答历史
+3. 同一 `videoId` 下，两种 provider 的历史不会再混用
+4. 服务端在视频问答模式下会优先使用数据库中同一作用域下的历史，而不是信任前端传来的混合 history
 
 当前问答提供方只支持：
 
@@ -175,6 +182,7 @@ QA_MAX_HISTORY_CHARS=2200
 1. 当前通义千问链路已经可用，`OPENAI_*` 与 `QWEN_*` 都是为 Qwen 的 OpenAI 兼容接口准备的兼容变量。
 2. 若要使用 DeepSeek，至少需要补齐 `DEEPSEEK_API_KEY`。
 3. 若希望默认问答走 DeepSeek，可将 `QA_DEFAULT_PROVIDER` 改为 `deepseek`。
+4. 如果你已经在使用现有 MySQL `questions` 表，需要手工补齐 `user_id / provider / mode / model` 字段后再启动新版本后端；旧数据若没有这些字段值，会继续保留为 legacy 记录，不会自动混入新的 provider 隔离空间。
 
 ## MySQL 表管理
 

@@ -83,13 +83,14 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { askQuestionStream } from '@/api/qa'
-import { storageGet, storageSet } from '@/utils/storage'
+import { askQuestionStream, getQuestionHistory } from '@/api/qa'
+import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
 const QA_PROVIDER_KEY = 'm_qa_provider'
 const DEEPSEEK_ANSWER_MODE_KEY = 'm_deepseek_answer_mode'
+const QA_SPACE_CACHE_PREFIX = 'm_qa_space'
 const PROVIDER_OPTIONS = Object.freeze([
   { value: 'qwen', label: '通义千问' },
   { value: 'deepseek', label: 'DeepSeek' }
@@ -98,6 +99,15 @@ const DEEPSEEK_ANSWER_MODE_OPTIONS = Object.freeze([
   { value: 'direct', label: '直接回答' },
   { value: 'reasoning', label: '深度思考' }
 ])
+
+const parseJSON = (text, fallback = null) => {
+  if (!text) return fallback
+  try {
+    return JSON.parse(text)
+  } catch {
+    return fallback
+  }
+}
 
 const normalizeProvider = (value) => {
   const text = String(value || '').trim().toLowerCase()
@@ -109,18 +119,115 @@ const normalizeDeepSeekAnswerMode = (value) => {
   return DEEPSEEK_ANSWER_MODE_OPTIONS.some((item) => item.value === text) ? text : 'direct'
 }
 
+const normalizeProgress = (value) => {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return 0
+  return Math.max(0, Math.min(100, Math.round(num)))
+}
+
+const normalizeReferences = (value) => {
+  if (!Array.isArray(value)) return []
+  return value.map((item, index) => ({
+    index: Number(item?.index || index + 1),
+    source_type: String(item?.source_type || ''),
+    label: String(item?.label || ''),
+    time_range: String(item?.time_range || ''),
+    preview: String(item?.preview || '')
+  }))
+}
+
+const normalizeMessage = (item) => {
+  const role = item?.role === 'assistant' ? 'ai' : String(item?.role || 'user')
+  return {
+    role: role === 'ai' ? 'ai' : 'user',
+    text: String(item?.text || item?.content || ''),
+    providerLabel: String(item?.providerLabel || item?.provider_label || ''),
+    model: String(item?.model || ''),
+    references: normalizeReferences(item?.references),
+    loading: Boolean(item?.loading),
+    statusText: String(item?.statusText || item?.status_text || ''),
+    progress: typeof item?.progress === 'undefined' ? undefined : normalizeProgress(item.progress)
+  }
+}
+
+const normalizeMessageList = (items) => {
+  if (!Array.isArray(items)) return []
+  return items
+    .map((item) => normalizeMessage(item))
+    .filter((item) => item.role && (item.text || item.loading || item.statusText))
+}
+
+const stripMessageForCache = (item) => {
+  const normalized = normalizeMessage(item)
+  if (normalized.role === 'ai' && normalized.loading) return null
+  return {
+    role: normalized.role,
+    text: normalized.text,
+    providerLabel: normalized.providerLabel,
+    model: normalized.model,
+    references: normalized.references
+  }
+}
+
+const resolveCurrentUserId = () => {
+  const user = parseJSON(storageGet('m_user'), null)
+  const numericId = Number(user?.id)
+  return Number.isInteger(numericId) && numericId > 0 ? numericId : null
+}
+
+const buildQaSpaceCacheKey = ({ userId, provider, videoId, mode }) => {
+  const scopeUser = userId == null ? 'anon' : `user_${userId}`
+  const scopeVideo = videoId == null ? 'video_none' : `video_${videoId}`
+  return `${QA_SPACE_CACHE_PREFIX}:${mode}:${scopeUser}:${scopeVideo}:${provider}`
+}
+
 const route = useRoute()
 const router = useRouter()
-const videoId = computed(() => route.query.videoId || '')
+const rawVideoId = computed(() => route.query.videoId || '')
+const videoId = computed(() => rawVideoId.value)
+const normalizedVideoId = computed(() => {
+  const numericId = Number(rawVideoId.value)
+  return Number.isInteger(numericId) && numericId > 0 ? numericId : null
+})
+const currentMode = computed(() => (normalizedVideoId.value ? 'video' : 'free'))
+const currentUserId = computed(() => resolveCurrentUserId())
 
 const chatRef = ref(null)
 const question = ref('')
 const asking = ref(false)
-const messages = ref([])
 const provider = ref(normalizeProvider(storageGet(QA_PROVIDER_KEY)))
 const deepSeekAnswerMode = ref(normalizeDeepSeekAnswerMode(storageGet(DEEPSEEK_ANSWER_MODE_KEY)))
 const isDeepSeekProvider = computed(() => provider.value === 'deepseek')
 const deepThinkingEnabled = computed(() => isDeepSeekProvider.value && deepSeekAnswerMode.value === 'reasoning')
+const messageSpaces = ref({})
+const remoteHydratedSpaces = ref({})
+let historyRestoreSequence = 0
+
+const currentSpaceKey = computed(() =>
+  buildQaSpaceCacheKey({
+    userId: currentUserId.value,
+    provider: provider.value,
+    videoId: normalizedVideoId.value,
+    mode: currentMode.value
+  })
+)
+
+const ensureSpaceMessages = (spaceKey) => {
+  if (!Array.isArray(messageSpaces.value[spaceKey])) {
+    messageSpaces.value[spaceKey] = []
+  }
+  return messageSpaces.value[spaceKey]
+}
+
+const messages = computed({
+  get() {
+    return ensureSpaceMessages(currentSpaceKey.value)
+  },
+  set(next) {
+    messageSpaces.value[currentSpaceKey.value] = Array.isArray(next) ? next : []
+  }
+})
+
 const shouldRenderChat = computed(() => messages.value.length > 0)
 
 const scrollToBottom = async () => {
@@ -129,17 +236,26 @@ const scrollToBottom = async () => {
   if (el) el.scrollTop = el.scrollHeight
 }
 
-const normalizeProgress = (value) => {
-  const num = Number(value)
-  if (!Number.isFinite(num)) return 0
-  return Math.max(0, Math.min(100, Math.round(num)))
+const loadCachedSpaceMessages = (spaceKey) => {
+  return normalizeMessageList(parseJSON(storageGet(spaceKey), []))
+}
+
+const persistSpaceMessages = (spaceKey = currentSpaceKey.value) => {
+  const currentMessages = ensureSpaceMessages(spaceKey)
+  const cachedMessages = currentMessages
+    .map((item) => stripMessageForCache(item))
+    .filter(Boolean)
+  storageSet(spaceKey, JSON.stringify(cachedMessages))
 }
 
 const buildHistoryPayload = () => {
-  return messages.value.slice(-8).map((item) => ({
-    role: item.role === 'ai' ? 'assistant' : 'user',
-    content: String(item.text || '')
-  }))
+  return messages.value
+    .filter((item) => !item.loading)
+    .slice(-8)
+    .map((item) => ({
+      role: item.role === 'ai' ? 'assistant' : 'user',
+      content: String(item.text || '')
+    }))
 }
 
 const extractErrorMessage = (err, fallback) => {
@@ -153,6 +269,45 @@ const extractErrorMessage = (err, fallback) => {
   const text = err?.response?.data?.message || err?.response?.data?.msg
   if (typeof text === 'string' && text.trim()) return text.trim()
   return err?.message || fallback
+}
+
+const restoreCurrentSpace = async () => {
+  const spaceKey = currentSpaceKey.value
+  const requestId = ++historyRestoreSequence
+  if (!Array.isArray(messageSpaces.value[spaceKey])) {
+    messageSpaces.value[spaceKey] = loadCachedSpaceMessages(spaceKey)
+  }
+
+  if (remoteHydratedSpaces.value[spaceKey]) {
+    await scrollToBottom()
+    return
+  }
+
+  if (currentMode.value !== 'video' || normalizedVideoId.value == null || currentUserId.value == null) {
+    await scrollToBottom()
+    return
+  }
+
+  try {
+    const res = await getQuestionHistory({
+      user_id: currentUserId.value,
+      video_id: normalizedVideoId.value,
+      provider: provider.value,
+      mode: currentMode.value
+    })
+    if (requestId !== historyRestoreSequence || spaceKey !== currentSpaceKey.value) return
+
+    const payload = res.data || {}
+    messageSpaces.value[spaceKey] = normalizeMessageList(payload.messages)
+    remoteHydratedSpaces.value[spaceKey] = true
+    persistSpaceMessages(spaceKey)
+  } catch (error) {
+    if (requestId !== historyRestoreSequence || spaceKey !== currentSpaceKey.value) return
+  } finally {
+    if (requestId === historyRestoreSequence && spaceKey === currentSpaceKey.value) {
+      await scrollToBottom()
+    }
+  }
 }
 
 const selectProvider = (value) => {
@@ -191,7 +346,7 @@ const applyStreamEventToMessage = async (message, event) => {
 
   if (event.provider_label) message.providerLabel = String(event.provider_label)
   if (event.model) message.model = String(event.model)
-  if (Array.isArray(event.references)) message.references = event.references
+  if (Array.isArray(event.references)) message.references = normalizeReferences(event.references)
   if (typeof event.progress !== 'undefined') message.progress = normalizeProgress(event.progress)
 
   if (event.type === 'answer') {
@@ -199,6 +354,7 @@ const applyStreamEventToMessage = async (message, event) => {
     message.statusText = String(event.message || '回答已完成')
     message.progress = 100
     message.text = String(event.answer || '（无返回内容）')
+    remoteHydratedSpaces.value[currentSpaceKey.value] = true
   } else if (event.type === 'error') {
     message.loading = false
     message.statusText = String(event.message || '回答失败')
@@ -217,18 +373,19 @@ const send = async () => {
   const q = question.value
   const historyPayload = buildHistoryPayload()
   question.value = ''
-  messages.value.push({ role: 'user', text: q })
+  messages.value = [...messages.value, { role: 'user', text: q }]
   const pendingAiMessage = buildPendingAiMessage()
-  messages.value.push(pendingAiMessage)
+  messages.value = [...messages.value, pendingAiMessage]
   await scrollToBottom()
 
   asking.value = true
   try {
     await askQuestionStream(
       {
+        user_id: currentUserId.value ?? undefined,
         question: q,
-        video_id: videoId.value ? Number(videoId.value) : undefined,
-        mode: videoId.value ? 'video' : 'free',
+        video_id: normalizedVideoId.value ?? undefined,
+        mode: currentMode.value,
         provider: provider.value,
         deep_thinking: deepThinkingEnabled.value,
         history: historyPayload
@@ -239,6 +396,7 @@ const send = async () => {
         }
       }
     )
+    persistSpaceMessages()
   } catch (e) {
     pendingAiMessage.loading = false
     pendingAiMessage.statusText = '回答失败'
@@ -247,6 +405,7 @@ const send = async () => {
     pendingAiMessage.text = extractErrorMessage(e, '请求失败，请稍后再试。')
   } finally {
     asking.value = false
+    persistSpaceMessages()
     await scrollToBottom()
   }
 }
@@ -254,12 +413,30 @@ const send = async () => {
 const clear = () => {
   if (asking.value) return
   messages.value = []
+  storageRemove(currentSpaceKey.value)
 }
 
 const goBack = () => {
   if (window.history.length > 1) router.back()
   else router.replace('/')
 }
+
+watch(
+  currentSpaceKey,
+  () => {
+    ensureSpaceMessages(currentSpaceKey.value)
+    void restoreCurrentSpace()
+  },
+  { immediate: true }
+)
+
+watch(
+  messages,
+  () => {
+    persistSpaceMessages()
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>

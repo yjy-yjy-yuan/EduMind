@@ -19,11 +19,12 @@ class QAHistoryMessage(BaseModel):
 class AskRequest(BaseModel):
     """问答请求"""
 
+    user_id: Optional[int] = Field(default=None, description="当前用户ID，用于隔离问答空间")
     video_id: Optional[int] = None
     question: str = Field(..., min_length=1)
     mode: str = Field(default="video", description="问答模式: video, free")
     stream: bool = Field(default=False, description="是否流式返回")
-    provider: str = Field(default="qwen", description="模型提供方: qwen, deepseek")
+    provider: str = Field(..., min_length=1, description="模型提供方: qwen, deepseek")
     model: Optional[str] = Field(default=None, description="可选模型名称，未传时按 provider 使用默认模型")
     deep_thinking: bool = Field(default=False, description="是否启用深度思考")
     history: List[QAHistoryMessage] = Field(default_factory=list, description="最近问答历史，用于连续追问")
@@ -33,7 +34,11 @@ class QuestionResponse(BaseModel):
     """问题响应"""
 
     id: int
+    user_id: Optional[int] = None
     video_id: Optional[int] = None
+    provider: Optional[str] = None
+    mode: Optional[str] = None
+    model: Optional[str] = None
     content: str
     answer: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -47,4 +52,5 @@ class QuestionHistoryResponse(BaseModel):
 
     message: str
     questions: list[QuestionResponse]
+    messages: List[dict] = Field(default_factory=list)
     total: int
