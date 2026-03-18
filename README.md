@@ -148,12 +148,12 @@ POST /api/videos/{video_id}/generate-tags
 4. `organizing`：正在整理回答与引用片段
 5. `completed`：最终回答已生成
 
-当前视频问答还按 `user_id + provider + mode + video_id` 做了空间隔离：
+当前视频问答将 `通义千问` 与 `DeepSeek` 作为两个独立聊天空间处理，但当前隔离范围收敛为“前端状态 + 本地缓存 + 请求处理分流”：
 
-1. 切到 `通义千问` 时，只恢复并续写通义千问自己的视频问答历史
-2. 切到 `DeepSeek` 时，只恢复并续写 DeepSeek 自己的视频问答历史
-3. 同一 `videoId` 下，两种 provider 的历史不会再混用
-4. 服务端在视频问答模式下会优先使用数据库中同一作用域下的历史，而不是信任前端传来的混合 history
+1. 切到 `通义千问` 时，只显示并续写通义千问自己的本地问答空间
+2. 切到 `DeepSeek` 时，只显示并续写 DeepSeek 自己的本地问答空间
+3. 同一 `videoId` 下，两种 provider 的前端内存状态与本地缓存不会再混用
+4. 后端仍会按 `provider` 做处理分流，但在不改现有 `questions` 表结构的前提下，服务端历史恢复默认安全禁用，避免把旧共享记录错误混入新的模型空间
 
 当前问答提供方只支持：
 
@@ -182,7 +182,7 @@ QA_MAX_HISTORY_CHARS=2200
 1. 当前通义千问链路已经可用，`OPENAI_*` 与 `QWEN_*` 都是为 Qwen 的 OpenAI 兼容接口准备的兼容变量。
 2. 若要使用 DeepSeek，至少需要补齐 `DEEPSEEK_API_KEY`。
 3. 若希望默认问答走 DeepSeek，可将 `QA_DEFAULT_PROVIDER` 改为 `deepseek`。
-4. 如果你已经在使用现有 MySQL `questions` 表，需要手工补齐 `user_id / provider / mode / model` 字段后再启动新版本后端；旧数据若没有这些字段值，会继续保留为 legacy 记录，不会自动混入新的 provider 隔离空间。
+4. 当前版本不要求修改现有 MySQL `questions` 表；数据库继续只保存基础问答记录，视频问答空间隔离以前端本地缓存与请求参数为准。
 
 ## MySQL 表管理
 

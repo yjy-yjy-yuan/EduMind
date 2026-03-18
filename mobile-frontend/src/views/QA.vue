@@ -298,7 +298,10 @@ const restoreCurrentSpace = async () => {
     if (requestId !== historyRestoreSequence || spaceKey !== currentSpaceKey.value) return
 
     const payload = res.data || {}
-    messageSpaces.value[spaceKey] = normalizeMessageList(payload.messages)
+    const remoteMessages = normalizeMessageList(payload.messages)
+    if (remoteMessages.length > 0) {
+      messageSpaces.value[spaceKey] = remoteMessages
+    }
     remoteHydratedSpaces.value[spaceKey] = true
     persistSpaceMessages(spaceKey)
   } catch (error) {

@@ -103,20 +103,14 @@ CREATE TABLE notes (
 
 CREATE TABLE questions (
 	id INTEGER NOT NULL AUTO_INCREMENT, 
-	user_id INTEGER, 
 	video_id INTEGER, 
-	provider VARCHAR(20), 
-	mode VARCHAR(20), 
-	model VARCHAR(100), 
 	content TEXT NOT NULL, 
 	answer TEXT, 
 	created_at DATETIME NOT NULL, 
 	updated_at DATETIME NOT NULL, 
 	PRIMARY KEY (id), 
-	FOREIGN KEY(user_id) REFERENCES users (id), 
 	FOREIGN KEY(video_id) REFERENCES videos (id)
 );
-CREATE INDEX ix_questions_scope_created_at ON questions (user_id, provider, mode, video_id, created_at);
 
 -- Create table: subtitles
 
