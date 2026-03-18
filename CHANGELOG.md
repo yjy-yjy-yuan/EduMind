@@ -306,3 +306,15 @@
 
 - 更新 [`backend_fastapi/app/services/whisper_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/whisper_runtime.py)：为 Whisper 模型加载失败补充本地文件 SHA256 校验诊断；当 `large-v3.pt` 等已下载模型文件损坏时，运行时会优先返回“本地 Whisper 模型文件校验失败，请删除后重新下载”的明确错误，而不是把问题误判成通用下载失败或加载超时。
 - 更新 [`backend_fastapi/tests/unit/test_whisper_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_whisper_runtime.py)：新增损坏模型文件回归测试，覆盖运行时在本地权重校验失败时的错误透传与状态记录。
+
+### Whisper 模型优势文案移到标题行
+
+- 更新 [`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)：将当前选中模型的“优势”说明从下方独立区块移到 `Whisper 模型` 标题右侧，并保持随选择即时切换，减少纵向占位的同时让用户在打开下拉前就能看到当前模型的核心特点。
+
+### 对 Whisper 模型优势位置的更正说明
+
+- 更正 [`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)：当前模型的“优势”说明最终收口到同一个下拉选择框内部，显示在模型名下方；选择框仍使用原生 `select` 承接 iOS 系统滚轮交互，但视觉上会在红框区域内同时展示“当前模型 + 对应优势”。
+
+### Whisper 模型下拉选项显示核心优势
+
+- 更新 [`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)：原生下拉选项文本改为同时显示模型名和核心优势摘要，例如 `large · 效果最好`、`medium · 准确率更高`，让 iOS 系统滚轮选择时也能直接看到各模型最突出的特点。

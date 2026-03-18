@@ -1,20 +1,25 @@
 <template>
   <div class="picker">
-    <label class="picker-field">
+    <div class="picker-heading">
       <span class="picker-title">{{ title }}</span>
+    </div>
+    <label class="picker-field">
       <div class="picker-control">
+        <div class="picker-display" :class="{ 'picker-display--disabled': disabled }" aria-hidden="true">
+          <span class="picker-display__value">{{ currentLabel }}</span>
+          <div class="picker-advantage">
+            <span class="picker-advantage__label">优势</span>
+            <span class="picker-advantage__text">{{ currentHighlight }}</span>
+          </div>
+        </div>
         <select class="picker-select" :value="model" :disabled="disabled" @change="handleChange">
           <option v-for="option in availableOptions" :key="option.value" :value="option.value">
-            {{ option.label }}
+            {{ optionText(option) }}
           </option>
         </select>
         <span class="picker-chevron" aria-hidden="true"></span>
       </div>
     </label>
-    <div class="picker-advantage">
-      <span class="picker-advantage__label">优势</span>
-      <span>{{ currentHighlight }}</span>
-    </div>
     <div v-if="hint" class="picker-hint">{{ hint }}</div>
   </div>
 </template>
@@ -53,7 +58,22 @@ const handleChange = (event) => {
 }
 
 const availableOptions = computed(() => (props.options?.length ? props.options : getWhisperModelOptions()))
+const currentLabel = computed(() => {
+  const normalized = String(props.model || '').trim().toLowerCase()
+  return availableOptions.value.find((option) => option.value === normalized)?.label || normalized || 'base'
+})
 const currentHighlight = computed(() => whisperModelHighlight(props.model))
+
+const optionHighlight = (option) => {
+  const rawHighlight = String(option?.highlight || whisperModelHighlight(option?.value)).trim()
+  return rawHighlight.split('，')[0].replace(/[。！？!?]+$/g, '')
+}
+
+const optionText = (option) => {
+  const label = String(option?.label || option?.value || '').trim().toLowerCase()
+  const highlight = optionHighlight(option)
+  return highlight ? `${label} · ${highlight}` : label
+}
 </script>
 
 <style scoped>
@@ -62,9 +82,12 @@ const currentHighlight = computed(() => whisperModelHighlight(props.model))
   gap: 6px;
 }
 
+.picker-heading {
+  display: block;
+}
+
 .picker-field {
-  display: grid;
-  gap: 8px;
+  display: block;
 }
 
 .picker-title {
@@ -82,11 +105,12 @@ const currentHighlight = computed(() => whisperModelHighlight(props.model))
 
 .picker-advantage {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.45;
   color: var(--muted);
+  min-width: 0;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -101,37 +125,58 @@ const currentHighlight = computed(() => whisperModelHighlight(props.model))
   background: rgba(21, 141, 178, 0.1);
 }
 
+.picker-advantage__text {
+  min-width: 0;
+}
+
 .picker-control {
   position: relative;
 }
 
-.picker-select {
-  width: 100%;
-  appearance: none;
-  -webkit-appearance: none;
+.picker-display {
+  display: grid;
+  gap: 10px;
   border: 1px solid rgba(32, 42, 55, 0.12);
   border-radius: 16px;
   padding: 12px 42px 12px 14px;
-  font-size: 15px;
-  font-weight: 800;
-  color: #2563d8;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 250, 253, 0.94)),
     rgba(255, 255, 255, 0.96);
   box-shadow: inset 0 -1px 0 rgba(32, 42, 55, 0.06);
 }
 
-.picker-select:disabled {
+.picker-display--disabled {
   opacity: 0.6;
+}
+
+.picker-display__value {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #2563d8;
+}
+
+.picker-select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.picker-select:disabled {
+  cursor: not-allowed;
 }
 
 .picker-chevron {
   position: absolute;
-  top: 50%;
+  top: 22px;
   right: 14px;
   width: 10px;
   height: 10px;
-  margin-top: -7px;
   border-right: 2px solid #2563d8;
   border-bottom: 2px solid #2563d8;
   transform: rotate(45deg);
