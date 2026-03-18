@@ -1,8 +1,10 @@
 """问答系统路由 - FastAPI 版本"""
 
+import json
 import logging
 
 from app.core.database import get_db
+from app.core.database import SessionLocal
 from app.models.qa import Question
 from app.models.video import Video
 from app.schemas.qa import AskRequest
@@ -20,6 +22,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 SUPPORTED_QA_MODES = {"video", "free"}
+
+
+def serialize_stream_event(event: dict) -> str:
+    return f"{json.dumps(event, ensure_ascii=False)}\n"
 
 
 @router.post("/ask")
@@ -46,27 +52,113 @@ async def ask_question(request: AskRequest, db: Session = Depends(get_db)):
 
         # 流式响应
         if request.stream:
-            result = qa_system.ask(
-                request.question,
-                provider=request.provider,
-                model=request.model or "",
-                deep_thinking=request.deep_thinking,
-                mode=normalized_mode,
-                history=request.history,
-            )
+            def generate():
+                stream_db = SessionLocal()
+                try:
+                    stream_video = None
+                    if normalized_mode == "video":
+                        stream_video = stream_db.query(Video).filter(Video.id == request.video_id).first()
+                        if not stream_video:
+                            yield serialize_stream_event(
+                                {
+                                    "type": "error",
+                                    "stage": "validation",
+                                    "message": "视频不存在",
+                                    "detail": "视频不存在",
+                                    "progress": 100,
+                                }
+                            )
+                            return
 
-            question = Question(
-                video_id=request.video_id if normalized_mode == "video" else None,
-                content=request.question,
-                answer=result["answer"],
-            )
-            db.add(question)
-            db.commit()
+                    stream_qa_system = QASystem(video=stream_video)
+                    if normalized_mode == "video" and not stream_qa_system.has_context():
+                        yield serialize_stream_event(
+                            {
+                                "type": "error",
+                                "stage": "validation",
+                                "message": "该视频暂无可用于问答的字幕或摘要内容",
+                                "detail": "该视频暂无可用于问答的字幕或摘要内容",
+                                "progress": 100,
+                            }
+                        )
+                        return
 
-            async def generate():
-                yield result["answer"]
+                    yield serialize_stream_event(
+                        {
+                            "type": "status",
+                            "stage": "accepted",
+                            "message": "问题已提交，等待处理",
+                            "progress": 5,
+                        }
+                    )
 
-            return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
+                    for event in stream_qa_system.answer_stream(
+                        request.question,
+                        provider=request.provider,
+                        model=request.model or "",
+                        deep_thinking=request.deep_thinking,
+                        mode=normalized_mode,
+                        history=request.history,
+                    ):
+                        if event.get("type") == "answer":
+                            question = Question(
+                                video_id=request.video_id if normalized_mode == "video" else None,
+                                content=request.question,
+                                answer=event.get("answer"),
+                            )
+                            stream_db.add(question)
+                            stream_db.commit()
+                            stream_db.refresh(question)
+                            event.update(question.to_dict())
+                        logger.info(
+                            "QA stream event | type=%s | stage=%s | provider=%s | model=%s | video_id=%s",
+                            event.get("type"),
+                            event.get("stage"),
+                            event.get("provider"),
+                            event.get("model"),
+                            request.video_id,
+                        )
+                        yield serialize_stream_event(event)
+                except QAConfigError as exc:
+                    logger.error("问答流配置错误 | error=%s", exc)
+                    stream_db.rollback()
+                    yield serialize_stream_event(
+                        {
+                            "type": "error",
+                            "stage": "config_error",
+                            "message": str(exc),
+                            "detail": str(exc),
+                            "progress": 100,
+                        }
+                    )
+                except QAProviderError as exc:
+                    logger.error("问答流模型调用失败 | error=%s", exc)
+                    stream_db.rollback()
+                    yield serialize_stream_event(
+                        {
+                            "type": "error",
+                            "stage": "provider_error",
+                            "message": "模型调用失败",
+                            "detail": str(exc),
+                            "progress": 100,
+                        }
+                    )
+                except Exception as exc:
+                    logger.error("问答流处理失败 | error=%s", exc)
+                    stream_db.rollback()
+                    yield serialize_stream_event(
+                        {
+                            "type": "error",
+                            "stage": "server_error",
+                            "message": "问答处理失败，请稍后重试",
+                            "detail": "问答处理失败，请稍后重试",
+                            "progress": 100,
+                        }
+                    )
+                finally:
+                    stream_db.close()
+
+            return StreamingResponse(generate(), media_type="application/x-ndjson; charset=utf-8")
 
         result = qa_system.ask(
             request.question,

@@ -1,5 +1,12 @@
 # 变更日志
 
+## 2026-03-18
+
+### DeepSeek 推理进度与问答页等待态修复
+- 更新 [`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/app/utils/qa_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/qa_utils.py)：`POST /api/qa/ask` 在 `stream=true` 时改为返回可解析的 NDJSON 阶段事件流，覆盖 `accepted / retrieving / reasoning|answering / organizing / completed`，并在最终回答生成后继续写入现有 `questions` 表。
+- 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：问答页改为接入后端阶段进度流，新增顶部 AI 进度条与消息内进度条；DeepSeek `先思考再回答` 模式下，用户现在可以明确看到“已提交、检索中、推理中、整理中、已完成”的实时状态，不再只看到空白等待态。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：补充问答流式阶段进度的实现边界与当前行为说明。
+
 ## 2026-03-16
 
 ### 摘要生成与处理设置收口
@@ -231,6 +238,10 @@
 - 更新 [`backend_fastapi/app/schemas/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/qa.py)、[`backend_fastapi/app/utils/qa_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/qa_utils.py)、[`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：新增 `history` 问答历史入参和 `QA_MAX_HISTORY_MESSAGES` / `QA_MAX_HISTORY_CHARS` 配置，后端在做视频检索时会结合最近对话历史改写检索 query，并把历史轮次一并交给通义千问 / DeepSeek，提升连续追问时的上下文记忆稳定性。
 - 更新 [`backend_fastapi/app/schemas/chat.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/chat.py)、[`backend_fastapi/app/utils/chat_system.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/chat_system.py)、[`backend_fastapi/app/routers/chat.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/chat.py)：聊天接口收敛为在线 provider-only，只保留通义千问 / DeepSeek 两类在线模型，不再暴露 `use_ollama`。
 - 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：前端问答页提交最近 8 条对话历史，支持后端在连续追问时保持更稳定的上下文记忆。
+
+### DeepSeek 回答方式切换
+
+- 更新 [`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)、[`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：当用户切换到 `DeepSeek` 时，问答页新增“直接回答 / 先思考再回答”选择按键；前端会把对应的 `deep_thinking` 参数随请求提交给后端，并在本地持久化用户选择。
 
 ## 2026-03-16
 

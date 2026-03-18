@@ -307,12 +307,13 @@ export const mockDeleteNote = (noteId) => {
   return mockResponse({ success: true, message: 'UI 模式：已删除笔记' })
 }
 
-export const mockAskQuestion = ({ question, video_id, provider = 'qwen' }) => {
+export const mockAskQuestion = ({ question, video_id, provider = 'qwen', deep_thinking = false }) => {
   const q = String(question || '').trim()
   const prefix = video_id ? `视频 ${video_id}` : '通用问答'
   const providerText = provider === 'deepseek' ? 'DeepSeek' : '通义千问'
+  const modeText = provider === 'deepseek' ? (deep_thinking ? '先思考再回答' : '直接回答') : '标准回答'
   const answer = q
-    ? `【UI 模式】这是 ${prefix} 的占位回复，当前模型通道为 ${providerText}：你问的是“${q}”。后续接入真实 AI 接口后会返回正式答案。`
+    ? `【UI 模式】这是 ${prefix} 的占位回复，当前模型通道为 ${providerText}（${modeText}）：你问的是“${q}”。后续接入真实 AI 接口后会返回正式答案。`
     : '【UI 模式】请输入问题内容。'
   return mockResponse({ answer })
 }

@@ -1,5 +1,6 @@
 import request from '@/utils/request'
-import { shouldUseMockApi } from '@/config'
+import { withBase, shouldUseMockApi } from '@/config'
+import { storageGet } from '@/utils/storage'
 import { mockAskQuestion } from '@/api/mockGateway'
 
 export function askQuestion({
@@ -19,4 +20,168 @@ export function askQuestion({
     method: 'post',
     data: { question, video_id, mode, provider, model, deep_thinking, history, stream: false }
   })
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const toStreamError = (detail, status = 0) => {
+  const message = String(detail || '请求失败，请稍后再试。')
+  const error = new Error(message)
+  error.response = {
+    status,
+    data: { detail: message }
+  }
+  return error
+}
+
+const parseStreamErrorBody = async (response) => {
+  const text = await response.text()
+  if (!text) return `请求失败（HTTP ${response.status}）`
+  try {
+    const payload = JSON.parse(text)
+    const detail = payload?.detail || payload?.message || payload?.msg
+    return typeof detail === 'string' && detail.trim() ? detail.trim() : text
+  } catch {
+    return text
+  }
+}
+
+const dispatchMockStream = async (payload, onEvent) => {
+  const providerText = payload.provider === 'deepseek' ? 'DeepSeek' : '通义千问'
+  const modelText =
+    payload.provider === 'deepseek'
+      ? (payload.deep_thinking ? 'deepseek-reasoner' : 'deepseek-chat')
+      : (payload.model || 'qwen-plus')
+  const answerText = (await mockAskQuestion(payload)).data?.answer || '【UI 模式】暂无回答。'
+  const events = [
+    { type: 'status', stage: 'accepted', message: '问题已提交，等待处理', progress: 5 },
+    {
+      type: 'status',
+      stage: payload.mode === 'video' ? 'retrieving' : 'answering',
+      message: payload.mode === 'video' ? '正在检索视频字幕、摘要与标签' : `正在调用 ${providerText} 回答`,
+      progress: payload.mode === 'video' ? 25 : 45,
+      provider: payload.provider,
+      provider_label: providerText,
+      model: modelText
+    },
+    {
+      type: 'status',
+      stage: payload.provider === 'deepseek' && payload.deep_thinking ? 'reasoning' : 'answering',
+      message:
+        payload.provider === 'deepseek' && payload.deep_thinking
+          ? '正在调用 DeepSeek 思考模型'
+          : `正在调用 ${providerText} 回答`,
+      progress: 60,
+      provider: payload.provider,
+      provider_label: providerText,
+      model: modelText
+    },
+    {
+      type: 'status',
+      stage: 'organizing',
+      message: '正在整理回答与引用片段',
+      progress: 85,
+      provider: payload.provider,
+      provider_label: providerText,
+      model: modelText
+    },
+    {
+      type: 'answer',
+      stage: 'completed',
+      message: '回答已完成',
+      progress: 100,
+      answer: answerText,
+      provider: payload.provider,
+      provider_label: providerText,
+      model: modelText,
+      references: []
+    }
+  ]
+
+  let finalEvent = null
+  for (const event of events) {
+    onEvent?.(event)
+    finalEvent = event
+    await sleep(event.type === 'answer' ? 0 : 220)
+  }
+  return finalEvent
+}
+
+export async function askQuestionStream(
+  { question, video_id, mode = 'free', provider = 'qwen', model = '', deep_thinking = false, history = [] },
+  { onEvent } = {}
+) {
+  const payload = { question, video_id, mode, provider, model, deep_thinking, history, stream: true }
+
+  if (shouldUseMockApi()) {
+    return dispatchMockStream(payload, onEvent)
+  }
+
+  const headers = { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' }
+  const token = storageGet('m_token')
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const response = await fetch(withBase('/api/qa/ask'), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload),
+    credentials: 'include'
+  })
+
+  if (!response.ok) {
+    throw toStreamError(await parseStreamErrorBody(response), response.status)
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    throw toStreamError('当前环境不支持问答进度流，请稍后重试。', response.status)
+  }
+
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+  let finalEvent = null
+
+  const handleLine = (line) => {
+    if (!line) return
+
+    let event = null
+    try {
+      event = JSON.parse(line)
+    } catch {
+      return
+    }
+
+    onEvent?.(event)
+    if (event?.type === 'error') {
+      const detail = event.detail || event.message || '问答处理失败，请稍后重试。'
+      throw toStreamError(detail, response.status)
+    }
+    if (event?.type === 'answer') {
+      finalEvent = event
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+
+    let newlineIndex = buffer.indexOf('\n')
+    while (newlineIndex >= 0) {
+      const line = buffer.slice(0, newlineIndex).trim()
+      buffer = buffer.slice(newlineIndex + 1)
+      handleLine(line)
+      newlineIndex = buffer.indexOf('\n')
+    }
+
+    if (done) break
+  }
+
+  const rest = `${buffer}${decoder.decode()}`.trim()
+  if (rest) handleLine(rest)
+
+  if (!finalEvent) {
+    throw toStreamError('问答进度流已结束，但未收到最终回答。', response.status)
+  }
+
+  return finalEvent
 }

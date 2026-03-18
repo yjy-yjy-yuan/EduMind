@@ -111,6 +111,17 @@ def resolve_provider_label(provider: str) -> str:
     return "DeepSeek" if provider == "deepseek" else "通义千问"
 
 
+def build_stream_event(event_type: str, **payload) -> dict:
+    event = {"type": event_type}
+    for key, value in payload.items():
+        if value is None:
+            continue
+        if isinstance(value, str) and not value and key not in {"answer", "model"}:
+            continue
+        event[key] = value
+    return event
+
+
 def resolve_provider_credentials(provider: str) -> tuple[str, str]:
     normalized_provider = normalize_provider(provider)
     if normalized_provider == "deepseek":
@@ -429,6 +440,15 @@ def build_free_qa_messages(question: str, *, history_messages: list[Conversation
     return messages
 
 
+def resolve_answering_status(provider: str, *, deep_thinking: bool) -> tuple[str, str]:
+    normalized_provider = normalize_provider(provider)
+    if normalized_provider == "deepseek" and deep_thinking:
+        return "reasoning", "正在调用 DeepSeek 思考模型"
+    if normalized_provider == "deepseek":
+        return "answering", "正在调用 DeepSeek 直接回答"
+    return "answering", "正在调用通义千问回答"
+
+
 def call_provider_chat(messages: list[dict], *, provider: str, model: str) -> str:
     normalized_provider = normalize_provider(provider, model)
     api_key, base_url = resolve_provider_credentials(normalized_provider)
@@ -581,13 +601,102 @@ class QASystem:
         deep_thinking: bool = False,
         mode: str = "video",
         history: Optional[list] = None,
-    ) -> Generator[str, None, None]:
-        result = self.ask(
-            question,
-            provider=provider,
-            model=model,
-            deep_thinking=deep_thinking,
-            mode=mode,
-            history=history,
+    ) -> Generator[dict, None, None]:
+        normalized_provider = normalize_provider(provider, model)
+        resolved_model = resolve_model(normalized_provider, model, deep_thinking=deep_thinking)
+        provider_label = resolve_provider_label(normalized_provider)
+        history_messages = normalize_history_messages(history)
+        answering_stage, answering_message = resolve_answering_status(
+            normalized_provider, deep_thinking=deep_thinking
         )
-        yield result["answer"]
+
+        if mode == "video":
+            if not self._chunks:
+                raise QAConfigError("该视频暂无可用于问答的字幕或摘要内容")
+
+            yield build_stream_event(
+                "status",
+                stage="retrieving",
+                message="正在检索视频字幕、摘要与标签",
+                progress=25,
+                provider=normalized_provider,
+                provider_label=provider_label,
+                model=resolved_model,
+            )
+            retrieval_query = build_retrieval_query(question, history_messages)
+            ranked_chunks = rank_chunks(retrieval_query, self._chunks, top_k=max(1, int(settings.QA_TOP_K)))
+            context_text = build_context_text(ranked_chunks, max_chars=max(500, int(settings.QA_MAX_CONTEXT_CHARS)))
+            messages = build_video_qa_messages(
+                question,
+                video_title=getattr(self.video, "title", "") or "",
+                context_text=context_text,
+                history_messages=history_messages,
+            )
+
+            yield build_stream_event(
+                "status",
+                stage=answering_stage,
+                message=answering_message,
+                progress=60,
+                provider=normalized_provider,
+                provider_label=provider_label,
+                model=resolved_model,
+            )
+            answer = call_provider_chat(messages, provider=normalized_provider, model=resolved_model)
+            result = self._build_result(answer, normalized_provider, resolved_model, ranked_chunks)
+
+            yield build_stream_event(
+                "status",
+                stage="organizing",
+                message="正在整理回答与引用片段",
+                progress=85,
+                provider=result["provider"],
+                provider_label=result["provider_label"],
+                model=result["model"],
+            )
+            yield build_stream_event(
+                "answer",
+                stage="completed",
+                message="回答已完成",
+                progress=100,
+                answer=result["answer"],
+                provider=result["provider"],
+                provider_label=result["provider_label"],
+                model=result["model"],
+                references=result["references"],
+            )
+            return
+
+        messages = build_free_qa_messages(question, history_messages=history_messages)
+        yield build_stream_event(
+            "status",
+            stage=answering_stage,
+            message=answering_message,
+            progress=45,
+            provider=normalized_provider,
+            provider_label=provider_label,
+            model=resolved_model,
+        )
+        answer = call_provider_chat(messages, provider=normalized_provider, model=resolved_model)
+        result = self._build_result(answer, normalized_provider, resolved_model, [])
+
+        yield build_stream_event(
+            "status",
+            stage="organizing",
+            message="正在整理回答",
+            progress=85,
+            provider=result["provider"],
+            provider_label=result["provider_label"],
+            model=result["model"],
+        )
+        yield build_stream_event(
+            "answer",
+            stage="completed",
+            message="回答已完成",
+            progress=100,
+            answer=result["answer"],
+            provider=result["provider"],
+            provider_label=result["provider_label"],
+            model=result["model"],
+            references=result["references"],
+        )
