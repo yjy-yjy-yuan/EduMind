@@ -38,18 +38,7 @@
         </button>
       </div>
       <div class="mode-panel__hint">
-        {{ deepThinkingEnabled ? '先进行推理，再组织回答，质量更稳但通常更慢。' : '优先直接回答，首字和整体返回速度更快。' }}
-      </div>
-    </div>
-
-    <div v-if="runtimeStatus" class="runtime-status" :class="{ 'runtime-status--done': !runtimeStatus.loading }">
-      <div class="runtime-status__top">
-        <span class="runtime-status__label">AI 进度</span>
-        <strong class="runtime-status__percent">{{ runtimeStatus.progress }}%</strong>
-      </div>
-      <div class="runtime-status__text">{{ runtimeStatus.text }}</div>
-      <div class="runtime-status__track">
-        <div class="runtime-status__fill" :style="{ width: `${runtimeStatus.progress}%` }"></div>
+        {{ deepThinkingEnabled ? '已开启深度思考，会先进行推理再组织回答，质量更稳但通常更慢。' : '优先直接回答，首字和整体返回速度更快。' }}
       </div>
     </div>
 
@@ -80,7 +69,7 @@
     </div>
     <div v-else class="empty-hint">输入问题开始对话。</div>
 
-    <div class="inputbar safe-bottom">
+    <div class="inputbar">
       <input
         class="input"
         v-model.trim="question"
@@ -107,7 +96,7 @@ const PROVIDER_OPTIONS = Object.freeze([
 ])
 const DEEPSEEK_ANSWER_MODE_OPTIONS = Object.freeze([
   { value: 'direct', label: '直接回答' },
-  { value: 'reasoning', label: '先思考再回答' }
+  { value: 'reasoning', label: '深度思考' }
 ])
 
 const normalizeProvider = (value) => {
@@ -133,19 +122,6 @@ const deepSeekAnswerMode = ref(normalizeDeepSeekAnswerMode(storageGet(DEEPSEEK_A
 const isDeepSeekProvider = computed(() => provider.value === 'deepseek')
 const deepThinkingEnabled = computed(() => isDeepSeekProvider.value && deepSeekAnswerMode.value === 'reasoning')
 const shouldRenderChat = computed(() => messages.value.length > 0)
-const runtimeStatus = computed(() => {
-  for (let index = messages.value.length - 1; index >= 0; index -= 1) {
-    const item = messages.value[index]
-    if (item.role === 'ai' && item.statusText) {
-      return {
-        text: String(item.statusText),
-        progress: normalizeProgress(item.progress),
-        loading: Boolean(item.loading)
-      }
-    }
-  }
-  return null
-})
 
 const scrollToBottom = async () => {
   await nextTick()
@@ -404,46 +380,6 @@ const goBack = () => {
   color: var(--muted);
 }
 
-.runtime-status {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 10px 18px rgba(24, 45, 73, 0.06);
-}
-
-.runtime-status--done {
-  background: rgba(245, 250, 250, 0.9);
-}
-
-.runtime-status__top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.runtime-status__label {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--muted);
-  letter-spacing: 0.04em;
-}
-
-.runtime-status__percent {
-  font-size: 12px;
-  color: var(--text);
-}
-
-.runtime-status__text {
-  margin-top: 6px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--text);
-}
-
-.runtime-status__track,
 .progress-track {
   margin-top: 8px;
   width: 100%;
@@ -453,7 +389,6 @@ const goBack = () => {
   overflow: hidden;
 }
 
-.runtime-status__fill,
 .progress-fill {
   height: 100%;
   border-radius: inherit;
@@ -461,8 +396,9 @@ const goBack = () => {
 }
 
 .chat {
+  margin-top: 8px;
   overflow: auto;
-  max-height: min(52vh, 420px);
+  max-height: min(44vh, 320px);
   min-height: 0;
   background: var(--card);
   border-radius: var(--radius);
@@ -554,14 +490,11 @@ const goBack = () => {
 }
 
 .inputbar {
-  margin-top: auto;
+  margin-top: 14px;
   display: flex;
   gap: 10px;
   align-items: center;
-  padding-bottom: 10px;
-  position: sticky;
-  bottom: 0;
-  background: var(--bg);
+  background: transparent;
 }
 
 .input {
@@ -588,7 +521,7 @@ const goBack = () => {
 <style scoped>
 .page {
   padding-top: calc(12px + env(safe-area-inset-top));
-  min-height: 100dvh;
+  padding-bottom: calc(28px + env(safe-area-inset-bottom));
 }
 
 .topbar {
@@ -599,24 +532,12 @@ const goBack = () => {
   box-shadow: 0 10px 20px rgba(24, 45, 73, 0.08);
 }
 
-.chat {
-  margin-top: 10px;
-  border-radius: 20px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: linear-gradient(180deg, #ffffff, #f8fbfd);
-  padding: 14px;
-}
-
 .msg.user .bubble {
   background: linear-gradient(135deg, rgba(31, 122, 140, 0.14), rgba(31, 122, 140, 0.08));
 }
 
 .msg.ai .bubble {
   background: rgba(32, 42, 55, 0.08);
-}
-
-.inputbar {
-  background: transparent;
 }
 
 .input {

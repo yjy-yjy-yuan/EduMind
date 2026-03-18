@@ -6,6 +6,7 @@
 - 更新 [`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/app/utils/qa_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/qa_utils.py)：`POST /api/qa/ask` 在 `stream=true` 时改为返回可解析的 NDJSON 阶段事件流，覆盖 `accepted / retrieving / reasoning|answering / organizing / completed`，并在最终回答生成后继续写入现有 `questions` 表。
 - 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：问答页改为接入后端阶段进度流，新增顶部 AI 进度条与消息内进度条；DeepSeek `先思考再回答` 模式下，用户现在可以明确看到“已提交、检索中、推理中、整理中、已完成”的实时状态，不再只看到空白等待态。
 - 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：补充问答流式阶段进度的实现边界与当前行为说明。
+- 更新 [`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：移除顶部独立进度卡片，仅保留消息内进度；问答输入区取消吸底布局，改为紧跟内容区，避免空页面时输入框被压到最底部；DeepSeek 的“先思考再回答”按钮文案同步改为“深度思考”。
 
 ## 2026-03-16
 
