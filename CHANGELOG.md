@@ -318,3 +318,12 @@
 ### Whisper 模型下拉选项显示核心优势
 
 - 更新 [`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)：原生下拉选项文本改为同时显示模型名和核心优势摘要，例如 `large · 效果最好`、`medium · 准确率更高`，让 iOS 系统滚轮选择时也能直接看到各模型最突出的特点。
+
+### EduMind Logo 与 AppIcon 替换
+
+- 更新 [`mobile-frontend/src/assets/edumind-logo.svg`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo.svg)：将共享品牌图替换为浅蓝底方形版本，保留脑图/书本主图形，并将底部品牌字样明确改为 `EduMind`；首页、登录页、注册页等所有使用 [`BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue) 的位置会统一显示新 logo。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png)：基于共享 logo 重新生成 iOS AppIcon，和主页品牌图保持同一视觉版本。
+
+### EduMind AppIcon 适配 iOS 图标蒙版
+
+- 新增 [`ios-app/branding/edumind-app-icon.svg`](/Users/yuan/final-work/EduMind/ios-app/branding/edumind-app-icon.svg)、更新 [`ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png)：为 iOS AppIcon 单独提供适配版源文件，移除此前在系统图标蒙版里显得过小的内层圆角底板，让浅蓝底直接铺满整个图标画布，并放大主图形与 `EduMind` 字样，避免主屏幕上出现“小 logo 嵌在白块里”的效果。
