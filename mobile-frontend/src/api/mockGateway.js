@@ -16,6 +16,8 @@ const videos = [
     status: 'completed',
     process_progress: 100,
     current_step: '分析完成',
+    requested_model: 'base',
+    effective_model: 'base',
     summary: '本节梳理导数定义、几何意义与常见求导法则。',
     tags: ['导数定义', '几何意义', '求导法则'],
     created_at: nowISO(),
@@ -27,6 +29,8 @@ const videos = [
     status: 'processing',
     process_progress: 42,
     current_step: '语音识别中',
+    requested_model: 'base',
+    effective_model: 'base',
     summary: '',
     tags: [],
     created_at: nowISO(),
@@ -38,6 +42,8 @@ const videos = [
     status: 'failed',
     process_progress: 18,
     current_step: '处理失败',
+    requested_model: 'base',
+    effective_model: 'base',
     summary: '',
     tags: [],
     created_at: nowISO(),
@@ -49,6 +55,8 @@ const videos = [
     status: 'pending',
     process_progress: 0,
     current_step: '排队中',
+    requested_model: 'base',
+    effective_model: 'base',
     summary: '',
     tags: [],
     created_at: nowISO(),
@@ -60,6 +68,8 @@ const videos = [
     status: 'uploaded',
     process_progress: 0,
     current_step: '已上传',
+    requested_model: 'base',
+    effective_model: 'base',
     summary: '',
     tags: [],
     created_at: nowISO(),
@@ -92,6 +102,8 @@ const notes = [
 ]
 
 const clone = (value) => JSON.parse(JSON.stringify(value))
+const normalizeModel = (value) => String(value || '').trim().toLowerCase() || 'base'
+const extractFormModel = (formData) => normalizeModel(formData?.get?.('model'))
 
 const mockResponse = (data) =>
   Promise.resolve({
@@ -113,7 +125,7 @@ const tickVideoProgress = (video) => {
 
   if (nextProgress >= 100) {
     video.status = 'completed'
-    video.current_step = '分析完成'
+    video.current_step = `分析完成（${video.effective_model || video.requested_model || 'base'}）`
     video.summary =
       video.summary || 'UI 模式示例摘要：本视频已完成转写、摘要与标签提取，可继续播放与问答。'
     video.tags = Array.isArray(video.tags) && video.tags.length > 0 ? video.tags : ['课程重点', '字幕转写', '学习复盘']
@@ -171,16 +183,21 @@ export const mockGetVideoStatus = (videoId) => {
   return mockResponse({
     status: video.status,
     progress: Number(video.process_progress || 0),
-    current_step: video.current_step || ''
+    current_step: video.current_step || '',
+    requested_model: video.requested_model || 'base',
+    effective_model: video.effective_model || video.requested_model || 'base'
   })
 }
 
-export const mockProcessVideo = (videoId) => {
+export const mockProcessVideo = (videoId, options = {}) => {
   const video = findVideo(videoId)
   if (!video) return Promise.reject(new Error('视频不存在（UI 模式）'))
+  const model = normalizeModel(options?.model)
   video.status = 'pending'
   video.process_progress = 3
-  video.current_step = '排队中'
+  video.current_step = `排队中（${model}）`
+  video.requested_model = model
+  video.effective_model = model
   video.summary = ''
   video.tags = []
   video.updated_at = nowISO()
@@ -197,6 +214,7 @@ export const mockDeleteVideo = (videoId) => {
 export const mockUploadLocalVideo = (formData, { onUploadProgress } = {}) =>
   new Promise((resolve) => {
     const file = formData?.get?.('file')
+    const model = extractFormModel(formData)
     const total = Number(file?.size || 5 * 1024 * 1024)
     const step = Math.max(Math.floor(total / 5), 256 * 1024)
     let loaded = 0
@@ -215,7 +233,9 @@ export const mockUploadLocalVideo = (formData, { onUploadProgress } = {}) =>
         title: baseTitle,
         status: 'uploaded',
         process_progress: 0,
-        current_step: '已上传',
+        current_step: `已上传（${model}）`,
+        requested_model: model,
+        effective_model: model,
         summary: '',
         tags: [],
         created_at: nowISO(),
@@ -239,12 +259,15 @@ export const mockUploadVideoUrl = (payload) => {
   videoAutoId += 1
   const id = videoAutoId
   const title = String(payload?.url || `链接视频-${id}`).slice(0, 80)
+  const model = normalizeModel(payload?.model)
   const created = {
     id,
     title,
     status: 'pending',
     process_progress: 0,
-    current_step: '排队中',
+    current_step: `排队中（${model}）`,
+    requested_model: model,
+    effective_model: model,
     summary: '',
     tags: [],
     created_at: nowISO(),

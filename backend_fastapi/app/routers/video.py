@@ -16,14 +16,21 @@ from app.models.video import Video
 from app.models.video import VideoStatus
 from app.schemas.video import VideoDetail
 from app.schemas.video import VideoListResponse
+from app.schemas.video import VideoProcessingOptionsResponse
 from app.schemas.video import VideoProcessRequest
 from app.schemas.video import VideoSummaryRequest
 from app.schemas.video import VideoTagRequest
 from app.schemas.video import VideoUploadResponse
 from app.schemas.video import VideoUploadURL
 from app.schemas.video import VideoStatusResponse
+from app.services.video_processing_registry import forget_video_processing_request
+from app.services.video_processing_registry import get_video_processing_request
+from app.services.video_processing_registry import remember_video_processing_request
 from app.services.video_content_service import normalize_summary_style
 from app.services.video_content_service import read_subtitle_text
+from app.services.whisper_runtime import get_supported_whisper_models
+from app.services.whisper_runtime import get_whisper_model_catalog
+from app.services.whisper_runtime import normalize_whisper_model_name
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import File
@@ -45,6 +52,7 @@ ALLOWED_EXTENSIONS = {ext.lower() for ext in settings.ALLOWED_EXTENSIONS}
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 STREAM_CHUNK_SIZE = 1024 * 1024
 BYTE_RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
+MODEL_STEP_RE = re.compile(r"（([a-z0-9._-]+)）")
 
 
 def allowed_file(filename: str) -> bool:
@@ -174,13 +182,43 @@ def build_processing_options(
     """规范化视频处理参数。"""
     whisper_language = "en" if str(language or "").strip() == "English" else "zh"
     auto_tags = bool(auto_generate_tags)
+    try:
+        normalized_model = normalize_whisper_model_name(model or settings.WHISPER_MODEL)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {
         "language": whisper_language,
-        "model": str(model or settings.WHISPER_MODEL).strip() or settings.WHISPER_MODEL,
+        "model": normalized_model,
         "auto_generate_summary": bool(auto_generate_summary or auto_tags),
         "auto_generate_tags": auto_tags,
         "summary_style": normalize_summary_style(summary_style),
     }
+
+
+def infer_model_from_step(step: Optional[str]) -> Optional[str]:
+    text = str(step or "").strip()
+    if not text:
+        return None
+    match = MODEL_STEP_RE.search(text)
+    return match.group(1).strip() if match else None
+
+
+def build_processing_metadata(video: Video) -> dict:
+    request_meta = get_video_processing_request(video.id) or {}
+    requested_model = str(request_meta.get("requested_model") or "").strip() or infer_model_from_step(video.current_step)
+    effective_model = str(request_meta.get("effective_model") or requested_model or "").strip() or None
+    requested_language = str(request_meta.get("requested_language") or "").strip() or None
+    return {
+        "requested_model": requested_model or None,
+        "effective_model": effective_model,
+        "requested_language": requested_language,
+    }
+
+
+def serialize_video(video: Video) -> dict:
+    payload = video.to_dict()
+    payload.update(build_processing_metadata(video))
+    return payload
 
 
 def extract_video_transcript_text(video: Video) -> str:
@@ -204,6 +242,7 @@ def submit_video_processing(
     raise_on_error: bool = False,
 ) -> bool:
     """提交视频处理任务并将状态写回当前视频记录。"""
+    normalized_model = str(model or settings.WHISPER_MODEL).strip() or settings.WHISPER_MODEL
     previous_status = video.status
     previous_progress = video.process_progress or 0.0
     previous_step = video.current_step
@@ -211,7 +250,7 @@ def submit_video_processing(
 
     video.status = VideoStatus.PENDING
     video.process_progress = 0.0
-    video.current_step = "已提交，等待处理"
+    video.current_step = f"已提交，等待处理（{normalized_model}）"
     video.error_message = None
     db.commit()
 
@@ -223,10 +262,16 @@ def submit_video_processing(
             process_video_task,
             video.id,
             language,
-            model or settings.WHISPER_MODEL,
+            normalized_model,
             auto_generate_summary=auto_generate_summary,
             auto_generate_tags=auto_generate_tags,
             summary_style=normalize_summary_style(summary_style),
+        )
+        remember_video_processing_request(
+            video.id,
+            model=normalized_model,
+            language=language,
+            source="submit_video_processing",
         )
         return True
     except Exception as exc:
@@ -317,7 +362,7 @@ async def upload_video(
                 ),
                 message="视频已存在",
                 duplicate=True,
-                data=existing_video.to_dict(),
+                data=serialize_video(existing_video),
             )
 
         title, filename, file_path = build_local_video_path(file.filename)
@@ -357,7 +402,7 @@ async def upload_video(
             status=video.status.value if hasattr(video.status, "value") else str(video.status),
             message="视频上传成功，已开始后台处理" if task_submitted else "视频上传成功，请手动开始处理",
             duplicate=False,
-            data=video.to_dict(),
+            data=serialize_video(video),
         )
 
     except HTTPException:
@@ -397,7 +442,7 @@ async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
             status=existing_video.status.value if hasattr(existing_video.status, "value") else str(existing_video.status),
             message="该视频链接已提交过",
             duplicate=True,
-            data=existing_video.to_dict(),
+            data=serialize_video(existing_video),
         )
 
     video_id = None
@@ -459,13 +504,22 @@ async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
             auto_generate_tags=data.auto_generate_tags,
             summary_style=data.summary_style,
         )
+        temp_video.current_step = f"已提交，等待下载（{process_options['model']}）"
+        db.commit()
+        db.refresh(temp_video)
         submit_task(download_video_from_url_task, temp_video.id, video_url, source_type, **process_options)
+        remember_video_processing_request(
+            temp_video.id,
+            model=process_options["model"],
+            language=process_options["language"],
+            source="upload_video_url",
+        )
         return VideoUploadResponse(
             id=temp_video.id,
             status="downloading",
             message="链接已提交，正在后台下载，下载完成后可自动开始处理",
             duplicate=False,
-            data=temp_video.to_dict(),
+            data=serialize_video(temp_video),
         )
     except Exception as exc:
         logger.error(f"提交下载任务失败: {str(exc)}")
@@ -516,6 +570,7 @@ async def get_video_list(
                     "current_step": video.current_step,
                     "error_message": video.error_message,
                 }
+                video_data.update(build_processing_metadata(video))
                 result.append(video_data)
             except Exception as e:
                 logger.error(f"处理视频记录时出错: {str(e)}")
@@ -539,13 +594,35 @@ async def get_video_list(
         raise HTTPException(status_code=500, detail=f"获取视频列表失败: {str(e)}")
 
 
+@router.get("/processing-options", response_model=VideoProcessingOptionsResponse)
+async def get_video_processing_options():
+    """返回前端可用的视频处理配置目录。"""
+    catalog = get_whisper_model_catalog(settings.WHISPER_MODEL_PATH)
+    try:
+        default_model = normalize_whisper_model_name(settings.WHISPER_MODEL)
+    except ValueError:
+        supported_models = get_supported_whisper_models()
+        default_model = supported_models[0] if supported_models else "base"
+
+    if not catalog:
+        catalog = [
+            {"value": model_name, "label": model_name, "highlight": "", "downloaded": False}
+            for model_name in get_supported_whisper_models()
+        ]
+
+    return {
+        "default_model": default_model,
+        "models": catalog,
+    }
+
+
 @router.get("/{video_id}", response_model=VideoDetail)
 async def get_video(video_id: int, db: Session = Depends(get_db)):
     """获取视频详情"""
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="视频不存在")
-    return video.to_dict()
+    return serialize_video(video)
 
 
 @router.get("/{video_id}/status", response_model=VideoStatusResponse)
@@ -564,6 +641,7 @@ async def get_video_status(video_id: int, db: Session = Depends(get_db)):
         "current_step": video.current_step or "",
         "task_id": video.task_id,
         "error_message": video.error_message,
+        **build_processing_metadata(video),
     }
 
 
@@ -618,6 +696,7 @@ async def delete_video(video_id: int, db: Session = Depends(get_db)):
 
     db.delete(video)
     db.commit()
+    forget_video_processing_request(video_id)
 
     return {"message": "视频删除成功", "video_id": video_id}
 

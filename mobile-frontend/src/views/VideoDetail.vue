@@ -38,12 +38,24 @@
         <span v-if="isInProgress(statusValue)" class="muted">{{ progressValue }}% · {{ stepValue || '处理中' }}</span>
       </div>
 
+      <div v-if="activeModelText" class="setting-hint">本次任务模型：{{ activeModelText }}</div>
+
       <div v-if="isInProgress(statusValue)" class="progress">
         <div class="bar" :style="{ width: `${progressValue}%` }"></div>
       </div>
 
       <div v-if="canOpenPlayerWhileProcessing" class="inline-tip">
         后台处理中仍可进入播放器，当前播放原始视频文件。
+      </div>
+
+      <div class="block">
+        <WhisperModelPicker
+          title="Whisper 模型"
+          :model="processingSettings.model"
+          :options="whisperModelOptions"
+          :disabled="processDisabled"
+          @select="selectProcessingModel"
+        />
       </div>
 
       <div v-if="canShowAnalysisBlock" class="block">
@@ -85,8 +97,17 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi } from '@/config'
-import { deleteVideo, generateVideoSummary, generateVideoTags, getVideo, getVideoStatus, processVideo } from '@/api/video'
-import { buildProcessPayload, getProcessingSettings, summaryStyleLabel } from '@/services/processingSettings'
+import { deleteVideo, generateVideoSummary, generateVideoTags, getVideo, getVideoProcessingOptions, getVideoStatus, processVideo } from '@/api/video'
+import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
+import {
+  buildProcessPayload,
+  getProcessingSettings,
+  getWhisperModelOptions,
+  saveProcessingSettings,
+  saveWhisperModelCatalog,
+  summaryStyleLabel,
+  whisperModelLabel
+} from '@/services/processingSettings'
 import {
   canAutoStartVideoProcessing,
   canRetryVideoProcessing,
@@ -111,6 +132,7 @@ const retrying = ref(false)
 const summaryGenerating = ref(false)
 const tagGenerating = ref(false)
 const processingSettings = ref(getProcessingSettings())
+const whisperModelOptions = ref(getWhisperModelOptions())
 
 let statusPoller = null
 const usingMockGateway = computed(() => shouldUseMockApi())
@@ -118,6 +140,13 @@ const usingMockGateway = computed(() => shouldUseMockApi())
 const statusValue = computed(() => statusInfo.value.status || video.value?.status || '')
 const progressValue = computed(() => Number(statusInfo.value.progress ?? 0) || 0)
 const stepValue = computed(() => statusInfo.value.current_step || '')
+const activeModelValue = computed(
+  () => statusInfo.value.effective_model || statusInfo.value.requested_model || video.value?.effective_model || video.value?.requested_model || ''
+)
+const activeModelText = computed(() => {
+  const value = String(activeModelValue.value || '').trim().toLowerCase()
+  return value ? whisperModelLabel(value) : ''
+})
 const heroInitial = computed(() => String(video.value?.title || 'V').trim().slice(0, 1).toUpperCase() || 'V')
 
 const isInProgress = isActiveVideoStatus
@@ -160,6 +189,18 @@ const badgeClass = (status) => {
   return videoStatusTone(status)
 }
 
+const refreshWhisperModelOptions = async () => {
+  try {
+    const res = await getVideoProcessingOptions()
+    const catalog = saveWhisperModelCatalog(res?.data || {})
+    whisperModelOptions.value = catalog.options
+    processingSettings.value = saveProcessingSettings(processingSettings.value)
+  } catch {
+    whisperModelOptions.value = getWhisperModelOptions()
+    processingSettings.value = saveProcessingSettings(processingSettings.value)
+  }
+}
+
 const heroClass = computed(() => {
   const tone = videoStatusTone(statusValue.value)
   if (tone === 'ok') return 'hero-shell--ok'
@@ -175,7 +216,10 @@ const fetchStatus = async () => {
   statusInfo.value = {
     status: p.status || p.data?.status || '',
     progress: p.progress ?? p.data?.progress ?? 0,
-    current_step: p.current_step || p.data?.current_step || ''
+    current_step: p.current_step || p.data?.current_step || '',
+    requested_model: p.requested_model || p.data?.requested_model || '',
+    effective_model: p.effective_model || p.data?.effective_model || '',
+    requested_language: p.requested_language || p.data?.requested_language || ''
   }
   const nextStatus = normalizeVideoStatus(statusInfo.value.status)
   if (previousStatus && isActiveVideoStatus(previousStatus) && !isActiveVideoStatus(nextStatus)) {
@@ -264,7 +308,9 @@ const normalizeVideo = (payload) => {
   if (!current) return null
   return {
     ...current,
-    tags: Array.isArray(current.tags) ? current.tags : []
+    tags: Array.isArray(current.tags) ? current.tags : [],
+    requested_model: String(current.requested_model || '').trim().toLowerCase(),
+    effective_model: String(current.effective_model || current.requested_model || '').trim().toLowerCase()
   }
 }
 
@@ -272,6 +318,7 @@ const reload = async () => {
   loading.value = true
   error.value = ''
   try {
+    await refreshWhisperModelOptions()
     processingSettings.value = getProcessingSettings()
     const res = await getVideo(id.value)
     video.value = normalizeVideo(res.data)
@@ -283,6 +330,14 @@ const reload = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const selectProcessingModel = (model) => {
+  if (processDisabled.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    model
+  })
 }
 
 const startProcess = async () => {

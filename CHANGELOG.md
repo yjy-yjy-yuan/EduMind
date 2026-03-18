@@ -2,6 +2,14 @@
 
 ## 2026-03-18
 
+### Whisper 启动预热与运行时加载管理
+- 新增 [`backend_fastapi/app/services/whisper_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/whisper_runtime.py)：集中管理 Whisper 设备选择、模型目录、模型文件存在性检查、已下载/首次下载两档加载超时、单模型缓存复用，以及启动后台预热状态。
+- 更新 [`backend_fastapi/app/tasks/video_processing.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_processing.py)：视频转录阶段改为统一走 Whisper 运行时服务，避免每个任务各自散落模型加载逻辑，并保留现有 MPS 失败后自动回退 CPU 的处理链路。
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：FastAPI 启动后会后台预热默认 Whisper 模型；新增 `WHISPER_PRELOAD_ON_STARTUP`、`WHISPER_LOAD_TIMEOUT_SECONDS`、`WHISPER_DOWNLOAD_TIMEOUT_SECONDS` 配置，`/health` 也会返回当前 Whisper 运行时状态，便于本机和 iOS 联调确认模型加载进度。
+- 新增 [`backend_fastapi/tests/unit/test_whisper_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_whisper_runtime.py)，更新 [`backend_fastapi/tests/conftest.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/conftest.py)、[`backend_fastapi/tests/smoke/test_app_startup.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/smoke/test_app_startup.py)：补充 Whisper 运行时的缓存复用、超时策略、MPS 回退 CPU、启动预热测试，并在测试环境默认关闭启动预热，避免单测真实加载本机模型。
+- 新增 [`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)，更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/services/processingSettings.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/processingSettings.js)：Whisper 模型选择改为页面内按键式选择；上传页和视频详情页可直接切换处理模型，点击后会同步保存到当前处理设置，并用于新上传、手动处理和失败重试；前端可选模型也补齐到 `large`。
+- 更新 [`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)：将模型按键从普通 pill 提升为卡片式选择器，补充模型定位文案、激活态高亮和移动端单列布局，提升在上传页与视频详情页中的可辨识度和点击反馈。
+
 ### DeepSeek 推理进度与问答页等待态修复
 - 更新 [`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/app/utils/qa_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/qa_utils.py)：`POST /api/qa/ask` 在 `stream=true` 时改为返回可解析的 NDJSON 阶段事件流，覆盖 `accepted / retrieving / reasoning|answering / organizing / completed`，并在最终回答生成后继续写入现有 `questions` 表。
 - 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：问答页改为接入后端阶段进度流，新增顶部 AI 进度条与消息内进度条；DeepSeek `先思考再回答` 模式下，用户现在可以明确看到“已提交、检索中、推理中、整理中、已完成”的实时状态，不再只看到空白等待态。
@@ -218,6 +226,11 @@
 ### 真机地址与端口自动同步
 
 - 更新 [`ios-app/sync_ios_web_assets.sh`](/Users/yuan/final-work/EduMind/ios-app/sync_ios_web_assets.sh)：构建 iOS 资源前自动读取 `backend_fastapi/.env` 中的 `PORT` 与当前 Mac `LocalHostName`，同步刷新 iOS 原生默认后端地址，避免端口变化后还要手工修改 Xcode Build Settings。
+
+## 2026-03-18
+
+### 模型按键进一步紧凑化
+- 更新 [`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)：将 Whisper 模型选择器进一步压缩为横向可滑动按钮条，当前模型与说明合并到单行头部展示，按钮保留激活高亮但显著减少垂直占位，适配上传页和视频详情页的小屏场景。
 - 更新 [`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)：开发设置页改为展示当前建议后端地址，不再写死 `2004` 和局域网 IP 示例。
 - 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`ios-app/README.md`](/Users/yuan/final-work/EduMind/ios-app/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：将真机默认地址说明统一为 `.local + backend_fastapi/.env PORT` 的单点配置链路。
 
@@ -269,3 +282,48 @@
 - 更正 [`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/app/models/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/qa.py)、[`backend_fastapi/scripts/mysql_managed_schema.sql`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/mysql_managed_schema.sql)：视频问答最终收口为“不改现有 `questions` 表结构”的实现；保留 `provider` 处理分流、前端内存隔离和本地缓存隔离，不再要求为 `questions` 表新增 `user_id / provider / mode / model` 字段。
 - 更正 [`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)、[`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)：当前通义千问 / DeepSeek 的隔离主要落在前端空间分桶与请求参数上；当后端历史接口返回空结果时，前端会保留本地缓存，不再被空历史覆盖。
 - 更正 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：视频问答当前不依赖数据库级 provider 隔离；在不改表前提下，服务端历史恢复默认安全禁用，以避免旧共享 `questions` 记录串入新的模型空间。
+
+## 2026-03-18
+
+### Whisper 模型改为滑动选择
+
+- 更新 [`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)：模型选择器改为横向滑动轨道，支持居中吸附和滑动停止后自动选中最近项；上传页与视频详情页现在使用真正的滑动选择模式，而不是静态按钮排布。
+
+### Whisper 模型选择改为原生下拉
+
+- 更新 [`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：根据 iOS 处理设置页样式，将模型选择器从横向滑动轨道收口为紧凑的原生 `select` 行；在 `WKWebView` 中点击后可直接唤起系统滑动选择器，且页面占位更接近处理设置页现有样式。
+- 更新 [`mobile-frontend/src/services/processingSettings.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/processingSettings.js)、[`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)、[`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)：为每个 Whisper 模型补充“最突出的优点”说明；上传页、视频详情页和“我的-处理设置”页都会在当前选中模型下显示对应优势文案。
+
+### Whisper 模型契约补全与回显修复
+
+- 更新 [`backend_fastapi/app/services/whisper_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/whisper_runtime.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)、新增 [`backend_fastapi/app/services/video_processing_registry.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_processing_registry.py)：补充 Whisper 模型目录与校验能力，新增 `/api/videos/processing-options`，并让视频上传、链接导入、手动重处理、列表、详情、状态接口统一回显 `requested_model / effective_model / requested_language`，避免页面长期只看到默认 `base`。
+- 更新 [`backend_fastapi/app/tasks/video_processing.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_processing.py)、[`backend_fastapi/app/tasks/video_download.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_download.py)：任务提交、下载过渡和处理完成/失败阶段的 `current_step` 现在会保留实际 Whisper 模型名，便于不改表结构也能从接口和数据库状态看出本次任务用的是哪个模型。
+- 更新 [`mobile-frontend/src/services/processingSettings.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/processingSettings.js)、[`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)、[`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：前端模型下拉现在优先对齐后端返回的模型目录，上传页/详情页/列表页会显示“本次任务实际模型”，UI-only mock 链路也同步返回模型信息，避免 mock 或回显缺失把所有任务都看成 `base`。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)、[`backend_fastapi/tests/unit/test_video_processing_task.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_processing_task.py)：补充非 `base` 模型在本地上传、链接导入、手动重处理三条链路的传参与回显测试，并同步校验任务完成时的模型落点。
+- 新增 [`ios-app/validate_ios_build.sh`](/Users/yuan/final-work/EduMind/ios-app/validate_ios_build.sh)、更新 [`ios-app/README.md`](/Users/yuan/final-work/EduMind/ios-app/README.md)：补充 iOS 容器一键验证脚本，串起 WebAssets 同步、`xcodebuild -allowProvisioningUpdates` 构建和常见签名 / CoreSimulator / `actool` 故障提示，方便本机持续验证 `WKWebView` 容器是否能加载最新前端资源。
+
+### Whisper 大模型文件完整性诊断增强
+
+- 更新 [`backend_fastapi/app/services/whisper_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/whisper_runtime.py)：为 Whisper 模型加载失败补充本地文件 SHA256 校验诊断；当 `large-v3.pt` 等已下载模型文件损坏时，运行时会优先返回“本地 Whisper 模型文件校验失败，请删除后重新下载”的明确错误，而不是把问题误判成通用下载失败或加载超时。
+- 更新 [`backend_fastapi/tests/unit/test_whisper_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_whisper_runtime.py)：新增损坏模型文件回归测试，覆盖运行时在本地权重校验失败时的错误透传与状态记录。
+
+### Whisper 模型优势文案移到标题行
+
+- 更新 [`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)：将当前选中模型的“优势”说明从下方独立区块移到 `Whisper 模型` 标题右侧，并保持随选择即时切换，减少纵向占位的同时让用户在打开下拉前就能看到当前模型的核心特点。
+
+### 对 Whisper 模型优势位置的更正说明
+
+- 更正 [`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)：当前模型的“优势”说明最终收口到同一个下拉选择框内部，显示在模型名下方；选择框仍使用原生 `select` 承接 iOS 系统滚轮交互，但视觉上会在红框区域内同时展示“当前模型 + 对应优势”。
+
+### Whisper 模型下拉选项显示核心优势
+
+- 更新 [`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)：原生下拉选项文本改为同时显示模型名和核心优势摘要，例如 `large · 效果最好`、`medium · 准确率更高`，让 iOS 系统滚轮选择时也能直接看到各模型最突出的特点。
+
+### EduMind Logo 与 AppIcon 替换
+
+- 更新 [`mobile-frontend/src/assets/edumind-logo.svg`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo.svg)：将共享品牌图替换为浅蓝底方形版本，保留脑图/书本主图形，并将底部品牌字样明确改为 `EduMind`；首页、登录页、注册页等所有使用 [`BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue) 的位置会统一显示新 logo。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png)：基于共享 logo 重新生成 iOS AppIcon，和主页品牌图保持同一视觉版本。
+
+### EduMind AppIcon 适配 iOS 图标蒙版
+
+- 新增 [`ios-app/branding/edumind-app-icon.svg`](/Users/yuan/final-work/EduMind/ios-app/branding/edumind-app-icon.svg)、更新 [`ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png)：为 iOS AppIcon 单独提供适配版源文件，移除此前在系统图标蒙版里显得过小的内层圆角底板，让浅蓝底直接铺满整个图标画布，并放大主图形与 `EduMind` 字样，避免主屏幕上出现“小 logo 嵌在白块里”的效果。

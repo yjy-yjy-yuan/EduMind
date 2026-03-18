@@ -10,6 +10,9 @@ from app.core.database import engine
 from app.models.base import Base
 from app.models.video import Video
 from app.models.video import VideoStatus
+from app.services.whisper_runtime import get_whisper_runtime_status
+from app.services.whisper_runtime import shutdown_whisper_runtime
+from app.services.whisper_runtime import start_whisper_background_preload
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -66,10 +69,12 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.PREVIEW_FOLDER, exist_ok=True)
     os.makedirs(settings.TEMP_FOLDER, exist_ok=True)
     logger.info(f"上传目录已就绪: {settings.UPLOAD_FOLDER}")
+    start_whisper_background_preload(settings.WHISPER_MODEL, settings.WHISPER_MODEL_PATH)
 
     yield
 
     # 关闭时执行
+    shutdown_whisper_runtime()
     logger.info("关闭 AI-EdVision API...")
 
 
@@ -119,4 +124,10 @@ async def root():
 @app.get("/health")
 @app.get("/api/health")
 async def health():
-    return {"status": "healthy", "services": {"database": "connected"}}
+    return {
+        "status": "healthy",
+        "services": {
+            "database": "connected",
+            "whisper": get_whisper_runtime_status(),
+        },
+    }

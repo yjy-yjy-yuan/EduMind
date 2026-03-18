@@ -98,7 +98,7 @@ def compute_file_md5(file_path: str) -> str:
     return digest.hexdigest()
 
 
-def finalize_video_record(video_id: int, *, filename: str, filepath: str, title: str, md5: str):
+def finalize_video_record(video_id: int, *, filename: str, filepath: str, title: str, md5: str, model: str = ""):
     """写回下载完成的视频记录"""
     engine, db = get_video_db_session()
     try:
@@ -113,7 +113,7 @@ def finalize_video_record(video_id: int, *, filename: str, filepath: str, title:
         video.md5 = md5
         video.status = VideoStatus.UPLOADED
         video.process_progress = 0.0
-        video.current_step = "已上传，等待处理"
+        video.current_step = f"已上传，等待处理（{model}）" if str(model or "").strip() else "已上传，等待处理"
         video.error_message = None
         db.commit()
     finally:
@@ -177,8 +177,9 @@ def download_video_from_url_task(
             filepath=downloaded_path,
             title=output_title,
             md5=md5,
+            model=model or settings.WHISPER_MODEL,
         )
-        update_video_status(video_id, VideoStatus.PENDING, 0.0, "下载完成，准备处理")
+        update_video_status(video_id, VideoStatus.PENDING, 0.0, f"下载完成，准备处理（{model or settings.WHISPER_MODEL}）")
         process_video_task(
             video_id,
             language,

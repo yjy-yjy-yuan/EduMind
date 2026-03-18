@@ -128,6 +128,18 @@ xcodebuild -project ios-app/EduMindIOS/EduMindIOS.xcodeproj \
   build
 ```
 
+如果你要连同前端资源同步、自动签名更新和构建日志一起做一遍本地校验，可直接执行：
+
+```bash
+bash ios-app/validate_ios_build.sh
+```
+
+该脚本会：
+
+1. 先执行 `bash ios-app/sync_ios_web_assets.sh`
+2. 再用 `xcodebuild -allowProvisioningUpdates` 构建 iOS 工程
+3. 构建失败时输出更聚焦的签名 / CoreSimulator / `actool` 排查提示
+
 ### 7. 视频上传权限说明
 
 iOS 容器当前依赖 `WKWebView` 默认文件选择能力。由于 iPhone 上点击视频上传控件时，系统可能同时提供“拍摄视频 / 相册 / 文件”等入口，因此工程必须保留以下隐私说明，避免上传视频时触发系统权限崩溃：

@@ -6,6 +6,16 @@
     </header>
 
     <div class="card">
+      <WhisperModelPicker
+        title="Whisper 模型"
+        :model="processingSettings.model"
+        :options="whisperModelOptions"
+        :disabled="busy"
+        @select="selectProcessingModel"
+      />
+    </div>
+
+    <div class="card">
       <div class="card-title">本地视频</div>
       <input
         ref="fileInputRef"
@@ -64,6 +74,7 @@
           <div class="recent-main">
             <div class="recent-title">{{ item.title }}</div>
             <div class="muted">{{ item.typeText }} · {{ item.timeText }}</div>
+            <div v-if="recentModelText(item)" class="muted">{{ recentModelText(item) }}</div>
             <div class="recent-meta">
               <span class="status" :class="statusClass(item.status)">{{ statusText(item.status) }}</span>
             </div>
@@ -101,8 +112,19 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getVideoStatus, processVideo, uploadLocalVideo, uploadVideoUrl } from '@/api/video'
-import { buildProcessPayload, getProcessingSettings, languageLabel, summaryStyleLabel, whisperModelLabel, appendProcessingSettingsToFormData } from '@/services/processingSettings'
+import { getVideoProcessingOptions, getVideoStatus, processVideo, uploadLocalVideo, uploadVideoUrl } from '@/api/video'
+import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
+import {
+  appendProcessingSettingsToFormData,
+  buildProcessPayload,
+  getProcessingSettings,
+  getWhisperModelOptions,
+  languageLabel,
+  saveWhisperModelCatalog,
+  saveProcessingSettings,
+  summaryStyleLabel,
+  whisperModelLabel
+} from '@/services/processingSettings'
 import { normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
@@ -121,6 +143,7 @@ const syncingRecent = ref(false)
 const statusFilter = ref('all')
 let recentStatusTimer = null
 const processingSettings = ref(getProcessingSettings())
+const whisperModelOptions = ref(getWhisperModelOptions())
 
 const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
 const ALLOWED_EXTENSIONS = new Set(['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'])
@@ -144,6 +167,14 @@ const processingSettingsSummary = computed(() => {
   if (current.autoGenerateTags) parts.push('自动标签')
   return parts.join(' · ')
 })
+
+const selectProcessingModel = (model) => {
+  if (busy.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    model
+  })
+}
 
 const readableSize = (size) => {
   const n = Number(size || 0)
@@ -221,9 +252,16 @@ const normalizeRecentUploads = (list) => {
       status: normalizeVideoStatus(item.status || (item.duplicate ? 'uploaded' : 'pending')),
       progress: displayProgress(item.progress),
       currentStep: String(item.currentStep || ''),
+      requestedModel: String(item.requestedModel || item.requested_model || '').trim().toLowerCase(),
+      effectiveModel: String(item.effectiveModel || item.effective_model || item.requestedModel || item.requested_model || '').trim().toLowerCase(),
       retrying: false
     }))
     .filter((item) => item.key)
+}
+
+const recentModelText = (item) => {
+  const model = String(item?.effectiveModel || item?.requestedModel || '').trim().toLowerCase()
+  return model ? `本次任务：${whisperModelLabel(model)} 模型` : ''
 }
 
 const hasActiveRecentUploads = computed(() => recentUploads.value.some((item) => isActiveStatus(item.status)))
@@ -253,7 +291,27 @@ const persistRecentUploads = () => {
   }
 }
 
-const addRecentUpload = ({ videoId, title, typeText, duplicate = false, status = 'pending' }) => {
+const refreshWhisperModelOptions = async () => {
+  try {
+    const res = await getVideoProcessingOptions()
+    const catalog = saveWhisperModelCatalog(res?.data || {})
+    whisperModelOptions.value = catalog.options
+    processingSettings.value = saveProcessingSettings(processingSettings.value)
+  } catch {
+    whisperModelOptions.value = getWhisperModelOptions()
+    processingSettings.value = saveProcessingSettings(processingSettings.value)
+  }
+}
+
+const addRecentUpload = ({
+  videoId,
+  title,
+  typeText,
+  duplicate = false,
+  status = 'pending',
+  requestedModel = '',
+  effectiveModel = ''
+}) => {
   const now = new Date().toISOString()
   const normalizedStatus = normalizeVideoStatus(duplicate ? 'uploaded' : status)
   const item = {
@@ -267,6 +325,8 @@ const addRecentUpload = ({ videoId, title, typeText, duplicate = false, status =
     status: normalizedStatus,
     progress: 0,
     currentStep: normalizedStatus === 'downloading' ? '已提交，等待下载' : '已提交，等待处理',
+    requestedModel: String(requestedModel || '').trim().toLowerCase(),
+    effectiveModel: String(effectiveModel || requestedModel || '').trim().toLowerCase(),
     retrying: false
   }
   const merged = [item, ...recentUploads.value.filter((x) => x.videoId !== item.videoId || !item.videoId)]
@@ -305,14 +365,18 @@ const syncRecentStatuses = async () => {
             key: item.key,
             status: normalizeVideoStatus(data?.status || data?.data?.status),
             progress: displayProgress(data?.progress ?? data?.data?.progress),
-            currentStep: String(data?.current_step || data?.data?.current_step || '')
+            currentStep: String(data?.current_step || data?.data?.current_step || ''),
+            requestedModel: String(data?.requested_model || data?.data?.requested_model || '').trim().toLowerCase(),
+            effectiveModel: String(data?.effective_model || data?.data?.effective_model || data?.requested_model || '').trim().toLowerCase()
           }
         } catch {
           return {
             key: item.key,
             status: normalizeVideoStatus(item.status),
             progress: displayProgress(item.progress),
-            currentStep: String(item.currentStep || '')
+            currentStep: String(item.currentStep || ''),
+            requestedModel: String(item.requestedModel || '').trim().toLowerCase(),
+            effectiveModel: String(item.effectiveModel || item.requestedModel || '').trim().toLowerCase()
           }
         }
       })
@@ -322,7 +386,9 @@ const syncRecentStatuses = async () => {
       ...item,
       status: statusMap.get(item.key)?.status || item.status,
       progress: statusMap.get(item.key)?.progress ?? item.progress,
-      currentStep: statusMap.get(item.key)?.currentStep ?? item.currentStep
+      currentStep: statusMap.get(item.key)?.currentStep ?? item.currentStep,
+      requestedModel: statusMap.get(item.key)?.requestedModel || item.requestedModel,
+      effectiveModel: statusMap.get(item.key)?.effectiveModel || item.effectiveModel
     }))
     persistRecentUploads()
   } finally {
@@ -363,6 +429,8 @@ const retryRecent = async (item) => {
       status: 'pending',
       progress: 0,
       currentStep: '已提交，等待处理',
+      requestedModel: String(processingSettings.value.model || '').trim().toLowerCase(),
+      effectiveModel: String(processingSettings.value.model || '').trim().toLowerCase(),
       retrying: false
     }
     message.value = `视频 ${item.videoId} 已重新提交处理`
@@ -447,7 +515,9 @@ const uploadFile = async () => {
       title: data?.data?.title || file.value?.name || '本地视频',
       typeText: `本地文件 · ${readableSize(file.value?.size)}`,
       duplicate: Boolean(data?.duplicate),
-      status: data?.status || 'uploaded'
+      status: data?.status || 'uploaded',
+      requestedModel: data?.data?.requested_model || processingSettings.value.model,
+      effectiveModel: data?.data?.effective_model || data?.data?.requested_model || processingSettings.value.model
     })
     router.push(
       videoId
@@ -484,7 +554,9 @@ const uploadUrl = async () => {
       title: data?.data?.title || trimmedUrl,
       typeText: '链接导入',
       duplicate: Boolean(data?.duplicate),
-      status: data?.status || 'downloading'
+      status: data?.status || 'downloading',
+      requestedModel: data?.data?.requested_model || processingSettings.value.model,
+      effectiveModel: data?.data?.effective_model || data?.data?.requested_model || processingSettings.value.model
     })
     router.push(
       videoId
@@ -500,6 +572,7 @@ const uploadUrl = async () => {
 
 onMounted(async () => {
   processingSettings.value = getProcessingSettings()
+  await refreshWhisperModelOptions()
   loadRecentUploads()
   await syncRecentStatuses()
   scheduleRecentStatusSync()

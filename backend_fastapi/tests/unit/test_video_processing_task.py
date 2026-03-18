@@ -110,7 +110,7 @@ def test_process_video_task_updates_video_and_subtitles(tmp_path, monkeypatch):
 
     assert stored_video is not None
     assert stored_video.status == VideoStatus.COMPLETED
-    assert stored_video.current_step == "处理完成"
+    assert stored_video.current_step == "处理完成（turbo）"
     assert stored_video.process_progress == 100.0
     assert stored_video.subtitle_filepath is not None
     assert stored_video.summary == "学习重点：\n1. 第一条。\n2. 第二条。"
