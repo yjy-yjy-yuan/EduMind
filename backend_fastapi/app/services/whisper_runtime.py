@@ -1,0 +1,451 @@
+"""Whisper 运行时管理。
+
+负责统一处理模型设备选择、模型目录、启动预热、加载超时与单模型复用。
+"""
+
+import gc
+import logging
+import os
+import threading
+import time
+from copy import deepcopy
+from typing import Any
+from urllib.parse import urlparse
+
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+class WhisperRuntimeManager:
+    """Whisper 模型运行时管理器。
+
+    当前实现只保留一个已加载模型，避免不同模型长期常驻造成内存占用失控。
+    """
+
+    def __init__(self):
+        self._load_lock = threading.RLock()
+        self._transcribe_lock = threading.Lock()
+        self._status_lock = threading.Lock()
+        self._loaded_model: Any | None = None
+        self._loaded_key: tuple[str, str, str] | None = None
+        self._preload_thread: threading.Thread | None = None
+        self._status = {
+            "state": "idle",
+            "enabled": bool(getattr(settings, "WHISPER_PRELOAD_ON_STARTUP", False)),
+            "loaded": False,
+            "model": "",
+            "device": "",
+            "model_path": os.path.expanduser(settings.WHISPER_MODEL_PATH),
+            "downloaded": False,
+            "cache_hit": False,
+            "last_source": "",
+            "last_error": "",
+            "timeout_seconds": 0,
+            "loaded_at": None,
+        }
+
+    def get_device(self) -> str:
+        """获取当前最合适的 Whisper 设备。"""
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                return "cuda"
+
+            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                pytorch_version = torch.__version__.split("+")[0]
+                major, minor = map(int, pytorch_version.split(".")[:2])
+                if major > 2 or (major == 2 and minor >= 1):
+                    return "mps"
+                logger.warning("PyTorch %s 的 MPS 兼容性不足，回退到 CPU", pytorch_version)
+        except ImportError:
+            logger.warning("未安装 torch，Whisper 将回退到 CPU")
+        except Exception as exc:
+            logger.warning("检测 Whisper 设备失败，回退到 CPU | error=%s", exc)
+
+        return "cpu"
+
+    def clear_device_cache(self):
+        """清理 CUDA/MPS 缓存。"""
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.info("已清理 CUDA 缓存")
+            elif hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
+                torch.mps.empty_cache()
+                logger.info("已清理 MPS 缓存")
+        except Exception as exc:
+            logger.warning("清理 Whisper 设备缓存失败 | error=%s", exc)
+
+        gc.collect()
+
+    def should_retry_on_cpu(self, device: str, error: Exception) -> bool:
+        """判断是否应从 MPS 自动回退到 CPU。"""
+        if device != "mps":
+            return False
+
+        message = str(error)
+        fallback_markers = (
+            "SparseMPS",
+            "sparse_coo_tensor",
+            "not implemented for the 'MPS' backend",
+            "Could not run",
+        )
+        return any(marker in message for marker in fallback_markers)
+
+    def get_status(self) -> dict:
+        """返回当前运行时状态。"""
+        with self._status_lock:
+            return deepcopy(self._status)
+
+    def _update_status(self, **changes):
+        with self._status_lock:
+            self._status.update(changes)
+
+    def _resolve_model_name(self, model_name: str) -> str:
+        normalized = str(model_name or settings.WHISPER_MODEL).strip()
+        return normalized or settings.WHISPER_MODEL
+
+    def _resolve_model_path(self, model_path: str = "", *, create_dir: bool = False) -> str:
+        expanded_path = os.path.expanduser(model_path or settings.WHISPER_MODEL_PATH)
+        if create_dir:
+            os.makedirs(expanded_path, exist_ok=True)
+        return expanded_path
+
+    def _resolve_model_filename(self, model_name: str) -> str:
+        normalized_name = self._resolve_model_name(model_name)
+
+        try:
+            import whisper
+
+            model_urls = getattr(whisper, "_MODELS", {})
+            model_url = model_urls.get(normalized_name)
+            if model_url:
+                return os.path.basename(urlparse(model_url).path)
+        except Exception:
+            logger.debug("无法通过 whisper._MODELS 解析模型文件名 | model=%s", normalized_name)
+
+        return f"{normalized_name}.pt"
+
+    def is_model_downloaded(self, model_name: str, model_path: str = "") -> bool:
+        """检查模型文件是否已存在于自定义目录或默认缓存目录。"""
+        resolved_path = self._resolve_model_path(model_path)
+        filename = self._resolve_model_filename(model_name)
+        candidate_paths = (
+            os.path.join(resolved_path, filename),
+            os.path.join(os.path.expanduser("~/.cache/whisper"), filename),
+        )
+        return any(os.path.exists(path) for path in candidate_paths)
+
+    def get_load_timeout_seconds(self, model_name: str, model_path: str = "") -> int:
+        """根据模型文件是否已存在选择加载超时。"""
+        downloaded = self.is_model_downloaded(model_name, model_path)
+        if downloaded:
+            return max(1, int(settings.WHISPER_LOAD_TIMEOUT_SECONDS))
+        return max(1, int(settings.WHISPER_DOWNLOAD_TIMEOUT_SECONDS))
+
+    def _load_model_with_timeout(self, model_name: str, device: str, model_path: str, timeout_seconds: int):
+        result_holder: dict[str, Any] = {}
+        error_holder: dict[str, BaseException] = {}
+
+        def worker():
+            try:
+                import whisper
+
+                result_holder["model"] = whisper.load_model(model_name, device=device, download_root=model_path)
+            except BaseException as exc:  # pragma: no cover - 线程异常保护
+                error_holder["error"] = exc
+
+        thread = threading.Thread(
+            target=worker,
+            name=f"whisper-load-{model_name}-{device}",
+            daemon=True,
+        )
+        thread.start()
+        thread.join(timeout_seconds)
+
+        if thread.is_alive():
+            raise TimeoutError(f"加载 {model_name} 模型超时 (超过{timeout_seconds}秒)")
+
+        if "error" in error_holder:
+            raise error_holder["error"]
+
+        return result_holder.get("model")
+
+    def unload_model(self):
+        """释放当前已加载模型。"""
+        with self._load_lock:
+            if self._loaded_model is None:
+                return
+
+            model_name = self._loaded_key[0] if self._loaded_key else ""
+            self._loaded_model = None
+            self._loaded_key = None
+            self.clear_device_cache()
+            self._update_status(
+                state="idle",
+                loaded=False,
+                model="",
+                device="",
+                cache_hit=False,
+                timeout_seconds=0,
+            )
+            logger.info("已释放 Whisper 模型 | model=%s", model_name)
+
+    def load_model(
+        self,
+        model_name: str,
+        *,
+        force_device: str = "",
+        model_path: str = "",
+        source: str = "task",
+    ):
+        """加载指定 Whisper 模型，并保留为当前活动模型。"""
+        normalized_name = self._resolve_model_name(model_name)
+        resolved_path = self._resolve_model_path(model_path, create_dir=True)
+        device = force_device or self.get_device()
+        cache_key = (normalized_name, device, resolved_path)
+
+        with self._load_lock:
+            if self._loaded_model is not None and self._loaded_key == cache_key:
+                self._update_status(
+                    state="ready",
+                    enabled=bool(settings.WHISPER_PRELOAD_ON_STARTUP),
+                    loaded=True,
+                    model=normalized_name,
+                    device=device,
+                    model_path=resolved_path,
+                    downloaded=self.is_model_downloaded(normalized_name, resolved_path),
+                    cache_hit=True,
+                    last_source=source,
+                    last_error="",
+                )
+                return self._loaded_model
+
+            if self._loaded_model is not None and self._loaded_key != cache_key:
+                previous_model = self._loaded_key[0] if self._loaded_key else ""
+                self._loaded_model = None
+                self._loaded_key = None
+                self.clear_device_cache()
+                logger.info("切换 Whisper 模型前释放旧模型 | from=%s | to=%s", previous_model, normalized_name)
+
+            timeout_seconds = self.get_load_timeout_seconds(normalized_name, resolved_path)
+            downloaded = self.is_model_downloaded(normalized_name, resolved_path)
+            self._update_status(
+                state="loading",
+                enabled=bool(settings.WHISPER_PRELOAD_ON_STARTUP),
+                loaded=False,
+                model=normalized_name,
+                device=device,
+                model_path=resolved_path,
+                downloaded=downloaded,
+                cache_hit=False,
+                last_source=source,
+                last_error="",
+                timeout_seconds=timeout_seconds,
+            )
+
+            started_at = time.time()
+            logger.info(
+                "开始加载 Whisper 模型 | model=%s | device=%s | path=%s | downloaded=%s | timeout=%ss | source=%s",
+                normalized_name,
+                device,
+                resolved_path,
+                downloaded,
+                timeout_seconds,
+                source,
+            )
+
+            try:
+                model = self._load_model_with_timeout(normalized_name, device, resolved_path, timeout_seconds)
+            except Exception as exc:
+                self._update_status(
+                    state="failed",
+                    loaded=False,
+                    cache_hit=False,
+                    last_error=str(exc),
+                    timeout_seconds=timeout_seconds,
+                )
+                raise
+
+            elapsed = time.time() - started_at
+            self._loaded_model = model
+            self._loaded_key = cache_key
+            self._update_status(
+                state="ready",
+                loaded=True,
+                model=normalized_name,
+                device=device,
+                model_path=resolved_path,
+                downloaded=True,
+                cache_hit=False,
+                last_source=source,
+                last_error="",
+                timeout_seconds=timeout_seconds,
+                loaded_at=time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime()),
+            )
+            logger.info(
+                "Whisper 模型加载完成 | model=%s | device=%s | elapsed=%.1fs | source=%s",
+                normalized_name,
+                device,
+                elapsed,
+                source,
+            )
+            return model
+
+    def transcribe(
+        self,
+        audio_path: str,
+        model_name: str,
+        language: str,
+        model_path: str = "",
+        *,
+        force_device: str = "",
+    ) -> dict:
+        """使用当前运行时管理器执行转录。"""
+        device = force_device or self.get_device()
+
+        try:
+            with self._transcribe_lock:
+                model = self.load_model(
+                    model_name,
+                    force_device=device,
+                    model_path=model_path,
+                    source="transcribe",
+                )
+                start_time = time.time()
+                result = model.transcribe(
+                    audio_path,
+                    language=language if language else None,
+                    verbose=False,
+                    fp16=(device in {"cuda", "mps"}),
+                )
+
+            elapsed = time.time() - start_time
+            logger.info(
+                "Whisper 转录完成 | model=%s | device=%s | file=%s | elapsed=%.1fs",
+                self._resolve_model_name(model_name),
+                device,
+                os.path.basename(audio_path),
+                elapsed,
+            )
+            self.clear_device_cache()
+            return result
+        except Exception as exc:
+            logger.error(
+                "Whisper 转录失败 | model=%s | device=%s | file=%s | error=%s",
+                self._resolve_model_name(model_name),
+                device,
+                os.path.basename(audio_path),
+                exc,
+            )
+            self.clear_device_cache()
+            if self.should_retry_on_cpu(device, exc):
+                logger.warning("MPS 转录失败，自动切换到 CPU 重试 | model=%s", model_name)
+                return self.transcribe(
+                    audio_path,
+                    model_name,
+                    language,
+                    model_path,
+                    force_device="cpu",
+                )
+            raise
+
+    def start_background_preload(self, model_name: str = "", model_path: str = "") -> bool:
+        """在后台线程预热默认 Whisper 模型。"""
+        target_model = self._resolve_model_name(model_name)
+        if not bool(settings.WHISPER_PRELOAD_ON_STARTUP):
+            resolved_path = self._resolve_model_path(model_path)
+            self._update_status(
+                state="disabled",
+                enabled=False,
+                model=target_model,
+                model_path=resolved_path,
+                last_source="startup_preload",
+            )
+            logger.info("Whisper 启动预热已禁用 | model=%s", target_model)
+            return False
+
+        resolved_path = self._resolve_model_path(model_path)
+
+        with self._load_lock:
+            if self._preload_thread is not None and self._preload_thread.is_alive():
+                logger.info("Whisper 启动预热已在进行中，跳过重复启动")
+                return False
+
+            self._update_status(
+                state="queued",
+                enabled=True,
+                model=target_model,
+                model_path=resolved_path,
+                cache_hit=False,
+                last_source="startup_preload",
+                last_error="",
+            )
+
+            def worker():
+                try:
+                    self.load_model(
+                        target_model,
+                        model_path=resolved_path,
+                        source="startup_preload",
+                    )
+                except Exception as exc:
+                    logger.warning("Whisper 启动预热失败 | model=%s | error=%s", target_model, exc)
+
+            self._preload_thread = threading.Thread(
+                target=worker,
+                name="whisper-startup-preload",
+                daemon=True,
+            )
+            self._preload_thread.start()
+
+        logger.info("Whisper 启动预热已开始 | model=%s | path=%s", target_model, resolved_path)
+        return True
+
+    def shutdown(self):
+        """应用关闭时释放 Whisper 运行时资源。"""
+        self.unload_model()
+
+
+whisper_runtime = WhisperRuntimeManager()
+
+
+def get_whisper_device() -> str:
+    return whisper_runtime.get_device()
+
+
+def clear_whisper_device_cache():
+    whisper_runtime.clear_device_cache()
+
+
+def transcribe_audio_with_whisper(
+    audio_path: str,
+    model_name: str,
+    language: str,
+    model_path: str = "",
+    *,
+    force_device: str = "",
+) -> dict:
+    return whisper_runtime.transcribe(
+        audio_path,
+        model_name,
+        language,
+        model_path,
+        force_device=force_device,
+    )
+
+
+def get_whisper_runtime_status() -> dict:
+    return whisper_runtime.get_status()
+
+
+def start_whisper_background_preload(model_name: str = "", model_path: str = "") -> bool:
+    return whisper_runtime.start_background_preload(model_name=model_name, model_path=model_path)
+
+
+def shutdown_whisper_runtime():
+    whisper_runtime.shutdown()

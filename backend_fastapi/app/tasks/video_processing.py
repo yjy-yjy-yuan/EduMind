@@ -16,6 +16,9 @@ import subprocess
 import threading
 import time
 
+from app.services.whisper_runtime import clear_whisper_device_cache
+from app.services.whisper_runtime import get_whisper_device
+from app.services.whisper_runtime import transcribe_audio_with_whisper
 from app.services.video_content_service import extract_transcript_text
 from sqlalchemy import inspect
 
@@ -28,36 +31,12 @@ TRANSCRIPTION_POLL_SECONDS = 2.0
 
 def get_device():
     """获取最佳计算设备 - 自动检测 CUDA/MPS/CPU"""
-    try:
-        import torch
-
-        if torch.cuda.is_available():
-            return "cuda"
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            # 检测 PyTorch 版本，MPS 在 2.1+ 更稳定
-            pytorch_version = torch.__version__.split("+")[0]
-            major, minor = map(int, pytorch_version.split(".")[:2])
-            if major > 2 or (major == 2 and minor >= 1):
-                return "mps"
-            logger.warning(f"PyTorch {pytorch_version} 的 MPS 不完全兼容，使用 CPU")
-    except ImportError:
-        pass
-    return "cpu"
+    return get_whisper_device()
 
 
 def clear_gpu_cache():
     """清理 GPU 缓存，释放显存"""
-    try:
-        import torch
-
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            logger.info("已清理 CUDA 缓存")
-        elif hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
-            torch.mps.empty_cache()
-            logger.info("已清理 MPS 缓存")
-    except Exception as e:
-        logger.warning(f"清理 GPU 缓存时出错: {str(e)}")
+    clear_whisper_device_cache()
     gc.collect()
 
 
@@ -206,31 +185,15 @@ def transcribe_with_whisper(
     """使用 Whisper 转录音频"""
     device = force_device or get_device()
     try:
-        import whisper
-
-        logger.info(f"加载 Whisper 模型: {model_name} (设备: {device})")
-
-        # 加载模型
-        model = whisper.load_model(model_name, device=device, download_root=model_path)
-
-        # 转录
-        logger.info(f"开始转录: {os.path.basename(audio_path)}")
-        start_time = time.time()
-
-        result = model.transcribe(
+        logger.info("调用 Whisper 运行时执行转录 | model=%s | device=%s", model_name, device)
+        result = transcribe_audio_with_whisper(
             audio_path,
-            language=language if language else None,
-            verbose=False,
-            fp16=(device == "cuda"),
+            model_name,
+            language,
+            model_path,
+            force_device=device,
         )
-
-        elapsed = time.time() - start_time
-        logger.info(f"转录完成，耗时: {elapsed:.1f}秒")
-
-        # 清理
-        del model
         clear_gpu_cache()
-
         return result
     except Exception as e:
         logger.error(f"转录失败: {str(e)}")

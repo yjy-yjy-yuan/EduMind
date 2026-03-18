@@ -2,6 +2,12 @@
 
 ## 2026-03-18
 
+### Whisper 启动预热与运行时加载管理
+- 新增 [`backend_fastapi/app/services/whisper_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/whisper_runtime.py)：集中管理 Whisper 设备选择、模型目录、模型文件存在性检查、已下载/首次下载两档加载超时、单模型缓存复用，以及启动后台预热状态。
+- 更新 [`backend_fastapi/app/tasks/video_processing.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_processing.py)：视频转录阶段改为统一走 Whisper 运行时服务，避免每个任务各自散落模型加载逻辑，并保留现有 MPS 失败后自动回退 CPU 的处理链路。
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：FastAPI 启动后会后台预热默认 Whisper 模型；新增 `WHISPER_PRELOAD_ON_STARTUP`、`WHISPER_LOAD_TIMEOUT_SECONDS`、`WHISPER_DOWNLOAD_TIMEOUT_SECONDS` 配置，`/health` 也会返回当前 Whisper 运行时状态，便于本机和 iOS 联调确认模型加载进度。
+- 新增 [`backend_fastapi/tests/unit/test_whisper_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_whisper_runtime.py)，更新 [`backend_fastapi/tests/conftest.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/conftest.py)、[`backend_fastapi/tests/smoke/test_app_startup.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/smoke/test_app_startup.py)：补充 Whisper 运行时的缓存复用、超时策略、MPS 回退 CPU、启动预热测试，并在测试环境默认关闭启动预热，避免单测真实加载本机模型。
+
 ### DeepSeek 推理进度与问答页等待态修复
 - 更新 [`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/app/utils/qa_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/qa_utils.py)：`POST /api/qa/ask` 在 `stream=true` 时改为返回可解析的 NDJSON 阶段事件流，覆盖 `accepted / retrieving / reasoning|answering / organizing / completed`，并在最终回答生成后继续写入现有 `questions` 表。
 - 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：问答页改为接入后端阶段进度流，新增顶部 AI 进度条与消息内进度条；DeepSeek `先思考再回答` 模式下，用户现在可以明确看到“已提交、检索中、推理中、整理中、已完成”的实时状态，不再只看到空白等待态。

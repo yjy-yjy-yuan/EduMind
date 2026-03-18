@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.main import app
 from app.models.base import Base
 
@@ -54,18 +55,22 @@ def db():
 @pytest.fixture(scope="function")
 def client(db):
     """测试客户端 fixture"""
-    # 覆盖数据库依赖
-    app.dependency_overrides[get_db] = override_get_db
+    original_preload = settings.WHISPER_PRELOAD_ON_STARTUP
+    settings.WHISPER_PRELOAD_ON_STARTUP = False
 
-    # 创建所有表
-    Base.metadata.create_all(bind=engine)
+    try:
+        # 覆盖数据库依赖
+        app.dependency_overrides[get_db] = override_get_db
 
-    with TestClient(app) as c:
-        yield c
+        # 创建所有表
+        Base.metadata.create_all(bind=engine)
 
-    # 清理
-    Base.metadata.drop_all(bind=engine)
-    app.dependency_overrides.clear()
+        with TestClient(app) as c:
+            yield c
+    finally:
+        settings.WHISPER_PRELOAD_ON_STARTUP = original_preload
+        Base.metadata.drop_all(bind=engine)
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture
