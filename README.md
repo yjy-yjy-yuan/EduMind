@@ -36,7 +36,7 @@ EduMind/
 - Node.js 16+
 - MySQL
 - FFmpeg
-- 按功能启用 Redis、Ollama
+- 通义千问或 DeepSeek API Key
 
 ## 快速开始
 
@@ -115,6 +115,74 @@ bash ios-app/sync_ios_web_assets.sh
 POST /api/videos/{video_id}/generate-summary
 POST /api/videos/{video_id}/generate-tags
 ```
+
+## 视频上下文问答
+
+当前视频问答已经接入真实后端 RAG，不再依赖前端占位回复：
+
+1. 前端向 `POST /api/qa/ask` 提交 `video_id`、`question`、`provider`
+2. 后端基于现有 `subtitles`、`videos.summary`、`videos.tags` 组装检索上下文
+3. 后端对字幕片段做轻量召回，再调用通义千问或 DeepSeek 生成回答
+4. 问答记录写入现有 `questions` 表，不新增平行问答表
+
+为保证连续追问时的上下文记忆，移动端会把最近几轮问答一并提交给后端，后端再结合视频字幕检索结果组织最终提示词；因此“它 / 这个 / 上一题提到的第二点”这类追问不再只靠当前一句话硬猜。
+
+当前移动端问答页支持以下模型交互：
+
+1. 选择 `通义千问` 进行标准在线问答
+2. 选择 `DeepSeek` 进行在线问答
+3. 当选择 `DeepSeek` 时，可进一步切换：
+4. `直接回答`：优先返回速度
+5. `深度思考`：优先多步推理质量，通常更慢
+
+当前 `DeepSeek` 的两种模式分别对应：
+
+1. `直接回答` -> `deepseek-chat`
+2. `深度思考` -> `deepseek-reasoner`
+
+当前问答页在真实后端模式下还会显示阶段进度，便于区分“还在推理中”还是“已经完成回答”。`POST /api/qa/ask` 在传入 `stream=true` 时会按顺序返回可解析的进度事件，当前至少包含：
+
+1. `accepted`：问题已提交
+2. `retrieving`：正在检索视频字幕、摘要与标签
+3. `reasoning` / `answering`：正在调用 DeepSeek 或通义千问
+4. `organizing`：正在整理回答与引用片段
+5. `completed`：最终回答已生成
+
+当前视频问答将 `通义千问` 与 `DeepSeek` 作为两个独立聊天空间处理，但当前隔离范围收敛为“前端状态 + 本地缓存 + 请求处理分流”：
+
+1. 切到 `通义千问` 时，只显示并续写通义千问自己的本地问答空间
+2. 切到 `DeepSeek` 时，只显示并续写 DeepSeek 自己的本地问答空间
+3. 同一 `videoId` 下，两种 provider 的前端内存状态与本地缓存不会再混用
+4. 后端仍会按 `provider` 做处理分流，但在不改现有 `questions` 表结构的前提下，服务端历史恢复默认安全禁用，避免把旧共享记录错误混入新的模型空间
+
+当前问答提供方只支持：
+
+1. `qwen`
+2. `deepseek`
+
+相关配置位于 `backend_fastapi/.env`：
+
+```bash
+OPENAI_API_KEY=your-qwen-api-key
+OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+QWEN_API_KEY=your-qwen-api-key
+QWEN_API_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1
+DEEPSEEK_API_KEY=your-deepseek-api-key
+DEEPSEEK_API_BASE=https://api.deepseek.com/v1
+QA_DEFAULT_PROVIDER=qwen
+QWEN_QA_MODEL=qwen-plus
+DEEPSEEK_QA_MODEL=deepseek-chat
+DEEPSEEK_REASONER_MODEL=deepseek-reasoner
+QA_MAX_HISTORY_MESSAGES=8
+QA_MAX_HISTORY_CHARS=2200
+```
+
+说明：
+
+1. 当前通义千问链路已经可用，`OPENAI_*` 与 `QWEN_*` 都是为 Qwen 的 OpenAI 兼容接口准备的兼容变量。
+2. 若要使用 DeepSeek，至少需要补齐 `DEEPSEEK_API_KEY`。
+3. 若希望默认问答走 DeepSeek，可将 `QA_DEFAULT_PROVIDER` 改为 `deepseek`。
+4. 当前版本不要求修改现有 MySQL `questions` 表；数据库继续只保存基础问答记录，视频问答空间隔离以前端本地缓存与请求参数为准。
 
 ## MySQL 表管理
 

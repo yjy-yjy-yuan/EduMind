@@ -38,6 +38,16 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     QWEN_API_KEY: str = ""
     QWEN_API_BASE: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    DEEPSEEK_API_KEY: str = ""
+    DEEPSEEK_API_BASE: str = "https://api.deepseek.com/v1"
+    QA_DEFAULT_PROVIDER: str = "qwen"
+    QWEN_QA_MODEL: str = "qwen-plus"
+    DEEPSEEK_QA_MODEL: str = "deepseek-chat"
+    DEEPSEEK_REASONER_MODEL: str = "deepseek-reasoner"
+    QA_TOP_K: int = 4
+    QA_MAX_CONTEXT_CHARS: int = 4500
+    QA_MAX_HISTORY_MESSAGES: int = 8
+    QA_MAX_HISTORY_CHARS: int = 2200
 
     # Ollama 配置
     OLLAMA_BASE_URL: str = "http://localhost:11434/api"

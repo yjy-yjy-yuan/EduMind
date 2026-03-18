@@ -4,114 +4,46 @@ import logging
 from typing import Generator
 from typing import List
 
-import requests
-from app.core.config import settings
-from openai import OpenAI
+from app.utils.qa_utils import call_provider_chat
+from app.utils.qa_utils import normalize_provider
+from app.utils.qa_utils import resolve_model
 
 logger = logging.getLogger(__name__)
 
 
-def check_ollama_service() -> bool:
-    """检查 Ollama 服务是否可用"""
-    try:
-        response = requests.get(f"{settings.OLLAMA_BASE_URL}/tags", timeout=5)
-        return response.status_code == 200
-    except Exception as e:
-        logger.warning(f"Ollama 服务不可用: {str(e)}")
-        return False
-
-
-def stream_ollama_chat(messages: List[dict], model: str = None) -> Generator[str, None, None]:
-    """Ollama 流式聊天"""
-    model = model or settings.OLLAMA_MODEL
-
-    try:
-        response = requests.post(
-            f"{settings.OLLAMA_BASE_URL}/chat",
-            json={
-                "model": model,
-                "messages": messages,
-                "stream": True,
-            },
-            stream=True,
-            timeout=120,
-        )
-
-        for line in response.iter_lines():
-            if line:
-                import json
-
-                try:
-                    data = json.loads(line)
-                    if "message" in data and "content" in data["message"]:
-                        yield data["message"]["content"]
-                except json.JSONDecodeError:
-                    continue
-
-    except Exception as e:
-        logger.error(f"Ollama 流式聊天出错: {str(e)}")
-        yield f"聊天出错: {str(e)}"
-
-
-def get_ollama_response(messages: List[dict], model: str = None) -> str:
-    """Ollama 非流式聊天"""
-    model = model or settings.OLLAMA_MODEL
-
-    try:
-        response = requests.post(
-            f"{settings.OLLAMA_BASE_URL}/chat",
-            json={
-                "model": model,
-                "messages": messages,
-                "stream": False,
-            },
-            timeout=120,
-        )
-
-        if response.status_code == 200:
-            data = response.json()
-            return data.get("message", {}).get("content", "")
+def normalize_chat_messages(messages: List[dict]) -> List[dict]:
+    """将聊天消息统一转换为 OpenAI 兼容结构。"""
+    normalized = []
+    for item in messages or []:
+        if isinstance(item, dict):
+            role = str(item.get("role") or "").strip()
+            content = str(item.get("content") or "").strip()
         else:
-            return f"Ollama 请求失败: {response.status_code}"
+            role = str(getattr(item, "role", "") or "").strip()
+            content = str(getattr(item, "content", "") or "").strip()
 
-    except Exception as e:
-        logger.error(f"Ollama 聊天出错: {str(e)}")
-        return f"聊天出错: {str(e)}"
-
-
-def stream_api_chat(messages: List[dict], api_key: str, model: str = "qwen-plus") -> Generator[str, None, None]:
-    """在线 API 流式聊天"""
-    try:
-        client = OpenAI(api_key=api_key, base_url=settings.OPENAI_BASE_URL)
-
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=True,
-        )
-
-        for chunk in response:
-            if chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
-
-    except Exception as e:
-        logger.error(f"API 流式聊天出错: {str(e)}")
-        yield f"聊天出错: {str(e)}"
+        if not role or not content:
+            continue
+        normalized.append({"role": role, "content": content})
+    return normalized
 
 
-def get_api_response(messages: List[dict], api_key: str, model: str = "qwen-plus") -> str:
-    """在线 API 非流式聊天"""
-    try:
-        client = OpenAI(api_key=api_key, base_url=settings.OPENAI_BASE_URL)
+def stream_chat(messages: List[dict], provider: str = "qwen", model: str = "") -> Generator[str, None, None]:
+    """在线模型聊天流式输出。当前以单次返回内容形式输出。"""
+    normalized_provider = normalize_provider(provider, model)
+    resolved_model = resolve_model(normalized_provider, model)
+    normalized_messages = normalize_chat_messages(messages)
+    yield call_provider_chat(normalized_messages, provider=normalized_provider, model=resolved_model)
 
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=False,
-        )
 
-        return response.choices[0].message.content
-
-    except Exception as e:
-        logger.error(f"API 聊天出错: {str(e)}")
-        return f"聊天出错: {str(e)}"
+def get_chat_response(messages: List[dict], provider: str = "qwen", model: str = "") -> dict:
+    """在线模型聊天非流式响应。"""
+    normalized_provider = normalize_provider(provider, model)
+    resolved_model = resolve_model(normalized_provider, model)
+    normalized_messages = normalize_chat_messages(messages)
+    content = call_provider_chat(normalized_messages, provider=normalized_provider, model=resolved_model)
+    return {
+        "content": content,
+        "provider": normalized_provider,
+        "model": resolved_model,
+    }

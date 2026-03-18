@@ -1,16 +1,23 @@
 """问答系统路由 - FastAPI 版本"""
 
+import json
 import logging
-import os
 from typing import Optional
 
 from app.core.database import get_db
+from app.core.database import SessionLocal
 from app.models.qa import Question
 from app.models.video import Video
 from app.schemas.qa import AskRequest
+from app.utils.qa_utils import QAConfigError
+from app.utils.qa_utils import QAProviderError
+from app.utils.qa_utils import QASystem
+from app.utils.qa_utils import SUPPORTED_QA_PROVIDERS
+from app.utils.qa_utils import resolve_provider_label
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import HTTPException
+from fastapi import Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -18,130 +25,245 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# QA 系统实例（延迟初始化）
-_qa_system = None
+SUPPORTED_QA_MODES = {"video", "free"}
 
 
-def get_qa_system():
-    """获取 QA 系统实例"""
-    global _qa_system
-    if _qa_system is None:
-        try:
-            from app.utils.qa_utils import QASystem
+def serialize_stream_event(event: dict) -> str:
+    return f"{json.dumps(event, ensure_ascii=False)}\n"
 
-            _qa_system = QASystem()
-        except ImportError:
-            logger.warning("QASystem 未实现，使用模拟实现")
-            _qa_system = None
-    return _qa_system
+
+def validate_provider(provider: str) -> str:
+    normalized_provider = str(provider or "").strip().lower()
+    if normalized_provider not in SUPPORTED_QA_PROVIDERS:
+        raise HTTPException(status_code=400, detail="provider 仅支持 qwen 或 deepseek，且不能为空")
+    return normalized_provider
+
+
+def persist_question_record(
+    db: Session,
+    *,
+    video_id: Optional[int],
+    content: str,
+    answer: Optional[str],
+) -> dict:
+    question = Question(
+        video_id=video_id,
+        content=content,
+        answer=answer,
+    )
+    db.add(question)
+    db.commit()
+    db.refresh(question)
+    return question.to_dict()
 
 
 @router.post("/ask")
 async def ask_question(request: AskRequest, db: Session = Depends(get_db)):
     """提问并获取答案"""
     try:
-        qa_system = get_qa_system()
+        normalized_mode = str(request.mode or "").strip().lower() or "video"
+        if normalized_mode not in SUPPORTED_QA_MODES:
+            raise HTTPException(status_code=400, detail="不支持的问答模式，仅支持 video 或 free")
+        normalized_provider = validate_provider(request.provider)
 
-        # 如果使用 Ollama 模式，检查服务是否可用
-        if request.use_ollama:
-            try:
-                from app.utils.qa_utils import check_ollama_service
-
-                if not check_ollama_service():
-                    raise HTTPException(status_code=503, detail="Ollama服务不可用，请检查服务是否运行")
-            except ImportError:
-                logger.warning("check_ollama_service 未实现")
-        elif not request.api_key:
-            raise HTTPException(status_code=400, detail="在线模式需要提供API密钥")
+        video = None
 
         # 视频问答模式需要验证视频
-        if request.mode == "video":
+        if normalized_mode == "video":
             if not request.video_id:
                 raise HTTPException(status_code=400, detail="视频问答模式需要提供视频ID")
 
             video = db.query(Video).filter(Video.id == request.video_id).first()
             if not video:
                 raise HTTPException(status_code=404, detail="视频不存在")
-            if not video.subtitle_filepath:
-                raise HTTPException(status_code=400, detail="该视频尚未生成字幕")
-            if not os.path.exists(video.subtitle_filepath):
-                raise HTTPException(status_code=400, detail="字幕文件不存在")
+        qa_system = QASystem(video=video)
+        if normalized_mode == "video" and not qa_system.has_context():
+            raise HTTPException(status_code=400, detail="该视频暂无可用于问答的字幕或摘要内容")
 
-            # 创建知识库
-            if qa_system:
-                try:
-                    qa_system.create_knowledge_base(video.subtitle_filepath)
-                except Exception as e:
-                    logger.error(f"创建知识库时出错: {str(e)}")
-                    raise HTTPException(status_code=500, detail=f"创建知识库时出错: {str(e)}")
-
-        # 创建问题记录
-        question = Question(video_id=request.video_id if request.mode == "video" else None, content=request.question)
-        db.add(question)
-        db.commit()
-        db.refresh(question)
+        effective_history = request.history
 
         # 流式响应
         if request.stream:
-
-            async def generate():
-                full_answer = ""
+            def generate():
+                stream_db = SessionLocal()
                 try:
-                    if qa_system:
-                        for chunk in qa_system.get_answer_stream(
-                            request.question,
-                            request.api_key,
-                            request.mode,
-                            use_ollama=request.use_ollama,
-                            deep_thinking=request.deep_thinking,
-                        ):
-                            full_answer += chunk
-                            yield chunk
-                    else:
-                        # 模拟响应
-                        mock_answer = f"这是对问题「{request.question}」的模拟回答。QA系统尚未完全配置。"
-                        full_answer = mock_answer
-                        yield mock_answer
+                    stream_video = None
+                    if normalized_mode == "video":
+                        stream_video = stream_db.query(Video).filter(Video.id == request.video_id).first()
+                        if not stream_video:
+                            yield serialize_stream_event(
+                                {
+                                    "type": "error",
+                                    "stage": "validation",
+                                    "message": "视频不存在",
+                                    "detail": "视频不存在",
+                                    "progress": 100,
+                                }
+                            )
+                            return
 
-                    # 更新答案
-                    question.answer = full_answer
-                    db.commit()
-                except Exception as e:
-                    logger.error(f"流式响应出错: {str(e)}")
-                    yield f"回答生成出错: {str(e)}"
+                    stream_qa_system = QASystem(video=stream_video)
+                    if normalized_mode == "video" and not stream_qa_system.has_context():
+                        yield serialize_stream_event(
+                            {
+                                "type": "error",
+                                "stage": "validation",
+                                "message": "该视频暂无可用于问答的字幕或摘要内容",
+                                "detail": "该视频暂无可用于问答的字幕或摘要内容",
+                                "progress": 100,
+                            }
+                        )
+                        return
 
-            return StreamingResponse(generate(), media_type="text/plain")
-        else:
-            # 非流式响应
-            if qa_system:
-                answer = qa_system.get_answer(
-                    request.question,
-                    request.api_key,
-                    request.mode,
-                    use_ollama=request.use_ollama,
-                    deep_thinking=request.deep_thinking,
-                )
-            else:
-                answer = f"这是对问题「{request.question}」的模拟回答。"
+                    yield serialize_stream_event(
+                        {
+                            "type": "status",
+                            "stage": "accepted",
+                            "message": "问题已提交，等待处理",
+                            "progress": 5,
+                            "provider": normalized_provider,
+                            "provider_label": resolve_provider_label(normalized_provider),
+                        }
+                    )
 
-            question.answer = answer
-            db.commit()
+                    stream_history = request.history
 
-            return question.to_dict()
+                    for event in stream_qa_system.answer_stream(
+                        request.question,
+                        provider=normalized_provider,
+                        model=request.model or "",
+                        deep_thinking=request.deep_thinking,
+                        mode=normalized_mode,
+                        history=stream_history,
+                    ):
+                        if event.get("type") == "answer":
+                            stored_question = persist_question_record(
+                                stream_db,
+                                video_id=request.video_id if normalized_mode == "video" else None,
+                                content=request.question,
+                                answer=event.get("answer"),
+                            )
+                            event.update(
+                                {
+                                    **stored_question,
+                                    "provider": normalized_provider,
+                                    "mode": normalized_mode,
+                                    "model": event.get("model"),
+                                }
+                            )
+                        logger.info(
+                            "QA stream event | type=%s | stage=%s | provider=%s | model=%s | video_id=%s",
+                            event.get("type"),
+                            event.get("stage"),
+                            event.get("provider"),
+                            event.get("model"),
+                            request.video_id,
+                        )
+                        yield serialize_stream_event(event)
+                except QAConfigError as exc:
+                    logger.error("问答流配置错误 | error=%s", exc)
+                    stream_db.rollback()
+                    yield serialize_stream_event(
+                        {
+                            "type": "error",
+                            "stage": "config_error",
+                            "message": str(exc),
+                            "detail": str(exc),
+                            "progress": 100,
+                        }
+                    )
+                except QAProviderError as exc:
+                    logger.error("问答流模型调用失败 | error=%s", exc)
+                    stream_db.rollback()
+                    yield serialize_stream_event(
+                        {
+                            "type": "error",
+                            "stage": "provider_error",
+                            "message": "模型调用失败",
+                            "detail": str(exc),
+                            "progress": 100,
+                        }
+                    )
+                except Exception as exc:
+                    logger.error("问答流处理失败 | error=%s", exc)
+                    stream_db.rollback()
+                    yield serialize_stream_event(
+                        {
+                            "type": "error",
+                            "stage": "server_error",
+                            "message": "问答处理失败，请稍后重试",
+                            "detail": "问答处理失败，请稍后重试",
+                            "progress": 100,
+                        }
+                    )
+                finally:
+                    stream_db.close()
+
+            return StreamingResponse(generate(), media_type="application/x-ndjson; charset=utf-8")
+
+        result = qa_system.ask(
+            request.question,
+            provider=normalized_provider,
+            model=request.model or "",
+            deep_thinking=request.deep_thinking,
+            mode=normalized_mode,
+            history=effective_history,
+        )
+        stored_question = persist_question_record(
+            db,
+            video_id=request.video_id if normalized_mode == "video" else None,
+            content=request.question,
+            answer=result["answer"],
+        )
+
+        response_payload = stored_question
+        response_payload.update(
+            {
+                "user_id": request.user_id,
+                "provider": result["provider"],
+                "mode": normalized_mode,
+                "provider_label": result["provider_label"],
+                "model": result["model"],
+                "references": result["references"],
+            }
+        )
+        return response_payload
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"处理问题时出错: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except QAConfigError as exc:
+        logger.error("问答配置错误 | error=%s", exc)
+        raise HTTPException(status_code=503, detail=str(exc))
+    except QAProviderError as exc:
+        logger.error("问答模型调用失败 | error=%s", exc)
+        raise HTTPException(status_code=502, detail=str(exc))
+    except Exception as exc:
+        logger.error("处理问题时出错 | error=%s", exc)
+        raise HTTPException(status_code=500, detail="问答处理失败，请稍后重试")
 
 
 @router.get("/history/{video_id}")
-async def get_qa_history(video_id: int, db: Session = Depends(get_db)):
+async def get_qa_history(
+    video_id: int,
+    provider: str = Query(..., description="模型提供方: qwen, deepseek"),
+    user_id: Optional[int] = Query(default=None, description="当前用户ID，用于隔离问答空间"),
+    mode: str = Query(default="video", description="问答模式，视频问答固定为 video"),
+):
     """获取视频的问答历史"""
     try:
-        questions = db.query(Question).filter(Question.video_id == video_id).order_by(Question.created_at.desc()).all()
-        return [q.to_dict() for q in questions]
-    except Exception as e:
-        logger.error(f"获取问答历史时出错: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        normalized_mode = str(mode or "").strip().lower() or "video"
+        if normalized_mode not in SUPPORTED_QA_MODES:
+            raise HTTPException(status_code=400, detail="不支持的问答模式，仅支持 video 或 free")
+
+        validate_provider(provider)
+        return {
+            "message": "当前 questions 表未按 provider 隔离，已禁用服务端历史恢复；请以前端本地缓存为准。",
+            "total": 0,
+            "questions": [],
+            "messages": [],
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("获取问答历史时出错 | error=%s", exc)
+        raise HTTPException(status_code=500, detail="获取问答历史失败，请稍后重试")

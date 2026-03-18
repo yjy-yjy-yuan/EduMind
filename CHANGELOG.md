@@ -1,5 +1,15 @@
 # 变更日志
 
+## 2026-03-18
+
+### DeepSeek 推理进度与问答页等待态修复
+- 更新 [`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/app/utils/qa_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/qa_utils.py)：`POST /api/qa/ask` 在 `stream=true` 时改为返回可解析的 NDJSON 阶段事件流，覆盖 `accepted / retrieving / reasoning|answering / organizing / completed`，并在最终回答生成后继续写入现有 `questions` 表。
+- 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：问答页改为接入后端阶段进度流，新增顶部 AI 进度条与消息内进度条；DeepSeek `先思考再回答` 模式下，用户现在可以明确看到“已提交、检索中、推理中、整理中、已完成”的实时状态，不再只看到空白等待态。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：补充问答流式阶段进度的实现边界与当前行为说明。
+- 更新 [`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：移除顶部独立进度卡片，仅保留消息内进度；问答输入区取消吸底布局，改为紧跟内容区，避免空页面时输入框被压到最底部；DeepSeek 的“先思考再回答”按钮文案同步改为“深度思考”。
+- 更新 [`backend_fastapi/app/models/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/qa.py)、[`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/app/schemas/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/qa.py)、[`backend_fastapi/scripts/mysql_managed_schema.sql`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/mysql_managed_schema.sql)：视频问答改为按 `user_id + provider + mode + video_id` 做同表隔离；`questions` 表新增 `user_id / provider / mode / model` 作用域字段，视频问答续聊改为优先使用数据库中同一作用域下的历史，避免通义千问与 DeepSeek 在同一视频下串历史；旧未标注记录不会自动混入新 provider 空间。
+- 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：前端视频问答页按 `user + provider + mode + videoId` 切分内存状态与本地缓存，切换通义千问 / DeepSeek 时会分别恢复各自历史，不再共用同一个 `messages` 数组。
+
 ## 2026-03-16
 
 ### 摘要生成与处理设置收口
@@ -219,6 +229,23 @@
 
 - 更新 [`.gitignore`](/Users/yuan/final-work/EduMind/.gitignore)：补充 `*.sqlite`、`*.db-journal`、`*.sqlite-shm`、`*.sqlite-wal` 等本地数据库运行产物忽略规则，并新增 `**/.idea/` 与仓库根误生成目录 `~/` 的忽略，减少本地大文件或无关缓存被错误纳入版本控制的风险。
 
+### 视频问答 RAG 联调打通
+
+- 更新 [`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/app/schemas/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/qa.py)、[`backend_fastapi/app/utils/qa_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/qa_utils.py)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：视频问答改为真实后端 RAG，实现“字幕/摘要/标签检索 + 通义千问或 DeepSeek 在线回答”，新增 `QA_DEFAULT_PROVIDER`、`QWEN_QA_MODEL`、`DEEPSEEK_QA_MODEL`、`DEEPSEEK_REASONER_MODEL` 等配置；问答链路不再要求前端传 `api_key/use_ollama`，并移除 Ollama 作为上下文问答主路径。
+- 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：移动端问答页接入新的真实问答协议，新增通义千问 / DeepSeek provider 切换、后端错误透传和引用片段展示。
+- 新增 [`backend_fastapi/tests/api/test_qa_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_qa_api.py)、[`backend_fastapi/tests/unit/test_qa_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_qa_utils.py)：补充视频问答接口与 RAG 检索逻辑测试，覆盖问答落库、上下文不足校验和 DeepSeek reasoner 选择。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：同步视频上下文问答只允许通义千问 / DeepSeek、问答必须走后端真实 RAG、结果写入现有 `questions` 表的实现边界。
+
+### 在线问答上下文记忆增强
+
+- 更新 [`backend_fastapi/app/schemas/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/qa.py)、[`backend_fastapi/app/utils/qa_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/qa_utils.py)、[`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：新增 `history` 问答历史入参和 `QA_MAX_HISTORY_MESSAGES` / `QA_MAX_HISTORY_CHARS` 配置，后端在做视频检索时会结合最近对话历史改写检索 query，并把历史轮次一并交给通义千问 / DeepSeek，提升连续追问时的上下文记忆稳定性。
+- 更新 [`backend_fastapi/app/schemas/chat.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/chat.py)、[`backend_fastapi/app/utils/chat_system.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/chat_system.py)、[`backend_fastapi/app/routers/chat.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/chat.py)：聊天接口收敛为在线 provider-only，只保留通义千问 / DeepSeek 两类在线模型，不再暴露 `use_ollama`。
+- 更新 [`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：前端问答页提交最近 8 条对话历史，支持后端在连续追问时保持更稳定的上下文记忆。
+
+### DeepSeek 回答方式切换
+
+- 更新 [`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)、[`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：当用户切换到 `DeepSeek` 时，问答页新增“直接回答 / 先思考再回答”选择按键；前端会把对应的 `deep_thinking` 参数随请求提交给后端，并在本地持久化用户选择。
+
 ## 2026-03-16
 
 ### 知识图谱可读性测试页
@@ -234,3 +261,11 @@
 - 更新 [`mobile-frontend/src/router/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/router/index.js)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Guide.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Guide.vue)：删除 `/knowledge` 路由、首页快捷入口和使用指南中的知识图谱入口与文案。
 - 删除 [`backend_fastapi/app/routers/knowledge_graph.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/knowledge_graph.py)、[`backend_fastapi/app/routers/knowledge_graph_integration.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/knowledge_graph_integration.py)、[`backend_fastapi/app/schemas/knowledge_graph.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/knowledge_graph.py)、[`backend_fastapi/app/utils/knowledge_graph_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/knowledge_graph_utils.py)：移除后端知识图谱 API、Schema 和 Neo4j 管理逻辑。
 - 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/requirements.txt`](/Users/yuan/final-work/EduMind/backend_fastapi/requirements.txt)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：移除知识图谱路由注册、Neo4j 配置项和 `neo4j` 依赖。
+
+## 2026-03-18
+
+### 对 2026-03-18 视频问答隔离记录的更正说明
+
+- 更正 [`backend_fastapi/app/routers/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/qa.py)、[`backend_fastapi/app/models/qa.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/qa.py)、[`backend_fastapi/scripts/mysql_managed_schema.sql`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/mysql_managed_schema.sql)：视频问答最终收口为“不改现有 `questions` 表结构”的实现；保留 `provider` 处理分流、前端内存隔离和本地缓存隔离，不再要求为 `questions` 表新增 `user_id / provider / mode / model` 字段。
+- 更正 [`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)、[`mobile-frontend/src/api/qa.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/qa.js)：当前通义千问 / DeepSeek 的隔离主要落在前端空间分桶与请求参数上；当后端历史接口返回空结果时，前端会保留本地缓存，不再被空历史覆盖。
+- 更正 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：视频问答当前不依赖数据库级 provider 隔离；在不改表前提下，服务端历史恢复默认安全禁用，以避免旧共享 `questions` 记录串入新的模型空间。
