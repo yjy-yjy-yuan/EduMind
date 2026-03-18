@@ -31,8 +31,9 @@
       <label class="field">
         <span class="field-label">Whisper 模型</span>
         <select v-model="processingForm.model" class="input">
-          <option v-for="option in WHISPER_MODEL_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
+          <option v-for="option in whisperModelOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
         </select>
+        <div class="field-help">当前优势：{{ currentModelHighlight }}</div>
       </label>
       <label class="field">
         <span class="field-label">摘要风格</span>
@@ -71,13 +72,16 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getApiBaseUrl, setApiBaseUrl } from '@/config'
+import { getVideoProcessingOptions } from '@/api/video'
 import {
   LANGUAGE_OPTIONS,
   PROCESSING_DEFAULTS,
   SUMMARY_STYLE_OPTIONS,
-  WHISPER_MODEL_OPTIONS,
   getProcessingSettings,
-  saveProcessingSettings
+  getWhisperModelOptions,
+  saveProcessingSettings,
+  saveWhisperModelCatalog,
+  whisperModelHighlight
 } from '@/services/processingSettings'
 import * as authStore from '@/store/auth'
 
@@ -86,11 +90,13 @@ const apiBaseInput = ref(getApiBaseUrl())
 const saving = ref(false)
 const savingProcessing = ref(false)
 const processingForm = ref(getProcessingSettings())
+const whisperModelOptions = ref(getWhisperModelOptions())
 const state = computed(() => authStore.getState())
 const loading = ref(false)
 const error = ref('')
 
 const avatarText = computed(() => String(state.value.user?.username || 'U').slice(0, 1).toUpperCase())
+const currentModelHighlight = computed(() => whisperModelHighlight(processingForm.value.model))
 const suggestedApiBase = computed(() => {
   try {
     const nativeValue = window.__edumindNativeConfig?.apiBaseUrl
@@ -140,6 +146,18 @@ const saveProcessing = () => {
   setTimeout(() => { savingProcessing.value = false }, 1500)
 }
 
+const refreshWhisperModelOptions = async () => {
+  try {
+    const res = await getVideoProcessingOptions()
+    const catalog = saveWhisperModelCatalog(res?.data || {})
+    whisperModelOptions.value = catalog.options
+    processingForm.value = saveProcessingSettings(processingForm.value)
+  } catch {
+    whisperModelOptions.value = getWhisperModelOptions()
+    processingForm.value = saveProcessingSettings(processingForm.value)
+  }
+}
+
 const resetProcessingDefaults = () => {
   processingForm.value = saveProcessingSettings(PROCESSING_DEFAULTS)
   savingProcessing.value = true
@@ -163,6 +181,7 @@ watch(
 onMounted(() => {
   apiBaseInput.value = getApiBaseUrl()
   processingForm.value = getProcessingSettings()
+  refreshWhisperModelOptions()
   refresh()
 })
 </script>
@@ -232,6 +251,14 @@ onMounted(() => {
   font-size: 12px;
   color: var(--muted);
   font-weight: 700;
+}
+
+.field-help {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .input {

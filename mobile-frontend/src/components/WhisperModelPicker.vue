@@ -4,19 +4,24 @@
       <span class="picker-title">{{ title }}</span>
       <div class="picker-control">
         <select class="picker-select" :value="model" :disabled="disabled" @change="handleChange">
-          <option v-for="option in WHISPER_MODEL_OPTIONS" :key="option.value" :value="option.value">
+          <option v-for="option in availableOptions" :key="option.value" :value="option.value">
             {{ option.label }}
           </option>
         </select>
         <span class="picker-chevron" aria-hidden="true"></span>
       </div>
     </label>
+    <div class="picker-advantage">
+      <span class="picker-advantage__label">优势</span>
+      <span>{{ currentHighlight }}</span>
+    </div>
     <div v-if="hint" class="picker-hint">{{ hint }}</div>
   </div>
 </template>
 
 <script setup>
-import { WHISPER_MODEL_OPTIONS } from '@/services/processingSettings'
+import { computed } from 'vue'
+import { getWhisperModelOptions, whisperModelHighlight } from '@/services/processingSettings'
 
 const props = defineProps({
   model: {
@@ -26,6 +31,10 @@ const props = defineProps({
   title: {
     type: String,
     default: 'Whisper 模型'
+  },
+  options: {
+    type: Array,
+    default: () => []
   },
   hint: {
     type: String,
@@ -42,6 +51,9 @@ const emit = defineEmits(['select'])
 const handleChange = (event) => {
   emit('select', String(event?.target?.value || props.model))
 }
+
+const availableOptions = computed(() => (props.options?.length ? props.options : getWhisperModelOptions()))
+const currentHighlight = computed(() => whisperModelHighlight(props.model))
 </script>
 
 <style scoped>
@@ -66,6 +78,27 @@ const handleChange = (event) => {
   color: var(--muted);
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.picker-advantage {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.picker-advantage__label {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 900;
+  color: var(--primary-deep);
+  background: rgba(21, 141, 178, 0.1);
 }
 
 .picker-control {

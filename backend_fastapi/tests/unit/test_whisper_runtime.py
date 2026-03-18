@@ -89,6 +89,36 @@ def test_transcribe_retries_on_cpu_after_mps_failure(tmp_path, monkeypatch):
 
 
 @pytest.mark.unit
+def test_load_model_surfaces_corrupted_local_model_file(tmp_path, monkeypatch):
+    """本地模型文件校验失败时应返回明确错误，而不是泛化为下载/超时异常。"""
+
+    def fake_load_model(*args, **kwargs):
+        raise RuntimeError("download failed")
+
+    expected_sha256 = "a" * 64
+    fake_whisper = types.SimpleNamespace(
+        _MODELS={
+            "large": f"https://example.com/models/{expected_sha256}/large-v3.pt",
+        },
+        load_model=fake_load_model,
+    )
+    monkeypatch.setitem(sys.modules, "whisper", fake_whisper)
+
+    model_file = tmp_path / "large-v3.pt"
+    model_file.write_bytes(b"broken-model")
+
+    manager = WhisperRuntimeManager()
+
+    with pytest.raises(RuntimeError, match="本地 Whisper 模型文件校验失败"):
+        manager.load_model("large", force_device="cpu", model_path=str(tmp_path), source="test")
+
+    status = manager.get_status()
+    assert status["state"] == "failed"
+    assert status["last_error"].startswith("本地 Whisper 模型文件校验失败")
+    assert str(model_file) in status["last_error"]
+
+
+@pytest.mark.unit
 def test_start_background_preload_updates_runtime_status(tmp_path, monkeypatch):
     """启动预热后应在后台完成模型加载并更新状态。"""
     calls = []

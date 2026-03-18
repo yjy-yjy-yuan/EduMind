@@ -530,7 +530,7 @@ def process_video_task(
 
         if not result:
             video.status = VideoStatus.FAILED
-            video.current_step = "转录失败"
+            video.current_step = f"转录失败（{model}）"
             db.commit()
             return {"status": "failed", "message": "转录失败"}
 
@@ -607,7 +607,7 @@ def process_video_task(
         # 完成
         video.status = VideoStatus.COMPLETED
         video.process_progress = 100.0
-        video.current_step = "处理完成"
+        video.current_step = f"处理完成（{model}）"
         video.error_message = None
         db.commit()
 
@@ -622,7 +622,7 @@ def process_video_task(
             if video:
                 video.status = VideoStatus.FAILED
                 video.process_progress = 0.0
-                video.current_step = f"处理失败: {str(e)}"
+                video.current_step = f"处理失败（{model}）: {str(e)}"
                 db.commit()
         except Exception:
             pass

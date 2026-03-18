@@ -27,6 +27,19 @@ export function getVideoStatus(videoId) {
   return request({ url: `/api/videos/${videoId}/status`, method: 'get' })
 }
 
+export function getVideoProcessingOptions() {
+  if (shouldUseMockApi()) {
+    return Promise.resolve({
+      data: {
+        default_model: 'base',
+        models: []
+      },
+      status: 200
+    })
+  }
+  return request({ url: '/api/videos/processing-options', method: 'get' })
+}
+
 export function processVideo(videoId, options = {}) {
   if (shouldUseMockApi()) return mockProcessVideo(videoId, options)
   return request({ url: `/api/videos/${videoId}/process`, method: 'post', data: options })

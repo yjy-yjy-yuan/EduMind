@@ -4,17 +4,29 @@
 """
 
 import gc
+import hashlib
 import logging
 import os
 import threading
 import time
 from copy import deepcopy
 from typing import Any
+from typing import Iterable
 from urllib.parse import urlparse
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+PRODUCT_WHISPER_MODELS = ("tiny", "base", "small", "medium", "large", "turbo")
+WHISPER_MODEL_HIGHLIGHTS = {
+    "tiny": "最快，适合先验证上传和转录流程是否跑通。",
+    "base": "默认最稳，资源占用较低，适合日常使用。",
+    "small": "速度和准确率更平衡，适合作为常用升级档。",
+    "medium": "准确率更高，适合正式内容转录。",
+    "large": "效果最好，适合高质量要求场景。",
+    "turbo": "优先提速，适合想更快拿到初稿。",
+}
 
 
 class WhisperRuntimeManager:
@@ -109,6 +121,41 @@ class WhisperRuntimeManager:
         normalized = str(model_name or settings.WHISPER_MODEL).strip()
         return normalized or settings.WHISPER_MODEL
 
+    def list_supported_models(self) -> list[str]:
+        """返回当前运行时实际支持的产品模型列表。"""
+        try:
+            import whisper
+
+            available = {str(name).strip() for name in getattr(whisper, "_MODELS", {}).keys() if str(name).strip()}
+        except Exception:
+            logger.warning("读取 Whisper 模型目录失败，回退到内置产品模型列表")
+            available = set(PRODUCT_WHISPER_MODELS)
+
+        preferred = [name for name in PRODUCT_WHISPER_MODELS if name in available]
+        if preferred:
+            return preferred
+
+        fallback = [name for name in available if name]
+        return sorted(fallback) if fallback else list(PRODUCT_WHISPER_MODELS)
+
+    def is_supported_model(self, model_name: str) -> bool:
+        normalized_name = self._resolve_model_name(model_name).lower()
+        return normalized_name in set(self.list_supported_models())
+
+    def normalize_supported_model_name(self, model_name: str) -> str:
+        normalized_name = self._resolve_model_name(model_name).strip().lower()
+        supported_models = self.list_supported_models()
+        if normalized_name in supported_models:
+            return normalized_name
+
+        default_model = str(settings.WHISPER_MODEL or "").strip().lower()
+        if not str(model_name or "").strip() and default_model in supported_models:
+            return default_model
+
+        raise ValueError(
+            f"不支持的 Whisper 模型: {normalized_name or model_name}，当前仅支持: {', '.join(supported_models)}"
+        )
+
     def _resolve_model_path(self, model_path: str = "", *, create_dir: bool = False) -> str:
         expanded_path = os.path.expanduser(model_path or settings.WHISPER_MODEL_PATH)
         if create_dir:
@@ -129,6 +176,72 @@ class WhisperRuntimeManager:
             logger.debug("无法通过 whisper._MODELS 解析模型文件名 | model=%s", normalized_name)
 
         return f"{normalized_name}.pt"
+
+    def _resolve_model_url(self, model_name: str) -> str:
+        normalized_name = self._resolve_model_name(model_name)
+        try:
+            import whisper
+
+            return str(getattr(whisper, "_MODELS", {}).get(normalized_name, "") or "")
+        except Exception:
+            return ""
+
+    def _resolve_expected_sha256(self, model_name: str) -> str:
+        model_url = self._resolve_model_url(model_name)
+        if not model_url:
+            return ""
+
+        path_parts = [part for part in urlparse(model_url).path.split("/") if part]
+        if len(path_parts) < 2:
+            return ""
+
+        candidate = path_parts[-2].strip().lower()
+        if len(candidate) == 64 and all(ch in "0123456789abcdef" for ch in candidate):
+            return candidate
+        return ""
+
+    def _locate_downloaded_model_file(self, model_name: str, model_path: str = "") -> str:
+        resolved_path = self._resolve_model_path(model_path)
+        filename = self._resolve_model_filename(model_name)
+        candidate_paths = (
+            os.path.join(resolved_path, filename),
+            os.path.join(os.path.expanduser("~/.cache/whisper"), filename),
+        )
+        for path in candidate_paths:
+            if os.path.exists(path):
+                return path
+        return ""
+
+    def _compute_file_sha256(self, file_path: str) -> str:
+        digest = hashlib.sha256()
+        with open(file_path, "rb") as handle:
+            while True:
+                chunk = handle.read(1024 * 1024)
+                if not chunk:
+                    break
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def diagnose_model_file_integrity(self, model_name: str, model_path: str = "") -> str:
+        file_path = self._locate_downloaded_model_file(model_name, model_path)
+        expected_sha256 = self._resolve_expected_sha256(model_name)
+
+        if not file_path or not expected_sha256:
+            return ""
+
+        try:
+            actual_sha256 = self._compute_file_sha256(file_path)
+        except Exception as exc:
+            return f"无法校验本地 Whisper 模型文件完整性：{exc}"
+
+        if actual_sha256 == expected_sha256:
+            return ""
+
+        return (
+            f"本地 Whisper 模型文件校验失败 | model={self._resolve_model_name(model_name)} | "
+            f"file={file_path} | expected_sha256={expected_sha256} | actual_sha256={actual_sha256}。"
+            "请删除该模型文件后重新下载。"
+        )
 
     def is_model_downloaded(self, model_name: str, model_path: str = "") -> bool:
         """检查模型文件是否已存在于自定义目录或默认缓存目录。"""
@@ -262,13 +375,17 @@ class WhisperRuntimeManager:
             try:
                 model = self._load_model_with_timeout(normalized_name, device, resolved_path, timeout_seconds)
             except Exception as exc:
+                integrity_error = self.diagnose_model_file_integrity(normalized_name, resolved_path)
+                error_message = integrity_error or str(exc)
                 self._update_status(
                     state="failed",
                     loaded=False,
                     cache_hit=False,
-                    last_error=str(exc),
+                    last_error=error_message,
                     timeout_seconds=timeout_seconds,
                 )
+                if integrity_error:
+                    raise RuntimeError(integrity_error) from exc
                 raise
 
             elapsed = time.time() - started_at
@@ -420,6 +537,33 @@ def get_whisper_device() -> str:
 
 def clear_whisper_device_cache():
     whisper_runtime.clear_device_cache()
+
+
+def get_supported_whisper_models() -> list[str]:
+    return whisper_runtime.list_supported_models()
+
+
+def normalize_whisper_model_name(model_name: str) -> str:
+    return whisper_runtime.normalize_supported_model_name(model_name)
+
+
+def iter_whisper_model_catalog(model_path: str = "") -> Iterable[dict]:
+    resolved_path = whisper_runtime._resolve_model_path(model_path)
+    supported_models = set(get_supported_whisper_models())
+
+    for model_name in PRODUCT_WHISPER_MODELS:
+        if model_name not in supported_models:
+            continue
+        yield {
+            "value": model_name,
+            "label": model_name,
+            "highlight": WHISPER_MODEL_HIGHLIGHTS.get(model_name, ""),
+            "downloaded": whisper_runtime.is_model_downloaded(model_name, resolved_path),
+        }
+
+
+def get_whisper_model_catalog(model_path: str = "") -> list[dict]:
+    return list(iter_whisper_model_catalog(model_path=model_path))
 
 
 def transcribe_audio_with_whisper(

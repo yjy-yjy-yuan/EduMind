@@ -53,6 +53,7 @@ class TestVideoAPI:
         data = response.json()
         assert "status" in data
         assert "progress" in data
+        assert "requested_model" in data
 
     def test_stream_video_file_supports_full_content(self, client, db, sample_video, tmp_path):
         """测试视频全量流接口"""
@@ -112,6 +113,7 @@ class TestVideoAPI:
         response = client.post(
             "/api/videos/upload",
             files={"file": ("lesson.mp4", io.BytesIO(b"fake-video-content"), "video/mp4")},
+            data={"model": "small"},
         )
         assert response.status_code == 200
 
@@ -119,15 +121,18 @@ class TestVideoAPI:
         assert payload["status"] == "pending"
         assert payload["duplicate"] is False
         assert payload["data"]["filename"] == "local-lesson.mp4"
+        assert payload["data"]["requested_model"] == "small"
+        assert payload["data"]["effective_model"] == "small"
         assert os.path.exists(payload["data"]["filepath"])
         assert payload["message"] == "视频上传成功，已开始后台处理"
 
         videos = db.query(Video).all()
         assert len(videos) == 1
         assert videos[0].status.value == "pending"
-        assert videos[0].current_step == "已提交，等待处理"
+        assert videos[0].current_step == "已提交，等待处理（small）"
         assert submitted["name"] == "process_video_task"
         assert submitted["args"][0] == videos[0].id
+        assert submitted["args"][2] == "small"
 
     def test_upload_video_file_duplicate(self, client, db, tmp_path, monkeypatch):
         """测试重复上传同一视频"""
@@ -177,7 +182,7 @@ class TestVideoAPI:
 
         response = client.post(
             "/api/videos/upload-url",
-            json={"url": "https://www.bilibili.com/video/BV1xx411c7mD"},
+            json={"url": "https://www.bilibili.com/video/BV1xx411c7mD", "model": "medium"},
         )
         assert response.status_code == 200
 
@@ -185,13 +190,55 @@ class TestVideoAPI:
         assert payload["status"] == "downloading"
         assert payload["duplicate"] is False
         assert payload["data"]["status"] == "downloading"
+        assert payload["data"]["requested_model"] == "medium"
 
         video = db.query(Video).filter(Video.id == payload["id"]).first()
         assert video is not None
         assert video.status.value == "downloading"
-        assert video.current_step == "已提交，等待下载"
+        assert video.current_step == "已提交，等待下载（medium）"
         assert submitted["name"] == "download_video_from_url_task"
         assert submitted["args"][0] == video.id
+        assert submitted["kwargs"]["model"] == "medium"
+
+    def test_process_video_route_passes_non_base_model(self, client, sample_video, monkeypatch):
+        """测试重新处理接口会把选中的模型传给后台任务。"""
+        submitted = {}
+
+        def fake_submit_task(task_func, *args, **kwargs):
+            submitted["name"] = task_func.__name__
+            submitted["args"] = args
+            submitted["kwargs"] = kwargs
+            return None
+
+        monkeypatch.setattr("app.core.executor.submit_task", fake_submit_task)
+
+        response = client.post(
+            f"/api/videos/{sample_video.id}/process",
+            json={"language": "Other", "model": "large", "auto_generate_summary": True, "auto_generate_tags": True},
+        )
+        assert response.status_code == 200
+
+        status_response = client.get(f"/api/videos/{sample_video.id}/status")
+        assert status_response.status_code == 200
+        status_payload = status_response.json()
+        assert status_payload["requested_model"] == "large"
+        assert status_payload["effective_model"] == "large"
+        assert "large" in status_payload["current_step"]
+
+        assert submitted["name"] == "process_video_task"
+        assert submitted["args"][0] == sample_video.id
+        assert submitted["args"][2] == "large"
+
+    def test_get_video_processing_options_returns_model_catalog(self, client):
+        """测试获取视频处理配置目录。"""
+        response = client.get("/api/videos/processing-options")
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert "default_model" in payload
+        assert "models" in payload
+        assert isinstance(payload["models"], list)
+        assert any(item["value"] == "base" for item in payload["models"])
 
 
 @pytest.mark.api

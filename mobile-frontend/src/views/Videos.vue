@@ -61,6 +61,7 @@
             <span class="badge" :class="badgeClass(v.status)">{{ statusText(v.status) }}</span>
             <span v-if="isInProgress(v.status)" class="muted">{{ Number(v.process_progress) || 0 }}%</span>
           </div>
+          <div v-if="processingModelText(v)" class="muted">{{ processingModelText(v) }}</div>
           <div v-if="isInProgress(v.status)" class="progress">
             <div class="bar" :style="{ width: `${Number(v.process_progress) || 0}%` }"></div>
           </div>
@@ -90,7 +91,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getVideoList, processVideo } from '@/api/video'
-import { buildProcessPayload, getProcessingSettings } from '@/services/processingSettings'
+import { buildProcessPayload, getProcessingSettings, whisperModelLabel } from '@/services/processingSettings'
 import { isActiveVideoStatus, normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
 const route = useRoute()
@@ -202,6 +203,11 @@ const setLocalStatus = (videoId, nextStatus) => {
     if (Number(item.id) !== id) return item
     return { ...item, status: nextStatus, process_progress: 0 }
   })
+}
+
+const processingModelText = (video) => {
+  const model = String(video?.effective_model || video?.requested_model || '').trim().toLowerCase()
+  return model ? `模型：${whisperModelLabel(model)}` : ''
 }
 
 const retryFailed = async (video) => {

@@ -67,6 +67,9 @@ class VideoBase(BaseModel):
     title: Optional[str] = None
     filename: Optional[str] = None
     status: str
+    requested_model: Optional[str] = None
+    effective_model: Optional[str] = None
+    requested_language: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -104,6 +107,9 @@ class VideoDetail(BaseModel):
     process_progress: Optional[float] = None
     current_step: Optional[str] = None
     error_message: Optional[str] = None
+    requested_model: Optional[str] = None
+    effective_model: Optional[str] = None
+    requested_language: Optional[str] = None
     upload_source: Optional[str] = None
     upload_source_label: Optional[str] = None
     upload_source_value: Optional[str] = None
@@ -120,6 +126,25 @@ class VideoStatusResponse(BaseModel):
     current_step: str = ""
     task_id: Optional[str] = None
     error_message: Optional[str] = None
+    requested_model: Optional[str] = None
+    effective_model: Optional[str] = None
+    requested_language: Optional[str] = None
+
+
+class WhisperModelOption(BaseModel):
+    """Whisper 模型选项"""
+
+    value: str
+    label: str
+    highlight: str = ""
+    downloaded: bool = False
+
+
+class VideoProcessingOptionsResponse(BaseModel):
+    """视频处理设置目录响应"""
+
+    default_model: str
+    models: List[WhisperModelOption]
 
 
 class VideoListResponse(BaseModel):
