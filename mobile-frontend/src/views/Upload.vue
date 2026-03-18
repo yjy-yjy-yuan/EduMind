@@ -6,6 +6,15 @@
     </header>
 
     <div class="card">
+      <WhisperModelPicker
+        title="Whisper 模型"
+        :model="processingSettings.model"
+        :disabled="busy"
+        @select="selectProcessingModel"
+      />
+    </div>
+
+    <div class="card">
       <div class="card-title">本地视频</div>
       <input
         ref="fileInputRef"
@@ -102,7 +111,16 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getVideoStatus, processVideo, uploadLocalVideo, uploadVideoUrl } from '@/api/video'
-import { buildProcessPayload, getProcessingSettings, languageLabel, summaryStyleLabel, whisperModelLabel, appendProcessingSettingsToFormData } from '@/services/processingSettings'
+import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
+import {
+  appendProcessingSettingsToFormData,
+  buildProcessPayload,
+  getProcessingSettings,
+  languageLabel,
+  saveProcessingSettings,
+  summaryStyleLabel,
+  whisperModelLabel
+} from '@/services/processingSettings'
 import { normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
@@ -144,6 +162,14 @@ const processingSettingsSummary = computed(() => {
   if (current.autoGenerateTags) parts.push('自动标签')
   return parts.join(' · ')
 })
+
+const selectProcessingModel = (model) => {
+  if (busy.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    model
+  })
+}
 
 const readableSize = (size) => {
   const n = Number(size || 0)

@@ -21,6 +21,7 @@ export const WHISPER_MODEL_OPTIONS = Object.freeze([
   { value: 'base', label: 'base' },
   { value: 'small', label: 'small' },
   { value: 'medium', label: 'medium' },
+  { value: 'large', label: 'large' },
   { value: 'turbo', label: 'turbo' }
 ])
 

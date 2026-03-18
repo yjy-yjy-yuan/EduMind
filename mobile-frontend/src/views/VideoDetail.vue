@@ -46,6 +46,15 @@
         后台处理中仍可进入播放器，当前播放原始视频文件。
       </div>
 
+      <div class="block">
+        <WhisperModelPicker
+          title="Whisper 模型"
+          :model="processingSettings.model"
+          :disabled="processDisabled"
+          @select="selectProcessingModel"
+        />
+      </div>
+
       <div v-if="canShowAnalysisBlock" class="block">
         <div class="block-head">
           <div class="block-title">智能摘要</div>
@@ -86,7 +95,8 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi } from '@/config'
 import { deleteVideo, generateVideoSummary, generateVideoTags, getVideo, getVideoStatus, processVideo } from '@/api/video'
-import { buildProcessPayload, getProcessingSettings, summaryStyleLabel } from '@/services/processingSettings'
+import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
+import { buildProcessPayload, getProcessingSettings, saveProcessingSettings, summaryStyleLabel } from '@/services/processingSettings'
 import {
   canAutoStartVideoProcessing,
   canRetryVideoProcessing,
@@ -283,6 +293,14 @@ const reload = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const selectProcessingModel = (model) => {
+  if (processDisabled.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    model
+  })
 }
 
 const startProcess = async () => {
