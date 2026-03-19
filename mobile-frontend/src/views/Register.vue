@@ -9,12 +9,11 @@
     </header>
 
     <div class="card">
-      <div class="label">用户名</div>
-      <input class="input" v-model.trim="form.username" placeholder="请输入用户名" />
-      <div class="label">邮箱</div>
-      <input class="input" v-model.trim="form.email" placeholder="请输入邮箱" />
+      <div class="label">邮箱 / 手机号</div>
+      <input class="input" v-model.trim="form.contact" placeholder="请输入邮箱或手机号" />
       <div class="label">密码</div>
       <input class="input" v-model="form.password" type="password" placeholder="请输入密码" @keyup.enter="submit" />
+      <div class="field-help">密码至少 8 位，且必须包含大小写字母、数字和特殊字符。</div>
       <button class="btn btn--primary" @click="submit" :disabled="loading">{{ loading ? '提交中…' : '注册' }}</button>
       <button class="link" @click="router.push('/login')">已有账号？去登录</button>
     </div>
@@ -30,22 +29,49 @@ import { useRouter } from 'vue-router'
 import BrandLogo from '@/components/BrandLogo.vue'
 import * as authStore from '@/store/auth'
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_RE = /^(?:\+?86)?1[3-9]\d{9}$/
+const STRONG_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])\S{8,128}$/
+
+const normalizePhone = (value) => {
+  const digits = String(value || '').replace(/\D/g, '')
+  if (digits.startsWith('86') && digits.length === 13) return digits.slice(2)
+  return digits
+}
+
 const router = useRouter()
 const loading = ref(false)
 const error = ref('')
 const ok = ref(false)
-const form = reactive({ username: '', email: '', password: '' })
+const form = reactive({ contact: '', password: '' })
 
 const submit = async () => {
-  if (!form.username || !form.password) {
-    error.value = '请填写用户名和密码'
+  const contact = String(form.contact || '').trim()
+  if (!contact || !form.password) {
+    error.value = '请填写邮箱/手机号和密码'
+    return
+  }
+
+  const payload = { password: form.password }
+  const normalizedPhone = normalizePhone(contact)
+  if (EMAIL_RE.test(contact.toLowerCase())) {
+    payload.email = contact.toLowerCase()
+  } else if (PHONE_RE.test(normalizedPhone)) {
+    payload.phone = normalizedPhone
+  } else {
+    error.value = '请输入正确的邮箱或手机号'
+    return
+  }
+
+  if (!STRONG_PASSWORD_RE.test(form.password)) {
+    error.value = '密码至少 8 位，且必须包含大小写字母、数字和特殊字符'
     return
   }
   loading.value = true
   error.value = ''
   ok.value = false
   try {
-    const res = await authStore.register({ ...form })
+    const res = await authStore.register(payload)
     if (!res.success) {
       error.value = res.message || '注册失败'
       return
@@ -116,6 +142,13 @@ const submit = async () => {
   border-radius: 12px;
   padding: 12px 12px;
   outline: none;
+}
+
+.field-help {
+  margin-top: -4px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .btn {

@@ -316,23 +316,46 @@ class TestAuthAPI:
         response = client.post(
             "/api/auth/register",
             json={
-                "username": "newuser",
                 "email": "new@example.com",
-                "password": "password123",
+                "password": "Strong#123",
             },
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["user"]["username"] == "newuser"
+        assert data["user"]["email"] == "new@example.com"
+        assert data["user"]["phone"] is None
 
-    def test_register_duplicate_username(self, client, sample_user):
-        """测试重复用户名注册"""
+    def test_register_user_with_phone(self, client):
+        """测试手机号注册"""
         response = client.post(
             "/api/auth/register",
             json={
-                "username": "testuser",  # 已存在的用户名
+                "phone": "13800138001",
+                "password": "Another#123",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["user"]["phone"] == "13800138001"
+
+    def test_register_duplicate_contact(self, client, sample_user):
+        """测试重复邮箱注册"""
+        response = client.post(
+            "/api/auth/register",
+            json={
+                "email": "test@example.com",
+                "password": "Other#1234",
+            },
+        )
+        assert response.status_code == 400
+
+    def test_register_duplicate_password(self, client, sample_user):
+        """测试重复密码注册被拦截"""
+        response = client.post(
+            "/api/auth/register",
+            json={
                 "email": "other@example.com",
-                "password": "password123",
+                "password": "Strong#123",
             },
         )
         assert response.status_code == 400
@@ -342,22 +365,53 @@ class TestAuthAPI:
         response = client.post(
             "/api/auth/login",
             json={
-                "username": "testuser",
-                "password": "password123",
+                "account": "test@example.com",
+                "password": "Strong#123",
             },
         )
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
         assert "user" in data
+        assert data["token"]
+        assert data["user"]["login_count"] == 1
+
+    def test_login_success_with_phone(self, client, sample_user):
+        """测试手机号登录成功"""
+        response = client.post(
+            "/api/auth/login",
+            json={
+                "account": "13800138000",
+                "password": "Strong#123",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["user"]["phone"] == "13800138000"
 
     def test_login_wrong_password(self, client, sample_user):
         """测试密码错误登录"""
         response = client.post(
             "/api/auth/login",
             json={
-                "username": "testuser",
+                "account": "test@example.com",
                 "password": "wrongpassword",
             },
         )
         assert response.status_code == 401
+
+    def test_get_current_user_by_token(self, client, sample_user):
+        """测试通过 token 获取当前用户"""
+        login_response = client.post(
+            "/api/auth/login",
+            json={
+                "account": "test@example.com",
+                "password": "Strong#123",
+            },
+        )
+        token = login_response.json()["token"]
+
+        response = client.get("/api/auth/user", headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["user"]["email"] == "test@example.com"

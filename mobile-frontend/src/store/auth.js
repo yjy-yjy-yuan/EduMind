@@ -32,8 +32,8 @@ export function getState() {
   return readonly(state)
 }
 
-export async function login(username, password) {
-  const res = await authApi.login(username, password)
+export async function login(account, password) {
+  const res = await authApi.login(account, password)
   if (res.success) {
     state.user = res.user || state.user
     state.token = res.token || state.token

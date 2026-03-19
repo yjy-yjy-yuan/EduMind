@@ -5,6 +5,8 @@ import argparse
 import sys
 from pathlib import Path
 
+from sqlalchemy import inspect
+from sqlalchemy import text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.engine.url import make_url
 from sqlalchemy.schema import CreateIndex
@@ -68,12 +70,58 @@ def print_managed_tables():
         print(f"  - {table.name}")
 
 
+def sync_users_table_schema():
+    """为现有 users 表补齐当前认证链路所需字段和索引。"""
+    if engine.dialect.name != "mysql":
+        return
+
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"]: column for column in inspector.get_columns("users")}
+    indexes = {index["name"] for index in inspector.get_indexes("users")}
+    statements = []
+
+    email_column = columns.get("email")
+    if email_column and not email_column.get("nullable", True):
+        statements.append("ALTER TABLE users MODIFY COLUMN email VARCHAR(120) NULL")
+
+    password_hash_column = columns.get("password_hash")
+    password_hash_length = getattr(password_hash_column.get("type"), "length", None) if password_hash_column else None
+    if password_hash_column and password_hash_length != 255:
+        statements.append("ALTER TABLE users MODIFY COLUMN password_hash VARCHAR(255) NOT NULL")
+
+    if "phone" not in columns:
+        statements.append("ALTER TABLE users ADD COLUMN phone VARCHAR(32) NULL")
+    if "password_fingerprint" not in columns:
+        statements.append("ALTER TABLE users ADD COLUMN password_fingerprint VARCHAR(64) NULL")
+    if "login_count" not in columns:
+        statements.append("ALTER TABLE users ADD COLUMN login_count INTEGER NOT NULL DEFAULT 0")
+
+    if "ix_users_phone" not in indexes:
+        statements.append("CREATE UNIQUE INDEX ix_users_phone ON users (phone)")
+    if "ix_users_password_fingerprint" not in indexes:
+        statements.append("CREATE UNIQUE INDEX ix_users_password_fingerprint ON users (password_fingerprint)")
+
+    if not statements:
+        print("users 表认证字段已是最新结构。")
+        return
+
+    print("正在同步 users 表认证字段...")
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+    print("users 表认证字段同步完成。")
+
+
 def init_database():
     """创建缺失的后端业务表，不删除现有数据。"""
     managed_tables = get_managed_tables()
     print(f"数据库连接: {masked_database_target()}")
     print("正在创建缺失的数据库表...")
     Base.metadata.create_all(bind=engine, tables=managed_tables, checkfirst=True)
+    sync_users_table_schema()
     print("数据库表创建完成。")
     print_managed_tables()
 

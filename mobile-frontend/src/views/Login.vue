@@ -9,8 +9,8 @@
     </header>
 
     <div class="card">
-      <div class="label">用户名/邮箱</div>
-      <input class="input" v-model.trim="form.username" placeholder="请输入用户名或邮箱" />
+      <div class="label">邮箱 / 手机号</div>
+      <input class="input" v-model.trim="form.account" placeholder="请输入邮箱或手机号" />
       <div class="label">密码</div>
       <input class="input" v-model="form.password" type="password" placeholder="请输入密码" @keyup.enter="submit" />
       <button class="btn btn--primary" @click="submit" :disabled="loading">
@@ -29,22 +29,36 @@ import { useRoute, useRouter } from 'vue-router'
 import BrandLogo from '@/components/BrandLogo.vue'
 import * as authStore from '@/store/auth'
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PHONE_RE = /^(?:\+?86)?1[3-9]\d{9}$/
+const normalizePhone = (value) => {
+  const digits = String(value || '').replace(/\D/g, '')
+  if (digits.startsWith('86') && digits.length === 13) return digits.slice(2)
+  return digits
+}
+
 const router = useRouter()
 const route = useRoute()
 
 const loading = ref(false)
 const error = ref('')
-const form = reactive({ username: '', password: '' })
+const form = reactive({ account: '', password: '' })
 
 const submit = async () => {
-  if (!form.username || !form.password) {
-    error.value = '请输入用户名和密码'
+  const account = String(form.account || '').trim()
+  if (!account || !form.password) {
+    error.value = '请输入邮箱/手机号和密码'
+    return
+  }
+  const normalizedPhone = normalizePhone(account)
+  if (!EMAIL_RE.test(account.toLowerCase()) && !PHONE_RE.test(normalizedPhone)) {
+    error.value = '请输入正确的邮箱或手机号'
     return
   }
   loading.value = true
   error.value = ''
   try {
-    const res = await authStore.login(form.username, form.password)
+    const res = await authStore.login(account, form.password)
     if (!res.success) {
       error.value = res.message || '登录失败'
       return

@@ -10,7 +10,8 @@
         <div class="avatar">{{ avatarText }}</div>
         <div class="info">
           <div class="username">{{ state.user?.username || '用户' }}</div>
-          <div class="email">{{ state.user?.email || '—' }}</div>
+          <div class="email">{{ contactText }}</div>
+          <div class="email">登录次数：{{ state.user?.login_count ?? 0 }}</div>
         </div>
       </div>
 
@@ -96,6 +97,7 @@ const loading = ref(false)
 const error = ref('')
 
 const avatarText = computed(() => String(state.value.user?.username || 'U').slice(0, 1).toUpperCase())
+const contactText = computed(() => state.value.user?.email || state.value.user?.phone || '—')
 const currentModelHighlight = computed(() => whisperModelHighlight(processingForm.value.model))
 const suggestedApiBase = computed(() => {
   try {

@@ -11,9 +11,9 @@ const normalize = (payload) => {
   return { success, user, token, message, raw: data }
 }
 
-export async function login(username, password) {
-  if (UI_ONLY_MODE) return normalize(await mockLogin(username, password))
-  const res = await request({ url: '/api/auth/login', method: 'post', data: { username, password } })
+export async function login(account, password) {
+  if (UI_ONLY_MODE) return normalize(await mockLogin(account, password))
+  const res = await request({ url: '/api/auth/login', method: 'post', data: { account, password } })
   return normalize(res)
 }
 
