@@ -78,10 +78,13 @@ def test_process_video_task_updates_video_and_subtitles(tmp_path, monkeypatch):
         return True
 
     def fake_generate_summary(_video_id, _subtitle_path="", **_kwargs):
-        return {"success": True, "summary": "学习重点：\n1. 第一条。\n2. 第二条。"}
+        return {
+            "success": True,
+            "summary": "主题：牛顿第二定律与受力分析\n学习重点：\n1. 受力分析步骤。\n2. 合力与加速度关系。"
+        }
 
     def fake_generate_tags(_video_id, _summary, **_kwargs):
-        return {"success": True, "tags": ["重点一", "重点二", "重点三"]}
+        return {"success": True, "tags": ["牛顿第二定律", "受力分析", "合力"]}
 
     monkeypatch.setattr("app.tasks.video_processing.generate_preview_image", fake_generate_preview_image)
     monkeypatch.setattr("app.tasks.video_processing.generate_video_info", fake_generate_video_info)
@@ -113,8 +116,13 @@ def test_process_video_task_updates_video_and_subtitles(tmp_path, monkeypatch):
     assert stored_video.current_step == "处理完成（turbo）"
     assert stored_video.process_progress == 100.0
     assert stored_video.subtitle_filepath is not None
-    assert stored_video.summary == "学习重点：\n1. 第一条。\n2. 第二条。"
-    assert json.loads(stored_video.tags) == ["重点一", "重点二", "重点三"]
+    assert stored_video.summary == "主题：牛顿第二定律与受力分析\n学习重点：\n1. 受力分析步骤。\n2. 合力与加速度关系。"
+    assert json.loads(stored_video.tags) == ["牛顿第二定律", "受力分析", "合力"]
+    assert stored_video.title == "牛顿第二定律与受力分析"
+    assert stored_video.filename == "牛顿第二定律与受力分析.mp4"
+    assert stored_video.filepath == str(tmp_path / "牛顿第二定律与受力分析.mp4")
+    assert Path(stored_video.filepath).exists()
+    assert not video_path.exists()
     assert Path(stored_video.subtitle_filepath).exists()
     assert len(stored_subtitles) == 2
     assert stored_subtitles[0].text == "第一句"
