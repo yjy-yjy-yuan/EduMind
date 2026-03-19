@@ -64,7 +64,7 @@ class Settings(BaseSettings):
 
     # Whisper 配置 (可选: tiny, base, small, medium, large, turbo)
     WHISPER_MODEL: str = "base"
-    WHISPER_MODEL_PATH: str = os.path.expanduser("~/Desktop/File/graduation/whisper")
+    WHISPER_MODEL_PATH: str = "/Users/yuan/302_works/whisper_models"
     WHISPER_PRELOAD_ON_STARTUP: bool = True
     WHISPER_LOAD_TIMEOUT_SECONDS: int = 60
     WHISPER_DOWNLOAD_TIMEOUT_SECONDS: int = 300

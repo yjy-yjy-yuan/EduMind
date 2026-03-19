@@ -3,7 +3,7 @@ import os
 import whisper
 
 
-def download_whisper_model(model_names, download_path="~/Desktop/File/graduation/whisper"):
+def download_whisper_model(model_names, download_path="/Users/yuan/302_works/whisper_models"):
     """
     下载 Whisper 模型到指定目录，如果目录不存在则自动创建
 
@@ -125,7 +125,7 @@ if __name__ == "__main__":
 
     # 询问下载路径（可选）
     print("\n" + "=" * 50)
-    default_path = "~/Desktop/File/graduation/whisper"
+    default_path = "/Users/yuan/302_works/whisper_models"
     use_default = input(f"使用默认路径 '{default_path}'? (y/n): ").strip().lower()
 
     if use_default in ['y', 'yes', '是']:

@@ -38,7 +38,7 @@
 - 软超时: 2.9小时 (10500秒)
 
 **自定义模型路径:**
-- 默认路径: `~/Desktop/File/graduation/whisper`
+- 默认路径: `/Users/yuan/302_works/whisper_models`
 - 避免重复下载,节省时间和空间
 - 支持离线使用已下载的模型
 
@@ -50,9 +50,9 @@
 torch.mps.empty_cache()
 ```
 
-**Worker 自动重启:**
-- 每处理 5 个任务后重启 worker
-- 防止内存泄漏累积
+**后台执行器隔离:**
+- 当前仓库本地开发默认通过 FastAPI 后台执行器处理任务
+- 转录完成后会释放模型引用并清理设备缓存，避免内存持续堆积
 
 ### 4. 使用 Python API 替代命令行
 
@@ -64,7 +64,7 @@ torch.mps.empty_cache()
 **关键代码:**
 ```python
 # 自定义模型路径
-custom_model_path = "~/Desktop/File/graduation/whisper"
+custom_model_path = "/Users/yuan/302_works/whisper_models"
 
 # 加载模型(带超时保护和自定义路径)
 device = get_whisper_device(model)
@@ -86,11 +86,12 @@ del whisper_model
 torch.mps.empty_cache()
 ```
 
-### 5. Solo Pool 模式
+### 5. 后台执行器模式
 
-**避免 fork 崩溃:**
-- Mac 使用 `worker_pool='solo'` (单进程模式)
-- fork 模式在子进程中使用 MPS 会导致 SIGSEGV 段错误
+**当前仓库实现:**
+- 本地开发默认使用 `backend_fastapi/app/core/executor.py` 中的后台执行器
+- 不再依赖旧的 Celery worker / solo pool 配置
+- 需要提升并发时，优先调整执行器配置而不是恢复旧 Worker 链路
 
 ## 📊 模型选择建议
 
@@ -126,21 +127,20 @@ torch.mps.empty_cache()
 
 ## 🛠️ 故障排除
 
-### 1. Worker 卡住无法终止
+### 1. 后台任务卡住无法终止
 
-**现象:** Ctrl+C 无法停止 Celery worker
+**现象:** 后端进程长时间卡住，Ctrl+C 无法正常停止
 
 **Mac 解决方法:**
 ```bash
-# 使用强制终止脚本
-cd /Users/chenjiaxuan/Desktop/File/graduation/AI-EdVision/backend
-bash kill_celery.sh
+# 结束当前 FastAPI 启动进程
+pkill -f "python backend_fastapi/run.py"
 ```
 
 **Windows 解决方法:**
 ```cmd
 # 打开任务管理器 (Ctrl+Shift+Esc)
-# 找到 python.exe 或 celery 相关进程
+# 找到 python.exe 或 uvicorn 相关进程
 # 右键 -> 结束任务
 
 # 或使用命令行
@@ -164,28 +164,28 @@ taskkill /F /IM python.exe
 python download_whisper.py
 
 # 选择要下载的模型
-# 默认保存到: ~/Desktop/File/graduation/whisper
+# 默认保存到: /Users/yuan/302_works/whisper_models
 ```
 
 **方法2: 手动移动已下载的模型**
 ```bash
 # Mac/Linux
-cp ~/Desktop/File/graduation/whisper/*.pt ~/.cache/whisper/
+cp /Users/yuan/302_works/whisper_models/*.pt ~/.cache/whisper/
 
 # Windows (PowerShell)
-Copy-Item "$env:USERPROFILE\Desktop\File\graduation\whisper\*.pt" "$env:USERPROFILE\.cache\whisper\"
+Copy-Item "C:\Users\yuan\302_works\whisper_models\*.pt" "$env:USERPROFILE\.cache\whisper\"
 ```
 
 **方法3: 修改代码使用自定义路径**
-代码已默认配置为使用 `~/Desktop/File/graduation/whisper`,无需修改。
+代码已默认配置为使用 `/Users/yuan/302_works/whisper_models`,无需修改。
 
 **验证模型完整性:**
 ```bash
 # Mac/Linux
-ls -lh ~/Desktop/File/graduation/whisper/
+ls -lh /Users/yuan/302_works/whisper_models/
 
 # Windows (PowerShell)
-Get-ChildItem "$env:USERPROFILE\Desktop\File\graduation\whisper" | Format-Table Name, Length
+Get-ChildItem "C:\Users\yuan\302_works\whisper_models" | Format-Table Name, Length
 
 # 预期输出:
 # medium.pt      1.4G
@@ -200,7 +200,7 @@ Get-ChildItem "$env:USERPROFILE\Desktop\File\graduation\whisper" | Format-Table 
 **解决方法:**
 1. 使用更小的模型 (如 `small` 替代 `medium`)
 2. 关闭其他占用内存的应用
-3. 重启 Celery worker 清理内存
+3. 重启当前 FastAPI 服务，释放 Whisper 模型与后台执行器占用
 
 ### 4. 转录质量不佳
 
@@ -218,76 +218,60 @@ Get-ChildItem "$env:USERPROFILE\Desktop\File\graduation\whisper" | Format-Table 
 - 转换为 16kHz 单声道 WAV
 - 使用多线程加速 FFmpeg
 
-### 2. 并发处理
+### 2. 后台执行并发
 
-虽然使用 solo pool,仍可并发:
+当前仓库在本地开发环境下默认使用后台执行器处理任务，而不是 Celery Worker。
 
-**启动多个 Worker:**
-```bash
-# Terminal 1
-celery -A celery_app.celery worker --loglevel=info -n worker1
-
-# Terminal 2
-celery -A celery_app.celery worker --loglevel=info -n worker2
-
-# Terminal 3
-celery -A celery_app.celery worker --loglevel=info -n worker3
-```
-
-每个 worker 独立处理任务,互不影响。
+**建议做法:**
+- 先用 `small` 或 `base` 模型验证链路，再视情况升级到 `medium` 或 `large`
+- 如需提高并发，优先检查 [`backend_fastapi/app/core/executor.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/executor.py) 和 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py) 中的执行器配置
+- 不建议沿用旧文档中的 Celery 多 Worker 命令
 
 ### 3. 监控任务进度
 
-**查看 Redis 中的任务:**
+**查看健康状态与 Whisper 运行时:**
 ```bash
-redis-cli
-> KEYS celery-task-meta-*
-> GET celery-task-meta-<task_id>
+curl http://127.0.0.1:8000/health
 ```
 
-**查看 Worker 状态:**
-```bash
-celery -A celery_app.celery inspect active
-celery -A celery_app.celery inspect stats
-```
+**查看上传与处理日志:**
+- 直接观察 `python backend_fastapi/run.py` 所在终端输出
+- 上传后在前端视频列表或详情页查看当前步骤和处理进度
 
 ## 📝 最佳实践
 
 1. **首次使用先测试小模型** - 确保环境配置正确
 2. **使用 small 模型作为默认选择** - 速度和质量的最佳平衡
-3. **定期重启 Worker** - 避免内存泄漏累积
+3. **定期重启本地后端服务** - 需要时可快速释放模型占用和执行器状态
 4. **监控系统资源** - 使用活动监视器查看内存/CPU 使用情况
 5. **保留日志** - 遇到问题时方便排查
 
 ## 🔧 配置文件位置
 
 **Mac:**
-- **Celery 配置**: `backend/celery_app.py`
-- **视频处理任务**: `backend/app/tasks/video_processing_mac.py`
-- **强制终止脚本**: `backend/kill_celery.sh`
+- **后台执行器**: `backend_fastapi/app/core/executor.py`
+- **Whisper 运行时**: `backend_fastapi/app/services/whisper_runtime.py`
+- **视频处理任务**: `backend_fastapi/app/tasks/video_processing.py`
 
 **Windows:**
-- **Celery 配置**: `backend/celery_app.py`
-- **视频处理任务**: `backend/app/tasks/video_processing.py`
+- **后台执行器**: `backend_fastapi/app/core/executor.py`
+- **视频处理任务**: `backend_fastapi/app/tasks/video_processing.py`
 
 **模型存储路径 (跨平台):**
-- 自定义路径: `~/Desktop/File/graduation/whisper`
-- Mac: `/Users/<用户名>/Desktop/File/graduation/whisper`
-- Windows: `C:\Users\<用户名>\Desktop\File\graduation\whisper`
+- 当前仓库默认路径: `/Users/yuan/302_works/whisper_models`
+- Mac 示例: `/Users/<用户名>/302_works/whisper_models`
+- Windows 示例: `C:\Users\<用户名>\302_works\whisper_models`
 
 ## 📞 获取帮助
 
 如遇到问题,查看日志:
 ```bash
-# Celery worker 日志
-tail -f celery.log
-
-# 应用日志
-tail -f app.log
+# 直接查看本地启动终端输出
+python backend_fastapi/run.py
 ```
 
 ---
 
-**最后更新:** 2025-11-10
-**适用版本:** AI-EdVision 1.0 (跨平台优化版)
+**最后更新:** 2026-03-19
+**适用版本:** EduMind Whisper 运行时
 **支持平台:** Mac (Apple Silicon MPS) / Windows (NVIDIA CUDA) / Linux (CPU/CUDA)

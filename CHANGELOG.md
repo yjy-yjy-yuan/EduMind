@@ -1,5 +1,11 @@
 # 变更日志
 
+## 2026-03-19
+
+### Whisper 模型目录文档同步
+- 更新 [`docs/Mac Whisper 模型优化指南.md`](/Users/yuan/final-work/EduMind/docs/Mac%20Whisper%20模型优化指南.md)：将旧的桌面模型目录说明统一改为 `/Users/yuan/302_works/whisper_models`，同步修正文档中的默认下载路径、手动校验命令、复制示例与跨平台路径说明，避免继续把模型放到桌面旧目录。
+- 更新 [`docs/Mac Whisper 模型优化指南.md`](/Users/yuan/final-work/EduMind/docs/Mac%20Whisper%20模型优化指南.md)：清理同页残留的旧 Celery Worker、旧桌面工程路径和过时配置位置说明，统一改为当前 `backend_fastapi` 后台执行器、Whisper 运行时与健康检查排查方式。
+
 ## 2026-03-18
 
 ### Whisper 启动预热与运行时加载管理
