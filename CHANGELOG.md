@@ -298,6 +298,11 @@
 - 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)、[`backend_fastapi/tests/unit/test_models.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_models.py)、[`backend_fastapi/tests/conftest.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/conftest.py)：补充邮箱/手机号注册登录、重复密码拦截、token 获取当前用户等回归测试。
 - 更新 [`mobile-frontend/src/views/Login.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Login.vue)、[`mobile-frontend/src/views/Register.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Register.vue)、[`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)、[`mobile-frontend/src/views/Guide.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Guide.vue)、[`mobile-frontend/src/api/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/auth.js)、[`mobile-frontend/src/store/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/store/auth.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：前端登录/注册 UI、UI-only mock、资料页展示与使用指南同步切换到邮箱/手机号认证约定，并展示登录次数。
 
+### Git Hooks 收口到 pre-commit 多阶段方案
+
+- 更新 [`.pre-commit-config.yaml`](/Users/yuan/final-work/EduMind/.pre-commit-config.yaml)、新增 [`scripts/install_git_hooks.sh`](/Users/yuan/final-work/EduMind/scripts/install_git_hooks.sh)、[`scripts/hooks/pre_push.sh`](/Users/yuan/final-work/EduMind/scripts/hooks/pre_push.sh)、[`scripts/hooks/commit_msg_check.py`](/Users/yuan/final-work/EduMind/scripts/hooks/commit_msg_check.py)、[`scripts/hooks/check_debug_statements.py`](/Users/yuan/final-work/EduMind/scripts/hooks/check_debug_statements.py)：保留并扩展现有 `pre-commit` 路线，补齐 `pre-commit`、`pre-push`、`commit-msg` 三类 hooks，覆盖 Python 格式化/静态检查、前端调试语句拦截、推送前 `mypy + pytest + build:ios` 以及 Conventional Commits 校验。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`.gitignore`](/Users/yuan/final-work/EduMind/.gitignore)：补充一键安装 hooks 的说明、`--no-verify` 逃生说明，并忽略 `pre-commit` 本地缓存目录。
+
 ## 2026-03-18
 
 ### 对 2026-03-18 视频问答隔离记录的更正说明
