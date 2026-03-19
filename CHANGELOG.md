@@ -9,6 +9,11 @@
 - 更新 [`docs/Mac Whisper 模型优化指南.md`](/Users/yuan/final-work/EduMind/docs/Mac%20Whisper%20模型优化指南.md)：将旧的桌面模型目录说明统一改为 `/Users/yuan/302_works/whisper_models`，同步修正文档中的默认下载路径、手动校验命令、复制示例与跨平台路径说明，避免继续把模型放到桌面旧目录。
 - 更新 [`docs/Mac Whisper 模型优化指南.md`](/Users/yuan/final-work/EduMind/docs/Mac%20Whisper%20模型优化指南.md)：清理同页残留的旧 Celery Worker、旧桌面工程路径和过时配置位置说明，统一改为当前 `backend_fastapi` 后台执行器、Whisper 运行时与健康检查排查方式。
 
+### 本地上传视频按摘要与关键词重命名
+- 更新 [`backend_fastapi/app/services/video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_content_service.py)：新增“主标题”提取逻辑，优先基于摘要与标签生成简短中文主题名，在线模型不可用时回退到本地规则提炼。
+- 更新 [`backend_fastapi/app/tasks/video_processing.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/video_processing.py)：本地上传视频在处理完成后会按摘要/关键词提炼出的主内容重命名原始文件，并同步写回 `videos.title`、`videos.filename`、`videos.filepath`。
+- 更新 [`backend_fastapi/tests/unit/test_video_processing_task.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_processing_task.py)：补充处理完成后重命名原始本地视频并同步数据库字段的回归测试。
+
 ## 2026-03-18
 
 ### Whisper 启动预热与运行时加载管理

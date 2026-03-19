@@ -25,6 +25,7 @@ SUPPORTED_SUMMARY_STYLES = {
 }
 DEFAULT_ONLINE_MODEL = "qwen-plus"
 DEFAULT_MAX_TAGS = 6
+DEFAULT_PRIMARY_TOPIC_NAME_LENGTH = 40
 
 STOP_WORDS = {
     "",
@@ -85,6 +86,18 @@ STOP_WORDS = {
     "your",
     "our",
     "their",
+}
+
+GENERIC_VIDEO_TITLE_PREFIXES = ("local-", "bilibili-", "youtube-", "mooc-")
+GENERIC_VIDEO_TITLE_VALUES = {
+    "",
+    "video",
+    "lesson",
+    "upload",
+    "local",
+    "本地视频",
+    "未命名视频",
+    "视频",
 }
 
 
@@ -282,6 +295,109 @@ def fallback_tags(summary: str, *, title: str = "", max_tags: int = DEFAULT_MAX_
     return normalize_tags(tags, max_tags=max_tags)
 
 
+def strip_generated_video_title(title: str) -> str:
+    text = clean_whitespace(title)
+    lowered = text.lower()
+    for prefix in GENERIC_VIDEO_TITLE_PREFIXES:
+        if lowered.startswith(prefix):
+            return clean_whitespace(text[len(prefix) :])
+    return text
+
+
+def looks_like_generic_video_title(title: str) -> bool:
+    text = strip_generated_video_title(title)
+    lowered = text.lower()
+    if lowered in GENERIC_VIDEO_TITLE_VALUES:
+        return True
+    return bool(re.fullmatch(r"(video|lesson|upload|本地视频|视频)[\s_-]*\d*", lowered))
+
+
+def normalize_primary_topic_name(name: str, *, max_length: int = DEFAULT_PRIMARY_TOPIC_NAME_LENGTH) -> str:
+    text = clean_multiline_text(name)
+    if not text:
+        return ""
+
+    lines = [clean_whitespace(line) for line in text.splitlines() if clean_whitespace(line)]
+    candidate = lines[0] if lines else text
+    candidate = re.sub(r"^(?:文件名|文件标题|标题|命名)[:：]\s*", "", candidate)
+    candidate = re.sub(r"^(?:主题|课程主题|视频主题)[:：]\s*", "", candidate)
+    candidate = re.sub(r"^(?:学习重点|详细梳理|主要内容)[:：]?\s*", "", candidate)
+    candidate = re.sub(r"^(?:[-*•]\s*|\d+[\.、:：]\s*)", "", candidate)
+    candidate = re.sub(r"\.[A-Za-z0-9]{1,8}$", "", candidate)
+    candidate = re.sub(r"^[《“\"'`]+|[》”\"'`]+$", "", candidate)
+    candidate = re.split(r"[。！？!?；;]", candidate, maxsplit=1)[0]
+    candidate = re.sub(r"\s+", " ", candidate)
+    candidate = re.sub(r'[<>:"/\\|?*]+', " ", candidate)
+    candidate = candidate.strip(" ._-")
+    if not candidate:
+        return ""
+    if len(candidate) > max_length:
+        candidate = candidate[:max_length].rstrip(" ._-")
+    return candidate
+
+
+def extract_primary_topic_candidates(summary: str, *, title: str = "") -> list[str]:
+    candidates = []
+    normalized_title = strip_generated_video_title(title)
+    if normalized_title and not looks_like_generic_video_title(normalized_title):
+        candidates.append(normalized_title)
+
+    lines = [clean_whitespace(line) for line in clean_multiline_text(summary).splitlines() if clean_whitespace(line)]
+    for line in lines:
+        normalized = normalize_primary_topic_name(line)
+        if not normalized:
+            continue
+        if looks_like_generic_video_title(normalized):
+            continue
+        candidates.append(normalized)
+
+    return candidates
+
+
+def build_tag_based_primary_topic(tags: Iterable[str], *, max_length: int = DEFAULT_PRIMARY_TOPIC_NAME_LENGTH) -> str:
+    normalized_tags = [normalize_primary_topic_name(tag, max_length=max_length) for tag in normalize_tags(tags, max_tags=3)]
+    normalized_tags = [tag for tag in normalized_tags if tag]
+    if not normalized_tags:
+        return ""
+
+    if len(normalized_tags) >= 2:
+        combined = f"{normalized_tags[0]}-{normalized_tags[1]}"
+        if len(combined) <= max_length:
+            return combined
+    return normalized_tags[0][:max_length].rstrip(" ._-")
+
+
+def fallback_primary_topic_name(
+    summary: str,
+    *,
+    tags: Iterable[str] = (),
+    title: str = "",
+    max_length: int = DEFAULT_PRIMARY_TOPIC_NAME_LENGTH,
+) -> str:
+    candidates = extract_primary_topic_candidates(summary, title=title)
+    normalized_tags = normalize_tags(tags, max_tags=3)
+
+    for candidate in candidates:
+        if len(candidate) < 2:
+            continue
+        if normalized_tags and any(tag in candidate for tag in normalized_tags[:2]):
+            return normalize_primary_topic_name(candidate, max_length=max_length)
+
+    for candidate in candidates:
+        normalized = normalize_primary_topic_name(candidate, max_length=max_length)
+        if len(normalized) >= 2:
+            return normalized
+
+    tag_candidate = build_tag_based_primary_topic(normalized_tags, max_length=max_length)
+    if tag_candidate:
+        return tag_candidate
+
+    normalized_title = normalize_primary_topic_name(strip_generated_video_title(title), max_length=max_length)
+    if normalized_title and not looks_like_generic_video_title(normalized_title):
+        return normalized_title
+    return ""
+
+
 def ollama_available() -> bool:
     try:
         response = requests.get(f"{settings.OLLAMA_BASE_URL}/tags", timeout=5)
@@ -375,6 +491,23 @@ def build_tag_prompt(summary: str, *, title: str, max_tags: int) -> tuple[str, s
     return system_prompt, prompt
 
 
+def build_primary_topic_name_prompt(summary: str, *, tags: Iterable[str], title: str) -> tuple[str, str]:
+    tag_text = "、".join(normalize_tags(tags, max_tags=6)) or "无"
+    system_prompt = "你是一个课程视频命名助手。请根据摘要和标签提炼最核心的学习主题，只输出一个简短中文标题。"
+    prompt = (
+        f"原始标题：{strip_generated_video_title(title) or '未命名视频'}\n"
+        f"摘要：\n{clean_multiline_text(summary)[:1800]}\n\n"
+        f"标签：{tag_text}\n\n"
+        "请输出一个适合作为本地视频文件名和数据库标题的中文名称。\n"
+        "要求：\n"
+        "1. 只输出标题本身，不要解释。\n"
+        "2. 突出最主要的知识主题，不要空泛词。\n"
+        "3. 控制在 8 到 24 个字之间，不能包含文件扩展名。\n"
+        "4. 不要使用引号、括号、序号、斜杠。"
+    )
+    return system_prompt, prompt
+
+
 def generate_video_summary(
     video_id: int,
     subtitle_path: str = "",
@@ -422,3 +555,36 @@ def generate_video_tags(video_id: int, summary: str, *, title: str = "", max_tag
 
     logger.info("视频标签生成完成 | video_id=%s | provider=%s | count=%s", video_id, provider, len(tags))
     return {"success": True, "tags": tags, "provider": provider}
+
+
+def generate_primary_topic_name(
+    summary: str,
+    *,
+    tags: Iterable[str] = (),
+    title: str = "",
+    max_length: int = DEFAULT_PRIMARY_TOPIC_NAME_LENGTH,
+) -> dict:
+    clean_summary = clean_multiline_text(summary)
+    normalized_tags = normalize_tags(tags, max_tags=6)
+    if not clean_summary and not normalized_tags:
+        return {"success": False, "error": "摘要和标签均为空"}
+
+    system_prompt, prompt = build_primary_topic_name_prompt(clean_summary, tags=normalized_tags, title=title)
+    raw_name = call_online_chat(prompt, system_prompt=system_prompt)
+    provider = "ai"
+
+    primary_name = normalize_primary_topic_name(raw_name, max_length=max_length) if raw_name else ""
+    if not primary_name:
+        primary_name = fallback_primary_topic_name(
+            clean_summary,
+            tags=normalized_tags,
+            title=title,
+            max_length=max_length,
+        )
+        provider = "fallback"
+
+    if not primary_name:
+        return {"success": False, "error": "无法生成主标题"}
+
+    logger.info("视频主标题生成完成 | provider=%s | title=%s", provider, primary_name)
+    return {"success": True, "name": primary_name, "provider": provider}

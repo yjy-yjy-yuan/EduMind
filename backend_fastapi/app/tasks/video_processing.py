@@ -12,6 +12,7 @@ import gc
 import json
 import logging
 import os
+import re
 import subprocess
 import threading
 import time
@@ -27,6 +28,49 @@ logger = logging.getLogger(__name__)
 TRANSCRIPTION_PROGRESS_START = 60.0
 TRANSCRIPTION_PROGRESS_END = 84.0
 TRANSCRIPTION_POLL_SECONDS = 2.0
+
+
+def build_safe_filename_stem(name: str, *, fallback: str = "video", max_length: int = 80) -> str:
+    candidate = str(name or "").strip()
+    candidate = re.sub(r'[<>:"/\\|?*]+', "_", candidate)
+    candidate = re.sub(r"\s+", " ", candidate)
+    candidate = candidate.strip(" ._-")
+    if not candidate:
+        candidate = fallback
+    if len(candidate) > max_length:
+        candidate = candidate[:max_length].rstrip(" ._-")
+    return candidate or fallback
+
+
+def rename_local_video_file(video, desired_title: str) -> tuple[bool, str]:
+    source_path = str(video.filepath or "").strip()
+    if video.url:
+        return False, "链接导入视频不执行本地重命名"
+    if not source_path:
+        return False, "缺少原始文件路径"
+    if not os.path.exists(source_path):
+        return False, "原始文件不存在"
+
+    ext = os.path.splitext(video.filename or source_path)[1] or os.path.splitext(source_path)[1]
+    safe_title = build_safe_filename_stem(desired_title, fallback=f"video_{video.id}")
+    target_filename = f"{safe_title}{ext.lower()}"
+    target_path = os.path.join(os.path.dirname(source_path), target_filename)
+
+    if os.path.abspath(target_path) != os.path.abspath(source_path):
+        if os.path.exists(target_path):
+            safe_title = build_safe_filename_stem(f"{safe_title}_{video.id}", fallback=f"video_{video.id}")
+            target_filename = f"{safe_title}{ext.lower()}"
+            target_path = os.path.join(os.path.dirname(source_path), target_filename)
+
+        if os.path.exists(target_path):
+            return False, "目标文件名已存在，跳过重命名"
+
+        os.replace(source_path, target_path)
+
+    video.title = safe_title
+    video.filename = target_filename
+    video.filepath = target_path
+    return True, safe_title
 
 
 def get_device():
@@ -556,6 +600,7 @@ def process_video_task(
         if auto_generate_summary or auto_generate_tags:
             from app.services.video_content_service import generate_video_summary
             from app.services.video_content_service import generate_video_tags
+            from app.services.video_content_service import generate_primary_topic_name
             from app.services.video_content_service import normalize_summary_style
 
             normalized_summary_style = normalize_summary_style(summary_style)
@@ -595,6 +640,46 @@ def process_video_task(
                         "标签生成失败，跳过写回 | video_id=%s | error=%s",
                         video_id,
                         tag_result.get("error"),
+                    )
+
+            if not video.url and (video.summary or video.tags):
+                resolved_tags = []
+                if video.tags:
+                    try:
+                        resolved_tags = json.loads(video.tags)
+                    except Exception as exc:
+                        logger.warning("解析视频标签失败，重命名时忽略标签 | video_id=%s | error=%s", video_id, exc)
+
+                title_result = generate_primary_topic_name(
+                    video.summary or "",
+                    tags=resolved_tags,
+                    title=video.title or "",
+                )
+                if title_result.get("success"):
+                    try:
+                        renamed, resolved_title = rename_local_video_file(video, title_result["name"])
+                        if renamed:
+                            db.commit()
+                            logger.info(
+                                "本地上传视频已按内容重命名 | video_id=%s | title=%s | filename=%s",
+                                video_id,
+                                resolved_title,
+                                video.filename,
+                            )
+                        else:
+                            logger.info(
+                                "本地上传视频跳过重命名 | video_id=%s | reason=%s",
+                                video_id,
+                                resolved_title,
+                            )
+                    except Exception as exc:
+                        db.rollback()
+                        logger.warning("本地上传视频重命名失败 | video_id=%s | error=%s", video_id, exc)
+                else:
+                    logger.warning(
+                        "视频主标题生成失败，保留原文件名 | video_id=%s | error=%s",
+                        video_id,
+                        title_result.get("error"),
                     )
 
         # 清理临时音频文件
