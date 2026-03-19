@@ -73,6 +73,8 @@ pytest backend_fastapi/tests/ -v
 ## Commit & Pull Request Guidelines
 - Use short imperative commit titles.
 - Keep each commit focused on one change.
+- Before any commit, explicitly remind the user to review the current branch, staged files, test/verification status, and whether any secrets or machine-local settings are being included.
+- Before any commit, explicitly remind the user that `git status`, `git diff --staged`, and `git log --oneline -5` are the minimum review commands if they have not already checked them.
 - PRs should state:
   - affected module
   - verification steps
@@ -83,6 +85,89 @@ pytest backend_fastapi/tests/ -v
 
 - 所有变更只在 `CHANGELOG.md` 中追加新条目，不修改或删除历史记录。
 - 如果需要更正历史说明，在最新条目中写“对某某日期记录的更正说明”。
+
+## Git Hooks Guidance
+When a task involves Git hooks, first thoroughly analyze the current project to determine:
+
+1. **Existing Git hooks setup**:
+   - Check for any existing Git hooks configuration:
+     - `.husky/` directory
+     - `.git/hooks/` (sample files or custom scripts)
+     - `.pre-commit-config.yaml` (pre-commit framework)
+     - `lefthook.yml`, simple-git-hooks config, or other tools
+     - Any `prepare` script or `gitHooks` in `package.json`
+   - If hooks exist, examine their content:
+     - What hooks are implemented (`pre-commit`, `pre-push`, `commit-msg`, etc.)?
+     - What commands do they run?
+     - Do they follow best practices (run only on staged files, fast, cached, CI-compatible, skippable)?
+     - Are they reasonably complete and effective?
+
+2. **Project characteristics**:
+   - Primary programming language(s)
+   - Key build/config files (`package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, etc.)
+   - Whether it's a monorepo
+   - Existing linters/formatters/tests
+   - Test framework in use
+
+**Decision logic for hooks**:
+- If existing hooks are **reasonable and complete** (cover pre-commit fast checks, pre-push tests, commit-msg linting, follow best practices, fast, CI-compatible):
+  - Optimize only if clear improvements are possible (for example, add caching, better ignore patterns, secrets check).
+  - Otherwise, leave them untouched and only add truly missing critical parts.
+- If existing hooks are **partially reasonable but incomplete/outdated**:
+  - Extend/improve the existing toolchain (do not replace unless necessary).
+- If existing hooks are **missing, broken, or significantly suboptimal**:
+  - Replace or set up a new appropriate toolchain.
+- If no hooks exist at all:
+  - Set up a fresh toolchain based on project type.
+
+**Toolchain selection** (only if setting up new or replacing):
+- JS/TS projects with `package.json` -> prefer Husky (v8+) + lint-staged + commitlint
+- Python, Go, Rust, Ruby, multi-language, or monorepos -> prefer cross-language pre-commit framework
+- Respect any existing toolchain and extend it when possible.
+
+Set up or improve Git hooks following industry best practices.
+
+### Requirements (apply to new or improved hooks)
+1. **Pre-commit** (fast, staged files only):
+   - Lint + format with project-appropriate tools
+   - Type checking if applicable
+   - Optional: block `console.log`/`debugger`, check for secrets
+2. **Pre-push**:
+   - Run tests + type checking
+   - Optional: integration tests / build
+3. **Commit-msg**:
+   - Enforce conventional commits (`type(scope): description`)
+   - Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`, `revert`
+
+### Best Practices (enforce in all cases)
+- Hooks must be fast (<10s typical pre-commit)
+- Use caching where possible
+- Skip automatically in CI
+- Document `--no-verify` escape hatch
+- Proper ignore patterns
+- Clear setup instructions in `README.md`
+
+### Implementation Steps (respect existing setup)
+**If extending/improving Husky + lint-staged**:
+- Keep existing `.husky` files, only modify if needed
+- Update `lint-staged` config for better patterns/caching
+- Ensure `"prepare": "husky install"`
+
+**If extending/improving pre-commit framework**:
+- Keep/modify existing `.pre-commit-config.yaml`
+- Add missing hooks (formatting, linting, tests, commitlint)
+
+**If setting up fresh**:
+- Husky route: install dependencies, create `.husky/*`, add `prepare` script
+- pre-commit route: create `.pre-commit-config.yaml`, run `pre-commit install`
+
+### Example configurations
+[保持之前的 JS/TS lint-staged 示例、Python/Go/Rust pre-commit 示例不变]
+
+### Final steps
+- Update `README.md` with clear setup instructions and hook descriptions
+- Commit all configuration files to version control
+- Ensure new contributors can run one command to install hooks
 
 ## Configuration & Safety
 - Do not commit real secrets from `.env` files or machine-local settings.
