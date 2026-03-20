@@ -12,8 +12,8 @@ from sqlalchemy.pool import StaticPool
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.core.database import get_db
 from app.core.config import settings
+from app.core.database import get_db
 from app.main import app
 from app.models.base import Base
 
@@ -116,7 +116,8 @@ def sample_user(db):
     user = User(
         username="testuser",
         email="test@example.com",
-        password="password123",
+        phone="13800138000",
+        password="Strong#123",
     )
     db.add(user)
     db.commit()

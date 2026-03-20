@@ -6,7 +6,10 @@ let mockToken = 'ui-only-token'
 let mockUser = {
   id: 1,
   username: 'demo_user',
-  email: 'demo@edumind.app'
+  email: 'demo@edumind.app',
+  phone: null,
+  avatar: null,
+  login_count: 0
 }
 
 const videos = [
@@ -143,22 +146,63 @@ const tickVideoProgress = (video) => {
 const sortByUpdatedDesc = (list) =>
   [...list].sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0))
 
-export const mockLogin = (username) => {
-  const name = String(username || '').trim() || 'demo_user'
-  mockUser = { ...mockUser, username: name, email: `${name}@edumind.app` }
+const normalizePhone = (value) => {
+  const digits = String(value || '').replace(/\D/g, '')
+  if (digits.startsWith('86') && digits.length === 13) return digits.slice(2)
+  return digits
+}
+
+const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim().toLowerCase())
+const fileToDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('头像读取失败（UI 模式）'))
+    reader.readAsDataURL(file)
+  })
+
+export const mockLogin = (account) => {
+  const raw = String(account || '').trim()
+  const phone = normalizePhone(raw)
+  const email = looksLikeEmail(raw) ? raw.toLowerCase() : null
+  const username = email ? email.split('@')[0] : phone ? `user_${phone.slice(-4)}` : 'demo_user'
+  mockUser = {
+    ...mockUser,
+    username,
+    email: email || null,
+    phone: email ? null : phone || mockUser.phone,
+    login_count: Number(mockUser.login_count || 0) + 1
+  }
   mockToken = `ui-token-${Date.now()}`
   return mockResponse({ success: true, user: clone(mockUser), token: mockToken, message: 'UI 模式登录成功' })
 }
 
 export const mockRegister = (userData) => {
-  const name = String(userData?.username || '').trim() || 'new_user'
-  mockUser = { ...mockUser, username: name, email: String(userData?.email || `${name}@edumind.app`) }
+  const email = userData?.email ? String(userData.email).trim().toLowerCase() : null
+  const phone = userData?.phone ? normalizePhone(userData.phone) : null
+  const username = email ? email.split('@')[0] : phone ? `user_${phone.slice(-4)}` : 'new_user'
+  mockUser = { ...mockUser, username, email, phone }
   return mockResponse({ success: true, user: clone(mockUser), message: 'UI 模式注册成功' })
 }
 
 export const mockMe = () => mockResponse({ success: true, user: clone(mockUser), token: mockToken })
 
 export const mockLogout = () => mockResponse({ success: true, message: 'UI 模式已退出' })
+
+export const mockUpdateProfile = (payload = {}) => {
+  const nextUsername = String(payload?.username || '').trim()
+  if (nextUsername) {
+    mockUser = { ...mockUser, username: nextUsername }
+  }
+  return mockResponse({ success: true, user: clone(mockUser), message: 'UI 模式：资料已更新' })
+}
+
+export const mockUploadAvatar = async (file) => {
+  if (!file) throw new Error('请选择头像文件（UI 模式）')
+  const avatar = await fileToDataUrl(file)
+  mockUser = { ...mockUser, avatar }
+  return mockResponse({ success: true, user: clone(mockUser), message: 'UI 模式：头像已更新' })
+}
 
 export const mockGetVideoList = (page = 1, perPage = 10) => {
   sortByUpdatedDesc(videos).forEach((item) => tickVideoProgress(item))

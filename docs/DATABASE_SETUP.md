@@ -75,6 +75,8 @@ python scripts/init_db.py
 python scripts/init_db.py --create
 ```
 
+`--create` 当前除了创建缺失表，也会对已有 `users` 表做最小认证字段同步，用于补齐手机号、密码重复检测指纹和登录次数列；不会新建额外认证表。
+
 查看表结构说明：
 
 ```bash
@@ -98,7 +100,7 @@ python scripts/init_db.py --info
 | `Access denied for user` | 检查 `.env` 中 `DATABASE_URL` 的用户名、密码是否正确；MySQL 是否允许该用户从本机登录。 |
 | `Unknown database 'edumind'` | 先执行 `CREATE DATABASE edumind ...` 创建数据库。 |
 | `Can't connect to MySQL server` | 确认 MySQL 已启动；端口是否为 3306；若用 Docker 是否映射了 3306。 |
-| 表已存在 / 想改表结构 | 当前项目通过 `create_all` 建表，只会创建不存在的表，不会改已有表。若要改结构，需手动改模型后删表重建，或后续引入 Alembic 做迁移。 |
+| 表已存在 / 想改表结构 | 当前项目默认通过 `create_all` 建表，只会创建不存在的表；当前额外保留了 `users` 表认证字段的最小同步能力。若要做更大范围结构调整，仍建议显式迁移或受控重建。 |
 
 ---
 

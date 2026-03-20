@@ -229,12 +229,55 @@ python backend_fastapi/scripts/init_db.py --emit-sql backend_fastapi/scripts/mys
 
 当前默认数据库名已统一为 `edumind`。
 
+## 用户认证当前约定
+
+- 注册只接受“邮箱或手机号”至少一项，密码必须至少 8 位，且同时包含大小写字母、数字和特殊字符。
+- 登录只接受邮箱/手机号 + 密码。
+- 用户数据继续写入现有 `users` 表；不会新建认证平行表。
+- 登录后支持在“我的”页修改用户名，并将新值写回 `users.username`。
+- 登录后支持上传头像照片；文件保存在 `backend_fastapi/uploads/avatars/`，数据库继续只在现有 `users.avatar` 字段内记录可访问路径。
+- `python backend_fastapi/scripts/init_db.py --create` 现在会补齐 `users` 表的认证字段（手机号、重复密码指纹、登录次数）并同步必要索引。
+
 ## 测试
 
 ```bash
 . .venv/bin/activate
 pytest backend_fastapi/tests/ -v
 ```
+
+## Git Hooks
+
+仓库当前统一使用 `pre-commit` 管理本地 Git hooks，覆盖：
+
+1. `pre-commit`
+2. `pre-push`
+3. `commit-msg`
+
+一键安装：
+
+```bash
+bash scripts/install_git_hooks.sh
+```
+
+该命令会：
+
+1. 复用或创建根目录 `.venv`
+2. 安装 `pre-commit` 与 `mypy`
+3. 安装 `pre-commit`、`pre-push`、`commit-msg` 三类 hook
+
+当前 hook 规则：
+
+1. `pre-commit`：基础文件检查、Python `black` / `isort` / `flake8`、Shell 语法检查、前端 `console.log` / `debugger` 拦截
+2. `pre-push`：对当前已清理干净的 Python 层执行 `mypy`（`backend_fastapi/app/models`、`backend_fastapi/app/schemas`、`backend_fastapi/scripts/init_db.py`、`scripts/hooks`），再跑后端快速测试集和 `mobile-frontend` 的 `npm run build:ios`
+3. `commit-msg`：强制 Conventional Commits，格式为 `type(scope): description`
+
+约定说明：
+
+1. Hook 默认只在本地开发环境执行；脚本检测到 `CI` 时会自动跳过本地专用逻辑
+2. `pre-commit` 只检查暂存文件，保持提交前反馈尽量快
+3. 如需临时跳过，可使用 `git commit --no-verify` 或 `git push --no-verify`，但这应是明确的例外而不是常态
+4. 首次执行 hook 时，`pre-commit` 会拉取并缓存自身依赖，后续会复用缓存
+5. `pre-push` 依赖 `.venv` 和 `mobile-frontend/node_modules` 已就绪
 
 ## 开发约束
 

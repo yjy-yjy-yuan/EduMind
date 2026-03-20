@@ -7,10 +7,64 @@
 
     <div class="card">
       <div class="user">
-        <div class="avatar">{{ avatarText }}</div>
+        <button class="avatar-shell avatar-trigger" type="button" @click="openAvatarPicker" :disabled="savingProfile">
+          <img v-if="avatarUrl" :src="avatarUrl" alt="用户头像" class="avatar-image" />
+          <div v-else class="avatar">{{ avatarText }}</div>
+          <span class="avatar-badge">更换</span>
+        </button>
         <div class="info">
-          <div class="username">{{ state.user?.username || '用户' }}</div>
-          <div class="email">{{ state.user?.email || '—' }}</div>
+          <div class="inline-editor inline-editor--compact">
+            <input
+              v-if="isEditingUsername"
+              ref="usernameInput"
+              v-model.trim="profileForm.username"
+              class="input inline-editor__input inline-editor__input--compact"
+              maxlength="64"
+              placeholder="请输入用户名"
+              :disabled="savingProfile"
+              @keydown.enter.prevent="saveProfile"
+            />
+            <div v-else class="inline-editor__display inline-editor__display--compact">{{ state.user?.username || '用户' }}</div>
+            <button
+              class="icon-button icon-button--compact"
+              type="button"
+              @click="enableUsernameEditing"
+              :disabled="savingProfile"
+              aria-label="修改昵称"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="icon-button__icon">
+                <path d="M4 17.25V20h2.75l8.1-8.1-2.75-2.75-8.1 8.1zm12.71-9.04a1.003 1.003 0 0 0 0-1.42l-1.5-1.5a1.003 1.003 0 0 0-1.42 0l-1.17 1.17 2.75 2.75 1.34-1.17z" />
+              </svg>
+            </button>
+          </div>
+          <div class="email">{{ contactText }}</div>
+          <div class="email">登录次数：{{ state.user?.login_count ?? 0 }}</div>
+        </div>
+      </div>
+
+      <div class="profile-editor">
+        <div class="card-title">资料设置</div>
+        <div class="field">
+          <span class="field-label">头像照片</span>
+          <div class="field-help">
+            {{ selectedAvatarFile ? `待上传：${selectedAvatarFile.name}` : '点击上方头像可更换照片；点击头像右侧昵称区域的修改图标后才可编辑昵称。' }}
+          </div>
+          <input
+            ref="avatarInput"
+            class="sr-only"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif"
+            @change="onAvatarSelected"
+          />
+        </div>
+
+        <div class="row-actions">
+          <button class="btn btn--small" @click="saveProfile" :disabled="savingProfile || !profileDirty">
+            {{ savingProfile ? '保存中…' : '保存资料' }}
+          </button>
+          <button class="btn btn--ghost btn--small" @click="resetProfileForm" :disabled="savingProfile || !profileDirty">
+            恢复当前值
+          </button>
         </div>
       </div>
 
@@ -64,14 +118,15 @@
       <button class="btn btn--small" @click="saveApiBase" :disabled="saving">{{ saving ? '已保存' : '保存后端地址' }}</button>
     </div>
 
+    <div v-if="successMessage" class="alert alert--good">{{ successMessage }}</div>
     <div v-if="error" class="alert alert--bad">{{ error }}</div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { getApiBaseUrl, setApiBaseUrl } from '@/config'
+import { getApiBaseUrl, setApiBaseUrl, withBase } from '@/config'
 import { getVideoProcessingOptions } from '@/api/video'
 import {
   LANGUAGE_OPTIONS,
@@ -85,18 +140,44 @@ import {
 } from '@/services/processingSettings'
 import * as authStore from '@/store/auth'
 
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024
+
 const router = useRouter()
 const apiBaseInput = ref(getApiBaseUrl())
+const avatarInput = ref(null)
+const usernameInput = ref(null)
 const saving = ref(false)
 const savingProcessing = ref(false)
+const savingProfile = ref(false)
+const isEditingUsername = ref(false)
 const processingForm = ref(getProcessingSettings())
 const whisperModelOptions = ref(getWhisperModelOptions())
-const state = computed(() => authStore.getState())
 const loading = ref(false)
 const error = ref('')
+const successMessage = ref('')
+const selectedAvatarFile = ref(null)
+const avatarPreviewUrl = ref('')
+const profileForm = ref({ username: '' })
+const state = computed(() => authStore.getState())
 
-const avatarText = computed(() => String(state.value.user?.username || 'U').slice(0, 1).toUpperCase())
+let avatarObjectUrl = ''
+
+const displayedUsername = computed(() => String(profileForm.value.username || state.value.user?.username || '用户').trim() || '用户')
+const avatarText = computed(() => displayedUsername.value.slice(0, 1).toUpperCase())
+const contactText = computed(() => state.value.user?.email || state.value.user?.phone || '—')
 const currentModelHighlight = computed(() => whisperModelHighlight(processingForm.value.model))
+const avatarUrl = computed(() => {
+  const value = String(avatarPreviewUrl.value || state.value.user?.avatar || '').trim()
+  if (!value) return ''
+  if (/^(data:|blob:|https?:\/\/)/i.test(value) || value.startsWith('//')) return value
+  if (value.startsWith('/')) return withBase(value)
+  return value
+})
+const profileDirty = computed(() => {
+  const nextUsername = String(profileForm.value.username || '').trim()
+  const currentUsername = String(state.value.user?.username || '').trim()
+  return nextUsername !== currentUsername || Boolean(selectedAvatarFile.value)
+})
 const suggestedApiBase = computed(() => {
   try {
     const nativeValue = window.__edumindNativeConfig?.apiBaseUrl
@@ -108,13 +189,33 @@ const suggestedApiBase = computed(() => {
 const apiBasePlaceholder = computed(() => suggestedApiBase.value || 'http://<Mac主机名>.local:<后端端口>')
 const go = (path) => router.push(path)
 
+const parseErrorMessage = (e, fallback) => e?.response?.data?.detail || e?.message || fallback
+
+const syncProfileForm = () => {
+  profileForm.value = {
+    username: state.value.user?.username || ''
+  }
+}
+
+const clearAvatarSelection = () => {
+  if (avatarObjectUrl) {
+    URL.revokeObjectURL(avatarObjectUrl)
+    avatarObjectUrl = ''
+  }
+  avatarPreviewUrl.value = ''
+  selectedAvatarFile.value = null
+  if (avatarInput.value) avatarInput.value.value = ''
+}
+
 const refresh = async () => {
   loading.value = true
   error.value = ''
+  successMessage.value = ''
   try {
-    await authStore.fetchMe()
+    const res = await authStore.fetchMe()
+    if (res?.success) syncProfileForm()
   } catch (e) {
-    error.value = e?.message || '刷新失败'
+    error.value = parseErrorMessage(e, '刷新失败')
   } finally {
     loading.value = false
   }
@@ -123,13 +224,93 @@ const refresh = async () => {
 const doLogout = async () => {
   loading.value = true
   error.value = ''
+  successMessage.value = ''
   try {
     await authStore.logout()
+    clearAvatarSelection()
     router.replace('/login')
   } catch (e) {
-    error.value = e?.message || '退出失败'
+    error.value = parseErrorMessage(e, '退出失败')
   } finally {
     loading.value = false
+  }
+}
+
+const openAvatarPicker = () => {
+  if (savingProfile.value) return
+  avatarInput.value?.click()
+}
+
+const enableUsernameEditing = async () => {
+  if (savingProfile.value) return
+  isEditingUsername.value = true
+  error.value = ''
+  successMessage.value = ''
+  await nextTick()
+  usernameInput.value?.focus()
+  usernameInput.value?.select?.()
+}
+
+const onAvatarSelected = (event) => {
+  const file = event?.target?.files?.[0]
+  if (!file) return
+
+  error.value = ''
+  successMessage.value = ''
+
+  if (!String(file.type || '').startsWith('image/')) {
+    error.value = '请选择图片格式的头像文件'
+    if (avatarInput.value) avatarInput.value.value = ''
+    return
+  }
+  if (Number(file.size || 0) > MAX_AVATAR_SIZE) {
+    error.value = '头像大小不能超过 5MB'
+    if (avatarInput.value) avatarInput.value.value = ''
+    return
+  }
+
+  clearAvatarSelection()
+  selectedAvatarFile.value = file
+  avatarObjectUrl = URL.createObjectURL(file)
+  avatarPreviewUrl.value = avatarObjectUrl
+}
+
+const resetProfileForm = () => {
+  error.value = ''
+  successMessage.value = ''
+  isEditingUsername.value = false
+  syncProfileForm()
+  clearAvatarSelection()
+}
+
+const saveProfile = async () => {
+  const nextUsername = String(profileForm.value.username || '').trim()
+  if (!nextUsername) {
+    error.value = '用户名不能为空'
+    return
+  }
+
+  savingProfile.value = true
+  error.value = ''
+  successMessage.value = ''
+
+  try {
+    if (nextUsername !== String(state.value.user?.username || '').trim()) {
+      await authStore.updateProfile({ username: nextUsername })
+    }
+
+    if (selectedAvatarFile.value) {
+      await authStore.uploadAvatar(selectedAvatarFile.value)
+    }
+
+    isEditingUsername.value = false
+    syncProfileForm()
+    clearAvatarSelection()
+    successMessage.value = '资料已保存'
+  } catch (e) {
+    error.value = parseErrorMessage(e, '资料保存失败')
+  } finally {
+    savingProfile.value = false
   }
 }
 
@@ -181,8 +362,13 @@ watch(
 onMounted(() => {
   apiBaseInput.value = getApiBaseUrl()
   processingForm.value = getProcessingSettings()
+  syncProfileForm()
   refreshWhisperModelOptions()
   refresh()
+})
+
+onBeforeUnmount(() => {
+  clearAvatarSelection()
 })
 </script>
 
@@ -190,7 +376,7 @@ onMounted(() => {
 .page {
   max-width: 520px;
   margin: 0 auto;
-  padding: 16px 16px 0;
+  padding: calc(14px + env(safe-area-inset-top)) 16px 0;
 }
 
 .topbar {
@@ -198,11 +384,16 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 10px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
 }
 
 .topbar h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .link {
@@ -213,13 +404,14 @@ onMounted(() => {
 }
 
 .card {
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 14px;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
+  margin-top: 12px;
   display: grid;
   gap: 10px;
+  border-radius: 24px;
+  padding: 16px;
+  background: linear-gradient(180deg, #ffffff, #f8fbfd);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
 }
 
 .card--muted {
@@ -231,15 +423,6 @@ onMounted(() => {
   font-weight: 700;
   font-size: 14px;
   margin-bottom: 4px;
-}
-
-.btn--small {
-  padding: 8px 12px;
-  font-size: 13px;
-}
-
-.btn--ghost {
-  background: transparent;
 }
 
 .field {
@@ -287,6 +470,11 @@ onMounted(() => {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.row-actions--profile {
+  justify-content: space-between;
 }
 
 .user {
@@ -297,19 +485,69 @@ onMounted(() => {
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
+.avatar-shell {
+  position: relative;
+  height: 72px;
+  width: 72px;
+  border-radius: 22px;
+  overflow: hidden;
+  background: rgba(31, 122, 140, 0.08);
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+}
+
+.avatar-trigger {
+  cursor: pointer;
+}
+
+.avatar-trigger:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
 .avatar {
-  height: 42px;
-  width: 42px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: #fff;
+  height: 100%;
+  width: 100%;
   display: grid;
   place-items: center;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #1f7a8c, #3d8da0);
+  color: #fff;
+  font-size: 26px;
   font-weight: 900;
+}
+
+.avatar-image {
+  display: block;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+}
+
+.avatar-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: rgba(17, 24, 39, 0.78);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.info {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 6px;
 }
 
 .username {
   font-weight: 900;
+  font-size: 16px;
 }
 
 .email {
@@ -317,17 +555,91 @@ onMounted(() => {
   color: var(--muted);
 }
 
-.btn {
+.profile-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.inline-editor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-editor--compact {
+  align-items: stretch;
+}
+
+.inline-editor__input {
+  flex: 1;
+}
+
+.inline-editor__display {
+  flex: 1;
+  min-height: 46px;
   border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+  padding: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+}
+
+.inline-editor__input--compact,
+.inline-editor__display--compact {
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.icon-button {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(31, 122, 140, 0.18);
+  background: rgba(31, 122, 140, 0.08);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1f7a8c;
+  flex: 0 0 auto;
+}
+
+.icon-button--compact {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+
+.icon-button__icon {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.btn {
+  border-radius: 16px;
   padding: 12px;
   font-weight: 900;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background: #fff;
 }
 
+.btn--small {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.btn--ghost {
+  background: transparent;
+}
+
 .danger {
   border: 0;
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 12px;
   font-weight: 900;
   background: rgba(239, 68, 68, 0.12);
@@ -345,42 +657,29 @@ onMounted(() => {
   font-weight: 800;
 }
 
-.alert--bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
-</style>
-<style scoped>
-.page {
-  padding-top: calc(14px + env(safe-area-inset-top));
+.alert--good {
+  background: rgba(34, 197, 94, 0.12);
+  color: #166534;
 }
 
-.topbar {
-  padding: 12px 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+.alert--bad {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
 }
 
-.topbar h2 {
-  font-size: 18px;
+.muted {
+  color: var(--muted);
 }
 
-.card {
-  margin-top: 12px;
-  border-radius: 24px;
-  padding: 16px;
-  background: linear-gradient(180deg, #ffffff, #f8fbfd);
-}
-
-.avatar {
-  border-radius: 16px;
-  background: linear-gradient(145deg, #1f7a8c, #3d8da0);
-}
-
-.btn {
-  border-radius: 16px;
-}
-
-.danger {
-  border-radius: 16px;
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>

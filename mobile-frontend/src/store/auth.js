@@ -1,4 +1,5 @@
 import { reactive, readonly } from 'vue'
+import { shouldUseMockApi } from '@/config'
 import * as authApi from '@/api/auth'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
@@ -11,14 +12,48 @@ const parseJSON = (text, fallback = null) => {
   }
 }
 
-const initialUser = parseJSON(storageGet('m_user'), null)
-const initialToken = storageGet('m_token')
+const isBackendAuthToken = (token) => /^\d+\.[a-f0-9]{64}$/i.test(String(token || ''))
+
+const storedUser = parseJSON(storageGet('m_user'), null)
+const storedToken = storageGet('m_token')
+const shouldResetStoredAuth = !shouldUseMockApi() && Boolean(storedUser || storedToken) && !isBackendAuthToken(storedToken)
+
+if (shouldResetStoredAuth) {
+  storageRemove('m_user')
+  storageRemove('m_token')
+}
+
+const initialUser = shouldResetStoredAuth ? null : storedUser
+const initialToken = shouldResetStoredAuth ? null : storedToken
 
 const state = reactive({
   user: initialUser,
   token: initialToken || null,
   isAuthenticated: Boolean(initialUser || initialToken)
 })
+
+const clearAuthState = () => {
+  state.user = null
+  state.token = null
+  persist()
+}
+
+const applyAuthState = (res) => {
+  if (!res?.success) return res
+  if (res.user) state.user = res.user
+  if (res.token) state.token = res.token
+  persist()
+  return res
+}
+
+const runAuthedRequest = async (requester) => {
+  try {
+    return applyAuthState(await requester())
+  } catch (error) {
+    if (!shouldUseMockApi() && Number(error?.response?.status) === 401) clearAuthState()
+    throw error
+  }
+}
 
 const persist = () => {
   if (state.user) storageSet('m_user', JSON.stringify(state.user))
@@ -32,14 +67,8 @@ export function getState() {
   return readonly(state)
 }
 
-export async function login(username, password) {
-  const res = await authApi.login(username, password)
-  if (res.success) {
-    state.user = res.user || state.user
-    state.token = res.token || state.token
-    persist()
-  }
-  return res
+export async function login(account, password) {
+  return applyAuthState(await authApi.login(account, password))
 }
 
 export async function register(userData) {
@@ -47,20 +76,21 @@ export async function register(userData) {
 }
 
 export async function fetchMe() {
-  const res = await authApi.me()
-  if (res.success && res.user) {
-    state.user = res.user
-    persist()
-  }
-  return res
+  return runAuthedRequest(() => authApi.me())
+}
+
+export async function updateProfile(profileData) {
+  return runAuthedRequest(() => authApi.updateProfile(profileData))
+}
+
+export async function uploadAvatar(file) {
+  return runAuthedRequest(() => authApi.uploadAvatar(file))
 }
 
 export async function logout() {
   try {
     await authApi.logout()
   } finally {
-    state.user = null
-    state.token = null
-    persist()
+    clearAuthState()
   }
 }

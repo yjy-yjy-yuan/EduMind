@@ -67,23 +67,28 @@ class TestUserModel:
         user = User(
             username="testuser",
             email="test@example.com",
-            password="password123",
+            phone="13800138000",
+            password="Strong#123",
         )
         db.add(user)
         db.commit()
 
         assert user.id is not None
         assert user.username == "testuser"
+        assert user.phone == "13800138000"
+        assert user.login_count == 0
 
     def test_password_hashing(self, db):
         """测试密码哈希"""
-        user = User(username="testuser", email="test@example.com", password="password123")
+        user = User(username="testuser", email="test@example.com", password="Strong#123")
         db.add(user)
         db.commit()
 
         assert user.password_hash is not None
-        assert user.password_hash != "password123"
-        assert user.check_password("password123")
+        assert user.password_hash != "Strong#123"
+        assert user.password_fingerprint is not None
+        assert user.check_password("Strong#123")
+        assert user.has_same_password("Strong#123")
         assert not user.check_password("wrongpassword")
 
 

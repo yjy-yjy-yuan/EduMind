@@ -1,5 +1,16 @@
 # 变更日志
 
+## 2026-03-20
+
+### 用户资料支持修改用户名与头像
+- 更新 [`backend_fastapi/app/routers/auth.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/auth.py)、[`backend_fastapi/app/schemas/auth.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/auth.py)：资料更新接口现已支持基于登录态修改用户名，并新增头像上传与头像文件读取接口；头像文件保存在后端 `uploads/avatars/` 目录，数据库继续只写回现有 `users.username` 与 `users.avatar` 字段，不新增表。
+- 新增 [`backend_fastapi/tests/api/test_auth_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_auth_api.py)：补充当前用户鉴权、用户名更新落库、重复用户名拦截、头像上传后写回 `users.avatar` 并可读取文件的 API 回归测试。
+- 更新 [`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)、[`mobile-frontend/src/api/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/auth.js)、[`mobile-frontend/src/store/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/store/auth.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：我的页面补充用户名编辑、头像选择与保存链路，前端状态和 UI-only mock 同步支持资料更新与头像预览。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)：同步记录当前用户名修改与头像上传的后端落点约定。
+
+### Git Hooks 可执行位修正
+- 更新 [`backend_fastapi/scripts/init_db.py`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/init_db.py)：保留原有 shebang，并补齐可执行权限，消除 `check-shebang-scripts-are-executable` 对初始化脚本的失败告警。
+
 ## 2026-03-19
 
 ### AGENTS 提交提醒规则
@@ -289,6 +300,20 @@
 - 删除 [`backend_fastapi/app/routers/knowledge_graph.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/knowledge_graph.py)、[`backend_fastapi/app/routers/knowledge_graph_integration.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/knowledge_graph_integration.py)、[`backend_fastapi/app/schemas/knowledge_graph.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/knowledge_graph.py)、[`backend_fastapi/app/utils/knowledge_graph_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/knowledge_graph_utils.py)：移除后端知识图谱 API、Schema 和 Neo4j 管理逻辑。
 - 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/requirements.txt`](/Users/yuan/final-work/EduMind/backend_fastapi/requirements.txt)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：移除知识图谱路由注册、Neo4j 配置项和 `neo4j` 依赖。
 
+## 2026-03-19
+
+### 用户系统注册/登录收口到现有 users 表
+
+- 更新 [`backend_fastapi/app/models/user.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/user.py)、[`backend_fastapi/app/schemas/auth.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/auth.py)、[`backend_fastapi/app/routers/auth.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/auth.py)、新增 [`backend_fastapi/app/utils/auth_security.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/auth_security.py)、[`backend_fastapi/app/utils/auth_token.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/auth_token.py)：注册改为“邮箱或手机号至少一项 + 强密码”，登录改为“邮箱/手机号 + 密码”，并在现有 `users` 表内补充手机号、重复密码检测指纹、登录次数和轻量 token 读取链路，不新增数据库表。
+- 更新 [`backend_fastapi/scripts/init_db.py`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/init_db.py)、[`backend_fastapi/scripts/mysql_managed_schema.sql`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/mysql_managed_schema.sql)：数据库初始化脚本现在会为已有 `users` 表补齐当前认证所需字段与索引，导出的 MySQL SQL 同步反映最新 `users` 表结构。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)、[`backend_fastapi/tests/unit/test_models.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_models.py)、[`backend_fastapi/tests/conftest.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/conftest.py)：补充邮箱/手机号注册登录、重复密码拦截、token 获取当前用户等回归测试。
+- 更新 [`mobile-frontend/src/views/Login.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Login.vue)、[`mobile-frontend/src/views/Register.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Register.vue)、[`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)、[`mobile-frontend/src/views/Guide.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Guide.vue)、[`mobile-frontend/src/api/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/auth.js)、[`mobile-frontend/src/store/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/store/auth.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：前端登录/注册 UI、UI-only mock、资料页展示与使用指南同步切换到邮箱/手机号认证约定，并展示登录次数。
+
+### Git Hooks 收口到 pre-commit 多阶段方案
+
+- 更新 [`.pre-commit-config.yaml`](/Users/yuan/final-work/EduMind/.pre-commit-config.yaml)、新增 [`scripts/install_git_hooks.sh`](/Users/yuan/final-work/EduMind/scripts/install_git_hooks.sh)、[`scripts/hooks/pre_push.sh`](/Users/yuan/final-work/EduMind/scripts/hooks/pre_push.sh)、[`scripts/hooks/commit_msg_check.py`](/Users/yuan/final-work/EduMind/scripts/hooks/commit_msg_check.py)、[`scripts/hooks/check_debug_statements.py`](/Users/yuan/final-work/EduMind/scripts/hooks/check_debug_statements.py)：保留并扩展现有 `pre-commit` 路线，补齐 `pre-commit`、`pre-push`、`commit-msg` 三类 hooks，覆盖 Python 格式化/静态检查、前端调试语句拦截、推送前 `mypy + pytest + build:ios` 以及 Conventional Commits 校验。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`.gitignore`](/Users/yuan/final-work/EduMind/.gitignore)：补充一键安装 hooks 的说明、`--no-verify` 逃生说明，并忽略 `pre-commit` 本地缓存目录。
+
 ## 2026-03-18
 
 ### 对 2026-03-18 视频问答隔离记录的更正说明
@@ -341,3 +366,18 @@
 ### EduMind AppIcon 适配 iOS 图标蒙版
 
 - 新增 [`ios-app/branding/edumind-app-icon.svg`](/Users/yuan/final-work/EduMind/ios-app/branding/edumind-app-icon.svg)、更新 [`ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png)：为 iOS AppIcon 单独提供适配版源文件，移除此前在系统图标蒙版里显得过小的内层圆角底板，让浅蓝底直接铺满整个图标画布，并放大主图形与 `EduMind` 字样，避免主屏幕上出现“小 logo 嵌在白块里”的效果。
+
+## 2026-03-20
+
+### 对 2026-03-20 用户资料编辑交互的更正说明
+
+- 更正 [`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)：头像不再通过独立按钮选择，而是改为点击当前头像后再触发更换；昵称默认只读，输入框右侧新增修改图标，点击后才进入可编辑状态，再通过“保存资料”写回后端。
+
+### 对 2026-03-20 昵称编辑位置的更正说明
+
+- 更正 [`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)：昵称编辑条从“资料设置”区块上移到头像右侧的用户信息区，直接替换原先顶部静态昵称显示；同时缩小输入条和修改图标尺寸，使其更适配头像旁的横向布局。
+
+### 认证接口从 UI mock 接回真实 users 表
+
+- 更正 [`mobile-frontend/src/api/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/auth.js)、[`mobile-frontend/src/store/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/store/auth.js)：认证相关请求不再只要 `UI_ONLY_MODE` 打开就强制走 mock；现在与视频接口保持一致，仅在“没有配置后端地址时”才使用 UI-only 数据。已有的假 token / 假用户缓存也会在切回真实后端时自动清理，避免页面继续显示 `demo_user` 却不写入 MySQL `users` 表。
+- 更正 [`mobile-frontend/src/config/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/config/index.js)、[`mobile-frontend/src/api/note.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/note.js)、[`mobile-frontend/src/views/Login.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Login.vue)、[`mobile-frontend/src/views/Register.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Register.vue)：前端默认不再静默开启 UI-only 模式；笔记接口也与认证/视频统一按“无后端地址时才 mock”处理，登录注册失败时会优先展示后端返回的真实错误，避免页面看似可用但 MySQL 一直没有新数据。
