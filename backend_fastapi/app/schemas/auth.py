@@ -83,12 +83,21 @@ class UserLogin(BaseModel):
 class UserUpdate(BaseModel):
     """用户信息更新请求"""
 
+    username: Optional[str] = Field(None, min_length=3, max_length=64)
     gender: Optional[str] = None
     education: Optional[str] = None
     occupation: Optional[str] = None
     learning_direction: Optional[str] = None
     avatar: Optional[str] = None
     bio: Optional[str] = None
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
 
 class UserResponse(BaseModel):

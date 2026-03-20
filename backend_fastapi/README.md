@@ -60,6 +60,8 @@ python run.py
 - 注册接口：邮箱或手机号至少一项必填，密码必须满足强密码规则。
 - 登录接口：仅接受邮箱/手机号 + 密码。
 - 数据落点：继续写入现有 `users` 表，不新增认证平行表。
+- 资料更新接口现已支持登录后修改用户名，并直接写回 `users.username`。
+- 头像上传接口会把文件保存到 `backend_fastapi/uploads/avatars/`，并将访问路径写入现有 `users.avatar` 字段，不新增附件表。
 - 执行 `python scripts/init_db.py --create` 时，会自动为已有 `users` 表补齐手机号、密码重复检测指纹和登录次数字段。
 
 ## 测试

@@ -20,6 +20,14 @@ const state = reactive({
   isAuthenticated: Boolean(initialUser || initialToken)
 })
 
+const applyAuthState = (res) => {
+  if (!res?.success) return res
+  if (res.user) state.user = res.user
+  if (res.token) state.token = res.token
+  persist()
+  return res
+}
+
 const persist = () => {
   if (state.user) storageSet('m_user', JSON.stringify(state.user))
   else storageRemove('m_user')
@@ -33,13 +41,7 @@ export function getState() {
 }
 
 export async function login(account, password) {
-  const res = await authApi.login(account, password)
-  if (res.success) {
-    state.user = res.user || state.user
-    state.token = res.token || state.token
-    persist()
-  }
-  return res
+  return applyAuthState(await authApi.login(account, password))
 }
 
 export async function register(userData) {
@@ -47,12 +49,15 @@ export async function register(userData) {
 }
 
 export async function fetchMe() {
-  const res = await authApi.me()
-  if (res.success && res.user) {
-    state.user = res.user
-    persist()
-  }
-  return res
+  return applyAuthState(await authApi.me())
+}
+
+export async function updateProfile(profileData) {
+  return applyAuthState(await authApi.updateProfile(profileData))
+}
+
+export async function uploadAvatar(file) {
+  return applyAuthState(await authApi.uploadAvatar(file))
 }
 
 export async function logout() {

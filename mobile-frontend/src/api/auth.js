@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 import { UI_ONLY_MODE } from '@/config'
-import { mockLogin, mockLogout, mockMe, mockRegister } from '@/api/mockGateway'
+import { mockLogin, mockLogout, mockMe, mockRegister, mockUpdateProfile, mockUploadAvatar } from '@/api/mockGateway'
 
 const normalize = (payload) => {
   const data = payload?.data ?? payload
@@ -32,5 +32,26 @@ export async function me() {
 export async function logout() {
   if (UI_ONLY_MODE) return normalize(await mockLogout())
   const res = await request({ url: '/api/auth/logout', method: 'post' })
+  return normalize(res)
+}
+
+export async function updateProfile(profileData) {
+  if (UI_ONLY_MODE) return normalize(await mockUpdateProfile(profileData))
+  const res = await request({ url: '/api/auth/user/update', method: 'post', data: profileData })
+  return normalize(res)
+}
+
+export async function uploadAvatar(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  if (UI_ONLY_MODE) return normalize(await mockUploadAvatar(file))
+  const res = await request({
+    url: '/api/auth/user/avatar',
+    method: 'post',
+    data: formData,
+    timeout: 60000,
+    retry: 0
+  })
   return normalize(res)
 }

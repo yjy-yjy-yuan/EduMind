@@ -1,5 +1,16 @@
 # 变更日志
 
+## 2026-03-20
+
+### 用户资料支持修改用户名与头像
+- 更新 [`backend_fastapi/app/routers/auth.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/auth.py)、[`backend_fastapi/app/schemas/auth.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/auth.py)：资料更新接口现已支持基于登录态修改用户名，并新增头像上传与头像文件读取接口；头像文件保存在后端 `uploads/avatars/` 目录，数据库继续只写回现有 `users.username` 与 `users.avatar` 字段，不新增表。
+- 新增 [`backend_fastapi/tests/api/test_auth_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_auth_api.py)：补充当前用户鉴权、用户名更新落库、重复用户名拦截、头像上传后写回 `users.avatar` 并可读取文件的 API 回归测试。
+- 更新 [`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)、[`mobile-frontend/src/api/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/auth.js)、[`mobile-frontend/src/store/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/store/auth.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：我的页面补充用户名编辑、头像选择与保存链路，前端状态和 UI-only mock 同步支持资料更新与头像预览。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)：同步记录当前用户名修改与头像上传的后端落点约定。
+
+### Git Hooks 可执行位修正
+- 更新 [`backend_fastapi/scripts/init_db.py`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/init_db.py)：保留原有 shebang，并补齐可执行权限，消除 `check-shebang-scripts-are-executable` 对初始化脚本的失败告警。
+
 ## 2026-03-19
 
 ### AGENTS 提交提醒规则
@@ -355,3 +366,13 @@
 ### EduMind AppIcon 适配 iOS 图标蒙版
 
 - 新增 [`ios-app/branding/edumind-app-icon.svg`](/Users/yuan/final-work/EduMind/ios-app/branding/edumind-app-icon.svg)、更新 [`ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png)：为 iOS AppIcon 单独提供适配版源文件，移除此前在系统图标蒙版里显得过小的内层圆角底板，让浅蓝底直接铺满整个图标画布，并放大主图形与 `EduMind` 字样，避免主屏幕上出现“小 logo 嵌在白块里”的效果。
+
+## 2026-03-20
+
+### 对 2026-03-20 用户资料编辑交互的更正说明
+
+- 更正 [`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)：头像不再通过独立按钮选择，而是改为点击当前头像后再触发更换；昵称默认只读，输入框右侧新增修改图标，点击后才进入可编辑状态，再通过“保存资料”写回后端。
+
+### 对 2026-03-20 昵称编辑位置的更正说明
+
+- 更正 [`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)：昵称编辑条从“资料设置”区块上移到头像右侧的用户信息区，直接替换原先顶部静态昵称显示；同时缩小输入条和修改图标尺寸，使其更适配头像旁的横向布局。

@@ -234,6 +234,8 @@ python backend_fastapi/scripts/init_db.py --emit-sql backend_fastapi/scripts/mys
 - 注册只接受“邮箱或手机号”至少一项，密码必须至少 8 位，且同时包含大小写字母、数字和特殊字符。
 - 登录只接受邮箱/手机号 + 密码。
 - 用户数据继续写入现有 `users` 表；不会新建认证平行表。
+- 登录后支持在“我的”页修改用户名，并将新值写回 `users.username`。
+- 登录后支持上传头像照片；文件保存在 `backend_fastapi/uploads/avatars/`，数据库继续只在现有 `users.avatar` 字段内记录可访问路径。
 - `python backend_fastapi/scripts/init_db.py --create` 现在会补齐 `users` 表的认证字段（手机号、重复密码指纹、登录次数）并同步必要索引。
 
 ## 测试

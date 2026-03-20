@@ -8,6 +8,7 @@ let mockUser = {
   username: 'demo_user',
   email: 'demo@edumind.app',
   phone: null,
+  avatar: null,
   login_count: 0
 }
 
@@ -152,6 +153,13 @@ const normalizePhone = (value) => {
 }
 
 const looksLikeEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim().toLowerCase())
+const fileToDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('头像读取失败（UI 模式）'))
+    reader.readAsDataURL(file)
+  })
 
 export const mockLogin = (account) => {
   const raw = String(account || '').trim()
@@ -180,6 +188,21 @@ export const mockRegister = (userData) => {
 export const mockMe = () => mockResponse({ success: true, user: clone(mockUser), token: mockToken })
 
 export const mockLogout = () => mockResponse({ success: true, message: 'UI 模式已退出' })
+
+export const mockUpdateProfile = (payload = {}) => {
+  const nextUsername = String(payload?.username || '').trim()
+  if (nextUsername) {
+    mockUser = { ...mockUser, username: nextUsername }
+  }
+  return mockResponse({ success: true, user: clone(mockUser), message: 'UI 模式：资料已更新' })
+}
+
+export const mockUploadAvatar = async (file) => {
+  if (!file) throw new Error('请选择头像文件（UI 模式）')
+  const avatar = await fileToDataUrl(file)
+  mockUser = { ...mockUser, avatar }
+  return mockResponse({ success: true, user: clone(mockUser), message: 'UI 模式：头像已更新' })
+}
 
 export const mockGetVideoList = (page = 1, perPage = 10) => {
   sortByUpdatedDesc(videos).forEach((item) => tickVideoProgress(item))
