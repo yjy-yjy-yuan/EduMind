@@ -376,3 +376,8 @@
 ### 对 2026-03-20 昵称编辑位置的更正说明
 
 - 更正 [`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)：昵称编辑条从“资料设置”区块上移到头像右侧的用户信息区，直接替换原先顶部静态昵称显示；同时缩小输入条和修改图标尺寸，使其更适配头像旁的横向布局。
+
+### 认证接口从 UI mock 接回真实 users 表
+
+- 更正 [`mobile-frontend/src/api/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/auth.js)、[`mobile-frontend/src/store/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/store/auth.js)：认证相关请求不再只要 `UI_ONLY_MODE` 打开就强制走 mock；现在与视频接口保持一致，仅在“没有配置后端地址时”才使用 UI-only 数据。已有的假 token / 假用户缓存也会在切回真实后端时自动清理，避免页面继续显示 `demo_user` 却不写入 MySQL `users` 表。
+- 更正 [`mobile-frontend/src/config/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/config/index.js)、[`mobile-frontend/src/api/note.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/note.js)、[`mobile-frontend/src/views/Login.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Login.vue)、[`mobile-frontend/src/views/Register.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Register.vue)：前端默认不再静默开启 UI-only 模式；笔记接口也与认证/视频统一按“无后端地址时才 mock”处理，登录注册失败时会优先展示后端返回的真实错误，避免页面看似可用但 MySQL 一直没有新数据。

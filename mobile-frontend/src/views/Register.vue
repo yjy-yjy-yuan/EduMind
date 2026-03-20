@@ -44,6 +44,7 @@ const loading = ref(false)
 const error = ref('')
 const ok = ref(false)
 const form = reactive({ contact: '', password: '' })
+const parseErrorMessage = (e, fallback) => e?.response?.data?.detail || e?.message || fallback
 
 const submit = async () => {
   const contact = String(form.contact || '').trim()
@@ -79,7 +80,7 @@ const submit = async () => {
     ok.value = true
     router.replace('/login')
   } catch (e) {
-    error.value = e?.message || '注册失败'
+    error.value = parseErrorMessage(e, '注册失败')
   } finally {
     loading.value = false
   }

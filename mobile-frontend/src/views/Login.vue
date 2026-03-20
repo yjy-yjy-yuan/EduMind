@@ -43,6 +43,7 @@ const route = useRoute()
 const loading = ref(false)
 const error = ref('')
 const form = reactive({ account: '', password: '' })
+const parseErrorMessage = (e, fallback) => e?.response?.data?.detail || e?.message || fallback
 
 const submit = async () => {
   const account = String(form.account || '').trim()
@@ -66,7 +67,7 @@ const submit = async () => {
     const redirect = route.query.redirect ? String(route.query.redirect) : '/'
     router.replace(redirect)
   } catch (e) {
-    error.value = e?.message || '登录失败'
+    error.value = parseErrorMessage(e, '登录失败')
   } finally {
     loading.value = false
   }

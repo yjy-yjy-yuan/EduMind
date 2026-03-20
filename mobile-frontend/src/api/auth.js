@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import { UI_ONLY_MODE } from '@/config'
+import { shouldUseMockApi } from '@/config'
 import { mockLogin, mockLogout, mockMe, mockRegister, mockUpdateProfile, mockUploadAvatar } from '@/api/mockGateway'
 
 const normalize = (payload) => {
@@ -12,31 +12,31 @@ const normalize = (payload) => {
 }
 
 export async function login(account, password) {
-  if (UI_ONLY_MODE) return normalize(await mockLogin(account, password))
+  if (shouldUseMockApi()) return normalize(await mockLogin(account, password))
   const res = await request({ url: '/api/auth/login', method: 'post', data: { account, password } })
   return normalize(res)
 }
 
 export async function register(userData) {
-  if (UI_ONLY_MODE) return normalize(await mockRegister(userData))
+  if (shouldUseMockApi()) return normalize(await mockRegister(userData))
   const res = await request({ url: '/api/auth/register', method: 'post', data: userData })
   return normalize(res)
 }
 
 export async function me() {
-  if (UI_ONLY_MODE) return normalize(await mockMe())
+  if (shouldUseMockApi()) return normalize(await mockMe())
   const res = await request({ url: '/api/auth/user', method: 'get' })
   return normalize(res)
 }
 
 export async function logout() {
-  if (UI_ONLY_MODE) return normalize(await mockLogout())
+  if (shouldUseMockApi()) return normalize(await mockLogout())
   const res = await request({ url: '/api/auth/logout', method: 'post' })
   return normalize(res)
 }
 
 export async function updateProfile(profileData) {
-  if (UI_ONLY_MODE) return normalize(await mockUpdateProfile(profileData))
+  if (shouldUseMockApi()) return normalize(await mockUpdateProfile(profileData))
   const res = await request({ url: '/api/auth/user/update', method: 'post', data: profileData })
   return normalize(res)
 }
@@ -45,7 +45,7 @@ export async function uploadAvatar(file) {
   const formData = new FormData()
   formData.append('file', file)
 
-  if (UI_ONLY_MODE) return normalize(await mockUploadAvatar(file))
+  if (shouldUseMockApi()) return normalize(await mockUploadAvatar(file))
   const res = await request({
     url: '/api/auth/user/avatar',
     method: 'post',

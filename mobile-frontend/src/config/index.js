@@ -86,7 +86,7 @@ export function getApiBaseUrl() {
 
 export const UI_ONLY_MODE = toBool(
   fromUiOnlyQuery || import.meta.env.VITE_MOBILE_UI_ONLY,
-  true
+  false
 )
 
 export const shouldUseMockApi = () => UI_ONLY_MODE && !getApiBaseUrl()
