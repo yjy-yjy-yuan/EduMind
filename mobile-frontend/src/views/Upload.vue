@@ -191,6 +191,7 @@ import {
   appendProcessingSettingsToFormData,
   buildProcessPayload,
   getProcessingSettings,
+  nativeTranscriptionLocale,
   getWhisperModelOptions,
   languageLabel,
   saveWhisperModelCatalog,
@@ -806,7 +807,7 @@ const startNativeOfflineTranscriptionFlow = async () => {
   nativeBusy.value = true
   try {
     const started = await startNativeOfflineTranscription({
-      language: processingSettings.value.language,
+      language: nativeTranscriptionLocale(processingSettings.value.language),
       model: processingSettings.value.model
     })
     await persistNativeTask({

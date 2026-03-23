@@ -686,19 +686,20 @@ private struct H5WebView: UIViewRepresentable {
         }
 
         private func normalizeSpeechLocaleIdentifier(from payload: [String: Any]) -> String {
-            let raw = String(describing: payload["language"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let source = payload["locale"] ?? payload["language"] ?? ""
+            let raw = String(describing: source).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             if raw.isEmpty || raw == "auto" {
                 return Locale.preferredLanguages.first ?? "zh-CN"
             }
 
             switch raw {
-            case "zh", "zh-cn", "zh_hans", "zh-hans", "chinese":
+            case "other", "zh", "zh-cn", "zh_hans", "zh-hans", "chinese", "中文", "中文/其他":
                 return "zh-CN"
-            case "zh-tw", "zh_hant", "zh-hant":
+            case "zh-tw", "zh_hant", "zh-hant", "繁体中文":
                 return "zh-TW"
-            case "en", "en-us", "english":
+            case "en", "en-us", "english", "英文":
                 return "en-US"
-            case "ja", "ja-jp", "japanese":
+            case "ja", "ja-jp", "japanese", "日文":
                 return "ja-JP"
             default:
                 return raw
@@ -864,6 +865,7 @@ private struct H5WebView: UIViewRepresentable {
 
             for candidate in candidates {
                 if let recognizer = SFSpeechRecognizer(locale: Locale(identifier: candidate)) {
+                    EduMindLog.info("OfflineTranscription", "using recognizer locale=\(recognizer.locale.identifier) requested=\(localeIdentifier)")
                     return recognizer
                 }
             }
@@ -951,6 +953,11 @@ private struct H5WebView: UIViewRepresentable {
 
         private func runOfflineTranscription(task: NativeSelectedVideo, payload: [String: Any]) async {
             let localeIdentifier = normalizeSpeechLocaleIdentifier(from: payload)
+            let requestedLanguage = String(describing: payload["locale"] ?? payload["language"] ?? "")
+            EduMindLog.info(
+                "OfflineTranscription",
+                "taskId=\(task.taskId) requestedLanguage=\(requestedLanguage) normalizedLocale=\(localeIdentifier)"
+            )
 
             do {
                 sendOfflineProgressEvent(

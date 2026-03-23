@@ -41,6 +41,17 @@
 
     <section class="recent ios-card">
       <div class="recent__head">
+        <h3>本地离线转录</h3>
+        <button class="refresh-btn" @click="reload" :disabled="loading">{{ loading ? '加载中…' : '刷新' }}</button>
+      </div>
+      <div class="message">
+        当前已保存 {{ localTranscriptCount }} 条本地离线转录结果。
+        <button class="message__link" @click="go('/local-transcripts')">查看列表</button>
+      </div>
+    </section>
+
+    <section class="recent ios-card">
+      <div class="recent__head">
         <h3>最近学习内容</h3>
         <button class="refresh-btn" @click="reload" :disabled="loading">{{ loading ? '加载中…' : '刷新' }}</button>
       </div>
@@ -74,11 +85,13 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BrandLogo from '@/components/BrandLogo.vue'
 import { getVideoList } from '@/api/video'
+import { listNativeOfflineTranscripts } from '@/services/nativeOfflineTranscripts'
 import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
 const quickActions = [
   { route: '/videos', tag: '视频', tagClass: 'tag--mint', title: '视频库', desc: '查看列表与处理状态' },
   { route: '/upload', tag: '上传', tagClass: 'tag--teal', title: '上传中心', desc: '支持本地文件和链接' },
+  { route: '/local-transcripts', tag: '本地', tagClass: 'tag--mint', title: '本地转录', desc: '查看 iOS 离线转录结果' },
   { route: '/notes', tag: '笔记', tagClass: 'tag--leaf', title: '学习笔记', desc: '随学随记，整理知识片段' },
   { route: '/qa', tag: '问答', tagClass: 'tag--amber', title: 'AI 问答', desc: '基于课程内容即时提问' },
   { route: '/learning-path', tag: '路径', tagClass: 'tag--teal', title: '学习路径', desc: '获取下一步学习建议' }
@@ -88,6 +101,7 @@ const router = useRouter()
 const loading = ref(false)
 const error = ref('')
 const allVideos = ref([])
+const localTranscriptCount = ref(0)
 
 const normalizeList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
@@ -141,7 +155,12 @@ const reload = async () => {
   loading.value = true
   error.value = ''
   try {
-    allVideos.value = mergeVideosById(await fetchAllVideos())
+    const [videos, transcripts] = await Promise.all([
+      fetchAllVideos(),
+      listNativeOfflineTranscripts().catch(() => [])
+    ])
+    allVideos.value = mergeVideosById(videos)
+    localTranscriptCount.value = transcripts.length
   } catch (e) {
     error.value = e?.message || '加载失败'
   } finally {

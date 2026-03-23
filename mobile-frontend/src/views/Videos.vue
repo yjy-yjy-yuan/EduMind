@@ -40,6 +40,11 @@
       还有 {{ offlineTaskCount }} 个离线任务在上传页等待自动补跑；这些任务拿到视频 ID 后会继续回到当前列表和详情页状态链路。
     </div>
 
+    <div class="queue-tip queue-tip--local">
+      iOS 本地离线转录结果已独立收口到本地列表页，不占用后端视频 ID。
+      <button class="link" @click="go('/local-transcripts')">查看本地转录</button>
+    </div>
+
     <div v-if="error" class="alert alert--bad">
       <span>{{ error }}</span>
       <button class="link" @click="reload(true)">重试</button>
@@ -449,6 +454,12 @@ onUnmounted(() => {
   color: #155e75;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.queue-tip--local {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.18);
+  color: #065f46;
 }
 
 .scope-switch {

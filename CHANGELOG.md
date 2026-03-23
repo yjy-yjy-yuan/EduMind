@@ -417,3 +417,13 @@
 - 新增 [`mobile-frontend/src/services/nativeOfflineTranscripts.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeOfflineTranscripts.js)：使用 IndexedDB 持久化 iOS 本地离线转录结果，保存状态、文本、分段、语言和更新时间，并通过前端事件通知页面同步刷新。
 - 新增 [`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)、更新 [`mobile-frontend/src/router/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/router/index.js)：增加本地离线转录详情路由 `/local-transcripts/:taskId`，支持查看完整文本、复制结果和删除本地记录。
 - 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：本地离线转录现在会在每次进度/完成/失败事件后自动写入 IndexedDB，并在上传页展示“本地转录历史”，支持从历史记录进入本地详情页。
+
+### 本地离线转录增加全局入口
+
+- 新增 [`mobile-frontend/src/views/LocalTranscripts.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscripts.vue)、更新 [`mobile-frontend/src/router/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/router/index.js)：新增本地离线转录列表页 `/local-transcripts`，支持按状态筛选、查看详情和删除结果。
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：首页和视频页增加本地离线转录入口，避免用户只能从上传页找到本地处理结果。
+
+### iOS 本地离线转录语言映射修正
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：原生离线转录现在会优先读取 `locale`，并将 `Other / 中文 / 中文/其他 / English / 英文` 等前端语言值统一归一成可用的 Apple Speech locale，避免把 `other` 直接传给 `SFSpeechRecognizer` 导致识别器初始化失败；同时补充任务启动时的请求语言和归一化 locale 日志，便于真机排查。
+- 更新 [`mobile-frontend/src/services/processingSettings.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/processingSettings.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：上传页发起 iOS 本地离线转录时，先将页面处理设置中的语言选项转换为原生侧可识别的 locale（例如 `zh-CN`、`en-US`），降低前后端枚举不一致造成的失败概率。

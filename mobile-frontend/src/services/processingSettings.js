@@ -191,3 +191,12 @@ export const whisperModelHighlight = (value) => {
   return getWhisperModelCatalog().meta[normalized]?.highlight || '适合当前视频处理场景。'
 }
 export const languageLabel = (value) => LANGUAGE_OPTIONS.find((item) => item.value === value)?.label || '中文/其他'
+
+export const nativeTranscriptionLocale = (value) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (!normalized || normalized === 'auto') return ''
+  if (['other', 'zh', 'zh-cn', 'chinese', '中文', '中文/其他'].includes(normalized)) return 'zh-CN'
+  if (['english', 'en', 'en-us', '英文'].includes(normalized)) return 'en-US'
+  if (['ja', 'ja-jp', 'japanese', '日文'].includes(normalized)) return 'ja-JP'
+  return String(value || '').trim()
+}
