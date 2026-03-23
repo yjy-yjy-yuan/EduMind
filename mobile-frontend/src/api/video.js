@@ -1,5 +1,6 @@
 import request from '@/utils/request'
 import { shouldUseMockApi } from '@/config'
+import { getBackendUnavailableMessage, hasReachableBackendConfig, isBackendUnavailableError } from '@/services/networkStatus'
 import {
   mockDeleteVideo,
   mockGenerateVideoSummary,
@@ -11,6 +12,11 @@ import {
   mockUploadLocalVideo,
   mockUploadVideoUrl
 } from '@/api/mockGateway'
+
+export const hasLiveVideoBackend = () => hasReachableBackendConfig()
+export const isVideoUploadQueueableError = (error) => isBackendUnavailableError(error)
+export const getVideoUploadQueueableMessage = (error, fallback = '后端暂时不可达') =>
+  getBackendUnavailableMessage(error, fallback)
 
 export function getVideoList(page = 1, pageSize = 10) {
   if (shouldUseMockApi()) return mockGetVideoList(page, pageSize)

@@ -113,9 +113,16 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getVideoProcessingOptions, getVideoStatus, processVideo, uploadLocalVideo, uploadVideoUrl } from '@/api/video'
+import {
+  getVideoProcessingOptions,
+  getVideoStatus,
+  getVideoUploadQueueableMessage,
+  isVideoUploadQueueableError,
+  processVideo,
+  uploadLocalVideo,
+  uploadVideoUrl
+} from '@/api/video'
 import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
-import { getBackendUnavailableMessage, isBackendUnavailableError } from '@/services/networkStatus'
 import {
   OFFLINE_QUEUE_EVENT_NAME,
   OFFLINE_TASK_STATUSES,
@@ -655,11 +662,11 @@ const uploadFile = async () => {
         : '/videos'
     )
   } catch (e) {
-    if (isBackendUnavailableError(e)) {
+    if (isVideoUploadQueueableError(e)) {
       try {
         await queueOfflineLocalUpload(file.value)
       } catch (queueError) {
-        error.value = `${getBackendUnavailableMessage(e, '后端暂时不可达')}；当前设备无法写入离线队列`
+        error.value = `${getVideoUploadQueueableMessage(e, '后端暂时不可达')}；当前设备无法写入离线队列`
       }
     } else {
       error.value = extractErrorMessage(e, '上传失败')
@@ -702,11 +709,11 @@ const uploadUrl = async () => {
         : '/videos'
     )
   } catch (e) {
-    if (isBackendUnavailableError(e)) {
+    if (isVideoUploadQueueableError(e)) {
       try {
         await queueOfflineUrlImport(String(videoUrl.value).trim())
       } catch (queueError) {
-        error.value = `${getBackendUnavailableMessage(e, '后端暂时不可达')}；当前设备无法写入离线队列`
+        error.value = `${getVideoUploadQueueableMessage(e, '后端暂时不可达')}；当前设备无法写入离线队列`
       }
     } else {
       error.value = extractErrorMessage(e, '提交失败')

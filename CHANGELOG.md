@@ -5,6 +5,7 @@
 ### Upload 页接入离线排队与自动补跑触发
 - 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/App.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/App.vue)、[`mobile-frontend/src/services/offlineQueue.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/offlineQueue.js)：上传页在本地文件/链接导入遇到后端不可达、超时或可重试 5xx 时，会将任务写入 IndexedDB 离线队列并立刻展示到最近上传；应用启动、Upload 页进入以及页面从后台回到前台时会自动触发离线补跑，补跑成功后再接回现有 `videoId + 状态轮询` 链路。
 - 更新 [`mobile-frontend/src/services/videoStatus.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/videoStatus.js)：补充离线排队与自动补跑中的状态文案，便于最近上传列表区分在线处理和离线补跑阶段。
+- 更新 [`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：将“是否可加入离线队列”的错误判定收口到视频 API 层，并在列表页/详情页增加离线补跑提示，明确无视频 ID 的任务仍在上传页等待自动补跑。
 
 ### 离线队列基础设施
 - 新增 [`mobile-frontend/src/services/offlineQueue.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/offlineQueue.js)：补充基于 IndexedDB 的离线任务存取层，固定使用 `edumind_offline_queue / offline_tasks / taskId` 结构，并预置本地上传、链接导入、失败退避、状态更新等基础能力，供后续 Upload 页接入离线补跑。

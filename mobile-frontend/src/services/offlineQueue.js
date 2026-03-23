@@ -231,6 +231,11 @@ export const getFlushableOfflineTasks = async (now = Date.now()) => {
   return tasks.filter((task) => isOfflineTaskReadyForFlush(task, now))
 }
 
+export const getPendingOfflineTasks = async () => {
+  const tasks = await getOfflineTasks()
+  return tasks.filter((task) => task.status !== OFFLINE_TASK_STATUSES.COMPLETED)
+}
+
 export const putOfflineTask = async (taskInput = {}) => {
   const timestamp = nowIso()
   const task = normalizeTask({

@@ -36,6 +36,10 @@
       </button>
     </div>
 
+    <div v-if="offlineTaskCount > 0" class="queue-tip">
+      还有 {{ offlineTaskCount }} 个离线任务在上传页等待自动补跑；这些任务拿到视频 ID 后会继续回到当前列表和详情页状态链路。
+    </div>
+
     <div v-if="error" class="alert alert--bad">
       <span>{{ error }}</span>
       <button class="link" @click="reload(true)">重试</button>
@@ -91,6 +95,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getVideoList, processVideo } from '@/api/video'
+import { OFFLINE_QUEUE_EVENT_NAME, getPendingOfflineTasks } from '@/services/offlineQueue'
 import { buildProcessPayload, getProcessingSettings, whisperModelLabel } from '@/services/processingSettings'
 import { isActiveVideoStatus, normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
@@ -105,6 +110,7 @@ const page = ref(1)
 const pageSize = 10
 const hasMore = ref(true)
 const videos = ref([])
+const offlineTaskCount = ref(0)
 const retryingIds = ref({})
 const batchRetrying = ref(false)
 const POLL_BASE_INTERVAL_MS = 3000
@@ -331,6 +337,15 @@ const startPollingIfNeeded = () => {
   scheduleNextPoll(POLL_BASE_INTERVAL_MS)
 }
 
+const reloadOfflineTaskCount = async () => {
+  try {
+    const tasks = await getPendingOfflineTasks()
+    offlineTaskCount.value = tasks.length
+  } catch {
+    offlineTaskCount.value = 0
+  }
+}
+
 const resumePolling = () => {
   if (!hasActiveTasks.value) return
   resetPollBackoff()
@@ -374,12 +389,15 @@ watch(
 )
 
 onMounted(async () => {
+  window.addEventListener(OFFLINE_QUEUE_EVENT_NAME, reloadOfflineTaskCount)
+  await reloadOfflineTaskCount()
   await reload(true)
   startPollingIfNeeded()
 })
 
 onUnmounted(() => {
   stopPolling()
+  window.removeEventListener(OFFLINE_QUEUE_EVENT_NAME, reloadOfflineTaskCount)
 })
 </script>
 
@@ -420,6 +438,17 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.queue-tip {
+  margin: -2px 0 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(31, 122, 140, 0.08);
+  border: 1px solid rgba(31, 122, 140, 0.16);
+  color: #155e75;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .scope-switch {
