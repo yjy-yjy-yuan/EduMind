@@ -124,8 +124,14 @@ private struct H5WebView: UIViewRepresentable {
         configuration.allowsPictureInPictureMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.userContentController.add(context.coordinator, name: Coordinator.logHandlerName)
+        configuration.userContentController.add(context.coordinator, name: Coordinator.nativeBridgeHandlerName)
         configuration.userContentController.addUserScript(WKUserScript(
             source: Self.nativeConfigScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: Coordinator.nativeBridgeScript,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))
@@ -146,6 +152,7 @@ private struct H5WebView: UIViewRepresentable {
         webView.backgroundColor = .systemBackground
         webView.isOpaque = false
         webView.navigationDelegate = context.coordinator
+        context.coordinator.attach(webView: webView)
         if #available(iOS 16.4, *) {
             webView.isInspectable = true
         }
@@ -159,6 +166,7 @@ private struct H5WebView: UIViewRepresentable {
     static func dismantleUIView(_ uiView: WKWebView, coordinator: Coordinator) {
         uiView.navigationDelegate = nil
         uiView.configuration.userContentController.removeScriptMessageHandler(forName: Coordinator.logHandlerName)
+        uiView.configuration.userContentController.removeScriptMessageHandler(forName: Coordinator.nativeBridgeHandlerName)
     }
 
     private func loadContent(into webView: WKWebView) {
@@ -236,6 +244,81 @@ private struct H5WebView: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         static let logHandlerName = "edumindLog"
+        static let nativeBridgeHandlerName = "edumindNative"
+
+        static let nativeBridgeScript = """
+            (function() {
+              if (window.__edumindNativeBridge) return;
+
+              var handlerName = 'edumindNative';
+              var version = '1';
+              var eventPrefix = 'edumind-native:';
+              var seq = 0;
+              var pending = Object.create(null);
+
+              function dispatchEvent(name, detail) {
+                window.dispatchEvent(new CustomEvent(eventPrefix + name, {
+                  detail: detail || {}
+                }));
+              }
+
+              function send(action, payload) {
+                return new Promise(function(resolve, reject) {
+                  var requestId = 'native-' + Date.now() + '-' + (++seq);
+                  pending[requestId] = { resolve: resolve, reject: reject };
+                  try {
+                    window.webkit.messageHandlers[handlerName].postMessage({
+                      requestId: requestId,
+                      action: String(action || ''),
+                      payload: payload || {}
+                    });
+                  } catch (error) {
+                    delete pending[requestId];
+                    reject(error);
+                  }
+                });
+              }
+
+              window.__edumindHandleNativeResponse = function(message) {
+                var body = message || {};
+                var requestId = String(body.requestId || '');
+                var entry = pending[requestId];
+                if (!entry) return false;
+                delete pending[requestId];
+                if (body.success === false) {
+                  entry.reject(new Error(String(body.error || 'Native bridge request failed')));
+                  return true;
+                }
+                entry.resolve(body.payload || {});
+                return true;
+              };
+
+              window.__edumindReceiveNativeEvent = function(name, payload) {
+                dispatchEvent(String(name || 'event'), payload || {});
+                return true;
+              };
+
+              window.__edumindNativeBridge = {
+                version: version,
+                isAvailable: function() {
+                  return true;
+                },
+                send: send,
+                on: function(name, listener) {
+                  var eventName = eventPrefix + String(name || '');
+                  window.addEventListener(eventName, listener);
+                  return function() {
+                    window.removeEventListener(eventName, listener);
+                  };
+                }
+              };
+
+              dispatchEvent('bridge-ready', {
+                handlerName: handlerName,
+                version: version
+              });
+            })();
+        """
 
         static let consoleBridgeScript = """
             (function() {
@@ -350,6 +433,11 @@ private struct H5WebView: UIViewRepresentable {
 
         private var loadTimeoutWorkItem: DispatchWorkItem?
         private var probeWorkItems: [DispatchWorkItem] = []
+        private weak var webView: WKWebView?
+
+        func attach(webView: WKWebView) {
+            self.webView = webView
+        }
 
         func startLoadTimeout(for webView: WKWebView) {
             loadTimeoutWorkItem?.cancel()
@@ -432,15 +520,115 @@ private struct H5WebView: UIViewRepresentable {
             }
         }
 
-        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard message.name == Self.logHandlerName else { return }
-            if let body = message.body as? [String: Any] {
-                let level = String(describing: body["level"] ?? "log")
-                let payload = String(describing: body["payload"] ?? "")
-                EduMindLog.write(nativeLogLevel(for: level), payload)
+        private func nativeBridgeCapabilities() -> [String: Any] {
+            [
+                "platform": "ios",
+                "bridgeVersion": 1,
+                "supportsOfflineTranscription": false,
+                "supportsNativeVideoPicker": false,
+                "availableActions": [
+                    "ping",
+                    "getCapabilities"
+                ]
+            ]
+        }
+
+        private func respondToNativeRequest(
+            requestId: String,
+            success: Bool,
+            payload: [String: Any] = [:],
+            errorMessage: String? = nil
+        ) {
+            var responseBody: [String: Any] = [
+                "requestId": requestId,
+                "success": success,
+                "payload": payload
+            ]
+            responseBody["error"] = errorMessage ?? NSNull()
+
+            guard
+                let webView,
+                let data = try? JSONSerialization.data(
+                    withJSONObject: responseBody,
+                    options: []
+                ),
+                let json = String(data: data, encoding: .utf8)
+            else {
+                EduMindLog.error("Bridge", "failed to serialize native bridge response for requestId=\(requestId)")
                 return
             }
-            EduMindLog.notice("Bridge", String(describing: message.body))
+
+            let js = """
+            (function() {
+              if (typeof window.__edumindHandleNativeResponse === 'function') {
+                window.__edumindHandleNativeResponse(\(json));
+              }
+            })();
+            """
+            webView.evaluateJavaScript(js) { _, error in
+                if let error {
+                    EduMindLog.error("Bridge", "native response delivery failed requestId=\(requestId) error=\(error.localizedDescription)")
+                }
+            }
+        }
+
+        private func handleNativeBridgeMessage(_ body: [String: Any]) {
+            let requestId = String(describing: body["requestId"] ?? "")
+            let action = String(describing: body["action"] ?? "")
+            let payload = body["payload"] as? [String: Any] ?? [:]
+
+            guard !requestId.isEmpty else {
+                EduMindLog.error("Bridge", "received native bridge message without requestId")
+                return
+            }
+
+            EduMindLog.info("Bridge", "native action=\(action) payload=\(payload)")
+
+            switch action {
+            case "ping":
+                let formatter = ISO8601DateFormatter()
+                respondToNativeRequest(
+                    requestId: requestId,
+                    success: true,
+                    payload: [
+                        "platform": "ios",
+                        "bridgeVersion": 1,
+                        "timestamp": formatter.string(from: Date())
+                    ]
+                )
+            case "getCapabilities":
+                respondToNativeRequest(
+                    requestId: requestId,
+                    success: true,
+                    payload: nativeBridgeCapabilities()
+                )
+            default:
+                respondToNativeRequest(
+                    requestId: requestId,
+                    success: false,
+                    errorMessage: "Unsupported native bridge action: \(action)"
+                )
+            }
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == Self.logHandlerName {
+                if let body = message.body as? [String: Any] {
+                    let level = String(describing: body["level"] ?? "log")
+                    let payload = String(describing: body["payload"] ?? "")
+                    EduMindLog.write(nativeLogLevel(for: level), payload)
+                    return
+                }
+                EduMindLog.notice("Bridge", String(describing: message.body))
+                return
+            }
+
+            guard message.name == Self.nativeBridgeHandlerName else { return }
+            guard let body = message.body as? [String: Any] else {
+                EduMindLog.error("Bridge", "received invalid native bridge payload: \(String(describing: message.body))")
+                return
+            }
+            handleNativeBridgeMessage(body)
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {

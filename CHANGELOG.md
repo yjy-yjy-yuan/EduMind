@@ -1,5 +1,11 @@
 # 变更日志
 
+## 2026-03-23
+
+### 离线补跑提示与链接幂等测试补强
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：最近上传卡片右侧标签改为区分“离线队列 / 补跑中 / 在线任务 / 重复”，避免把离线排队任务误读成已经在线成功。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充链接导入重复提交复用 existing video，以及历史 `FAILED` 链接允许重新提交的 API 测试，固化当前后端幂等行为。
+
 ## 2026-03-21
 
 ### Upload 页接入离线排队与自动补跑触发
@@ -392,3 +398,11 @@
 
 - 更正 [`mobile-frontend/src/api/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/auth.js)、[`mobile-frontend/src/store/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/store/auth.js)：认证相关请求不再只要 `UI_ONLY_MODE` 打开就强制走 mock；现在与视频接口保持一致，仅在“没有配置后端地址时”才使用 UI-only 数据。已有的假 token / 假用户缓存也会在切回真实后端时自动清理，避免页面继续显示 `demo_user` 却不写入 MySQL `users` 表。
 - 更正 [`mobile-frontend/src/config/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/config/index.js)、[`mobile-frontend/src/api/note.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/note.js)、[`mobile-frontend/src/views/Login.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Login.vue)、[`mobile-frontend/src/views/Register.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Register.vue)：前端默认不再静默开启 UI-only 模式；笔记接口也与认证/视频统一按“无后端地址时才 mock”处理，登录注册失败时会优先展示后端返回的真实错误，避免页面看似可用但 MySQL 一直没有新数据。
+
+## 2026-03-23
+
+### iOS 原生离线转录架构规则与桥接骨架
+
+- 更新 [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)：正式将 `ios-app/` 收口为“`WKWebView` 容器 + 原生离线执行层”，允许 iOS 本地文件访问、音频提取、原生桥接和端侧转录，并要求前端通过 `WKWebView` bridge 与原生层通信。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：新增 `edumindNative` 原生桥 handler，在 WebView 注入统一的请求/响应协议，首批支持 `ping` 和 `getCapabilities`，为后续本地视频选择、音频提取和端侧转录预留稳定入口。
+- 新增 [`mobile-frontend/src/services/nativeBridge.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeBridge.js)、更新 [`mobile-frontend/src/main.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/main.js)：前端新增原生桥服务层并在启动时自动探测 iOS 原生桥能力，后续页面只通过该服务访问原生离线能力，不直接散落 `window.webkit.messageHandlers` 调用。

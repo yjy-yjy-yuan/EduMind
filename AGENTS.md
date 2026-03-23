@@ -5,22 +5,23 @@ This repository is now an iOS-only mobile learning project for MacBook Pro devel
 
 1. `mobile-frontend/` as the frontend UI layer
 2. `backend_fastapi/` as the real backend capability layer
-3. `ios-app/` as the iOS `WKWebView` container
+3. `ios-app/` as the iOS `WKWebView` container and native execution layer for on-device features
 
 Do not reintroduce `frontend/`, `backend/`, Android modules, or desktop-web-specific product branches.
 
 ## Project Structure & Module Organization
-- `backend_fastapi/`: the only backend service. All real business logic, database access, upload handling, audio extraction, transcription, analysis, notes, QA, and graph features belong here.
+- `backend_fastapi/`: the only backend service. All server-side business logic, database access, upload handling, audio extraction, transcription, analysis, notes, QA, and graph features belong here.
 - `mobile-frontend/`: the only frontend codebase. It provides the H5 UI loaded by iOS `WKWebView`.
-- `ios-app/`: the iOS container project and Web asset sync script.
+- `ios-app/`: the iOS container project, native bridge layer, on-device media/file access, on-device audio extraction/transcription execution, and Web asset sync script.
 - `docs/`: only keep documents that directly support the iOS mobile chain, Mac development, backend deployment, database setup, or video-processing workflow.
 - `CHANGELOG.md`, `README.md`, `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`: root-level control documents that must stay aligned with the current iOS-only architecture.
 
 ## Architecture Rules
 - UI is frontend, real functionality is backend.
-- `mobile-frontend/` must not implement business rules, direct database logic, or fake “real processing” in page code.
-- `backend_fastapi/` is the only execution layer for uploads, FFmpeg extraction, Whisper transcription, database writes, summaries, QA, and similar features.
-- Frontend and backend communicate only through HTTP ports and documented APIs.
+- `mobile-frontend/` must not implement database logic, model inference, or fake “real processing” in page code.
+- `backend_fastapi/` remains the default online execution layer for uploads, FFmpeg extraction, Whisper transcription, database writes, summaries, QA, and similar features.
+- `ios-app/` is the only on-device execution layer for iOS-native capabilities such as local file picking, media access, audio extraction, local task persistence, and on-device transcription.
+- Frontend and backend communicate through HTTP ports and documented APIs; frontend and `ios-app/` communicate through a documented `WKWebView` bridge.
 - The default backend entry is `/Users/yuan/final-work/EduMind/backend_fastapi`.
 - The product target is iOS, not a standalone desktop website.
 
@@ -58,6 +59,12 @@ FastAPI tests:
 pytest backend_fastapi/tests/ -v
 ```
 
+iOS native validation:
+
+```bash
+bash ios-app/validate_ios_build.sh
+```
+
 ## Coding Style & Naming Conventions
 - Python follows Black and isort settings from `pyproject.toml`: 4-space indentation, 120-character lines, explicit imports.
 - Vue files should remain focused on UI state and API calls. Do not move backend logic into views.
@@ -69,6 +76,7 @@ pytest backend_fastapi/tests/ -v
 - Put backend tests in `backend_fastapi/tests/`.
 - New backend features should include direct unit or API coverage.
 - For frontend changes, build output alone is insufficient. iOS container validation is required.
+- For `ios-app/` native changes, at minimum run an iOS build validation and verify the affected bridge or native flow in the container.
 
 ## Commit & Pull Request Guidelines
 - Use short imperative commit titles.
@@ -175,6 +183,7 @@ Set up or improve Git hooks following industry best practices.
 - Do not change database tables casually.
 - Prefer adapting to the existing schema and existing tables instead of adding new tables.
 - If an API contract changes, update the related docs and prompts in the same patch.
+- Do not clone external reference repositories into this project tree; if an external project is used as reference, absorb only the necessary implementation ideas into the existing modules.
 
 ## iOS WebView Validation Rules
 - Every `mobile-frontend/` interaction change must be validated in the iOS `WKWebView` container, not only in a desktop browser.
@@ -183,6 +192,10 @@ Set up or improve Git hooks following industry best practices.
   - touch is reachable
   - route actually changes
   - target page renders correctly in iOS
+- For `ios-app/` bridge or native execution changes, verify:
+  - H5 can detect the native bridge
+  - native message dispatch returns to the page
+  - native-triggered UI state changes render correctly in `WKWebView`
 
 ## Removal Policy
 - Files unrelated to the iOS mobile chain should not be restored.

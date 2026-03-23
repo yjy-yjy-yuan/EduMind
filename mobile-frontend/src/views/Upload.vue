@@ -87,8 +87,8 @@
             </div>
           </div>
           <div class="recent-actions">
-            <span class="recent-tag" :class="{ 'recent-tag--dup': item.duplicate }">
-              {{ item.duplicate ? '重复' : '正常' }}
+            <span class="recent-tag" :class="recentTagClass(item)">
+              {{ recentTagText(item) }}
             </span>
             <button class="mini" @click="openRecent(item)" :disabled="!item.videoId">查看</button>
             <button
@@ -284,6 +284,18 @@ const recentModelText = (item) => {
   const model = String(item?.effectiveModel || item?.requestedModel || '').trim().toLowerCase()
   return model ? `本次任务：${whisperModelLabel(model)} 模型` : ''
 }
+
+const recentTagText = (item) => {
+  if (item?.duplicate) return '重复'
+  if (normalizeVideoStatus(item?.status) === 'uploading') return '补跑中'
+  if (item?.offlineTaskId && !item?.videoId) return '离线队列'
+  return '在线任务'
+}
+
+const recentTagClass = (item) => ({
+  'recent-tag--dup': Boolean(item?.duplicate),
+  'recent-tag--offline': Boolean(item?.offlineTaskId) && !item?.duplicate
+})
 
 const hasActiveRecentUploads = computed(() => recentUploads.value.some((item) => isActiveStatus(item.status)))
 const isRecentQueueStatus = (status) => ['offline_queued', 'uploading'].includes(normalizeVideoStatus(status))
@@ -980,6 +992,11 @@ onUnmounted(() => {
 .recent-tag--dup {
   background: rgba(245, 158, 11, 0.14);
   color: #92400e;
+}
+
+.recent-tag--offline {
+  background: rgba(31, 122, 140, 0.12);
+  color: #155e75;
 }
 
 .mini {
