@@ -711,6 +711,10 @@ private struct H5WebView: UIViewRepresentable {
             switch raw {
             case "other", "zh", "zh-cn", "zh_hans", "zh-hans", "chinese", "中文", "中文/其他":
                 return "zh-CN"
+            case "yue", "yue-cn", "粤语":
+                return "yue-CN"
+            case "wuu", "wuu-cn", "吴语":
+                return "wuu-CN"
             case "zh-tw", "zh_hant", "zh-hant", "繁体中文":
                 return "zh-TW"
             case "en", "en-us", "english", "英文":
@@ -1119,12 +1123,20 @@ private struct H5WebView: UIViewRepresentable {
         }
 
         private func buildSpeechRecognizer(localeIdentifier: String) throws -> SFSpeechRecognizer {
-            let candidates = [
-                localeIdentifier,
-                Locale.preferredLanguages.first ?? "",
-                "zh-CN",
-                "en-US"
-            ].filter { !$0.isEmpty }
+            let fallbackCandidates: [String]
+            switch localeIdentifier.lowercased() {
+            case "yue-cn":
+                fallbackCandidates = ["yue-CN", "zh-HK", "zh-CN", "zh-TW"]
+            case "wuu-cn":
+                fallbackCandidates = ["wuu-CN", "zh-CN", "zh-HK"]
+            case "zh-tw":
+                fallbackCandidates = ["zh-TW", "zh-HK", "zh-CN"]
+            case "en-us":
+                fallbackCandidates = ["en-US", "en-GB"]
+            default:
+                fallbackCandidates = [localeIdentifier, Locale.preferredLanguages.first ?? "", "zh-CN", "en-US"]
+            }
+            let candidates = Array(NSOrderedSet(array: fallbackCandidates.filter { !$0.isEmpty })) as? [String] ?? fallbackCandidates.filter { !$0.isEmpty }
 
             for candidate in candidates {
                 if let recognizer = SFSpeechRecognizer(locale: Locale(identifier: candidate)) {

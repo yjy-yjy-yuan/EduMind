@@ -65,6 +65,7 @@ import {
   deleteNativeOfflineTranscript,
   listNativeOfflineTranscripts
 } from '@/services/nativeOfflineTranscripts'
+import { nativeLocaleLabel } from '@/services/processingSettings'
 import { normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
 const router = useRouter()
@@ -119,14 +120,7 @@ const readableSize = (size) => {
   return `${n} B`
 }
 
-const localeLabel = (locale) => {
-  const value = String(locale || '').trim().toLowerCase()
-  if (!value) return '自动语言'
-  if (value === 'zh-cn') return '中文（简体）'
-  if (value === 'zh-tw') return '中文（繁体）'
-  if (value === 'en-us') return '英语（美国）'
-  return String(locale || '')
-}
+const localeLabel = (locale) => nativeLocaleLabel(locale)
 
 const engineLabel = (engine) => {
   if (String(engine || '').trim() === 'apple_speech_on_device') return 'Apple 端侧识别'

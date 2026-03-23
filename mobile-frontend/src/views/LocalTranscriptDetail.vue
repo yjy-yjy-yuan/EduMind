@@ -71,6 +71,7 @@ import {
   deleteNativeOfflineTranscript,
   getNativeOfflineTranscript
 } from '@/services/nativeOfflineTranscripts'
+import { nativeLocaleLabel } from '@/services/processingSettings'
 import { normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
 const route = useRoute()
@@ -89,14 +90,7 @@ const showProgress = computed(() => {
   return ['preparing', 'extracting', 'transcribing'].includes(status)
 })
 const segmentCount = computed(() => (Array.isArray(transcript.value?.segments) ? transcript.value.segments.length : 0))
-const localeLabel = computed(() => {
-  const value = String(transcript.value?.locale || '').trim().toLowerCase()
-  if (!value) return '自动语言'
-  if (value === 'zh-cn') return '中文（简体）'
-  if (value === 'zh-tw') return '中文（繁体）'
-  if (value === 'en-us') return '英语（美国）'
-  return transcript.value?.locale || '自动语言'
-})
+const localeLabel = computed(() => nativeLocaleLabel(transcript.value?.locale || ''))
 const engineLabel = computed(() =>
   String(transcript.value?.engine || '').trim() === 'apple_speech_on_device' ? 'Apple 端侧识别' : 'iOS 原生识别'
 )

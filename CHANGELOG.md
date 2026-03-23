@@ -452,3 +452,8 @@
 ### iOS 本地离线转录增加单任务保护
 
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：原生侧现在会拒绝在已有离线转录任务执行时再次启动新任务；上传页的“iOS 本地离线转录”按钮也会在任务真正完成或失败前保持忙碌态，避免用户重复点击导致并发转录、内存压力上升甚至真机进程被系统终止。
+
+### iOS 本地离线转录增加方言 / locale 明确选择
+
+- 更新 [`mobile-frontend/src/services/processingSettings.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/processingSettings.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)：为 iOS 本地离线转录新增独立的“本地识别语言/方言”设置，可明确选择普通话、粤语、吴语、繁体中文或英语，并单独持久化，不影响后端在线 Whisper 的语言参数。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)、[`mobile-frontend/src/views/LocalTranscripts.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscripts.vue)：原生离线转录对 `yue-CN`、`wuu-CN` 等 locale 增加识别器 fallback，前端各处本地结果页面也统一显示对应方言/语言标签，便于用户确认当前任务是否按正确 locale 识别。

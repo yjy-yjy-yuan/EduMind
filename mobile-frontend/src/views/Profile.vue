@@ -83,6 +83,13 @@
         </select>
       </label>
       <label class="field">
+        <span class="field-label">iOS 离线识别语言/方言</span>
+        <select v-model="processingForm.nativeLocale" class="input">
+          <option v-for="option in NATIVE_LOCALE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
+        </select>
+        <div class="field-help">仅用于 iPhone 本地离线转录，不影响后端在线 Whisper 处理。</div>
+      </label>
+      <label class="field">
         <span class="field-label">Whisper 模型</span>
         <select v-model="processingForm.model" class="input">
           <option v-for="option in whisperModelOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
@@ -130,6 +137,7 @@ import { getApiBaseUrl, setApiBaseUrl, withBase } from '@/config'
 import { getVideoProcessingOptions } from '@/api/video'
 import {
   LANGUAGE_OPTIONS,
+  NATIVE_LOCALE_OPTIONS,
   PROCESSING_DEFAULTS,
   SUMMARY_STYLE_OPTIONS,
   getProcessingSettings,

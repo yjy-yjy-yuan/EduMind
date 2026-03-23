@@ -35,8 +35,22 @@
       <button class="btn btn--native" @click="startNativeOfflineTranscriptionFlow" :disabled="busy || nativeBusy">
         {{ nativeBusy ? '准备本地离线转录…' : 'iOS 本地离线转录' }}
       </button>
+      <label class="field field--native">
+        <span class="field-label">本地识别语言/方言</span>
+        <select
+          class="input"
+          :value="processingSettings.nativeLocale"
+          :disabled="busy || nativeBusy"
+          @change="selectNativeLocale($event.target.value)"
+        >
+          <option v-for="option in NATIVE_LOCALE_OPTIONS" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
       <div class="muted">当前处理：{{ processingSettingsSummary }}</div>
       <div class="muted">本地离线转录优先使用 iOS 原生识别能力，只处理当前设备上的本地视频，不依赖 FastAPI。</div>
+      <div class="muted">如果视频是粤语、吴语、繁体中文或明显口音内容，请先切换到更接近的本地识别语言/方言。</div>
 
       <div v-if="busy" class="progress">
         <div class="bar" :style="{ width: `${progress}%` }"></div>
@@ -191,9 +205,11 @@ import {
   appendProcessingSettingsToFormData,
   buildProcessPayload,
   getProcessingSettings,
-  nativeTranscriptionLocale,
   getWhisperModelOptions,
   languageLabel,
+  NATIVE_LOCALE_OPTIONS,
+  nativeLocaleLabel,
+  resolveNativeTranscriptionLocale,
   saveWhisperModelCatalog,
   saveProcessingSettings,
   summaryStyleLabel,
@@ -254,9 +270,14 @@ const processingSettingsSummary = computed(() => {
   const current = processingSettings.value || getProcessingSettings()
   const parts = [
     `${whisperModelLabel(current.model)} 模型`,
-    languageLabel(current.language),
-    `${summaryStyleLabel(current.summaryStyle)}摘要`
+    languageLabel(current.language)
   ]
+  if (current.nativeLocale && current.nativeLocale !== 'auto') {
+    parts.push(`端侧${nativeLocaleLabel(current.nativeLocale)}`)
+  }
+  parts.push(
+    `${summaryStyleLabel(current.summaryStyle)}摘要`
+  )
   if (current.autoGenerateSummary) parts.push('自动摘要')
   if (current.autoGenerateTags) parts.push('自动标签')
   return parts.join(' · ')
@@ -267,6 +288,14 @@ const selectProcessingModel = (model) => {
   processingSettings.value = saveProcessingSettings({
     ...processingSettings.value,
     model
+  })
+}
+
+const selectNativeLocale = (nativeLocale) => {
+  if (busy.value || nativeBusy.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    nativeLocale: String(nativeLocale || '').trim()
   })
 }
 
@@ -323,15 +352,6 @@ const statusClass = (status) => {
 const nativeEngineLabel = (engine) => {
   if (String(engine || '').trim() === 'apple_speech_on_device') return 'Apple 端侧识别'
   return 'iOS 原生识别'
-}
-
-const nativeLocaleLabel = (locale) => {
-  const value = String(locale || '').trim()
-  if (!value) return '自动语言'
-  if (value.toLowerCase() === 'zh-cn') return '中文（简体）'
-  if (value.toLowerCase() === 'zh-tw') return '中文（繁体）'
-  if (value.toLowerCase() === 'en-us') return '英语（美国）'
-  return value
 }
 
 const upsertNativeTask = (patch = {}) => {
@@ -807,8 +827,10 @@ const startNativeOfflineTranscriptionFlow = async () => {
   nativeBusy.value = true
   let started = false
   try {
+    const requestedLocale = resolveNativeTranscriptionLocale(processingSettings.value)
     const response = await startNativeOfflineTranscription({
-      language: nativeTranscriptionLocale(processingSettings.value.language),
+      locale: requestedLocale,
+      language: processingSettings.value.language,
       model: processingSettings.value.model
     })
     started = true
@@ -820,7 +842,7 @@ const startNativeOfflineTranscriptionFlow = async () => {
       status: response?.status || 'preparing',
       progress: 5,
       currentStep: response?.message || '已选择本地视频，准备本地离线转录',
-      locale: response?.locale || processingSettings.value.language,
+      locale: response?.locale || requestedLocale || processingSettings.value.language,
       engine: response?.engine || 'apple_speech_on_device',
       transcriptText: '',
       errorMessage: ''
