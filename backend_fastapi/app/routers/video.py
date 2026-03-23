@@ -14,20 +14,21 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.video import Video
 from app.models.video import VideoStatus
+from app.schemas.video import TranscriptSummaryRequest
 from app.schemas.video import VideoDetail
 from app.schemas.video import VideoListResponse
 from app.schemas.video import VideoProcessingOptionsResponse
 from app.schemas.video import VideoProcessRequest
+from app.schemas.video import VideoStatusResponse
 from app.schemas.video import VideoSummaryRequest
 from app.schemas.video import VideoTagRequest
 from app.schemas.video import VideoUploadResponse
 from app.schemas.video import VideoUploadURL
-from app.schemas.video import VideoStatusResponse
+from app.services.video_content_service import normalize_summary_style
+from app.services.video_content_service import read_subtitle_text
 from app.services.video_processing_registry import forget_video_processing_request
 from app.services.video_processing_registry import get_video_processing_request
 from app.services.video_processing_registry import remember_video_processing_request
-from app.services.video_content_service import normalize_summary_style
-from app.services.video_content_service import read_subtitle_text
 from app.services.whisper_runtime import get_supported_whisper_models
 from app.services.whisper_runtime import get_whisper_model_catalog
 from app.services.whisper_runtime import normalize_whisper_model_name
@@ -205,7 +206,9 @@ def infer_model_from_step(step: Optional[str]) -> Optional[str]:
 
 def build_processing_metadata(video: Video) -> dict:
     request_meta = get_video_processing_request(video.id) or {}
-    requested_model = str(request_meta.get("requested_model") or "").strip() or infer_model_from_step(video.current_step)
+    requested_model = str(request_meta.get("requested_model") or "").strip() or infer_model_from_step(
+        video.current_step
+    )
     effective_model = str(request_meta.get("effective_model") or requested_model or "").strip() or None
     requested_language = str(request_meta.get("requested_language") or "").strip() or None
     return {
@@ -439,7 +442,9 @@ async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
     if existing_video:
         return VideoUploadResponse(
             id=existing_video.id,
-            status=existing_video.status.value if hasattr(existing_video.status, "value") else str(existing_video.status),
+            status=(
+                existing_video.status.value if hasattr(existing_video.status, "value") else str(existing_video.status)
+            ),
             message="该视频链接已提交过",
             duplicate=True,
             data=serialize_video(existing_video),
@@ -816,6 +821,39 @@ async def generate_summary(video_id: int, request: VideoSummaryRequest, db: Sess
         raise
     except Exception as exc:
         logger.error("生成视频摘要失败 | video_id=%s | error=%s", video_id, exc)
+        raise HTTPException(status_code=500, detail="摘要生成失败，请稍后重试")
+
+
+@router.post("/generate-summary-from-transcript")
+async def generate_summary_from_transcript(request: TranscriptSummaryRequest):
+    """基于转录文本直接生成摘要，供本地离线转录结果复用在线摘要能力。"""
+    transcript_text = (request.transcript_text or "").strip()
+    if not transcript_text:
+        raise HTTPException(status_code=400, detail="转录文本为空，无法生成摘要")
+
+    try:
+        from app.services.video_content_service import generate_video_summary
+
+        result = generate_video_summary(
+            0,
+            "",
+            transcript_text=transcript_text,
+            title=request.title or "",
+            style=request.style,
+        )
+        if not result["success"]:
+            raise HTTPException(status_code=500, detail=f"生成摘要失败: {result['error']}")
+
+        return {
+            "success": True,
+            "summary": result["summary"],
+            "style": result.get("style"),
+            "provider": result.get("provider"),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("基于转录文本生成摘要失败 | error=%s", exc)
         raise HTTPException(status_code=500, detail="摘要生成失败，请稍后重试")
 
 

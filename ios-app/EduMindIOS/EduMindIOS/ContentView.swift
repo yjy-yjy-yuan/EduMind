@@ -127,6 +127,7 @@ private struct H5WebView: UIViewRepresentable {
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.allowsPictureInPictureMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
+        configuration.setURLSchemeHandler(context.coordinator, forURLScheme: Coordinator.offlineVideoScheme)
         configuration.userContentController.add(context.coordinator, name: Coordinator.logHandlerName)
         configuration.userContentController.add(context.coordinator, name: Coordinator.nativeBridgeHandlerName)
         configuration.userContentController.addUserScript(WKUserScript(
@@ -246,7 +247,7 @@ private struct H5WebView: UIViewRepresentable {
         html.contains("src=\"./assets/index-") || html.contains("src='./assets/index-")
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKURLSchemeHandler {
         private struct NativeSelectedVideo {
             let taskId: String
             let workingURL: URL
@@ -314,6 +315,9 @@ private struct H5WebView: UIViewRepresentable {
 
         static let logHandlerName = "edumindLog"
         static let nativeBridgeHandlerName = "edumindNative"
+        static let offlineVideoScheme = "edumind-local"
+        private static let offlineVideoHost = "offline-video"
+        private static let offlineVideoManifestKey = "edumind.offline-video-manifest"
 
         static let nativeBridgeScript = """
             (function() {
@@ -506,6 +510,123 @@ private struct H5WebView: UIViewRepresentable {
         private var pendingVideoPickerRequestId: String?
         private var pendingVideoPickerPayload: [String: Any] = [:]
         private var activeOfflineTasks: [String: Task<Void, Never>] = [:]
+
+        private func offlineVideoManifest() -> [String: String] {
+            UserDefaults.standard.dictionary(forKey: Self.offlineVideoManifestKey) as? [String: String] ?? [:]
+        }
+
+        private func saveOfflineVideoManifest(_ manifest: [String: String]) {
+            UserDefaults.standard.set(manifest, forKey: Self.offlineVideoManifestKey)
+        }
+
+        private func persistOfflineVideoURL(taskId: String, videoURL: URL) {
+            guard !taskId.isEmpty else { return }
+            var manifest = offlineVideoManifest()
+            manifest[taskId] = videoURL.path
+            saveOfflineVideoManifest(manifest)
+            EduMindLog.info("OfflineVideo", "taskId=\(taskId) stored path=\(videoURL.path)")
+        }
+
+        private func resolveOfflineVideoURL(taskId: String) -> URL? {
+            guard !taskId.isEmpty else { return nil }
+            let manifest = offlineVideoManifest()
+            guard let path = manifest[taskId], !path.isEmpty else { return nil }
+            let url = URL(fileURLWithPath: path)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                var nextManifest = manifest
+                nextManifest.removeValue(forKey: taskId)
+                saveOfflineVideoManifest(nextManifest)
+                EduMindLog.notice("OfflineVideo", "taskId=\(taskId) missing file path=\(path)")
+                return nil
+            }
+            return url
+        }
+
+        private func mimeType(for fileURL: URL) -> String {
+            let ext = fileURL.pathExtension.lowercased()
+            if let type = UTType(filenameExtension: ext), let mimeType = type.preferredMIMEType {
+                return mimeType
+            }
+            return "video/mp4"
+        }
+
+        private func parseByteRange(_ rangeHeader: String, totalLength: Int64) -> (start: Int64, end: Int64)? {
+            let normalized = rangeHeader.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard normalized.hasPrefix("bytes=") else { return nil }
+            let rawRange = normalized.replacingOccurrences(of: "bytes=", with: "")
+            let parts = rawRange.split(separator: "-", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { return nil }
+
+            if parts[0].isEmpty {
+                guard let suffixLength = Int64(parts[1]), suffixLength > 0 else { return nil }
+                let clampedLength = min(suffixLength, totalLength)
+                return (max(0, totalLength - clampedLength), max(0, totalLength - 1))
+            }
+
+            guard let start = Int64(parts[0]), start >= 0 else { return nil }
+            let end = Int64(parts[1]) ?? (totalLength - 1)
+            guard start <= end else { return nil }
+            return (start, min(end, totalLength - 1))
+        }
+
+        private func respondWithOfflineVideo(
+            requestURL: URL,
+            videoURL: URL,
+            byteRangeHeader: String?,
+            to urlSchemeTask: WKURLSchemeTask
+        ) throws {
+            let attributes = try FileManager.default.attributesOfItem(atPath: videoURL.path)
+            let totalLength = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+            let mimeType = mimeType(for: videoURL)
+            let selectedRange = byteRangeHeader.flatMap { parseByteRange($0, totalLength: totalLength) }
+            let start = selectedRange?.start ?? 0
+            let end = selectedRange?.end ?? max(0, totalLength - 1)
+            let contentLength = max(0, end - start + 1)
+            let statusCode = selectedRange == nil ? 200 : 206
+
+            var headers: [String: String] = [
+                "Content-Type": mimeType,
+                "Accept-Ranges": "bytes",
+                "Content-Length": "\(contentLength)",
+                "Cache-Control": "no-store"
+            ]
+            if statusCode == 206 {
+                headers["Content-Range"] = "bytes \(start)-\(end)/\(totalLength)"
+            }
+
+            guard let response = HTTPURLResponse(
+                url: requestURL,
+                statusCode: statusCode,
+                httpVersion: "HTTP/1.1",
+                headerFields: headers
+            ) else {
+                throw NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotDecodeContentData)
+            }
+
+            let handle = try FileHandle(forReadingFrom: videoURL)
+            defer {
+                try? handle.close()
+            }
+
+            try handle.seek(toOffset: UInt64(start))
+            urlSchemeTask.didReceive(response)
+
+            var remaining = contentLength
+            let chunkSize = 256 * 1024
+            while remaining > 0 {
+                let nextChunk = Int(min(Int64(chunkSize), remaining))
+                let data = try handle.read(upToCount: nextChunk) ?? Data()
+                if data.isEmpty { break }
+                urlSchemeTask.didReceive(data)
+                remaining -= Int64(data.count)
+            }
+
+            urlSchemeTask.didFinish()
+            EduMindLog.info(
+                "OfflineVideo",
+                "served taskUrl=\(requestURL.absoluteString) file=\(videoURL.lastPathComponent) status=\(statusCode) bytes=\(start)-\(end)"
+            )
+        }
 
         func attach(webView: WKWebView) {
             self.webView = webView
@@ -1490,6 +1611,42 @@ private struct H5WebView: UIViewRepresentable {
             """
             webView.loadHTMLString(html, baseURL: nil)
         }
+
+        func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
+            guard let requestURL = urlSchemeTask.request.url else {
+                urlSchemeTask.didFailWithError(NSError(domain: NSURLErrorDomain, code: NSURLErrorBadURL))
+                return
+            }
+
+            guard requestURL.host == Self.offlineVideoHost else {
+                urlSchemeTask.didFailWithError(NSError(domain: NSURLErrorDomain, code: NSURLErrorUnsupportedURL))
+                return
+            }
+
+            let taskId = requestURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).removingPercentEncoding ?? ""
+            guard let videoURL = resolveOfflineVideoURL(taskId: taskId) else {
+                EduMindLog.error("OfflineVideo", "taskId=\(taskId) unresolved request=\(requestURL.absoluteString)")
+                urlSchemeTask.didFailWithError(NSError(domain: NSURLErrorDomain, code: NSURLErrorFileDoesNotExist))
+                return
+            }
+
+            do {
+                try respondWithOfflineVideo(
+                    requestURL: requestURL,
+                    videoURL: videoURL,
+                    byteRangeHeader: urlSchemeTask.request.value(forHTTPHeaderField: "Range"),
+                    to: urlSchemeTask
+                )
+            } catch {
+                EduMindLog.error("OfflineVideo", "taskId=\(taskId) failed error=\(error.localizedDescription)")
+                urlSchemeTask.didFailWithError(error)
+            }
+        }
+
+        func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {
+            guard let requestURL = urlSchemeTask.request.url else { return }
+            EduMindLog.debug("OfflineVideo", "stop request=\(requestURL.absoluteString)")
+        }
     }
 }
 
@@ -1520,6 +1677,7 @@ extension H5WebView.Coordinator: UIDocumentPickerDelegate {
 
         do {
             let task = try buildSelectedVideoMetadata(from: sourceURL)
+            persistOfflineVideoURL(taskId: task.taskId, videoURL: task.workingURL)
             respondToNativeRequest(
                 requestId: requestId,
                 success: true,

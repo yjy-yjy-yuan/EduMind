@@ -78,6 +78,30 @@ export function generateVideoSummary(videoId, data = {}) {
   return request({ url: `/api/videos/${videoId}/generate-summary`, method: 'post', data, timeout: 120000, retry: 0 })
 }
 
+export function generateTranscriptSummary(data = {}) {
+  if (shouldUseMockApi()) {
+    const source = String(data?.transcript_text || '').trim()
+    const trimmed = source.replace(/\s+/g, ' ')
+    const preview = trimmed.slice(0, 120)
+    return Promise.resolve({
+      data: {
+        success: true,
+        style: String(data?.style || 'study'),
+        provider: 'mock',
+        summary: preview ? `UI 模式摘要：${preview}${trimmed.length > preview.length ? '…' : ''}` : 'UI 模式摘要：当前转录文本为空。'
+      },
+      status: 200
+    })
+  }
+  return request({
+    url: '/api/videos/generate-summary-from-transcript',
+    method: 'post',
+    data,
+    timeout: 120000,
+    retry: 0
+  })
+}
+
 export function generateVideoTags(videoId, data = {}) {
   if (shouldUseMockApi()) return mockGenerateVideoTags(videoId, data)
   return request({ url: `/api/videos/${videoId}/generate-tags`, method: 'post', data, timeout: 120000, retry: 0 })

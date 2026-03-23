@@ -51,6 +51,14 @@ class VideoSummaryRequest(BaseModel):
     style: str = Field(default="study", description="摘要风格: brief/study/detailed")
 
 
+class TranscriptSummaryRequest(BaseModel):
+    """基于转录文本的摘要生成请求"""
+
+    transcript_text: str = Field(..., description="转录全文")
+    title: str = Field(default="", description="转录标题")
+    style: str = Field(default="study", description="摘要风格: brief/study/detailed")
+
+
 class VideoTagRequest(BaseModel):
     """标签生成请求"""
 

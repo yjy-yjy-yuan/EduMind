@@ -298,6 +298,42 @@ class TestVideoAPI:
         assert isinstance(payload["models"], list)
         assert any(item["value"] == "base" for item in payload["models"])
 
+    def test_generate_summary_from_transcript(self, client, monkeypatch):
+        """测试本地转录文本也可以复用在线摘要生成逻辑。"""
+        monkeypatch.setattr(
+            "app.services.video_content_service.generate_video_summary",
+            lambda *args, **kwargs: {
+                "success": True,
+                "summary": "这是基于本地转录文本生成的摘要。",
+                "style": "study",
+                "provider": "fallback",
+            },
+        )
+
+        response = client.post(
+            "/api/videos/generate-summary-from-transcript",
+            json={
+                "title": "本地视频",
+                "transcript_text": "第一段内容。第二段内容。第三段内容。",
+                "style": "study",
+            },
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["summary"] == "这是基于本地转录文本生成的摘要。"
+        assert payload["style"] == "study"
+
+    def test_generate_summary_from_transcript_rejects_empty_text(self, client):
+        """测试空转录文本不能生成摘要。"""
+        response = client.post(
+            "/api/videos/generate-summary-from-transcript",
+            json={"title": "空文本", "transcript_text": "   ", "style": "study"},
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "转录文本为空，无法生成摘要"
+
 
 @pytest.mark.api
 class TestNoteAPI:

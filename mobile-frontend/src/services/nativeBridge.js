@@ -28,6 +28,11 @@ export const getNativeCapabilities = () => requestNative('getCapabilities')
 
 export const startNativeOfflineTranscription = (payload = {}) => requestNative('startOfflineTranscription', payload)
 
+export const buildNativeOfflineVideoUrl = (taskId = '') => {
+  const id = String(taskId || '').trim()
+  return id ? `edumind-local://offline-video/${encodeURIComponent(id)}` : ''
+}
+
 export const onNativeEvent = (name, handler) => {
   const eventName = `${NATIVE_EVENT_PREFIX}${String(name || '')}`
   const listener = (event) => handler?.(event?.detail || {})

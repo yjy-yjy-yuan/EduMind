@@ -457,3 +457,14 @@
 
 - 更新 [`mobile-frontend/src/services/processingSettings.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/processingSettings.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)：为 iOS 本地离线转录新增独立的“本地识别语言/方言”设置，可明确选择普通话、粤语、吴语、繁体中文或英语，并单独持久化，不影响后端在线 Whisper 的语言参数。
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)、[`mobile-frontend/src/views/LocalTranscripts.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscripts.vue)：原生离线转录对 `yue-CN`、`wuu-CN` 等 locale 增加识别器 fallback，前端各处本地结果页面也统一显示对应方言/语言标签，便于用户确认当前任务是否按正确 locale 识别。
+
+### 离线详情页对齐在线布局并增加本地视频播放器
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：iOS 容器新增 `edumind-local://offline-video/<taskId>` 本地视频自定义 scheme，并在离线任务创建时持久化任务到本地视频文件路径的映射，供 `WKWebView` 直接播放离线原始视频。
+- 更新 [`mobile-frontend/src/services/nativeBridge.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeBridge.js)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)：本地离线转录详情页的布局对齐在线视频详情页，新增 hero 区、状态/进度展示和动作按钮，并内嵌本地视频播放器；在 iOS 原生容器中可直接播放对应离线任务的本地原始视频，不再只显示转录文本。
+
+### 本地离线转录复用在线摘要生成
+
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)：新增基于 `transcript_text` 直接生成摘要的后端接口，复用现有 `video_content_service.generate_video_summary()`，避免把摘要逻辑下沉到前端页面。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充“本地转录文本生成摘要成功”和“空转录文本被拒绝”的 API 测试，覆盖新增摘要接口的主路径和错误路径。
+- 更新 [`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)、[`mobile-frontend/src/services/nativeOfflineTranscripts.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeOfflineTranscripts.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)：本地离线转录结果新增 `summary / summaryStatus / summaryStyle` 持久化字段；上传页在本地转录完成后会按当前处理设置自动尝试提取摘要，本地详情页新增与在线视频详情页一致的摘要区，并支持手动重生成。

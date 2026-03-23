@@ -183,8 +183,10 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
+  generateTranscriptSummary,
   getVideoProcessingOptions,
   getVideoStatus,
+  hasLiveVideoBackend,
   getVideoUploadQueueableMessage,
   isVideoUploadQueueableError,
   processVideo,
@@ -227,6 +229,7 @@ import {
 import {
   NATIVE_OFFLINE_TRANSCRIPTS_EVENT_NAME,
   deleteNativeOfflineTranscript,
+  getNativeOfflineTranscript,
   getLatestNativeOfflineTranscript,
   listNativeOfflineTranscripts,
   saveNativeOfflineTranscript
@@ -366,6 +369,14 @@ const upsertNativeTask = (patch = {}) => {
     currentStep: String(patch.currentStep || patch.message || current.currentStep || '准备本地离线转录'),
     transcriptText: String(patch.transcriptText ?? current.transcriptText ?? ''),
     errorMessage: String(patch.errorMessage ?? current.errorMessage ?? ''),
+    summary: String(patch.summary ?? current.summary ?? ''),
+    summaryStyle: String(patch.summaryStyle || current.summaryStyle || processingSettings.value.summaryStyle || 'study'),
+    summaryStatus: String(patch.summaryStatus || current.summaryStatus || 'idle').trim().toLowerCase() || 'idle',
+    summaryErrorMessage: String(patch.summaryErrorMessage ?? current.summaryErrorMessage ?? ''),
+    summaryUpdatedAt: String(patch.summaryUpdatedAt || current.summaryUpdatedAt || ''),
+    autoGenerateSummary: typeof patch.autoGenerateSummary === 'boolean'
+      ? patch.autoGenerateSummary
+      : Boolean(current.autoGenerateSummary),
     locale: String(patch.locale || current.locale || ''),
     localeLabel: nativeLocaleLabel(patch.locale || current.locale || ''),
     engine: String(patch.engine || current.engine || 'apple_speech_on_device'),
@@ -397,6 +408,65 @@ const persistNativeTask = async (patch = {}) => {
   if (!next.taskId) return next
   await saveNativeOfflineTranscript(next)
   return next
+}
+
+const generateOfflineTranscriptSummaryForTask = async (taskId, { silent = false } = {}) => {
+  const id = String(taskId || '').trim()
+  if (!id) return null
+
+  const current = await getNativeOfflineTranscript(id)
+  if (!current?.transcriptText?.trim()) return null
+
+  if (!hasLiveVideoBackend()) {
+    const skipped = await saveNativeOfflineTranscript({
+      taskId: id,
+      summaryStatus: 'failed',
+      summaryErrorMessage: '当前未配置可用后端，无法提取摘要；可在后端恢复后进入详情页重试。'
+    })
+    upsertNativeTask(skipped)
+    return null
+  }
+
+  await persistNativeTask({
+    taskId: id,
+    summaryStatus: 'generating',
+    summaryErrorMessage: '',
+    currentStep: current.status === 'completed' ? '转录完成，正在提取摘要' : current.currentStep
+  })
+
+  try {
+    const style = String(current.summaryStyle || processingSettings.value.summaryStyle || 'study')
+    const res = await generateTranscriptSummary({
+      title: current.fileName || '本地视频',
+      transcript_text: current.transcriptText,
+      style
+    })
+    const data = res?.data || {}
+    const saved = await persistNativeTask({
+      taskId: id,
+      summary: data.summary || '',
+      summaryStyle: data.style || style,
+      summaryStatus: 'completed',
+      summaryErrorMessage: '',
+      summaryUpdatedAt: new Date().toISOString(),
+      currentStep: current.status === 'completed' ? '本地离线转录完成' : current.currentStep
+    })
+    if (!silent) {
+      message.value = saved.summary ? 'iOS 本地离线转录完成，摘要已生成' : 'iOS 本地离线转录完成'
+    }
+    return saved
+  } catch (e) {
+    const saved = await persistNativeTask({
+      taskId: id,
+      summaryStatus: 'failed',
+      summaryErrorMessage: extractErrorMessage(e, '摘要提取失败'),
+      currentStep: current.status === 'completed' ? '本地离线转录完成' : current.currentStep
+    })
+    if (!silent) {
+      error.value = saved.summaryErrorMessage || '摘要提取失败'
+    }
+    return saved
+  }
 }
 
 const openNativeTaskDetail = (taskId) => {
@@ -844,6 +914,11 @@ const startNativeOfflineTranscriptionFlow = async () => {
       currentStep: response?.message || '已选择本地视频，准备本地离线转录',
       locale: response?.locale || requestedLocale || processingSettings.value.language,
       engine: response?.engine || 'apple_speech_on_device',
+      autoGenerateSummary: processingSettings.value.autoGenerateSummary,
+      summaryStyle: processingSettings.value.summaryStyle,
+      summary: '',
+      summaryStatus: 'idle',
+      summaryErrorMessage: '',
       transcriptText: '',
       errorMessage: ''
     })
@@ -871,7 +946,7 @@ const handleNativeProgressEvent = async (detail = {}) => {
 
 const handleNativeCompletedEvent = async (detail = {}) => {
   nativeBusy.value = false
-  await persistNativeTask({
+  const saved = await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,
     fileSize: detail.fileSize,
@@ -884,6 +959,11 @@ const handleNativeCompletedEvent = async (detail = {}) => {
     locale: detail.locale,
     engine: detail.engine
   })
+  if (saved?.autoGenerateSummary) {
+    message.value = 'iOS 本地离线转录完成，正在提取摘要'
+    void generateOfflineTranscriptSummaryForTask(saved.taskId)
+    return
+  }
   message.value = 'iOS 本地离线转录完成'
 }
 
