@@ -1,7 +1,10 @@
 import { buildProcessPayload } from '@/services/processingSettings'
+import { uploadLocalVideo, uploadVideoUrl } from '@/api/video'
+import { getBackendUnavailableMessage, hasReachableBackendConfig } from '@/services/networkStatus'
 
 export const OFFLINE_QUEUE_DB_NAME = 'edumind_offline_queue'
 export const OFFLINE_QUEUE_STORE_NAME = 'offline_tasks'
+export const OFFLINE_QUEUE_EVENT_NAME = 'edumind:offline-queue-updated'
 const OFFLINE_QUEUE_DB_VERSION = 1
 const RETRY_BASE_DELAY_MS = 60 * 1000
 const RETRY_MAX_DELAY_MS = 5 * 60 * 1000
@@ -19,6 +22,7 @@ export const OFFLINE_TASK_STATUSES = Object.freeze({
 })
 
 let dbPromise = null
+let flushPromise = null
 
 const requestToPromise = (request) =>
   new Promise((resolve, reject) => {
@@ -33,6 +37,10 @@ const normalizeIsoTime = (value, fallback) => {
 }
 
 const nowIso = () => new Date().toISOString()
+const emitOfflineQueueEvent = (detail = {}) => {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return
+  window.dispatchEvent(new CustomEvent(OFFLINE_QUEUE_EVENT_NAME, { detail }))
+}
 
 const normalizeVideoId = (value) => {
   if (value == null || value === '') return null
@@ -73,6 +81,10 @@ const normalizeRetryCount = (value) => {
 }
 
 const normalizeProcessing = (value) => buildProcessPayload(value || {})
+const resolveVideoId = (payload) => {
+  const data = payload?.data ?? payload
+  return normalizeVideoId(data?.video_id || data?.id || data?.video?.id || data?.data?.id || data?.data?.video_id)
+}
 
 const normalizeTask = (input = {}) => {
   const taskId = String(input.taskId || buildTaskId())
@@ -142,22 +154,23 @@ const withStore = async (mode, runner) => {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(OFFLINE_QUEUE_STORE_NAME, mode)
     const store = tx.objectStore(OFFLINE_QUEUE_STORE_NAME)
+    let result
     let settled = false
 
-    const finish = (resolver) => (value) => {
+    const settle = (resolver, value) => {
       if (settled) return
       settled = true
       resolver(value)
     }
 
-    tx.oncomplete = () => finish(resolve)()
-    tx.onerror = () => finish(reject)(tx.error || new Error('IndexedDB transaction failed'))
-    tx.onabort = () => finish(reject)(tx.error || new Error('IndexedDB transaction aborted'))
+    tx.oncomplete = () => settle(resolve, result)
+    tx.onerror = () => settle(reject, tx.error || new Error('IndexedDB transaction failed'))
+    tx.onabort = () => settle(reject, tx.error || new Error('IndexedDB transaction aborted'))
 
     Promise.resolve()
       .then(() => runner(store))
       .then((value) => {
-        if (value !== undefined) finish(resolve)(value)
+        result = value
       })
       .catch((error) => {
         try {
@@ -165,7 +178,7 @@ const withStore = async (mode, runner) => {
         } catch {
           // ignore abort failures
         }
-        finish(reject)(error)
+        settle(reject, error)
       })
   })
 }
@@ -225,10 +238,12 @@ export const putOfflineTask = async (taskInput = {}) => {
     createdAt: taskInput.createdAt || timestamp,
     updatedAt: taskInput.updatedAt || timestamp
   })
-  return withStore('readwrite', async (store) => {
+  const savedTask = await withStore('readwrite', async (store) => {
     await requestToPromise(store.put(task))
     return task
   })
+  emitOfflineQueueEvent({ reason: 'task-put', taskId: savedTask.taskId, status: savedTask.status, tempKey: savedTask.tempKey, videoId: savedTask.videoId })
+  return savedTask
 }
 
 export const createLocalUploadTask = async ({ file, processing, tempKey } = {}) => {
@@ -303,7 +318,64 @@ export const markOfflineTaskCompleted = async (taskId, { videoId } = {}) =>
 
 export const deleteOfflineTask = async (taskId) => {
   if (!taskId) return
-  return withStore('readwrite', async (store) => {
+  await withStore('readwrite', async (store) => {
     await requestToPromise(store.delete(String(taskId)))
   })
+  emitOfflineQueueEvent({ reason: 'task-delete', taskId: String(taskId) })
+}
+
+const appendOfflineProcessingToFormData = (formData, processing = {}) => {
+  Object.entries(processing).forEach(([key, value]) => {
+    formData.append(key, String(value))
+  })
+  return formData
+}
+
+const runOfflineTaskUpload = async (task) => {
+  if (task.type === OFFLINE_TASK_TYPES.LOCAL_UPLOAD) {
+    if (!(task.blob instanceof Blob)) throw new Error('离线本地任务缺少可上传的文件数据')
+    const form = new FormData()
+    form.append('file', task.blob, task.fileName || `offline-upload.${task.fileExt || 'mp4'}`)
+    appendOfflineProcessingToFormData(form, task.processing)
+    return uploadLocalVideo(form)
+  }
+
+  if (task.type === OFFLINE_TASK_TYPES.URL_IMPORT) {
+    return uploadVideoUrl({ url: task.videoUrl, ...task.processing })
+  }
+
+  throw new Error(`未知的离线任务类型：${task.type}`)
+}
+
+export const flushOfflineQueue = async () => {
+  if (!isOfflineQueueSupported() || !hasReachableBackendConfig()) return []
+  if (flushPromise) return flushPromise
+
+  flushPromise = (async () => {
+    const tasks = await getFlushableOfflineTasks()
+    const results = []
+
+    for (const task of tasks) {
+      try {
+        await markOfflineTaskUploading(task.taskId)
+        const response = await runOfflineTaskUpload(task)
+        const videoId = resolveVideoId(response?.data || response)
+        if (!videoId) throw new Error('离线补跑成功，但接口未返回 videoId')
+
+        await markOfflineTaskCompleted(task.taskId, { videoId })
+        results.push({ taskId: task.taskId, tempKey: task.tempKey, status: OFFLINE_TASK_STATUSES.COMPLETED, videoId })
+      } catch (error) {
+        const errorMessage = getBackendUnavailableMessage(error, '自动补跑失败')
+        await markOfflineTaskFailed(task.taskId, errorMessage)
+        results.push({ taskId: task.taskId, tempKey: task.tempKey, status: OFFLINE_TASK_STATUSES.FAILED, error: errorMessage })
+      }
+    }
+
+    emitOfflineQueueEvent({ reason: 'flush-finished', results })
+    return results
+  })().finally(() => {
+    flushPromise = null
+  })
+
+  return flushPromise
 }

@@ -26,6 +26,8 @@ export const videoStatusText = (status) => {
     completed: '已完成',
     failed: '失败',
     downloading: '下载中',
+    offline_queued: '离线排队中',
+    uploading: '自动补跑中',
     unknown: '未知'
   }
   return map[normalizeVideoStatus(status)] || '未知'
@@ -35,6 +37,7 @@ export const videoStatusTone = (status) => {
   const normalized = normalizeVideoStatus(status)
   if (normalized === 'completed') return 'ok'
   if (normalized === 'failed') return 'bad'
+  if (normalized === 'offline_queued' || normalized === 'uploading') return 'warn'
   if (ACTIVE_VIDEO_STATUSES.has(normalized)) return 'warn'
   return 'info'
 }

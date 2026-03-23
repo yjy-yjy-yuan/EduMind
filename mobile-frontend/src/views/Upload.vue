@@ -38,6 +38,7 @@
         <div class="bar" :style="{ width: `${progress}%` }"></div>
       </div>
       <div v-if="busy" class="muted">进度：{{ progress }}%</div>
+      <div class="muted">离线补跑仅适用于已配置真实后端地址但暂时不可达；纯 UI ONLY 演示模式不会进入真实离线补跑。</div>
     </div>
 
     <div class="card">
@@ -91,7 +92,7 @@
             </span>
             <button class="mini" @click="openRecent(item)" :disabled="!item.videoId">查看</button>
             <button
-              v-if="item.status === 'failed'"
+              v-if="item.status === 'failed' && item.videoId"
               class="mini mini--warn"
               @click="retryRecent(item)"
               :disabled="busy || syncingRecent || item.retrying || !item.videoId"
@@ -114,6 +115,16 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getVideoProcessingOptions, getVideoStatus, processVideo, uploadLocalVideo, uploadVideoUrl } from '@/api/video'
 import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
+import { getBackendUnavailableMessage, isBackendUnavailableError } from '@/services/networkStatus'
+import {
+  OFFLINE_QUEUE_EVENT_NAME,
+  OFFLINE_TASK_STATUSES,
+  createLocalUploadTask,
+  createUrlImportTask,
+  deleteOfflineTask,
+  flushOfflineQueue,
+  getOfflineTasks
+} from '@/services/offlineQueue'
 import {
   appendProcessingSettingsToFormData,
   buildProcessPayload,
@@ -155,6 +166,7 @@ const STATUS_FILTERS = [
   { value: 'active', label: '进行中' },
   { value: 'completed', label: '已完成' }
 ]
+let syncingOfflineRecent = false
 
 const processingSettingsSummary = computed(() => {
   const current = processingSettings.value || getProcessingSettings()
@@ -252,6 +264,8 @@ const normalizeRecentUploads = (list) => {
       status: normalizeVideoStatus(item.status || (item.duplicate ? 'uploaded' : 'pending')),
       progress: displayProgress(item.progress),
       currentStep: String(item.currentStep || ''),
+      offlineTaskId: item.offlineTaskId ? String(item.offlineTaskId) : '',
+      tempKey: item.tempKey ? String(item.tempKey) : '',
       requestedModel: String(item.requestedModel || item.requested_model || '').trim().toLowerCase(),
       effectiveModel: String(item.effectiveModel || item.effective_model || item.requestedModel || item.requested_model || '').trim().toLowerCase(),
       retrying: false
@@ -265,11 +279,14 @@ const recentModelText = (item) => {
 }
 
 const hasActiveRecentUploads = computed(() => recentUploads.value.some((item) => isActiveStatus(item.status)))
+const isRecentQueueStatus = (status) => ['offline_queued', 'uploading'].includes(normalizeVideoStatus(status))
 
 const filteredRecentUploads = computed(() => {
   if (statusFilter.value === 'all') return recentUploads.value
   if (statusFilter.value === 'active') {
-    return recentUploads.value.filter((item) => ['pending', 'processing', 'downloading'].includes(normalizeVideoStatus(item.status)))
+    return recentUploads.value.filter((item) =>
+      ['pending', 'processing', 'downloading', 'offline_queued', 'uploading'].includes(normalizeVideoStatus(item.status))
+    )
   }
   return recentUploads.value.filter((item) => normalizeVideoStatus(item.status) === statusFilter.value)
 })
@@ -303,6 +320,31 @@ const refreshWhisperModelOptions = async () => {
   }
 }
 
+const findRecentUploadIndex = (item = {}) =>
+  recentUploads.value.findIndex((current) => {
+    if (item.key && current.key === item.key) return true
+    if (item.offlineTaskId && current.offlineTaskId === item.offlineTaskId) return true
+    if (item.tempKey && current.tempKey === item.tempKey) return true
+    if (item.videoId && current.videoId && Number(current.videoId) === Number(item.videoId)) return true
+    return false
+  })
+
+const upsertRecentUpload = (item) => {
+  const normalized = normalizeRecentUploads([item])[0]
+  if (!normalized) return
+
+  const next = [...recentUploads.value]
+  const idx = findRecentUploadIndex(normalized)
+  if (idx >= 0) {
+    next[idx] = { ...next[idx], ...normalized }
+    recentUploads.value = next
+  } else {
+    recentUploads.value = [normalized, ...next].slice(0, MAX_RECENT_UPLOADS)
+  }
+
+  persistRecentUploads()
+}
+
 const addRecentUpload = ({
   videoId,
   title,
@@ -329,10 +371,69 @@ const addRecentUpload = ({
     effectiveModel: String(effectiveModel || requestedModel || '').trim().toLowerCase(),
     retrying: false
   }
-  const merged = [item, ...recentUploads.value.filter((x) => x.videoId !== item.videoId || !item.videoId)]
-  recentUploads.value = merged.slice(0, MAX_RECENT_UPLOADS)
-  persistRecentUploads()
+  upsertRecentUpload(item)
   scheduleRecentStatusSync()
+}
+
+const buildOfflineCurrentStep = (task) => {
+  if (task.status === OFFLINE_TASK_STATUSES.UPLOADING) return '后端已恢复，正在自动补跑'
+  if (task.status === OFFLINE_TASK_STATUSES.FAILED) return task.lastError || '自动补跑失败，等待稍后重试'
+  if (task.status === OFFLINE_TASK_STATUSES.COMPLETED && task.videoId) return '离线补跑成功，正在同步处理状态'
+  return '已加入离线队列，等待后端恢复自动补跑'
+}
+
+const buildRecentUploadFromOfflineTask = (task, current = {}) => {
+  const requestedModel = String(task?.processing?.model || current.requestedModel || '').trim().toLowerCase()
+  const liveStatus =
+    task.status === OFFLINE_TASK_STATUSES.COMPLETED && task.videoId
+      ? normalizeVideoStatus(current.status || 'pending')
+      : normalizeVideoStatus(task.status)
+  const time = current.time || task.createdAt
+  return {
+    key: current.key || task.tempKey || `offline-${task.taskId}`,
+    offlineTaskId: task.taskId,
+    tempKey: task.tempKey || current.tempKey || `offline-${task.taskId}`,
+    videoId: task.videoId || current.videoId || null,
+    title: current.title || task.fileName || task.videoUrl || '离线任务',
+    typeText:
+      current.typeText
+      || (task.type === 'local_upload' ? `本地文件 · ${readableSize(task.fileSize)}` : '链接导入'),
+    time,
+    timeText: formatTimeText(time),
+    duplicate: Boolean(current.duplicate),
+    status: liveStatus,
+    progress: task.videoId ? current.progress || 0 : 0,
+    currentStep: buildOfflineCurrentStep(task),
+    requestedModel,
+    effectiveModel: String(current.effectiveModel || requestedModel).trim().toLowerCase(),
+    retrying: false
+  }
+}
+
+const syncOfflineRecentUploads = async () => {
+  if (syncingOfflineRecent) return false
+  syncingOfflineRecent = true
+
+  try {
+    const tasks = await getOfflineTasks()
+    let promoted = false
+
+    for (const task of tasks) {
+      const current = recentUploads.value[findRecentUploadIndex({ offlineTaskId: task.taskId, tempKey: task.tempKey, videoId: task.videoId })] || {}
+      const nextItem = buildRecentUploadFromOfflineTask(task, current)
+      upsertRecentUpload(nextItem)
+
+      if (task.status === OFFLINE_TASK_STATUSES.COMPLETED && task.videoId) {
+        promoted = true
+        await deleteOfflineTask(task.taskId)
+      }
+    }
+
+    scheduleRecentStatusSync()
+    return promoted
+  } finally {
+    syncingOfflineRecent = false
+  }
 }
 
 const clearRecentStatusSync = () => {
@@ -413,6 +514,11 @@ const openRecent = (item) => {
   router.push(`/videos/${item.videoId}`)
 }
 
+const handleOfflineQueueEvent = async () => {
+  const promoted = await syncOfflineRecentUploads()
+  if (promoted) await syncRecentStatuses()
+}
+
 const retryRecent = async (item) => {
   if (!item?.videoId) return
   const idx = recentUploads.value.findIndex((x) => x.key === item.key)
@@ -440,6 +546,30 @@ const retryRecent = async (item) => {
     recentUploads.value[idx] = { ...recentUploads.value[idx], retrying: false }
     error.value = extractErrorMessage(e, '重试失败')
   }
+}
+
+const queueOfflineLocalUpload = async (selectedFile) => {
+  const task = await createLocalUploadTask({
+    file: selectedFile,
+    processing: processingSettings.value
+  })
+  upsertRecentUpload(buildRecentUploadFromOfflineTask(task))
+  savedFileMeta.value = { name: selectedFile.name, size: Number(selectedFile.size || 0) }
+  file.value = null
+  progress.value = 0
+  if (fileInputRef.value) fileInputRef.value.value = ''
+  message.value = '后端暂时不可达，已加入离线队列，等待后端恢复后自动补跑'
+}
+
+const queueOfflineUrlImport = async (trimmedUrl) => {
+  const task = await createUrlImportTask({
+    videoUrl: trimmedUrl,
+    processing: processingSettings.value
+  })
+  upsertRecentUpload(buildRecentUploadFromOfflineTask(task))
+  videoUrl.value = ''
+  progress.value = 0
+  message.value = '链接任务已加入离线队列，等待后端恢复后自动补跑'
 }
 
 const validateVideoUrl = (url) => {
@@ -525,7 +655,15 @@ const uploadFile = async () => {
         : '/videos'
     )
   } catch (e) {
-    error.value = extractErrorMessage(e, '上传失败')
+    if (isBackendUnavailableError(e)) {
+      try {
+        await queueOfflineLocalUpload(file.value)
+      } catch (queueError) {
+        error.value = `${getBackendUnavailableMessage(e, '后端暂时不可达')}；当前设备无法写入离线队列`
+      }
+    } else {
+      error.value = extractErrorMessage(e, '上传失败')
+    }
   } finally {
     busy.value = false
   }
@@ -564,7 +702,15 @@ const uploadUrl = async () => {
         : '/videos'
     )
   } catch (e) {
-    error.value = extractErrorMessage(e, '提交失败')
+    if (isBackendUnavailableError(e)) {
+      try {
+        await queueOfflineUrlImport(String(videoUrl.value).trim())
+      } catch (queueError) {
+        error.value = `${getBackendUnavailableMessage(e, '后端暂时不可达')}；当前设备无法写入离线队列`
+      }
+    } else {
+      error.value = extractErrorMessage(e, '提交失败')
+    }
   } finally {
     busy.value = false
   }
@@ -574,12 +720,17 @@ onMounted(async () => {
   processingSettings.value = getProcessingSettings()
   await refreshWhisperModelOptions()
   loadRecentUploads()
+  window.addEventListener(OFFLINE_QUEUE_EVENT_NAME, handleOfflineQueueEvent)
+  await syncOfflineRecentUploads()
+  await flushOfflineQueue()
+  await syncOfflineRecentUploads()
   await syncRecentStatuses()
   scheduleRecentStatusSync()
 })
 
 onUnmounted(() => {
   clearRecentStatusSync()
+  window.removeEventListener(OFFLINE_QUEUE_EVENT_NAME, handleOfflineQueueEvent)
 })
 </script>
 
