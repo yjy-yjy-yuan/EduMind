@@ -805,21 +805,23 @@ const startNativeOfflineTranscriptionFlow = async () => {
   }
 
   nativeBusy.value = true
+  let started = false
   try {
-    const started = await startNativeOfflineTranscription({
+    const response = await startNativeOfflineTranscription({
       language: nativeTranscriptionLocale(processingSettings.value.language),
       model: processingSettings.value.model
     })
+    started = true
     await persistNativeTask({
-      taskId: started?.taskId,
-      fileName: started?.fileName,
-      fileSize: started?.fileSize,
-      fileExt: started?.fileExt,
-      status: started?.status || 'preparing',
+      taskId: response?.taskId,
+      fileName: response?.fileName,
+      fileSize: response?.fileSize,
+      fileExt: response?.fileExt,
+      status: response?.status || 'preparing',
       progress: 5,
-      currentStep: started?.message || '已选择本地视频，准备本地离线转录',
-      locale: started?.locale || processingSettings.value.language,
-      engine: started?.engine || 'apple_speech_on_device',
+      currentStep: response?.message || '已选择本地视频，准备本地离线转录',
+      locale: response?.locale || processingSettings.value.language,
+      engine: response?.engine || 'apple_speech_on_device',
       transcriptText: '',
       errorMessage: ''
     })
@@ -827,11 +829,12 @@ const startNativeOfflineTranscriptionFlow = async () => {
   } catch (e) {
     error.value = extractErrorMessage(e, '无法启动 iOS 本地离线转录')
   } finally {
-    nativeBusy.value = false
+    if (!started) nativeBusy.value = false
   }
 }
 
 const handleNativeProgressEvent = async (detail = {}) => {
+  nativeBusy.value = true
   await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,
@@ -845,6 +848,7 @@ const handleNativeProgressEvent = async (detail = {}) => {
 }
 
 const handleNativeCompletedEvent = async (detail = {}) => {
+  nativeBusy.value = false
   await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,
@@ -862,6 +866,7 @@ const handleNativeCompletedEvent = async (detail = {}) => {
 }
 
 const handleNativeFailedEvent = async (detail = {}) => {
+  nativeBusy.value = false
   await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,

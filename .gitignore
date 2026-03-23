@@ -54,6 +54,10 @@ Thumbs.db
 *.swo
 **/xcuserdata/
 *.xcuserstate
+.swift-module-cache/
+.xcode-derived/
+.xcode-derived*/
+DerivedData/
 
 # Accidental local directories
 ~/

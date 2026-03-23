@@ -261,9 +261,19 @@ private struct H5WebView: UIViewRepresentable {
             let localeIdentifier: String
         }
 
+        private struct NativeAudioChunk {
+            let index: Int
+            let total: Int
+            let startSeconds: Double
+            let durationSeconds: Double
+            let url: URL
+            let requiresCleanup: Bool
+        }
+
         private enum NativeOfflineTranscriptionError: LocalizedError {
             case presenterUnavailable
             case pickerBusy
+            case transcriptionBusy
             case pickerCancelled
             case invalidSelection
             case audioExtractionUnavailable
@@ -278,6 +288,8 @@ private struct H5WebView: UIViewRepresentable {
                     return "当前 iOS 容器无法打开本地视频选择器"
                 case .pickerBusy:
                     return "已有一个原生离线转录任务正在选择视频，请稍后再试"
+                case .transcriptionBusy:
+                    return "已有一个原生离线转录任务正在执行，请等待完成后再试"
                 case .pickerCancelled:
                     return "已取消本地视频选择"
                 case .invalidSelection:
@@ -295,6 +307,10 @@ private struct H5WebView: UIViewRepresentable {
                 }
             }
         }
+
+        private let offlineChunkDurationSeconds: Double = 15
+        private let offlineChunkOverlapSeconds: Double = 1.5
+        private let offlineMinimumChunkSeconds: Double = 1
 
         static let logHandlerName = "edumindLog"
         static let nativeBridgeHandlerName = "edumindNative"
@@ -750,6 +766,15 @@ private struct H5WebView: UIViewRepresentable {
                 return
             }
 
+            guard activeOfflineTasks.isEmpty else {
+                respondToNativeRequest(
+                    requestId: requestId,
+                    success: false,
+                    errorMessage: NativeOfflineTranscriptionError.transcriptionBusy.localizedDescription
+                )
+                return
+            }
+
             guard let presenter = topViewController() else {
                 respondToNativeRequest(
                     requestId: requestId,
@@ -776,6 +801,14 @@ private struct H5WebView: UIViewRepresentable {
             pendingVideoPickerPayload = [:]
         }
 
+        private func offlineProgressBar(_ progress: Int, width: Int = 16) -> String {
+            let clamped = max(0, min(100, progress))
+            let filled = Int(round((Double(clamped) / 100.0) * Double(width)))
+            let fullBlocks = String(repeating: "█", count: max(0, min(width, filled)))
+            let emptyBlocks = String(repeating: "░", count: max(0, width - filled))
+            return "[\(fullBlocks)\(emptyBlocks)] \(String(format: "%3d%%", clamped))"
+        }
+
         private func sendOfflineProgressEvent(
             taskId: String,
             fileName: String,
@@ -785,6 +818,10 @@ private struct H5WebView: UIViewRepresentable {
             message: String,
             localeIdentifier: String = ""
         ) {
+            EduMindLog.info(
+                "OfflineTranscription",
+                "\(offlineProgressBar(progress)) taskId=\(taskId) phase=\(phase) locale=\(localeIdentifier.isEmpty ? "<auto>" : localeIdentifier) message=\(message)"
+            )
             sendNativeEvent(name: "offline-transcription-progress", payload: [
                 "taskId": taskId,
                 "fileName": fileName,
@@ -804,6 +841,10 @@ private struct H5WebView: UIViewRepresentable {
             fileSize: Int,
             message: String
         ) {
+            EduMindLog.error(
+                "OfflineTranscription",
+                "\(offlineProgressBar(0)) taskId=\(taskId) phase=failed message=\(message)"
+            )
             sendNativeEvent(name: "offline-transcription-failed", payload: [
                 "taskId": taskId,
                 "fileName": fileName,
@@ -855,6 +896,228 @@ private struct H5WebView: UIViewRepresentable {
             }
         }
 
+        private func exportAudioChunk(
+            from audioURL: URL,
+            taskId: String,
+            chunkIndex: Int,
+            startSeconds: Double,
+            durationSeconds: Double
+        ) async throws -> URL {
+            let asset = AVURLAsset(url: audioURL)
+            guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+                throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+            }
+
+            let workingDirectory = try createWorkingDirectory()
+            let outputURL = workingDirectory.appendingPathComponent("\(taskId)-chunk-\(chunkIndex).m4a")
+            if FileManager.default.fileExists(atPath: outputURL.path) {
+                try FileManager.default.removeItem(at: outputURL)
+            }
+
+            exportSession.outputURL = outputURL
+            exportSession.outputFileType = .m4a
+            exportSession.shouldOptimizeForNetworkUse = false
+            exportSession.timeRange = CMTimeRange(
+                start: CMTime(seconds: startSeconds, preferredTimescale: 600),
+                duration: CMTime(seconds: durationSeconds, preferredTimescale: 600)
+            )
+
+            return try await withCheckedThrowingContinuation { continuation in
+                exportSession.exportAsynchronously {
+                    switch exportSession.status {
+                    case .completed:
+                        continuation.resume(returning: outputURL)
+                    case .failed:
+                        continuation.resume(throwing: exportSession.error ?? NativeOfflineTranscriptionError.audioExtractionUnavailable)
+                    case .cancelled:
+                        continuation.resume(throwing: NativeOfflineTranscriptionError.pickerCancelled)
+                    default:
+                        continuation.resume(throwing: exportSession.error ?? NativeOfflineTranscriptionError.audioExtractionUnavailable)
+                    }
+                }
+            }
+        }
+
+        private func normalizeAudioForSpeechRecognition(
+            sourceURL: URL,
+            taskId: String,
+            chunkIndex: Int
+        ) throws -> URL {
+            let inputFile = try AVAudioFile(forReading: sourceURL)
+            guard let outputFormat = AVAudioFormat(
+                commonFormat: .pcmFormatInt16,
+                sampleRate: 16_000,
+                channels: 1,
+                interleaved: false
+            ) else {
+                throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+            }
+            guard let converter = AVAudioConverter(from: inputFile.processingFormat, to: outputFormat) else {
+                throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+            }
+
+            converter.sampleRateConverterQuality = AVAudioQuality.max.rawValue
+
+            let workingDirectory = try createWorkingDirectory()
+            let outputURL = workingDirectory.appendingPathComponent("\(taskId)-speech-\(chunkIndex).caf")
+            if FileManager.default.fileExists(atPath: outputURL.path) {
+                try FileManager.default.removeItem(at: outputURL)
+            }
+
+            let outputFile = try AVAudioFile(
+                forWriting: outputURL,
+                settings: outputFormat.settings,
+                commonFormat: outputFormat.commonFormat,
+                interleaved: outputFormat.isInterleaved
+            )
+
+            let inputFrameCapacity: AVAudioFrameCount = 8_192
+            let ratio = outputFormat.sampleRate / max(inputFile.processingFormat.sampleRate, 1)
+            let outputFrameCapacity = AVAudioFrameCount(max(4_096, Int(Double(inputFrameCapacity) * ratio) + 1_024))
+
+            while true {
+                guard let inputBuffer = AVAudioPCMBuffer(
+                    pcmFormat: inputFile.processingFormat,
+                    frameCapacity: inputFrameCapacity
+                ) else {
+                    throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+                }
+                try inputFile.read(into: inputBuffer)
+                if inputBuffer.frameLength == 0 {
+                    break
+                }
+
+                guard let outputBuffer = AVAudioPCMBuffer(
+                    pcmFormat: outputFormat,
+                    frameCapacity: outputFrameCapacity
+                ) else {
+                    throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+                }
+
+                var conversionError: NSError?
+                let status = converter.convert(to: outputBuffer, error: &conversionError) { _, outStatus in
+                    outStatus.pointee = .haveData
+                    return inputBuffer
+                }
+
+                if let conversionError {
+                    throw conversionError
+                }
+                if status == .error {
+                    throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+                }
+                if outputBuffer.frameLength > 0 {
+                    try outputFile.write(from: outputBuffer)
+                }
+            }
+
+            EduMindLog.info(
+                "OfflineTranscription",
+                "taskId=\(taskId) prepared speech audio chunk=\(chunkIndex + 1) sourceRate=\(String(format: "%.0f", inputFile.processingFormat.sampleRate))Hz sourceChannels=\(inputFile.processingFormat.channelCount) targetRate=16000Hz targetChannels=1"
+            )
+            return outputURL
+        }
+
+        private func buildAudioChunks(audioURL: URL, taskId: String) async throws -> [NativeAudioChunk] {
+            let asset = AVURLAsset(url: audioURL)
+            let loadedDuration = try await asset.load(.duration)
+            let duration = CMTimeGetSeconds(loadedDuration)
+            let safeDuration = duration.isFinite && duration > 0 ? duration : 0
+
+            guard safeDuration > offlineChunkDurationSeconds else {
+                return [
+                    NativeAudioChunk(
+                        index: 0,
+                        total: 1,
+                        startSeconds: 0,
+                        durationSeconds: max(safeDuration, offlineMinimumChunkSeconds),
+                        url: audioURL,
+                        requiresCleanup: false
+                    )
+                ]
+            }
+
+            let stepSeconds = max(offlineChunkDurationSeconds - offlineChunkOverlapSeconds, offlineMinimumChunkSeconds)
+            var rawChunks: [(start: Double, duration: Double, url: URL)] = []
+            var startSeconds = 0.0
+            var chunkIndex = 0
+
+            while startSeconds < safeDuration {
+                let remaining = safeDuration - startSeconds
+                let durationSeconds = max(min(offlineChunkDurationSeconds, remaining), offlineMinimumChunkSeconds)
+                let chunkURL = try await exportAudioChunk(
+                    from: audioURL,
+                    taskId: taskId,
+                    chunkIndex: chunkIndex,
+                    startSeconds: startSeconds,
+                    durationSeconds: durationSeconds
+                )
+                rawChunks.append((
+                    start: startSeconds,
+                    duration: durationSeconds,
+                    url: chunkURL
+                ))
+                if startSeconds + durationSeconds >= safeDuration {
+                    break
+                }
+                startSeconds += stepSeconds
+                chunkIndex += 1
+            }
+
+            let chunkCount = rawChunks.count
+            let chunks = rawChunks.enumerated().map { index, chunk in
+                NativeAudioChunk(
+                    index: index,
+                    total: chunkCount,
+                    startSeconds: chunk.start,
+                    durationSeconds: chunk.duration,
+                    url: chunk.url,
+                    requiresCleanup: true
+                )
+            }
+
+            EduMindLog.info(
+                "OfflineTranscription",
+                "taskId=\(taskId) audioDuration=\(String(format: "%.2f", safeDuration))s chunkDuration=\(String(format: "%.1f", offlineChunkDurationSeconds))s overlap=\(String(format: "%.1f", offlineChunkOverlapSeconds))s chunks=\(chunkCount)"
+            )
+            return chunks
+        }
+
+        private func mergeTranscriptionText(_ existingText: String, _ nextText: String) -> String {
+            let left = existingText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let right = nextText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if left.isEmpty { return right }
+            if right.isEmpty { return left }
+            if left.hasSuffix(right) { return left }
+            if right.hasPrefix(left) { return right }
+
+            let leftChars = Array(left)
+            let rightChars = Array(right)
+            let maxOverlap = min(48, min(leftChars.count, rightChars.count))
+
+            if maxOverlap >= 4 {
+                for length in stride(from: maxOverlap, through: 4, by: -1) {
+                    if Array(leftChars.suffix(length)) == Array(rightChars.prefix(length)) {
+                        return left + String(rightChars.dropFirst(length))
+                    }
+                }
+            }
+
+            let suffixSample = String(leftChars.suffix(min(8, leftChars.count)))
+            let prefixSample = String(rightChars.prefix(min(8, rightChars.count)))
+            if !suffixSample.isEmpty, suffixSample == prefixSample {
+                return left + String(rightChars.dropFirst(suffixSample.count))
+            }
+
+            return left + "\n" + right
+        }
+
+        private func isNoSpeechDetectedError(_ error: Error) -> Bool {
+            let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return message.contains("no speech detected") || message.contains("未检测到语音")
+        }
+
         private func buildSpeechRecognizer(localeIdentifier: String) throws -> SFSpeechRecognizer {
             let candidates = [
                 localeIdentifier,
@@ -873,26 +1136,56 @@ private struct H5WebView: UIViewRepresentable {
             throw NativeOfflineTranscriptionError.recognizerUnavailable
         }
 
-        private func transcribeAudioFile(
+        private func transcribeAudioChunk(
+            recognizer: SFSpeechRecognizer,
+            audioChunk: NativeAudioChunk,
             taskId: String,
-            audioURL: URL,
             fileName: String,
-            fileSize: Int,
-            localeIdentifier: String
+            fileSize: Int
         ) async throws -> NativeTranscriptionResult {
-            let authorizationStatus = await requestSpeechAuthorization()
-            guard authorizationStatus == .authorized else {
-                throw NativeOfflineTranscriptionError.speechAuthorizationDenied
+            let chunkLabel = audioChunk.total > 1 ? "（\(audioChunk.index + 1)/\(audioChunk.total)）" : ""
+            let progressBase = 55 + Int((Double(audioChunk.index) / Double(max(audioChunk.total, 1))) * 30)
+            let progressPeak = min(progressBase + 25, 95)
+            let chunkWindow = "start=\(String(format: "%.1f", audioChunk.startSeconds))s duration=\(String(format: "%.1f", audioChunk.durationSeconds))s"
+            var preparedAudioURL: URL? = nil
+
+            do {
+                preparedAudioURL = try normalizeAudioForSpeechRecognition(
+                    sourceURL: audioChunk.url,
+                    taskId: taskId,
+                    chunkIndex: audioChunk.index
+                )
+            } catch {
+                EduMindLog.notice(
+                    "OfflineTranscription",
+                    "taskId=\(taskId) chunk=\(audioChunk.index + 1)/\(audioChunk.total) normalize-audio-failed fallback=original reason=\(error.localizedDescription)"
+                )
             }
 
-            let recognizer = try buildSpeechRecognizer(localeIdentifier: localeIdentifier)
-            guard recognizer.supportsOnDeviceRecognition else {
-                throw NativeOfflineTranscriptionError.onDeviceRecognitionUnavailable
+            let recognitionAudioURL = preparedAudioURL ?? audioChunk.url
+            defer {
+                if let preparedAudioURL {
+                    try? FileManager.default.removeItem(at: preparedAudioURL)
+                }
             }
 
-            let request = SFSpeechURLRecognitionRequest(url: audioURL)
+            sendOfflineProgressEvent(
+                taskId: taskId,
+                fileName: fileName,
+                fileSize: fileSize,
+                phase: "transcribing",
+                progress: progressBase,
+                message: "正在进行本地语音识别\(chunkLabel) · \(chunkWindow)",
+                localeIdentifier: recognizer.locale.identifier
+            )
+
+            let request = SFSpeechURLRecognitionRequest(url: recognitionAudioURL)
             request.requiresOnDeviceRecognition = true
             request.shouldReportPartialResults = true
+            if #available(iOS 16.0, *) {
+                request.addsPunctuation = true
+            }
+            request.taskHint = .dictation
 
             return try await withCheckedThrowingContinuation { continuation in
                 var hasResumed = false
@@ -909,8 +1202,8 @@ private struct H5WebView: UIViewRepresentable {
                                 fileName: fileName,
                                 fileSize: fileSize,
                                 phase: "transcribing",
-                                progress: result.isFinal ? 95 : 75,
-                                message: "正在进行本地语音识别",
+                                progress: result.isFinal ? progressPeak : min(progressBase + 10, progressPeak - 5),
+                                message: "正在进行本地语音识别\(chunkLabel) · \(chunkWindow)",
                                 localeIdentifier: recognizer.locale.identifier
                             )
                         }
@@ -921,7 +1214,7 @@ private struct H5WebView: UIViewRepresentable {
                             let segments = result.bestTranscription.segments.map { segment in
                                 [
                                     "text": segment.substring,
-                                    "start": segment.timestamp,
+                                    "start": segment.timestamp + audioChunk.startSeconds,
                                     "duration": segment.duration,
                                     "confidence": segment.confidence
                                 ]
@@ -949,6 +1242,74 @@ private struct H5WebView: UIViewRepresentable {
                     }
                 }
             }
+        }
+
+        private func transcribeAudioFile(
+            taskId: String,
+            audioURL: URL,
+            fileName: String,
+            fileSize: Int,
+            localeIdentifier: String
+        ) async throws -> NativeTranscriptionResult {
+            let authorizationStatus = await requestSpeechAuthorization()
+            guard authorizationStatus == .authorized else {
+                throw NativeOfflineTranscriptionError.speechAuthorizationDenied
+            }
+
+            let recognizer = try buildSpeechRecognizer(localeIdentifier: localeIdentifier)
+            guard recognizer.supportsOnDeviceRecognition else {
+                throw NativeOfflineTranscriptionError.onDeviceRecognitionUnavailable
+            }
+            let chunks = try await buildAudioChunks(audioURL: audioURL, taskId: taskId)
+            var mergedText = ""
+            var chunkSegments: [[String: Any]] = []
+
+            for chunk in chunks {
+                do {
+                    let chunkResult = try await transcribeAudioChunk(
+                        recognizer: recognizer,
+                        audioChunk: chunk,
+                        taskId: taskId,
+                        fileName: fileName,
+                        fileSize: fileSize
+                    )
+                    if !chunkResult.text.isEmpty {
+                        let nextMergedText = mergeTranscriptionText(mergedText, chunkResult.text)
+                        if nextMergedText != mergedText {
+                            mergedText = nextMergedText
+                        }
+                    }
+                    chunkSegments.append(contentsOf: chunkResult.segments)
+                } catch {
+                    if isNoSpeechDetectedError(error) {
+                        EduMindLog.notice(
+                            "OfflineTranscription",
+                            "taskId=\(taskId) skip chunk \(chunk.index + 1)/\(chunk.total) start=\(String(format: "%.2f", chunk.startSeconds))s reason=no-speech"
+                        )
+                    } else {
+                        if chunk.requiresCleanup {
+                            try? FileManager.default.removeItem(at: chunk.url)
+                        }
+                        throw error
+                    }
+                }
+
+                if chunk.requiresCleanup {
+                    try? FileManager.default.removeItem(at: chunk.url)
+                }
+            }
+
+            let finalText = mergedText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if finalText.isEmpty {
+                throw NativeOfflineTranscriptionError.emptyTranscript
+            }
+
+            return NativeTranscriptionResult(
+                text: finalText,
+                segments: chunkSegments,
+                localeIdentifier: recognizer.locale.identifier
+            )
         }
 
         private func runOfflineTranscription(task: NativeSelectedVideo, payload: [String: Any]) async {
@@ -998,6 +1359,10 @@ private struct H5WebView: UIViewRepresentable {
                     localeIdentifier: localeIdentifier
                 )
 
+                EduMindLog.info(
+                    "OfflineTranscription",
+                    "\(offlineProgressBar(100)) taskId=\(task.taskId) phase=completed textLength=\(transcription.text.count) segments=\(transcription.segments.count)"
+                )
                 sendNativeEvent(name: "offline-transcription-completed", payload: [
                     "taskId": task.taskId,
                     "fileName": task.fileName,

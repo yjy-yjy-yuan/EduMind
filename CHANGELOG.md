@@ -427,3 +427,28 @@
 
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：原生离线转录现在会优先读取 `locale`，并将 `Other / 中文 / 中文/其他 / English / 英文` 等前端语言值统一归一成可用的 Apple Speech locale，避免把 `other` 直接传给 `SFSpeechRecognizer` 导致识别器初始化失败；同时补充任务启动时的请求语言和归一化 locale 日志，便于真机排查。
 - 更新 [`mobile-frontend/src/services/processingSettings.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/processingSettings.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：上传页发起 iOS 本地离线转录时，先将页面处理设置中的语言选项转换为原生侧可识别的 locale（例如 `zh-CN`、`en-US`），降低前后端枚举不一致造成的失败概率。
+
+### iOS 本地离线转录切片识别与本地缓存忽略规则
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：原生离线转录不再只把整段音频一次性交给 Apple Speech，而是将较长音频切成多个小片段顺序识别，并在最终结果中合并文本与时间片段；单个片段若返回 `No speech detected` 会记日志后跳过，不再直接让整条任务失败，从而提高长视频或含静音片段视频的稳定性。
+- 更新 [`.gitignore`](/Users/yuan/final-work/EduMind/.gitignore)：新增 `.swift-module-cache/`、`.xcode-derived*/`、`DerivedData/` 等本地 Xcode / Swift 构建缓存忽略规则，避免真机调试后的缓存文件误入 Git 暂存区并触发大文件 hook。
+
+### iOS 本地离线转录增加 Xcode 进度日志
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：每次本地离线转录进度事件、失败事件和完成事件现在都会直接写入 Xcode 控制台日志，日志中包含 `taskId / phase / progress / locale / message`，便于真机排查当前卡在音频提取、分片识别还是结果合并阶段。
+
+### iOS 本地离线转录日志增加文本进度条
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：Xcode 控制台中的原生离线转录日志现在会附带与在线处理风格接近的文本进度条，例如 `[██████░░░░░░░░] 45%`，便于快速判断当前任务推进到了哪个阶段。
+
+### iOS 本地离线转录改为重叠分片与去重合并
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：本地离线转录的音频分片从较长整段切换为更短的重叠分片，并在合并结果时对相邻片段做文本重叠去重；同时在进度日志里带出当前片段的 `start/duration`，用于定位漏句、断句和跨片段识别不连续的问题。
+
+### iOS 本地离线转录增加 16kHz 单声道预处理
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：每个待识别音频片段在送入 Apple Speech 前，会先转换为 `16kHz / 单声道 / PCM` 的识别友好格式；如果预处理失败则记录日志并回退到原始音频，优先提升长视频、远场收音和双声道视频的本地识别稳定性。
+
+### iOS 本地离线转录增加单任务保护
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：原生侧现在会拒绝在已有离线转录任务执行时再次启动新任务；上传页的“iOS 本地离线转录”按钮也会在任务真正完成或失败前保持忙碌态，避免用户重复点击导致并发转录、内存压力上升甚至真机进程被系统终止。
