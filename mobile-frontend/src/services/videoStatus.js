@@ -1,4 +1,4 @@
-const ACTIVE_VIDEO_STATUSES = new Set(['pending', 'processing', 'downloading'])
+const ACTIVE_VIDEO_STATUSES = new Set(['pending', 'processing', 'downloading', 'preparing', 'extracting', 'transcribing'])
 const COMPLETED_VIDEO_STATUSES = new Set(['completed'])
 const AUTO_START_VIDEO_STATUSES = new Set(['uploaded', 'failed'])
 
@@ -26,6 +26,9 @@ export const videoStatusText = (status) => {
     completed: '已完成',
     failed: '失败',
     downloading: '下载中',
+    preparing: '准备中',
+    extracting: '提取音频中',
+    transcribing: '本地识别中',
     offline_queued: '离线排队中',
     uploading: '自动补跑中',
     unknown: '未知'

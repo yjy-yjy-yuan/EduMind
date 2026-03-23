@@ -406,3 +406,8 @@
 - 更新 [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)：正式将 `ios-app/` 收口为“`WKWebView` 容器 + 原生离线执行层”，允许 iOS 本地文件访问、音频提取、原生桥接和端侧转录，并要求前端通过 `WKWebView` bridge 与原生层通信。
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：新增 `edumindNative` 原生桥 handler，在 WebView 注入统一的请求/响应协议，首批支持 `ping` 和 `getCapabilities`，为后续本地视频选择、音频提取和端侧转录预留稳定入口。
 - 新增 [`mobile-frontend/src/services/nativeBridge.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeBridge.js)、更新 [`mobile-frontend/src/main.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/main.js)：前端新增原生桥服务层并在启动时自动探测 iOS 原生桥能力，后续页面只通过该服务访问原生离线能力，不直接散落 `window.webkit.messageHandlers` 调用。
+
+### iOS 本地视频离线转录最小闭环
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)、[`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：新增 `startOfflineTranscription` 原生 action，接入 iOS 本地视频选择、音频提取、Apple Speech 端侧识别、进度事件和完成/失败回传，并补充语音识别权限文案。
+- 更新 [`mobile-frontend/src/services/nativeBridge.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeBridge.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/services/videoStatus.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/videoStatus.js)：上传页新增 “iOS 本地离线转录” 入口和结果展示区，前端通过原生桥发起本地转录，并统一展示 `preparing / extracting / transcribing / completed / failed` 状态。

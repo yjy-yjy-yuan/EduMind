@@ -5,9 +5,13 @@
 //  Created by yuan on 2026/3/12.
 //
 
+@preconcurrency import AVFoundation
 import Foundation
 import OSLog
+import Speech
 import SwiftUI
+import UniformTypeIdentifiers
+import UIKit
 import WebKit
 
 private enum EduMindLogLevel {
@@ -243,6 +247,55 @@ private struct H5WebView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+        private struct NativeSelectedVideo {
+            let taskId: String
+            let workingURL: URL
+            let fileName: String
+            let fileSize: Int
+            let fileExt: String
+        }
+
+        private struct NativeTranscriptionResult {
+            let text: String
+            let segments: [[String: Any]]
+            let localeIdentifier: String
+        }
+
+        private enum NativeOfflineTranscriptionError: LocalizedError {
+            case presenterUnavailable
+            case pickerBusy
+            case pickerCancelled
+            case invalidSelection
+            case audioExtractionUnavailable
+            case speechAuthorizationDenied
+            case recognizerUnavailable
+            case onDeviceRecognitionUnavailable
+            case emptyTranscript
+
+            var errorDescription: String? {
+                switch self {
+                case .presenterUnavailable:
+                    return "当前 iOS 容器无法打开本地视频选择器"
+                case .pickerBusy:
+                    return "已有一个原生离线转录任务正在选择视频，请稍后再试"
+                case .pickerCancelled:
+                    return "已取消本地视频选择"
+                case .invalidSelection:
+                    return "未能读取所选视频文件"
+                case .audioExtractionUnavailable:
+                    return "当前视频无法提取音频，无法进行本地转录"
+                case .speechAuthorizationDenied:
+                    return "未获得语音识别权限，无法进行本地离线转录"
+                case .recognizerUnavailable:
+                    return "当前设备不支持所选语言的语音识别"
+                case .onDeviceRecognitionUnavailable:
+                    return "当前设备或当前语言暂不支持 Apple 端侧离线识别"
+                case .emptyTranscript:
+                    return "本地识别已完成，但未生成可用文本"
+                }
+            }
+        }
+
         static let logHandlerName = "edumindLog"
         static let nativeBridgeHandlerName = "edumindNative"
 
@@ -434,6 +487,9 @@ private struct H5WebView: UIViewRepresentable {
         private var loadTimeoutWorkItem: DispatchWorkItem?
         private var probeWorkItems: [DispatchWorkItem] = []
         private weak var webView: WKWebView?
+        private var pendingVideoPickerRequestId: String?
+        private var pendingVideoPickerPayload: [String: Any] = [:]
+        private var activeOfflineTasks: [String: Task<Void, Never>] = [:]
 
         func attach(webView: WKWebView) {
             self.webView = webView
@@ -524,11 +580,14 @@ private struct H5WebView: UIViewRepresentable {
             [
                 "platform": "ios",
                 "bridgeVersion": 1,
-                "supportsOfflineTranscription": false,
-                "supportsNativeVideoPicker": false,
+                "supportsOfflineTranscription": true,
+                "supportsNativeVideoPicker": true,
+                "transcriptionEngine": "apple_speech_on_device",
+                "requiresSpeechAuthorization": true,
                 "availableActions": [
                     "ping",
-                    "getCapabilities"
+                    "getCapabilities",
+                    "startOfflineTranscription"
                 ]
             ]
         }
@@ -565,11 +624,397 @@ private struct H5WebView: UIViewRepresentable {
               }
             })();
             """
-            webView.evaluateJavaScript(js) { _, error in
-                if let error {
-                    EduMindLog.error("Bridge", "native response delivery failed requestId=\(requestId) error=\(error.localizedDescription)")
+            DispatchQueue.main.async {
+                webView.evaluateJavaScript(js) { _, error in
+                    if let error {
+                        EduMindLog.error("Bridge", "native response delivery failed requestId=\(requestId) error=\(error.localizedDescription)")
+                    }
                 }
             }
+        }
+
+        private func sendNativeEvent(name: String, payload: [String: Any]) {
+            guard
+                let webView,
+                let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
+                let json = String(data: data, encoding: .utf8)
+            else {
+                EduMindLog.error("Bridge", "failed to serialize native event payload name=\(name)")
+                return
+            }
+
+            let escapedName = name
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+
+            let js = """
+            (function() {
+              if (typeof window.__edumindReceiveNativeEvent === 'function') {
+                window.__edumindReceiveNativeEvent('\(escapedName)', \(json));
+              }
+            })();
+            """
+            DispatchQueue.main.async {
+                webView.evaluateJavaScript(js) { _, error in
+                    if let error {
+                        EduMindLog.error("Bridge", "native event delivery failed name=\(name) error=\(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+
+        private func topViewController() -> UIViewController? {
+            if let root = webView?.window?.rootViewController {
+                var current: UIViewController? = root
+                while let presented = current?.presentedViewController {
+                    current = presented
+                }
+                return current
+            }
+
+            let root = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap(\.windows)
+                .first(where: \.isKeyWindow)?
+                .rootViewController
+
+            var current = root
+            while let presented = current?.presentedViewController {
+                current = presented
+            }
+            return current
+        }
+
+        private func normalizeSpeechLocaleIdentifier(from payload: [String: Any]) -> String {
+            let raw = String(describing: payload["language"] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if raw.isEmpty || raw == "auto" {
+                return Locale.preferredLanguages.first ?? "zh-CN"
+            }
+
+            switch raw {
+            case "zh", "zh-cn", "zh_hans", "zh-hans", "chinese":
+                return "zh-CN"
+            case "zh-tw", "zh_hant", "zh-hant":
+                return "zh-TW"
+            case "en", "en-us", "english":
+                return "en-US"
+            case "ja", "ja-jp", "japanese":
+                return "ja-JP"
+            default:
+                return raw
+            }
+        }
+
+        private func createWorkingDirectory() throws -> URL {
+            let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory
+            let dir = base.appendingPathComponent("OfflineTranscription", isDirectory: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            return dir
+        }
+
+        private func copySelectedVideoToWorkingDirectory(from sourceURL: URL) throws -> URL {
+            let dir = try createWorkingDirectory()
+            let ext = sourceURL.pathExtension.isEmpty ? "mov" : sourceURL.pathExtension.lowercased()
+            let destinationURL = dir.appendingPathComponent("\(UUID().uuidString).\(ext)")
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+            try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+            return destinationURL
+        }
+
+        private func buildSelectedVideoMetadata(from sourceURL: URL) throws -> NativeSelectedVideo {
+            let workingURL = try copySelectedVideoToWorkingDirectory(from: sourceURL)
+            let values = try workingURL.resourceValues(forKeys: [.nameKey, .fileSizeKey])
+            let fileName = values.name ?? sourceURL.lastPathComponent
+            let fileSize = values.fileSize ?? 0
+            let fileExt = workingURL.pathExtension.lowercased()
+            return NativeSelectedVideo(
+                taskId: UUID().uuidString,
+                workingURL: workingURL,
+                fileName: fileName,
+                fileSize: fileSize,
+                fileExt: fileExt
+            )
+        }
+
+        private func startOfflineTranscriptionFlow(requestId: String, payload: [String: Any]) {
+            guard pendingVideoPickerRequestId == nil else {
+                respondToNativeRequest(
+                    requestId: requestId,
+                    success: false,
+                    errorMessage: NativeOfflineTranscriptionError.pickerBusy.localizedDescription
+                )
+                return
+            }
+
+            guard let presenter = topViewController() else {
+                respondToNativeRequest(
+                    requestId: requestId,
+                    success: false,
+                    errorMessage: NativeOfflineTranscriptionError.presenterUnavailable.localizedDescription
+                )
+                return
+            }
+
+            pendingVideoPickerRequestId = requestId
+            pendingVideoPickerPayload = payload
+
+            let picker = UIDocumentPickerViewController(
+                forOpeningContentTypes: [UTType.movie, UTType.video],
+                asCopy: true
+            )
+            picker.delegate = self
+            picker.allowsMultipleSelection = false
+            presenter.present(picker, animated: true)
+        }
+
+        private func clearPendingVideoPickerState() {
+            pendingVideoPickerRequestId = nil
+            pendingVideoPickerPayload = [:]
+        }
+
+        private func sendOfflineProgressEvent(
+            taskId: String,
+            fileName: String,
+            fileSize: Int,
+            phase: String,
+            progress: Int,
+            message: String,
+            localeIdentifier: String = ""
+        ) {
+            sendNativeEvent(name: "offline-transcription-progress", payload: [
+                "taskId": taskId,
+                "fileName": fileName,
+                "fileSize": fileSize,
+                "phase": phase,
+                "status": phase,
+                "progress": progress,
+                "message": message,
+                "locale": localeIdentifier,
+                "engine": "apple_speech_on_device"
+            ])
+        }
+
+        private func sendOfflineFailureEvent(
+            taskId: String,
+            fileName: String,
+            fileSize: Int,
+            message: String
+        ) {
+            sendNativeEvent(name: "offline-transcription-failed", payload: [
+                "taskId": taskId,
+                "fileName": fileName,
+                "fileSize": fileSize,
+                "status": "failed",
+                "progress": 0,
+                "message": message,
+                "engine": "apple_speech_on_device"
+            ])
+        }
+
+        private func requestSpeechAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
+            await withCheckedContinuation { continuation in
+                SFSpeechRecognizer.requestAuthorization { status in
+                    continuation.resume(returning: status)
+                }
+            }
+        }
+
+        private func exportAudioTrack(from videoURL: URL, taskId: String) async throws -> URL {
+            let asset = AVURLAsset(url: videoURL)
+            guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+                throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+            }
+
+            let workingDirectory = try createWorkingDirectory()
+            let outputURL = workingDirectory.appendingPathComponent("\(taskId).m4a")
+            if FileManager.default.fileExists(atPath: outputURL.path) {
+                try FileManager.default.removeItem(at: outputURL)
+            }
+
+            exportSession.outputURL = outputURL
+            exportSession.outputFileType = .m4a
+            exportSession.shouldOptimizeForNetworkUse = false
+
+            return try await withCheckedThrowingContinuation { continuation in
+                exportSession.exportAsynchronously {
+                    switch exportSession.status {
+                    case .completed:
+                        continuation.resume(returning: outputURL)
+                    case .failed:
+                        continuation.resume(throwing: exportSession.error ?? NativeOfflineTranscriptionError.audioExtractionUnavailable)
+                    case .cancelled:
+                        continuation.resume(throwing: NativeOfflineTranscriptionError.pickerCancelled)
+                    default:
+                        continuation.resume(throwing: exportSession.error ?? NativeOfflineTranscriptionError.audioExtractionUnavailable)
+                    }
+                }
+            }
+        }
+
+        private func buildSpeechRecognizer(localeIdentifier: String) throws -> SFSpeechRecognizer {
+            let candidates = [
+                localeIdentifier,
+                Locale.preferredLanguages.first ?? "",
+                "zh-CN",
+                "en-US"
+            ].filter { !$0.isEmpty }
+
+            for candidate in candidates {
+                if let recognizer = SFSpeechRecognizer(locale: Locale(identifier: candidate)) {
+                    return recognizer
+                }
+            }
+
+            throw NativeOfflineTranscriptionError.recognizerUnavailable
+        }
+
+        private func transcribeAudioFile(
+            taskId: String,
+            audioURL: URL,
+            fileName: String,
+            fileSize: Int,
+            localeIdentifier: String
+        ) async throws -> NativeTranscriptionResult {
+            let authorizationStatus = await requestSpeechAuthorization()
+            guard authorizationStatus == .authorized else {
+                throw NativeOfflineTranscriptionError.speechAuthorizationDenied
+            }
+
+            let recognizer = try buildSpeechRecognizer(localeIdentifier: localeIdentifier)
+            guard recognizer.supportsOnDeviceRecognition else {
+                throw NativeOfflineTranscriptionError.onDeviceRecognitionUnavailable
+            }
+
+            let request = SFSpeechURLRecognitionRequest(url: audioURL)
+            request.requiresOnDeviceRecognition = true
+            request.shouldReportPartialResults = true
+
+            return try await withCheckedThrowingContinuation { continuation in
+                var hasResumed = false
+                var recognitionTask: SFSpeechRecognitionTask?
+
+                recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+                    guard let self else { return }
+
+                    if let result {
+                        let partialText = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !partialText.isEmpty {
+                            self.sendOfflineProgressEvent(
+                                taskId: taskId,
+                                fileName: fileName,
+                                fileSize: fileSize,
+                                phase: "transcribing",
+                                progress: result.isFinal ? 95 : 75,
+                                message: "正在进行本地语音识别",
+                                localeIdentifier: recognizer.locale.identifier
+                            )
+                        }
+
+                        if result.isFinal && !hasResumed {
+                            hasResumed = true
+                            let text = partialText
+                            let segments = result.bestTranscription.segments.map { segment in
+                                [
+                                    "text": segment.substring,
+                                    "start": segment.timestamp,
+                                    "duration": segment.duration,
+                                    "confidence": segment.confidence
+                                ]
+                            }
+                            if text.isEmpty {
+                                continuation.resume(throwing: NativeOfflineTranscriptionError.emptyTranscript)
+                            } else {
+                                continuation.resume(returning: NativeTranscriptionResult(
+                                    text: text,
+                                    segments: segments,
+                                    localeIdentifier: recognizer.locale.identifier
+                                ))
+                            }
+                            recognitionTask?.cancel()
+                            recognitionTask = nil
+                            return
+                        }
+                    }
+
+                    if let error, !hasResumed {
+                        hasResumed = true
+                        continuation.resume(throwing: error)
+                        recognitionTask?.cancel()
+                        recognitionTask = nil
+                    }
+                }
+            }
+        }
+
+        private func runOfflineTranscription(task: NativeSelectedVideo, payload: [String: Any]) async {
+            let localeIdentifier = normalizeSpeechLocaleIdentifier(from: payload)
+
+            do {
+                sendOfflineProgressEvent(
+                    taskId: task.taskId,
+                    fileName: task.fileName,
+                    fileSize: task.fileSize,
+                    phase: "preparing",
+                    progress: 5,
+                    message: "已选择本地视频，准备提取音频",
+                    localeIdentifier: localeIdentifier
+                )
+
+                sendOfflineProgressEvent(
+                    taskId: task.taskId,
+                    fileName: task.fileName,
+                    fileSize: task.fileSize,
+                    phase: "extracting",
+                    progress: 25,
+                    message: "正在提取本地视频音频",
+                    localeIdentifier: localeIdentifier
+                )
+                let audioURL = try await exportAudioTrack(from: task.workingURL, taskId: task.taskId)
+
+                sendOfflineProgressEvent(
+                    taskId: task.taskId,
+                    fileName: task.fileName,
+                    fileSize: task.fileSize,
+                    phase: "transcribing",
+                    progress: 55,
+                    message: "音频提取完成，开始本地离线识别",
+                    localeIdentifier: localeIdentifier
+                )
+                let transcription = try await transcribeAudioFile(
+                    taskId: task.taskId,
+                    audioURL: audioURL,
+                    fileName: task.fileName,
+                    fileSize: task.fileSize,
+                    localeIdentifier: localeIdentifier
+                )
+
+                sendNativeEvent(name: "offline-transcription-completed", payload: [
+                    "taskId": task.taskId,
+                    "fileName": task.fileName,
+                    "fileSize": task.fileSize,
+                    "fileExt": task.fileExt,
+                    "status": "completed",
+                    "progress": 100,
+                    "message": "本地离线转录完成",
+                    "locale": transcription.localeIdentifier,
+                    "engine": "apple_speech_on_device",
+                    "transcriptText": transcription.text,
+                    "segments": transcription.segments
+                ])
+            } catch {
+                EduMindLog.error("OfflineTranscription", "taskId=\(task.taskId) failed error=\(error.localizedDescription)")
+                sendOfflineFailureEvent(
+                    taskId: task.taskId,
+                    fileName: task.fileName,
+                    fileSize: task.fileSize,
+                    message: error.localizedDescription
+                )
+            }
+
+            activeOfflineTasks[task.taskId] = nil
         }
 
         private func handleNativeBridgeMessage(_ body: [String: Any]) {
@@ -602,6 +1047,8 @@ private struct H5WebView: UIViewRepresentable {
                     success: true,
                     payload: nativeBridgeCapabilities()
                 )
+            case "startOfflineTranscription":
+                startOfflineTranscriptionFlow(requestId: requestId, payload: payload)
             default:
                 respondToNativeRequest(
                     requestId: requestId,
@@ -658,6 +1105,62 @@ private struct H5WebView: UIViewRepresentable {
             </div>
             """
             webView.loadHTMLString(html, baseURL: nil)
+        }
+    }
+}
+
+extension H5WebView.Coordinator: UIDocumentPickerDelegate {
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        guard let requestId = pendingVideoPickerRequestId else { return }
+        clearPendingVideoPickerState()
+        respondToNativeRequest(
+            requestId: requestId,
+            success: false,
+            errorMessage: NativeOfflineTranscriptionError.pickerCancelled.localizedDescription
+        )
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let requestId = pendingVideoPickerRequestId else { return }
+        let payload = pendingVideoPickerPayload
+        clearPendingVideoPickerState()
+
+        guard let sourceURL = urls.first else {
+            respondToNativeRequest(
+                requestId: requestId,
+                success: false,
+                errorMessage: NativeOfflineTranscriptionError.invalidSelection.localizedDescription
+            )
+            return
+        }
+
+        do {
+            let task = try buildSelectedVideoMetadata(from: sourceURL)
+            respondToNativeRequest(
+                requestId: requestId,
+                success: true,
+                payload: [
+                    "taskId": task.taskId,
+                    "fileName": task.fileName,
+                    "fileSize": task.fileSize,
+                    "fileExt": task.fileExt,
+                    "status": "preparing",
+                    "engine": "apple_speech_on_device",
+                    "message": "已选择本地视频，开始本地离线转录"
+                ]
+            )
+
+            let work = Task { [weak self] in
+                guard let self else { return }
+                await self.runOfflineTranscription(task: task, payload: payload)
+            }
+            activeOfflineTasks[task.taskId] = work
+        } catch {
+            respondToNativeRequest(
+                requestId: requestId,
+                success: false,
+                errorMessage: error.localizedDescription
+            )
         }
     }
 }

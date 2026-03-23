@@ -1,5 +1,8 @@
 const NATIVE_EVENT_PREFIX = 'edumind-native:'
 const BRIDGE_READY_EVENT = `${NATIVE_EVENT_PREFIX}bridge-ready`
+export const NATIVE_OFFLINE_TRANSCRIPTION_PROGRESS_EVENT = 'offline-transcription-progress'
+export const NATIVE_OFFLINE_TRANSCRIPTION_COMPLETED_EVENT = 'offline-transcription-completed'
+export const NATIVE_OFFLINE_TRANSCRIPTION_FAILED_EVENT = 'offline-transcription-failed'
 
 const logNativeBridge = (level, label, details = '') => {
   const text = details ? `${label} | ${details}` : label
@@ -22,6 +25,8 @@ export const requestNative = async (action, payload = {}) => {
 export const pingNativeBridge = () => requestNative('ping')
 
 export const getNativeCapabilities = () => requestNative('getCapabilities')
+
+export const startNativeOfflineTranscription = (payload = {}) => requestNative('startOfflineTranscription', payload)
 
 export const onNativeEvent = (name, handler) => {
   const eventName = `${NATIVE_EVENT_PREFIX}${String(name || '')}`

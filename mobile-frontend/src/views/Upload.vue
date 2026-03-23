@@ -32,7 +32,11 @@
       <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
         {{ busy ? '上传中…' : '开始上传' }}
       </button>
+      <button class="btn btn--native" @click="startNativeOfflineTranscriptionFlow" :disabled="busy || nativeBusy">
+        {{ nativeBusy ? '准备本地离线转录…' : 'iOS 本地离线转录' }}
+      </button>
       <div class="muted">当前处理：{{ processingSettingsSummary }}</div>
+      <div class="muted">本地离线转录优先使用 iOS 原生识别能力，只处理当前设备上的本地视频，不依赖 FastAPI。</div>
 
       <div v-if="busy" class="progress">
         <div class="bar" :style="{ width: `${progress}%` }"></div>
@@ -47,6 +51,31 @@
       <button class="btn" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交链接' }}</button>
       <div class="muted">支持：B站、YouTube、中国大学慕课（icourse163）</div>
       <div class="muted">将沿用当前处理设置：{{ processingSettingsSummary }}</div>
+    </div>
+
+    <div v-if="nativeTask" class="card">
+      <div class="card-head">
+        <div class="card-title">iOS 本地离线转录</div>
+        <button class="link link--small" @click="clearNativeTask" :disabled="nativeBusy">清除结果</button>
+      </div>
+      <div class="recent-title">{{ nativeTask.fileName || '本地视频' }}</div>
+      <div class="muted">
+        {{ readableSize(nativeTask.fileSize) }} · {{ nativeTask.engineLabel }} · {{ nativeTask.localeLabel }}
+      </div>
+      <div class="recent-meta">
+        <span class="status" :class="statusClass(nativeTask.status)">{{ statusText(nativeTask.status) }}</span>
+      </div>
+      <div class="recent-progress">
+        <div class="recent-progress__text">{{ displayProgress(nativeTask.progress) }}% · {{ nativeTask.currentStep }}</div>
+        <div class="progress progress--compact">
+          <div class="bar bar--native" :style="{ width: `${displayProgress(nativeTask.progress)}%` }"></div>
+        </div>
+      </div>
+      <div v-if="nativeTask.transcriptText" class="native-result">
+        <div class="card-title">转录文本</div>
+        <pre class="native-result__text">{{ nativeTask.transcriptText }}</pre>
+      </div>
+      <div v-if="nativeTask.errorMessage" class="alert alert--bad">{{ nativeTask.errorMessage }}</div>
     </div>
 
     <div v-if="recentUploads.length > 0" class="card">
@@ -144,6 +173,14 @@ import {
   whisperModelLabel
 } from '@/services/processingSettings'
 import { normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
+import {
+  NATIVE_OFFLINE_TRANSCRIPTION_COMPLETED_EVENT,
+  NATIVE_OFFLINE_TRANSCRIPTION_FAILED_EVENT,
+  NATIVE_OFFLINE_TRANSCRIPTION_PROGRESS_EVENT,
+  hasNativeBridge,
+  onNativeEvent,
+  startNativeOfflineTranscription
+} from '@/services/nativeBridge'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
 const router = useRouter()
@@ -153,10 +190,12 @@ const file = ref(null)
 const savedFileMeta = ref(null)
 const videoUrl = ref('')
 const busy = ref(false)
+const nativeBusy = ref(false)
 const progress = ref(0)
 const message = ref('')
 const error = ref('')
 const recentUploads = ref([])
+const nativeTask = ref(null)
 const syncingRecent = ref(false)
 const statusFilter = ref('all')
 let recentStatusTimer = null
@@ -174,6 +213,7 @@ const STATUS_FILTERS = [
   { value: 'completed', label: '已完成' }
 ]
 let syncingOfflineRecent = false
+const nativeEventDisposers = []
 
 const processingSettingsSummary = computed(() => {
   const current = processingSettings.value || getProcessingSettings()
@@ -243,6 +283,45 @@ const statusClass = (status) => {
   if (tone === 'bad') return 'status--bad'
   if (tone === 'warn') return 'status--warn'
   return 'status--info'
+}
+
+const nativeEngineLabel = (engine) => {
+  if (String(engine || '').trim() === 'apple_speech_on_device') return 'Apple 端侧识别'
+  return 'iOS 原生识别'
+}
+
+const nativeLocaleLabel = (locale) => {
+  const value = String(locale || '').trim()
+  if (!value) return '自动语言'
+  if (value.toLowerCase() === 'zh-cn') return '中文（简体）'
+  if (value.toLowerCase() === 'zh-tw') return '中文（繁体）'
+  if (value.toLowerCase() === 'en-us') return '英语（美国）'
+  return value
+}
+
+const upsertNativeTask = (patch = {}) => {
+  const current = nativeTask.value || {}
+  const next = {
+    taskId: String(patch.taskId || current.taskId || ''),
+    fileName: String(patch.fileName || current.fileName || '本地视频'),
+    fileSize: Number(patch.fileSize ?? current.fileSize ?? 0),
+    fileExt: String(patch.fileExt || current.fileExt || ''),
+    status: normalizeVideoStatus(patch.status || current.status || 'pending'),
+    progress: displayProgress(patch.progress ?? current.progress ?? 0),
+    currentStep: String(patch.currentStep || patch.message || current.currentStep || '准备本地离线转录'),
+    transcriptText: String(patch.transcriptText ?? current.transcriptText ?? ''),
+    errorMessage: String(patch.errorMessage ?? current.errorMessage ?? ''),
+    locale: String(patch.locale || current.locale || ''),
+    localeLabel: nativeLocaleLabel(patch.locale || current.locale || ''),
+    engine: String(patch.engine || current.engine || 'apple_speech_on_device'),
+    engineLabel: nativeEngineLabel(patch.engine || current.engine || 'apple_speech_on_device')
+  }
+  nativeTask.value = next
+}
+
+const clearNativeTask = () => {
+  if (nativeBusy.value) return
+  nativeTask.value = null
 }
 
 const formatTimeText = (isoText) => {
@@ -634,6 +713,90 @@ const resetAll = () => {
   progress.value = 0
   message.value = ''
   error.value = ''
+  if (!nativeBusy.value) nativeTask.value = null
+}
+
+const startNativeOfflineTranscriptionFlow = async () => {
+  if (busy.value || nativeBusy.value) return
+  processingSettings.value = getProcessingSettings()
+  message.value = ''
+  error.value = ''
+
+  if (!hasNativeBridge()) {
+    error.value = '当前环境不是 iOS 原生容器，无法进行本地离线转录'
+    return
+  }
+
+  nativeBusy.value = true
+  try {
+    const started = await startNativeOfflineTranscription({
+      language: processingSettings.value.language,
+      model: processingSettings.value.model
+    })
+    upsertNativeTask({
+      taskId: started?.taskId,
+      fileName: started?.fileName,
+      fileSize: started?.fileSize,
+      fileExt: started?.fileExt,
+      status: started?.status || 'pending',
+      progress: 5,
+      currentStep: started?.message || '已选择本地视频，准备本地离线转录',
+      locale: started?.locale || processingSettings.value.language,
+      engine: started?.engine || 'apple_speech_on_device',
+      transcriptText: '',
+      errorMessage: ''
+    })
+    message.value = '已启动 iOS 本地离线转录'
+  } catch (e) {
+    error.value = extractErrorMessage(e, '无法启动 iOS 本地离线转录')
+  } finally {
+    nativeBusy.value = false
+  }
+}
+
+const handleNativeProgressEvent = (detail = {}) => {
+  upsertNativeTask({
+    taskId: detail.taskId,
+    fileName: detail.fileName,
+    fileSize: detail.fileSize,
+    status: detail.status || detail.phase || 'processing',
+    progress: detail.progress,
+    currentStep: detail.message || '正在本地离线转录',
+    locale: detail.locale,
+    engine: detail.engine
+  })
+}
+
+const handleNativeCompletedEvent = (detail = {}) => {
+  upsertNativeTask({
+    taskId: detail.taskId,
+    fileName: detail.fileName,
+    fileSize: detail.fileSize,
+    fileExt: detail.fileExt,
+    status: detail.status || 'completed',
+    progress: detail.progress ?? 100,
+    currentStep: detail.message || '本地离线转录完成',
+    transcriptText: detail.transcriptText || '',
+    errorMessage: '',
+    locale: detail.locale,
+    engine: detail.engine
+  })
+  message.value = 'iOS 本地离线转录完成'
+}
+
+const handleNativeFailedEvent = (detail = {}) => {
+  upsertNativeTask({
+    taskId: detail.taskId,
+    fileName: detail.fileName,
+    fileSize: detail.fileSize,
+    status: detail.status || 'failed',
+    progress: detail.progress ?? 0,
+    currentStep: detail.message || '本地离线转录失败',
+    errorMessage: detail.message || '本地离线转录失败',
+    locale: detail.locale,
+    engine: detail.engine
+  })
+  error.value = detail.message || 'iOS 本地离线转录失败'
 }
 
 const uploadFile = async () => {
@@ -736,6 +899,9 @@ const uploadUrl = async () => {
 }
 
 onMounted(async () => {
+  nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_PROGRESS_EVENT, handleNativeProgressEvent))
+  nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_COMPLETED_EVENT, handleNativeCompletedEvent))
+  nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_FAILED_EVENT, handleNativeFailedEvent))
   processingSettings.value = getProcessingSettings()
   await refreshWhisperModelOptions()
   loadRecentUploads()
@@ -750,6 +916,7 @@ onMounted(async () => {
 onUnmounted(() => {
   clearRecentStatusSync()
   window.removeEventListener(OFFLINE_QUEUE_EVENT_NAME, handleOfflineQueueEvent)
+  nativeEventDisposers.splice(0).forEach((dispose) => dispose?.())
 })
 </script>
 
@@ -866,6 +1033,12 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #667eea, #764ba2);
 }
 
+.btn--native {
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  color: #065f46;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(45, 212, 191, 0.08));
+}
+
 .btn:disabled {
   opacity: 0.6;
 }
@@ -880,6 +1053,10 @@ onUnmounted(() => {
 .bar {
   height: 100%;
   background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.bar--native {
+  background: linear-gradient(90deg, #10b981, #14b8a6);
 }
 
 .muted {
@@ -976,6 +1153,26 @@ onUnmounted(() => {
   flex-wrap: wrap;
   justify-content: flex-end;
   margin-left: auto;
+}
+
+.native-result {
+  display: grid;
+  gap: 8px;
+}
+
+.native-result__text {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  max-height: 260px;
+  overflow: auto;
 }
 
 .recent-tag {
