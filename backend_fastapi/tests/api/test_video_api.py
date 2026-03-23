@@ -334,6 +334,89 @@ class TestVideoAPI:
         assert response.status_code == 400
         assert response.json()["detail"] == "转录文本为空，无法生成摘要"
 
+    def test_sync_offline_transcript_writes_same_video_table(self, client, db, monkeypatch):
+        """测试 iOS 本地离线转录结果可写入 videos 表并标记离线来源。"""
+        from app.models.subtitle import Subtitle
+        from app.models.video import Video
+
+        monkeypatch.setattr(
+            "app.routers.video.generate_primary_topic_name",
+            lambda *args, **kwargs: {"success": True, "name": "极限与连续核心梳理", "provider": "fallback"},
+        )
+
+        response = client.post(
+            "/api/videos/sync-offline-transcript",
+            json={
+                "task_id": "local-task-001",
+                "file_name": "lesson-local.mp4",
+                "file_ext": "mp4",
+                "file_size": 1024,
+                "locale": "zh-CN",
+                "engine": "apple_speech_on_device",
+                "transcript_text": "先讲极限定义，再讲连续函数判定。",
+                "summary": "本节重点讲解极限定义、连续函数判定与常见题型。",
+                "summary_style": "study",
+                "segments": [
+                    {"text": "先讲极限定义", "start": 0, "duration": 3.5, "confidence": 0.9},
+                    {"text": "再讲连续函数判定", "start": 3.5, "duration": 4.0, "confidence": 0.9},
+                ],
+            },
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["duplicate"] is False
+        assert payload["video"]["processing_origin"] == "ios_offline"
+        assert payload["video"]["processing_origin_label"] == "iOS 离线处理"
+        assert payload["video"]["title"] == "极限与连续核心梳理"
+        assert payload["video"]["task_id"] == "local-task-001"
+
+        video = db.query(Video).filter(Video.task_id == "local-task-001").first()
+        assert video is not None
+        assert video.title == "极限与连续核心梳理"
+        assert video.summary == "本节重点讲解极限定义、连续函数判定与常见题型。"
+        assert video.status.value == "completed"
+
+        subtitles = db.query(Subtitle).filter(Subtitle.video_id == video.id).order_by(Subtitle.start_time.asc()).all()
+        assert len(subtitles) == 2
+        assert subtitles[0].text == "先讲极限定义"
+
+    def test_sync_offline_transcript_updates_existing_record(self, client, db, monkeypatch):
+        """测试同一 task_id 的离线结果会更新原记录而不是重复插入。"""
+        from app.models.video import Video
+
+        monkeypatch.setattr(
+            "app.routers.video.generate_primary_topic_name",
+            lambda *args, **kwargs: {"success": True, "name": "导数题型总结", "provider": "fallback"},
+        )
+
+        payload = {
+            "task_id": "local-task-002",
+            "file_name": "derivative.mp4",
+            "file_ext": "mp4",
+            "file_size": 2048,
+            "locale": "zh-CN",
+            "engine": "apple_speech_on_device",
+            "transcript_text": "第一版转录文本",
+            "summary": "第一版摘要",
+            "summary_style": "study",
+            "segments": [],
+        }
+        first = client.post("/api/videos/sync-offline-transcript", json=payload)
+        assert first.status_code == 200
+
+        second = client.post(
+            "/api/videos/sync-offline-transcript",
+            json={**payload, "summary": "更新后的摘要", "transcript_text": "更新后的转录文本"},
+        )
+        assert second.status_code == 200
+        assert second.json()["duplicate"] is True
+
+        videos = db.query(Video).filter(Video.task_id == "local-task-002").all()
+        assert len(videos) == 1
+        assert videos[0].summary == "更新后的摘要"
+
 
 @pytest.mark.api
 class TestNoteAPI:

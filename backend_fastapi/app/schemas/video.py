@@ -59,6 +59,30 @@ class TranscriptSummaryRequest(BaseModel):
     style: str = Field(default="study", description="摘要风格: brief/study/detailed")
 
 
+class OfflineTranscriptSegment(BaseModel):
+    """本地离线转录分段"""
+
+    text: str = Field(..., description="分段文本")
+    start: float = Field(default=0, ge=0, description="开始时间（秒）")
+    duration: float = Field(default=0, ge=0, description="持续时间（秒）")
+    confidence: float = Field(default=0, ge=0, description="置信度")
+
+
+class OfflineTranscriptSyncRequest(BaseModel):
+    """本地离线转录结果同步到 videos 表"""
+
+    task_id: str = Field(..., description="本地离线任务 ID")
+    file_name: str = Field(default="本地视频", description="本地视频文件名")
+    file_ext: str = Field(default="", description="本地视频扩展名")
+    file_size: int = Field(default=0, ge=0, description="本地视频大小")
+    locale: str = Field(default="", description="本地离线识别语言")
+    engine: str = Field(default="apple_speech_on_device", description="本地离线识别引擎")
+    transcript_text: str = Field(..., description="本地离线转录全文")
+    summary: str = Field(default="", description="本地离线摘要")
+    summary_style: str = Field(default="study", description="摘要风格")
+    segments: List[OfflineTranscriptSegment] = Field(default_factory=list, description="本地离线转录分段")
+
+
 class VideoTagRequest(BaseModel):
     """标签生成请求"""
 
@@ -78,6 +102,9 @@ class VideoBase(BaseModel):
     requested_model: Optional[str] = None
     effective_model: Optional[str] = None
     requested_language: Optional[str] = None
+    task_id: Optional[str] = None
+    processing_origin: Optional[str] = None
+    processing_origin_label: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -118,6 +145,9 @@ class VideoDetail(BaseModel):
     requested_model: Optional[str] = None
     effective_model: Optional[str] = None
     requested_language: Optional[str] = None
+    task_id: Optional[str] = None
+    processing_origin: Optional[str] = None
+    processing_origin_label: Optional[str] = None
     upload_source: Optional[str] = None
     upload_source_label: Optional[str] = None
     upload_source_value: Optional[str] = None
@@ -137,6 +167,9 @@ class VideoStatusResponse(BaseModel):
     requested_model: Optional[str] = None
     effective_model: Optional[str] = None
     requested_language: Optional[str] = None
+    task_id: Optional[str] = None
+    processing_origin: Optional[str] = None
+    processing_origin_label: Optional[str] = None
 
 
 class WhisperModelOption(BaseModel):

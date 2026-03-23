@@ -68,7 +68,7 @@
       <div v-else-if="allVideos.length === 0" class="message">暂无视频，先上传一个开始学习吧。</div>
 
       <div v-else class="video-list">
-        <button v-for="video in recentVideos" :key="video.id" class="video-item" @click="openVideo(video.id)">
+        <button v-for="video in recentVideos" :key="video.id" class="video-item" @click="openVideo(video)">
           <div class="video-item__info">
             <p class="video-item__title">{{ video.title || '未命名视频' }}</p>
             <span class="video-item__status" :class="statusClass(video.status)">{{ statusText(video.status) }}</span>
@@ -174,9 +174,14 @@ const goStat = (scope) => {
   router.push({ path: '/videos', query: { scope } })
 }
 
-const openVideo = (id) => {
-  if (!id) return
-  router.push(`/videos/${id}`)
+const openVideo = (video) => {
+  const current = video || {}
+  if (current.processing_origin === 'ios_offline' && current.task_id) {
+    router.push(`/local-transcripts/${current.task_id}`)
+    return
+  }
+  if (!current.id) return
+  router.push(`/videos/${current.id}`)
 }
 
 onMounted(reload)

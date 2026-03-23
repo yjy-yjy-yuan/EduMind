@@ -190,6 +190,7 @@ import {
   getVideoUploadQueueableMessage,
   isVideoUploadQueueableError,
   processVideo,
+  syncOfflineTranscriptToVideo,
   uploadLocalVideo,
   uploadVideoUrl
 } from '@/api/video'
@@ -377,6 +378,10 @@ const upsertNativeTask = (patch = {}) => {
     autoGenerateSummary: typeof patch.autoGenerateSummary === 'boolean'
       ? patch.autoGenerateSummary
       : Boolean(current.autoGenerateSummary),
+    syncedVideoId: Number(patch.syncedVideoId ?? current.syncedVideoId ?? 0) || 0,
+    syncStatus: String(patch.syncStatus || current.syncStatus || 'idle').trim().toLowerCase() || 'idle',
+    syncErrorMessage: String(patch.syncErrorMessage ?? current.syncErrorMessage ?? ''),
+    syncUpdatedAt: String(patch.syncUpdatedAt || current.syncUpdatedAt || ''),
     locale: String(patch.locale || current.locale || ''),
     localeLabel: nativeLocaleLabel(patch.locale || current.locale || ''),
     engine: String(patch.engine || current.engine || 'apple_speech_on_device'),
@@ -408,6 +413,85 @@ const persistNativeTask = async (patch = {}) => {
   if (!next.taskId) return next
   await saveNativeOfflineTranscript(next)
   return next
+}
+
+const syncOfflineTranscriptRecord = async (taskId, { silent = false } = {}) => {
+  const id = String(taskId || '').trim()
+  if (!id) return null
+
+  const current = await getNativeOfflineTranscript(id)
+  if (!current?.transcriptText?.trim()) return null
+
+  if (!hasLiveVideoBackend()) {
+    const skipped = await saveNativeOfflineTranscript({
+      taskId: id,
+      syncStatus: 'failed',
+      syncErrorMessage: '当前未配置可用后端，无法写入视频库；可在后端恢复后再次同步。'
+    })
+    upsertNativeTask(skipped)
+    return null
+  }
+
+  const pending = await persistNativeTask({
+    taskId: id,
+    syncStatus: 'syncing',
+    syncErrorMessage: ''
+  })
+
+  try {
+    const res = await syncOfflineTranscriptToVideo({
+      task_id: pending.taskId,
+      file_name: pending.fileName,
+      file_ext: pending.fileExt,
+      file_size: pending.fileSize,
+      locale: pending.locale,
+      engine: pending.engine,
+      transcript_text: pending.transcriptText,
+      summary: pending.summary || '',
+      summary_style: pending.summaryStyle || processingSettings.value.summaryStyle || 'study',
+      segments: Array.isArray(current.segments) ? current.segments : []
+    })
+    const data = res?.data || {}
+    const videoId = resolveVideoId(data)
+    const title = data?.video?.title || pending.fileName || '本地视频'
+    const saved = await persistNativeTask({
+      taskId: id,
+      syncedVideoId: videoId || 0,
+      syncStatus: 'completed',
+      syncErrorMessage: '',
+      syncUpdatedAt: new Date().toISOString(),
+      fileName: title
+    })
+    upsertRecentUpload({
+      key: `offline-synced-${videoId || id}`,
+      videoId: videoId || null,
+      title,
+      typeText: 'iOS 离线处理',
+      time: new Date().toISOString(),
+      status: 'completed',
+      progress: 100,
+      currentStep: 'iOS 本地离线结果已写入视频库',
+      offlineTaskId: id,
+      tempKey: `ios-offline-${id}`,
+      requestedModel: '',
+      effectiveModel: ''
+    })
+    if (!silent) {
+      message.value = '本地离线转录结果已写入视频库'
+    }
+    return saved
+  } catch (e) {
+    const saved = await persistNativeTask({
+      taskId: id,
+      syncStatus: 'failed',
+      syncErrorMessage: extractErrorMessage(e, '写入视频库失败'),
+      syncUpdatedAt: new Date().toISOString()
+    })
+    if (!silent) {
+      error.value = saved.syncErrorMessage || '写入视频库失败'
+    }
+    return saved
+  }
 }
 
 const generateOfflineTranscriptSummaryForTask = async (taskId, { silent = false } = {}) => {
@@ -451,6 +535,7 @@ const generateOfflineTranscriptSummaryForTask = async (taskId, { silent = false 
       summaryUpdatedAt: new Date().toISOString(),
       currentStep: current.status === 'completed' ? '本地离线转录完成' : current.currentStep
     })
+    await syncOfflineTranscriptRecord(id, { silent })
     if (!silent) {
       message.value = saved.summary ? 'iOS 本地离线转录完成，摘要已生成' : 'iOS 本地离线转录完成'
     }
@@ -775,6 +860,10 @@ const clearRecentUploads = () => {
 }
 
 const openRecent = (item) => {
+  if (item?.offlineTaskId) {
+    router.push(`/local-transcripts/${item.offlineTaskId}`)
+    return
+  }
   if (!item?.videoId) return
   router.push(`/videos/${item.videoId}`)
 }
@@ -919,6 +1008,9 @@ const startNativeOfflineTranscriptionFlow = async () => {
       summary: '',
       summaryStatus: 'idle',
       summaryErrorMessage: '',
+      syncStatus: 'idle',
+      syncErrorMessage: '',
+      syncedVideoId: 0,
       transcriptText: '',
       errorMessage: ''
     })
@@ -964,6 +1056,7 @@ const handleNativeCompletedEvent = async (detail = {}) => {
     void generateOfflineTranscriptSummaryForTask(saved.taskId)
     return
   }
+  void syncOfflineTranscriptRecord(saved.taskId)
   message.value = 'iOS 本地离线转录完成'
 }
 

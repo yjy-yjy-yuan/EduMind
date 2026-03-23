@@ -337,6 +337,10 @@ const reload = async () => {
     processingSettings.value = getProcessingSettings()
     const res = await getVideo(id.value)
     video.value = normalizeVideo(res.data)
+    if (video.value?.processing_origin === 'ios_offline' && video.value?.task_id) {
+      await router.replace(`/local-transcripts/${video.value.task_id}`)
+      return
+    }
     await fetchStatus()
     startPollingIfNeeded()
     await tryAutoStartProcessing()

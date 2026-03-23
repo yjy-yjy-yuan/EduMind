@@ -61,13 +61,14 @@
 
     <div v-else class="list">
       <div v-for="v in filteredVideos" :key="v.id" class="card">
-        <button class="card-main" @click="go(`/videos/${v.id}`)">
+        <button class="card-main" @click="openVideo(v)">
           <div class="row">
             <div class="title" :title="v.title || ''">{{ v.title || '未命名视频' }}</div>
             <i class="arrow">›</i>
           </div>
           <div class="meta">
             <span class="badge" :class="badgeClass(v.status)">{{ statusText(v.status) }}</span>
+            <span v-if="v.processing_origin_label" class="muted">{{ v.processing_origin_label }}</span>
             <span v-if="isInProgress(v.status)" class="muted">{{ Number(v.process_progress) || 0 }}%</span>
           </div>
           <div v-if="processingModelText(v)" class="muted">{{ processingModelText(v) }}</div>
@@ -107,6 +108,13 @@ import { isActiveVideoStatus, normalizeVideoStatus, videoStatusText, videoStatus
 const route = useRoute()
 const router = useRouter()
 const go = (path) => router.push(path)
+const openVideo = (video) => {
+  if (String(video?.processing_origin || '').trim() === 'ios_offline' && video?.task_id) {
+    router.push(`/local-transcripts/${video.task_id}`)
+    return
+  }
+  go(`/videos/${video.id}`)
+}
 
 const loading = ref(false)
 const error = ref('')

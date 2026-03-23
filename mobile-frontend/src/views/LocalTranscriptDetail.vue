@@ -66,6 +66,7 @@
 
       <div class="setting-hint">{{ updatedText }}</div>
       <div v-if="segmentCount > 0" class="setting-hint">分段数量：{{ segmentCount }}</div>
+      <div v-if="syncHintText" class="setting-hint">{{ syncHintText }}</div>
 
       <div v-if="showProgress" class="progress">
         <div class="bar" :style="{ width: `${transcript.progress}%` }"></div>
@@ -121,7 +122,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { generateTranscriptSummary, hasLiveVideoBackend } from '@/api/video'
+import { generateTranscriptSummary, hasLiveVideoBackend, syncOfflineTranscriptToVideo } from '@/api/video'
 import {
   NATIVE_OFFLINE_TRANSCRIPTS_EVENT_NAME,
   deleteNativeOfflineTranscript,
@@ -173,6 +174,15 @@ const updatedText = computed(() => {
   } catch {
     return ''
   }
+})
+const syncHintText = computed(() => {
+  const status = String(transcript.value?.syncStatus || '').trim().toLowerCase()
+  if (status === 'completed' && Number(transcript.value?.syncedVideoId || 0) > 0) {
+    return `已写入视频库：videoId=${transcript.value.syncedVideoId} · 来源标记=iOS 离线处理`
+  }
+  if (status === 'syncing') return '正在将本地离线结果写入视频库…'
+  if (status === 'failed' && transcript.value?.syncErrorMessage) return `写入视频库失败：${transcript.value.syncErrorMessage}`
+  return ''
 })
 const heroInitial = computed(() => String(transcript.value?.fileName || 'L').trim().slice(0, 1).toUpperCase() || 'L')
 const heroClass = computed(() => {
@@ -233,6 +243,50 @@ const extractErrorMessage = (err, fallback) => {
   return err?.message || fallback
 }
 
+const syncToVideoLibrary = async ({ silent = false } = {}) => {
+  if (!transcript.value?.taskId || !String(transcript.value?.transcriptText || '').trim()) return
+  if (!summaryBackendConfigured.value) return
+
+  transcript.value = await saveNativeOfflineTranscript({
+    taskId: transcript.value.taskId,
+    syncStatus: 'syncing',
+    syncErrorMessage: ''
+  })
+
+  try {
+    const res = await syncOfflineTranscriptToVideo({
+      task_id: transcript.value.taskId,
+      file_name: transcript.value.fileName,
+      file_ext: transcript.value.fileExt,
+      file_size: transcript.value.fileSize,
+      locale: transcript.value.locale,
+      engine: transcript.value.engine,
+      transcript_text: transcript.value.transcriptText,
+      summary: transcript.value.summary || '',
+      summary_style: transcript.value.summaryStyle || processingSettings.value.summaryStyle || 'study',
+      segments: Array.isArray(transcript.value.segments) ? transcript.value.segments : []
+    })
+    const data = res?.data || {}
+    transcript.value = await saveNativeOfflineTranscript({
+      taskId: transcript.value.taskId,
+      fileName: data?.video?.title || transcript.value.fileName,
+      syncedVideoId: Number(data?.video?.id || data?.id || 0) || 0,
+      syncStatus: 'completed',
+      syncErrorMessage: '',
+      syncUpdatedAt: new Date().toISOString()
+    })
+  } catch (e) {
+    const messageText = extractErrorMessage(e, '写入视频库失败')
+    transcript.value = await saveNativeOfflineTranscript({
+      taskId: transcript.value.taskId,
+      syncStatus: 'failed',
+      syncErrorMessage: messageText,
+      syncUpdatedAt: new Date().toISOString()
+    })
+    if (!silent) error.value = messageText
+  }
+}
+
 const reload = async () => {
   if (!taskId.value || loading.value) return
   loading.value = true
@@ -251,6 +305,16 @@ const reload = async () => {
       && summaryBackendConfigured.value
     ) {
       void createSummary({ silent: true })
+      return
+    }
+    if (
+      transcript.value
+      && transcript.value.summary
+      && transcript.value.syncStatus === 'idle'
+      && !Number(transcript.value.syncedVideoId || 0)
+      && summaryBackendConfigured.value
+    ) {
+      void syncToVideoLibrary({ silent: true })
     }
   } catch (e) {
     error.value = e?.message || '加载本地离线转录结果失败'
@@ -300,6 +364,7 @@ const createSummary = async ({ silent = false } = {}) => {
       summaryErrorMessage: '',
       summaryUpdatedAt: new Date().toISOString()
     })
+    await syncToVideoLibrary({ silent })
   } catch (e) {
     const messageText = extractErrorMessage(e, '摘要提取失败')
     transcript.value = await saveNativeOfflineTranscript({
