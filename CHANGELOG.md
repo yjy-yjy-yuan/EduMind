@@ -411,3 +411,9 @@
 
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)、[`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：新增 `startOfflineTranscription` 原生 action，接入 iOS 本地视频选择、音频提取、Apple Speech 端侧识别、进度事件和完成/失败回传，并补充语音识别权限文案。
 - 更新 [`mobile-frontend/src/services/nativeBridge.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeBridge.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/services/videoStatus.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/videoStatus.js)：上传页新增 “iOS 本地离线转录” 入口和结果展示区，前端通过原生桥发起本地转录，并统一展示 `preparing / extracting / transcribing / completed / failed` 状态。
+
+### 本地离线转录结果持久化与详情页
+
+- 新增 [`mobile-frontend/src/services/nativeOfflineTranscripts.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeOfflineTranscripts.js)：使用 IndexedDB 持久化 iOS 本地离线转录结果，保存状态、文本、分段、语言和更新时间，并通过前端事件通知页面同步刷新。
+- 新增 [`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)、更新 [`mobile-frontend/src/router/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/router/index.js)：增加本地离线转录详情路由 `/local-transcripts/:taskId`，支持查看完整文本、复制结果和删除本地记录。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：本地离线转录现在会在每次进度/完成/失败事件后自动写入 IndexedDB，并在上传页展示“本地转录历史”，支持从历史记录进入本地详情页。

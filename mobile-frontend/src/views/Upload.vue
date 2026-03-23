@@ -56,7 +56,10 @@
     <div v-if="nativeTask" class="card">
       <div class="card-head">
         <div class="card-title">iOS 本地离线转录</div>
-        <button class="link link--small" @click="clearNativeTask" :disabled="nativeBusy">清除结果</button>
+        <div class="card-head-actions">
+          <button class="link link--small" @click="openNativeTaskDetail(nativeTask.taskId)" :disabled="!nativeTask.taskId">查看详情</button>
+          <button class="link link--small" @click="clearNativeTask" :disabled="nativeBusy">清除结果</button>
+        </div>
       </div>
       <div class="recent-title">{{ nativeTask.fileName || '本地视频' }}</div>
       <div class="muted">
@@ -76,6 +79,29 @@
         <pre class="native-result__text">{{ nativeTask.transcriptText }}</pre>
       </div>
       <div v-if="nativeTask.errorMessage" class="alert alert--bad">{{ nativeTask.errorMessage }}</div>
+    </div>
+
+    <div v-if="nativeHistory.length > 0" class="card">
+      <div class="card-head">
+        <div class="card-title">本地转录历史</div>
+        <button class="link link--small" @click="reloadNativeHistory" :disabled="nativeBusy">刷新</button>
+      </div>
+      <div class="recent-list">
+        <div v-for="item in nativeHistory" :key="item.taskId" class="recent-item">
+          <div class="recent-main">
+            <div class="recent-title">{{ item.fileName || '本地视频' }}</div>
+            <div class="muted">{{ readableSize(item.fileSize) }} · {{ formatTimeText(item.updatedAt || item.createdAt) }}</div>
+            <div class="muted">{{ nativeEngineLabel(item.engine) }} · {{ nativeLocaleLabel(item.locale) }}</div>
+            <div class="recent-meta">
+              <span class="status" :class="statusClass(item.status)">{{ statusText(item.status) }}</span>
+            </div>
+          </div>
+          <div class="recent-actions">
+            <button class="mini" @click="openNativeTaskDetail(item.taskId)">查看</button>
+            <button class="mini mini--warn" @click="removeNativeHistoryItem(item.taskId)" :disabled="nativeBusy">删除</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="recentUploads.length > 0" class="card">
@@ -181,6 +207,13 @@ import {
   onNativeEvent,
   startNativeOfflineTranscription
 } from '@/services/nativeBridge'
+import {
+  NATIVE_OFFLINE_TRANSCRIPTS_EVENT_NAME,
+  deleteNativeOfflineTranscript,
+  getLatestNativeOfflineTranscript,
+  listNativeOfflineTranscripts,
+  saveNativeOfflineTranscript
+} from '@/services/nativeOfflineTranscripts'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
 const router = useRouter()
@@ -196,6 +229,7 @@ const message = ref('')
 const error = ref('')
 const recentUploads = ref([])
 const nativeTask = ref(null)
+const nativeHistory = ref([])
 const syncingRecent = ref(false)
 const statusFilter = ref('all')
 let recentStatusTimer = null
@@ -317,11 +351,53 @@ const upsertNativeTask = (patch = {}) => {
     engineLabel: nativeEngineLabel(patch.engine || current.engine || 'apple_speech_on_device')
   }
   nativeTask.value = next
+  return next
 }
 
 const clearNativeTask = () => {
   if (nativeBusy.value) return
   nativeTask.value = null
+}
+
+const reloadNativeHistory = async () => {
+  try {
+    nativeHistory.value = await listNativeOfflineTranscripts()
+    if (!nativeTask.value) {
+      const latest = await getLatestNativeOfflineTranscript()
+      if (latest) upsertNativeTask(latest)
+    }
+  } catch (e) {
+    error.value = e?.message || '加载本地转录历史失败'
+  }
+}
+
+const persistNativeTask = async (patch = {}) => {
+  const next = upsertNativeTask(patch)
+  if (!next.taskId) return next
+  await saveNativeOfflineTranscript(next)
+  return next
+}
+
+const openNativeTaskDetail = (taskId) => {
+  const id = String(taskId || '').trim()
+  if (!id) return
+  router.push(`/local-transcripts/${id}`)
+}
+
+const removeNativeHistoryItem = async (taskId) => {
+  const id = String(taskId || '').trim()
+  if (!id) return
+  try {
+    await deleteNativeOfflineTranscript(id)
+    if (nativeTask.value?.taskId === id) nativeTask.value = null
+    await reloadNativeHistory()
+  } catch (e) {
+    error.value = e?.message || '删除本地转录历史失败'
+  }
+}
+
+const handleNativeTranscriptStoreEvent = async () => {
+  await reloadNativeHistory()
 }
 
 const formatTimeText = (isoText) => {
@@ -733,12 +809,12 @@ const startNativeOfflineTranscriptionFlow = async () => {
       language: processingSettings.value.language,
       model: processingSettings.value.model
     })
-    upsertNativeTask({
+    await persistNativeTask({
       taskId: started?.taskId,
       fileName: started?.fileName,
       fileSize: started?.fileSize,
       fileExt: started?.fileExt,
-      status: started?.status || 'pending',
+      status: started?.status || 'preparing',
       progress: 5,
       currentStep: started?.message || '已选择本地视频，准备本地离线转录',
       locale: started?.locale || processingSettings.value.language,
@@ -754,8 +830,8 @@ const startNativeOfflineTranscriptionFlow = async () => {
   }
 }
 
-const handleNativeProgressEvent = (detail = {}) => {
-  upsertNativeTask({
+const handleNativeProgressEvent = async (detail = {}) => {
+  await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,
     fileSize: detail.fileSize,
@@ -767,8 +843,8 @@ const handleNativeProgressEvent = (detail = {}) => {
   })
 }
 
-const handleNativeCompletedEvent = (detail = {}) => {
-  upsertNativeTask({
+const handleNativeCompletedEvent = async (detail = {}) => {
+  await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,
     fileSize: detail.fileSize,
@@ -784,8 +860,8 @@ const handleNativeCompletedEvent = (detail = {}) => {
   message.value = 'iOS 本地离线转录完成'
 }
 
-const handleNativeFailedEvent = (detail = {}) => {
-  upsertNativeTask({
+const handleNativeFailedEvent = async (detail = {}) => {
+  await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,
     fileSize: detail.fileSize,
@@ -902,8 +978,10 @@ onMounted(async () => {
   nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_PROGRESS_EVENT, handleNativeProgressEvent))
   nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_COMPLETED_EVENT, handleNativeCompletedEvent))
   nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_FAILED_EVENT, handleNativeFailedEvent))
+  window.addEventListener(NATIVE_OFFLINE_TRANSCRIPTS_EVENT_NAME, handleNativeTranscriptStoreEvent)
   processingSettings.value = getProcessingSettings()
   await refreshWhisperModelOptions()
+  await reloadNativeHistory()
   loadRecentUploads()
   window.addEventListener(OFFLINE_QUEUE_EVENT_NAME, handleOfflineQueueEvent)
   await syncOfflineRecentUploads()
@@ -916,6 +994,7 @@ onMounted(async () => {
 onUnmounted(() => {
   clearRecentStatusSync()
   window.removeEventListener(OFFLINE_QUEUE_EVENT_NAME, handleOfflineQueueEvent)
+  window.removeEventListener(NATIVE_OFFLINE_TRANSCRIPTS_EVENT_NAME, handleNativeTranscriptStoreEvent)
   nativeEventDisposers.splice(0).forEach((dispose) => dispose?.())
 })
 </script>
