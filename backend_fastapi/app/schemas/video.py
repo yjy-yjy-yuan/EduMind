@@ -167,7 +167,6 @@ class VideoStatusResponse(BaseModel):
     requested_model: Optional[str] = None
     effective_model: Optional[str] = None
     requested_language: Optional[str] = None
-    task_id: Optional[str] = None
     processing_origin: Optional[str] = None
     processing_origin_label: Optional[str] = None
 
