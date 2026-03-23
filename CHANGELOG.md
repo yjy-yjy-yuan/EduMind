@@ -1,5 +1,11 @@
 # 变更日志
 
+## 2026-03-21
+
+### 离线队列基础设施
+- 新增 [`mobile-frontend/src/services/offlineQueue.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/offlineQueue.js)：补充基于 IndexedDB 的离线任务存取层，固定使用 `edumind_offline_queue / offline_tasks / taskId` 结构，并预置本地上传、链接导入、失败退避、状态更新等基础能力，供后续 Upload 页接入离线补跑。
+- 新增 [`mobile-frontend/src/services/networkStatus.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/networkStatus.js)：统一识别“后端地址已配置但后端不可达”的网络错误、超时与可重试 5xx，作为上传失败进入离线队列的判定基础。
+
 ## 2026-03-20
 
 ### 用户资料支持修改用户名与头像
