@@ -66,11 +66,14 @@
         <div class="block-head">
           <div class="block-title">智能摘要</div>
           <div class="block-actions">
-            <button class="mini" @click="createSummary" :disabled="!canGenerateSummary || summaryGenerating || tagGenerating">
+            <button class="mini" @click="createSummary" :disabled="!canGenerateSummary || summaryGenerating || tagGenerating || summaryImporting">
               {{ summaryGenerating ? '生成中…' : (video.summary ? '重生成摘要' : '生成摘要') }}
             </button>
-            <button class="mini" @click="createTags" :disabled="!canGenerateTags || summaryGenerating || tagGenerating">
+            <button class="mini" @click="createTags" :disabled="!canGenerateTags || summaryGenerating || tagGenerating || summaryImporting">
               {{ tagGenerating ? '提取中…' : (tagList.length > 0 ? '重提标签' : '提取标签') }}
+            </button>
+            <button class="mini mini--primary" @click="importSummaryToNote" :disabled="!canImportSummary">
+              {{ summaryImporting ? '导入中…' : '导入到笔记' }}
             </button>
           </div>
         </div>
@@ -135,7 +138,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi } from '@/config'
-import { getNotes } from '@/api/note'
+import { createNote, getNotes, updateNote } from '@/api/note'
 import { deleteVideo, generateVideoSummary, generateVideoTags, getVideo, getVideoProcessingOptions, getVideoStatus, processVideo } from '@/api/video'
 import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
 import { OFFLINE_QUEUE_EVENT_NAME, getPendingOfflineTasks } from '@/services/offlineQueue'
@@ -172,6 +175,7 @@ const autoStarting = ref(false)
 const retrying = ref(false)
 const summaryGenerating = ref(false)
 const tagGenerating = ref(false)
+const summaryImporting = ref(false)
 const notesLoading = ref(false)
 const videoNotes = ref([])
 const processingSettings = ref(getProcessingSettings())
@@ -207,6 +211,9 @@ const canShowAnalysisBlock = computed(
 )
 const canGenerateSummary = computed(() => normalizeVideoStatus(statusValue.value) === 'completed')
 const canGenerateTags = computed(() => normalizeVideoStatus(statusValue.value) === 'completed' && Boolean(video.value?.summary))
+const canImportSummary = computed(
+  () => Boolean(normalizeText(video.value?.summary)) && !summaryGenerating.value && !tagGenerating.value && !summaryImporting.value
+)
 const summaryStyleText = computed(() => `${summaryStyleLabel(processingSettings.value.summaryStyle)}风格`)
 const processDisabled = computed(
   () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(normalizeVideoStatus(statusValue.value))
@@ -227,6 +234,8 @@ const extractErrorMessage = (err, fallback) => {
   if (typeof messageText === 'string' && messageText.trim()) return messageText.trim()
   return err?.message || fallback
 }
+
+const normalizeText = (value) => String(value || '').trim()
 
 const badgeClass = (status) => {
   return videoStatusTone(status)
@@ -371,6 +380,8 @@ const normalizeNoteList = (payload) => {
   return Array.isArray(list) ? list : []
 }
 
+const normalizeNote = (payload) => payload?.note || payload?.data || payload || null
+
 const loadVideoNotes = async () => {
   notesLoading.value = true
   try {
@@ -471,6 +482,64 @@ const createTags = async () => {
     error.value = extractErrorMessage(e, '提取标签失败')
   } finally {
     tagGenerating.value = false
+  }
+}
+
+const buildSummaryNotePayload = () => ({
+  title: normalizeText(video.value?.title) || '未命名视频',
+  content: normalizeText(video.value?.summary),
+  note_type: 'summary',
+  video_id: Number(id.value),
+  tags: tagList.value.join(',')
+})
+
+const findSummaryNote = async () => {
+  const response = await getNotes({ video_id: Number(id.value), per_page: 100 })
+  const currentTitle = normalizeText(video.value?.title) || '未命名视频'
+  const summaryNotes = normalizeNoteList(response?.data).filter(
+    (item) => String(item?.note_type || 'text') === 'summary' && Number(item?.video_id || 0) === Number(id.value)
+  )
+  return summaryNotes.find((item) => normalizeText(item?.title) === currentTitle) || summaryNotes[0] || null
+}
+
+const importSummaryToNote = async () => {
+  if (!canImportSummary.value) return
+  if (usingMockGateway.value) {
+    error.value = '当前未连接真实后端，摘要导入不会写入数据库；请先配置 API Base 并关闭 UI-only。'
+    return
+  }
+
+  summaryImporting.value = true
+  error.value = ''
+
+  try {
+    const payload = buildSummaryNotePayload()
+    const existing = await findSummaryNote()
+    let noteId = ''
+    let noteAction = 'created'
+
+    if (existing?.id) {
+      const response = await updateNote(existing.id, payload)
+      const updated = normalizeNote(response?.data)
+      noteId = String(updated?.id || existing.id)
+      noteAction = 'updated'
+    } else {
+      const response = await createNote(payload)
+      const created = normalizeNote(response?.data)
+      noteId = String(created?.id || '')
+    }
+
+    const query = {
+      noteAction,
+      videoId: String(id.value)
+    }
+    if (noteId) query.noteId = noteId
+
+    await router.push({ path: '/notes', query })
+  } catch (e) {
+    error.value = extractErrorMessage(e, '导入摘要失败')
+  } finally {
+    summaryImporting.value = false
   }
 }
 
@@ -902,6 +971,11 @@ onUnmounted(() => {
 
 .mini:disabled {
   opacity: 0.6;
+}
+
+.mini--primary {
+  background: linear-gradient(135deg, #0f766e, #0ea5a4);
+  color: #fff;
 }
 
 .actions {

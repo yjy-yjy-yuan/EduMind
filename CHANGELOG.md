@@ -532,3 +532,10 @@
 - 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：当用户从视频上下文记笔记但正文为空时，编辑页会基于关联视频和重点时间点自动生成可保存的记忆内容，避免“看起来已记笔记，实际没有落库”的情况；保存成功后还会带着 `noteId` 返回笔记页。
 - 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：笔记页新增“刚保存/刚更新笔记”的回显提示、置顶与高亮逻辑，确保从视频详情页回来后能直接看到对应笔记。
 - 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：视频详情页新增“本视频笔记”预览区，直接展示当前视频最近的笔记、重点时间点摘要和进入全部笔记的入口，形成视频学习到笔记回看的记忆闭环。
+
+## 2026-03-24
+
+### 视频摘要一键导入笔记
+
+- 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：视频详情页摘要区新增“一键导入到笔记”入口；在线模式下直接复用现有笔记创建/更新接口写入 `notes` 表，标题固定使用当前视频题目，内容写入当前摘要文本，并只更新同视频下的 `summary` 类型笔记，避免误覆盖普通学习笔记。
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：从视频上下文进入新建笔记时，标题会优先预填当前视频题目，减少手工命名成本并统一视频笔记命名口径。

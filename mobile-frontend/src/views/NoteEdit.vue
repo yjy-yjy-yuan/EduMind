@@ -235,6 +235,10 @@ const bootstrapFromRouteQuery = () => {
     ensureVideoOption(queryVideoId, queryVideoTitle)
   }
 
+  if (!form.title && queryVideoTitle) {
+    form.title = queryVideoTitle
+  }
+
   const validTime = queryTime !== undefined && queryTime !== null && String(queryTime).trim() !== ''
   if (!validTime && !querySubtitle) return
 
