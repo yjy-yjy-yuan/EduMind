@@ -29,6 +29,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def normalize_tag_string(raw_tags: Optional[str]) -> Optional[str]:
+    """规范化标签字符串，统一去空、去重并按逗号存储。"""
+    if raw_tags is None:
+        return None
+
+    normalized_tags = []
+    seen = set()
+    for part in str(raw_tags).split(","):
+        tag = part.strip()
+        if not tag or tag in seen:
+            continue
+        seen.add(tag)
+        normalized_tags.append(tag)
+
+    return ",".join(normalized_tags) if normalized_tags else None
+
+
 def extract_keywords(text: str, top_k: int = 10) -> List[str]:
     """提取文本关键词"""
     if not text or len(text) < 10:
@@ -119,7 +136,7 @@ async def create_note(data: NoteCreate, db: Session = Depends(get_db)):
         content_vector=content_vector,
         note_type=data.note_type or "text",
         video_id=data.video_id,
-        tags=data.tags,
+        tags=normalize_tag_string(data.tags),
         keywords=keywords_str,
     )
 
@@ -144,19 +161,30 @@ async def update_note(note_id: int, data: NoteUpdate, db: Session = Depends(get_
     if not note:
         raise HTTPException(status_code=404, detail="笔记不存在")
 
-    if data.title is not None:
+    updated_fields = data.model_fields_set
+
+    if "title" in updated_fields:
         note.title = data.title
-    if data.content is not None:
-        note.content = data.content
+    if "content" in updated_fields:
+        note.content = data.content or ""
         keywords = extract_keywords(note.content)
         note.keywords = ",".join(keywords) if keywords else None
         note.content_vector = generate_content_vector(note.content, db)
-    if data.note_type is not None:
+    if "note_type" in updated_fields:
         note.note_type = data.note_type
-    if data.tags is not None:
-        note.tags = data.tags
+    if "video_id" in updated_fields:
+        if data.video_id is None:
+            note.video_id = None
+        else:
+            video = db.query(Video).filter(Video.id == data.video_id).first()
+            if not video:
+                raise HTTPException(status_code=404, detail="视频不存在")
+            note.video_id = data.video_id
+    if "tags" in updated_fields:
+        note.tags = normalize_tag_string(data.tags)
 
     db.commit()
+    db.refresh(note)
     return {"status": "success", "data": note.to_dict()}
 
 

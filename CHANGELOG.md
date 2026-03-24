@@ -494,3 +494,18 @@
 
 - 新增 [`docs/BLITZ_EDUMIND_WORKFLOW.md`](/Users/yuan/final-work/EduMind/docs/BLITZ_EDUMIND_WORKFLOW.md)：新增面向 AI agent 和开发者的中文工作流文档，明确当前 iOS-only 架构、正确启动顺序、前端修改后的必做同步操作、`WKWebView` 调试重点、白屏排查顺序、后端连通性排查顺序，以及给 Codex / Claude / Blitz 的操作建议。
 - 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)：新增 “Blitz / Codex CLI 开发工作流” 小节，简要说明 4 个新脚本的用途、执行顺序、前端改动后必须重新同步 `WebAssets` 的约束，以及进一步查看 [`docs/BLITZ_EDUMIND_WORKFLOW.md`](/Users/yuan/final-work/EduMind/docs/BLITZ_EDUMIND_WORKFLOW.md) 的入口。
+
+## 2026-03-24
+
+### 笔记系统实施提示词落地
+
+- 新增 [`docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md)：补充一份可直接交给 Codex / Claude / Blitz 的笔记系统专用提示词，收口当前 iOS-only 架构、现有 `notes` / `note_timestamps` 基线、第一版真实可用目标、实施边界、验收要求与禁止事项。
+- 更新 [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：新增“笔记系统实现边界”小节，明确笔记系统必须继续复用现有表结构与后端链路，并指向新的专用提示词文档。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)：在相关文档列表中新增笔记系统实施提示词入口，便于后续直接查找和复用。
+
+## 2026-03-24
+
+### 笔记后端接口与测试补强
+
+- 更新 [`backend_fastapi/app/models/note.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/note.py)、[`backend_fastapi/app/schemas/note.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/note.py)、[`backend_fastapi/app/routers/note.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/note.py)：笔记返回结构补充 `video_title`，更新接口支持修改或清空 `video_id`，并统一规范化标签字符串，继续在不改表的前提下复用现有 `notes` / `note_timestamps` 链路。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充笔记创建携带标签与时间点、列表按 `video/tag/search` 筛选、时间点新增删除、视频关联更新与标签清空等 API 回归测试。
