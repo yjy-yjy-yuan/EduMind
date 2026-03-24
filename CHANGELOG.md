@@ -524,3 +524,11 @@
 
 - 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：新建/编辑页新增关联视频、标签推荐、重点时间点的新增/删除/保存能力，并支持从路由 query 预填视频上下文与初始时间点。
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步最新移动端前端构建产物，确保 iOS `WKWebView` 加载的是当前笔记编辑页实现。
+
+## 2026-03-24
+
+### 视频笔记回显与记忆闭环修复
+
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：当用户从视频上下文记笔记但正文为空时，编辑页会基于关联视频和重点时间点自动生成可保存的记忆内容，避免“看起来已记笔记，实际没有落库”的情况；保存成功后还会带着 `noteId` 返回笔记页。
+- 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：笔记页新增“刚保存/刚更新笔记”的回显提示、置顶与高亮逻辑，确保从视频详情页回来后能直接看到对应笔记。
+- 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：视频详情页新增“本视频笔记”预览区，直接展示当前视频最近的笔记、重点时间点摘要和进入全部笔记的入口，形成视频学习到笔记回看的记忆闭环。

@@ -13,6 +13,11 @@
       <button class="link" @click="reload">重试</button>
     </div>
 
+    <div v-else-if="focusMessage" class="alert alert--ok">
+      <span>{{ focusMessage }}</span>
+      <button class="link" @click="clearFocusState">知道了</button>
+    </div>
+
     <section class="filter-card">
       <div class="filter-head">
         <div>
@@ -77,7 +82,14 @@
       </div>
 
       <div class="list">
-        <button v-for="note in notes" :key="note.id" class="card" @click="go(`/notes/${note.id}`)">
+        <button
+          v-for="note in notes"
+          :key="note.id"
+          class="card"
+          :class="{ 'card--focus': Number(note.id) === focusedNoteId }"
+          :data-note-id="note.id"
+          @click="go(`/notes/${note.id}`)"
+        >
           <div class="row">
             <div class="title">{{ note.title || '未命名笔记' }}</div>
             <i class="arrow">›</i>
@@ -105,9 +117,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getNoteTags, getNotes } from '@/api/note'
+import { getNote, getNoteTags, getNotes } from '@/api/note'
 import { getVideoList } from '@/api/video'
 
 const route = useRoute()
@@ -127,6 +139,16 @@ const filters = reactive({
 })
 
 const hasActiveFilters = computed(() => Boolean(filters.search || filters.videoId || filters.tag))
+const focusedNoteId = computed(() => {
+  const value = Number(route.query.noteId || 0)
+  return Number.isFinite(value) && value > 0 ? value : 0
+})
+const focusMessage = computed(() => {
+  if (!focusedNoteId.value) return ''
+  if (route.query.noteAction === 'created') return '刚保存的笔记已为你置顶显示。'
+  if (route.query.noteAction === 'updated') return '刚更新的笔记已为你置顶显示。'
+  return '已定位到指定笔记。'
+})
 const selectedVideoTitle = computed(
   () => videoOptions.value.find((item) => String(item.id) === String(filters.videoId || ''))?.title || ''
 )
@@ -180,12 +202,39 @@ const reload = async () => {
 
   try {
     if (noteResult.status !== 'fulfilled') throw noteResult.reason
-    notes.value = sortNotes(normalizeNoteList(noteResult.value?.data))
+    let nextNotes = sortNotes(normalizeNoteList(noteResult.value?.data))
+
+    if (focusedNoteId.value > 0) {
+      const existing = nextNotes.find((item) => Number(item?.id) === focusedNoteId.value)
+      if (existing) {
+        nextNotes = [existing, ...nextNotes.filter((item) => Number(item?.id) !== focusedNoteId.value)]
+      } else {
+        try {
+          const focusedResponse = await getNote(focusedNoteId.value)
+          const focusedNote = focusedResponse?.data?.note || focusedResponse?.data?.data || focusedResponse?.data
+          if (focusedNote) {
+            nextNotes = [focusedNote, ...nextNotes]
+          }
+        } catch {
+          // keep current list when the focused note cannot be reloaded
+        }
+      }
+    }
+
+    notes.value = nextNotes
 
     tagOptions.value = tagResult.status === 'fulfilled' ? normalizeTagBuckets(tagResult.value?.data) : []
     videoOptions.value = videoResult.status === 'fulfilled'
       ? sortNotes(normalizeVideoList(videoResult.value?.data))
       : []
+
+    if (focusedNoteId.value > 0) {
+      await nextTick()
+      const target = document.querySelector(`[data-note-id="${focusedNoteId.value}"]`)
+      if (target?.scrollIntoView) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
   } catch (e) {
     error.value = e?.message || '加载失败'
   } finally {
@@ -215,6 +264,13 @@ const goNewNote = () => {
   if (filters.videoId) query.videoId = String(filters.videoId)
   if (selectedVideoTitle.value) query.videoTitle = selectedVideoTitle.value
   router.push({ path: '/notes/new', query })
+}
+
+const clearFocusState = async () => {
+  const query = { ...route.query }
+  delete query.noteId
+  delete query.noteAction
+  await router.replace({ path: route.path, query })
 }
 
 const buildExcerpt = (content) => {
@@ -294,6 +350,11 @@ onMounted(reload)
 .alert--bad {
   background: rgba(239, 68, 68, 0.1);
   color: #b91c1c;
+}
+
+.alert--ok {
+  background: rgba(15, 118, 110, 0.12);
+  color: #0f766e;
 }
 
 .filter-card,
@@ -466,6 +527,11 @@ onMounted(reload)
   padding: 16px;
   display: grid;
   gap: 10px;
+}
+
+.card--focus {
+  border: 1px solid rgba(31, 122, 140, 0.28);
+  box-shadow: 0 0 0 2px rgba(31, 122, 140, 0.12), 0 16px 30px rgba(24, 45, 73, 0.1);
 }
 
 .title {

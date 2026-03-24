@@ -360,10 +360,40 @@ const syncTimestamps = async (noteId) => {
 
 const buildPayload = () => ({
   title: form.title,
-  content: form.content,
+  content: buildNoteContent(),
   video_id: form.videoId ? Number(form.videoId) : null,
   tags: normalizeTags(form.tagsText).join(',')
 })
+
+const buildMemoryLines = () => {
+  const lines = []
+  if (selectedVideoLabel.value) lines.push(`关联视频：${selectedVideoLabel.value}`)
+
+  const normalizedTimestamps = sortTimestamps(timestamps.value)
+    .map((item) => {
+      const timeLabel = formatSeconds(item.timeSeconds)
+      const subtitle = normalizeText(item.subtitleText)
+      return subtitle ? `- ${timeLabel} ${subtitle}` : `- ${timeLabel}`
+    })
+    .filter(Boolean)
+
+  if (normalizedTimestamps.length > 0) {
+    lines.push('重点时间点：')
+    lines.push(...normalizedTimestamps)
+  }
+
+  return lines
+}
+
+const buildNoteContent = () => {
+  const manualContent = normalizeText(form.content)
+  if (manualContent) return manualContent
+
+  const memoryLines = buildMemoryLines()
+  if (memoryLines.length === 0) return ''
+
+  return `${memoryLines.join('\n')}\n\n待补充要点：\n- `
+}
 
 const save = async () => {
   if (saving.value) return
@@ -376,18 +406,36 @@ const save = async () => {
     }
 
     const payload = buildPayload()
-    if (isNew.value) {
-      await createNote({
-        ...payload,
-        timestamps: timestamps.value.map((item) => toTimestampPayload(item))
-      })
-      router.replace('/notes')
+    if (!payload.content) {
+      error.value = '请填写内容，或至少关联视频/添加重点时间点后再保存'
       return
     }
 
-    await updateNote(id.value, payload)
+    if (isNew.value) {
+      const response = await createNote({
+        ...payload,
+        timestamps: timestamps.value.map((item) => toTimestampPayload(item))
+      })
+      const created = normalizeNote(response?.data)
+      const createdId = created?.id ? String(created.id) : ''
+      const query = {}
+      if (createdId) query.noteId = createdId
+      query.noteAction = 'created'
+      if (payload.video_id) query.videoId = String(payload.video_id)
+      await router.replace({ path: '/notes', query })
+      return
+    }
+
+    const response = await updateNote(id.value, payload)
     await syncTimestamps(id.value)
-    router.replace('/notes')
+    const updated = normalizeNote(response?.data)
+    const updatedId = updated?.id ? String(updated.id) : String(id.value)
+    const query = {
+      noteId: updatedId,
+      noteAction: 'updated'
+    }
+    if (payload.video_id) query.videoId = String(payload.video_id)
+    await router.replace({ path: '/notes', query })
   } catch (e) {
     error.value = e?.message || '保存失败'
   } finally {
