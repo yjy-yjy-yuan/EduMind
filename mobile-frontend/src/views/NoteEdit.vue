@@ -238,7 +238,6 @@ const bootstrapFromRouteQuery = () => {
   if (!form.title && queryVideoTitle) {
     form.title = queryVideoTitle
   }
-
   const validTime = queryTime !== undefined && queryTime !== null && String(queryTime).trim() !== ''
   if (!validTime && !querySubtitle) return
 
@@ -398,7 +397,6 @@ const buildNoteContent = () => {
 
   return `${memoryLines.join('\n')}\n\n待补充要点：\n- `
 }
-
 const save = async () => {
   if (saving.value) return
   saving.value = true
