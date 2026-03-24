@@ -82,6 +82,35 @@ bash ios-app/sync_ios_web_assets.sh
 2. 读取 `backend_fastapi/.env` 中的 `PORT`，自动刷新 iOS 真机默认后端地址
 3. 将最新 `dist/` 同步到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
 
+## Blitz / Codex CLI 开发工作流
+
+面向 Blitz、Codex CLI、Claude Code 等本地代码代理，当前仓库新增了 4 个统一脚本：
+
+```bash
+bash scripts/blitz_prepare_edumind.sh
+bash scripts/blitz_start_backend.sh
+bash scripts/blitz_backend_healthcheck.sh
+bash scripts/blitz_build_ios.sh
+```
+
+推荐顺序：
+
+1. `blitz_prepare_edumind.sh`
+   创建或复用 `.venv`，安装后端依赖，必要时安装前端依赖，并执行 `bash ios-app/sync_ios_web_assets.sh`
+2. `blitz_start_backend.sh`
+   激活 `.venv` 并启动 `backend_fastapi/run.py`
+3. `blitz_backend_healthcheck.sh`
+   默认检查 `http://127.0.0.1:2004/health`
+4. `blitz_build_ios.sh`
+   用 `xcodebuild` 构建 `ios-app/EduMindIOS/EduMindIOS.xcodeproj`
+
+补充说明：
+
+1. `mobile-frontend/` 任何改动后，都必须重新执行 `bash ios-app/sync_ios_web_assets.sh`
+2. iOS 容器是本地打包资源模式，不是 dev server 直连模式
+3. 若要做更完整的 iOS 校验，执行 `bash ios-app/validate_ios_build.sh`
+4. 更详细的 Agent 接管说明见 [`docs/BLITZ_EDUMIND_WORKFLOW.md`](/Users/yuan/final-work/EduMind/docs/BLITZ_EDUMIND_WORKFLOW.md)
+
 ## 摘要生成与处理设置
 
 当前视频处理链路已经包含真实摘要生成，不再停留在 UI-only 占位：

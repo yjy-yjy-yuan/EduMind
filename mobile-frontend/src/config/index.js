@@ -44,13 +44,88 @@ const toBool = (value, fallback = false) => {
   return fallback
 }
 
-export const API_BASE_URL = String(
-  fromQuery || fromStorage || fromNative || import.meta.env.VITE_MOBILE_API_BASE_URL || ''
-).replace(/\/+$/, '')
+const normalizeApiBaseUrl = (value) => String(value || '').trim().replace(/\/+$/, '')
+
+const resolveApiBaseConfig = ({
+  queryValue = '',
+  storageValue = '',
+  nativeValue = '',
+  envValue = ''
+} = {}) => {
+  const normalizedQuery = normalizeApiBaseUrl(queryValue)
+  if (normalizedQuery) {
+    return {
+      apiBaseUrl: normalizedQuery,
+      source: 'query'
+    }
+  }
+
+  const normalizedStorage = normalizeApiBaseUrl(storageValue)
+  if (normalizedStorage) {
+    return {
+      apiBaseUrl: normalizedStorage,
+      source: 'storage'
+    }
+  }
+
+  const normalizedNative = normalizeApiBaseUrl(nativeValue)
+  if (normalizedNative) {
+    return {
+      apiBaseUrl: normalizedNative,
+      source: 'native'
+    }
+  }
+
+  const normalizedEnv = normalizeApiBaseUrl(envValue)
+  if (normalizedEnv) {
+    return {
+      apiBaseUrl: normalizedEnv,
+      source: 'env'
+    }
+  }
+
+  return {
+    apiBaseUrl: '',
+    source: 'empty'
+  }
+}
+
+const getRuntimeApiBaseConfig = () => {
+  try {
+    const queryValue = typeof window !== 'undefined' && window.location?.search
+      ? new URLSearchParams(window.location.search).get('apiBase') || ''
+      : ''
+    const storageValue = typeof localStorage !== 'undefined'
+      ? localStorage.getItem('m_api_base_url') || ''
+      : ''
+    const nativeValue = window.__edumindNativeConfig?.apiBaseUrl || ''
+    return resolveApiBaseConfig({
+      queryValue,
+      storageValue,
+      nativeValue,
+      envValue: import.meta.env.VITE_MOBILE_API_BASE_URL || ''
+    })
+  } catch {
+    return initialApiBaseConfig
+  }
+}
+
+const initialApiBaseConfig = resolveApiBaseConfig({
+  queryValue: fromQuery,
+  storageValue: fromStorage,
+  nativeValue: fromNative,
+  envValue: import.meta.env.VITE_MOBILE_API_BASE_URL || ''
+})
+
+export const API_BASE_URL = initialApiBaseConfig.apiBaseUrl
+
+console.info(
+  `[INFO][Config] api base=${API_BASE_URL || '<empty>'} source=${initialApiBaseConfig.source}`
+)
 
 if (!fromStorage && fromNative) {
   try {
-    localStorage.setItem('m_api_base_url', fromNative.replace(/\/+$/, ''))
+    localStorage.setItem('m_api_base_url', normalizeApiBaseUrl(fromNative))
   } catch {
     // Ignore storage write failures in restricted WebView contexts.
   }
@@ -59,11 +134,15 @@ if (!fromStorage && fromNative) {
 /** 运行时设置 API 基地址（换 Wi‑Fi/换地点后可用，避免因本机 IP 变化导致请求失败） */
 export function setApiBaseUrl(url) {
   try {
-    const value = url ? String(url).trim().replace(/\/+$/, '') : ''
+    const value = normalizeApiBaseUrl(url)
     if (typeof localStorage !== 'undefined') {
       if (value) localStorage.setItem('m_api_base_url', value)
       else localStorage.removeItem('m_api_base_url')
     }
+    const runtimeConfig = getRuntimeApiBaseConfig()
+    console.info(
+      `[INFO][Config] api base=${runtimeConfig.apiBaseUrl || '<empty>'} source=${runtimeConfig.source}`
+    )
     return value
   } catch {
     return ''
@@ -73,15 +152,14 @@ export function setApiBaseUrl(url) {
 /** 当前 API 基地址（每次调用都会重新读取 localStorage，便于换网络后生效） */
 export function getApiBaseUrl() {
   try {
-    const q = typeof window !== 'undefined' && window.location?.search
-      ? new URLSearchParams(window.location.search).get('apiBase') || ''
-      : ''
-    const s = typeof localStorage !== 'undefined' ? localStorage.getItem('m_api_base_url') || '' : ''
-    const n = window.__edumindNativeConfig?.apiBaseUrl || ''
-    return String(q || s || n || import.meta.env.VITE_MOBILE_API_BASE_URL || '').replace(/\/+$/, '')
+    return getRuntimeApiBaseConfig().apiBaseUrl
   } catch {
     return API_BASE_URL
   }
+}
+
+export function getApiBaseSource() {
+  return getRuntimeApiBaseConfig().source
 }
 
 export const UI_ONLY_MODE = toBool(
