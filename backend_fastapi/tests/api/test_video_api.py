@@ -437,11 +437,23 @@ class TestNoteAPI:
                 "title": "新笔记",
                 "content": "笔记内容",
                 "video_id": sample_video.id,
+                "tags": "导数, 极限, 导数",
+                "timestamps": [
+                    {
+                        "time_seconds": 12.5,
+                        "subtitle_text": "这是第一段重点字幕",
+                    }
+                ],
             },
         )
         assert response.status_code == 200
         data = response.json()
         assert data["data"]["title"] == "新笔记"
+        assert data["data"]["video_id"] == sample_video.id
+        assert data["data"]["video_title"] == sample_video.title
+        assert data["data"]["tags"] == ["导数", "极限"]
+        assert len(data["data"]["timestamps"]) == 1
+        assert data["data"]["timestamps"][0]["time_seconds"] == 12.5
 
     def test_create_note_without_title(self, client):
         """测试创建没有标题的笔记"""
@@ -473,6 +485,77 @@ class TestNoteAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["data"]["title"] == "更新后的标题"
+
+    def test_update_note_video_and_clear_tags(self, client, db, sample_note):
+        """测试更新笔记的视频关联并清空标签。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        second_video = Video(
+            filename="second_video.mp4",
+            filepath="/tmp/second_video.mp4",
+            title="第二个测试视频",
+            status=VideoStatus.COMPLETED,
+        )
+        db.add(second_video)
+        db.commit()
+        db.refresh(second_video)
+
+        sample_note.tags = "旧标签,临时"
+        db.commit()
+
+        response = client.put(
+            f"/api/notes/notes/{sample_note.id}",
+            json={
+                "video_id": second_video.id,
+                "tags": "",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["data"]["video_id"] == second_video.id
+        assert data["data"]["video_title"] == second_video.title
+        assert data["data"]["tags"] == []
+
+    def test_get_notes_with_filters(self, client, db, sample_video):
+        """测试笔记列表支持 video/tag/search 筛选。"""
+        from app.models.note import Note
+
+        note = Note(
+            title="函数极限笔记",
+            content="这里记录函数极限与导数关系",
+            video_id=sample_video.id,
+            note_type="text",
+            tags="极限,导数",
+            keywords="极限,导数",
+        )
+        db.add(note)
+        db.commit()
+
+        response = client.get(
+            "/api/notes/notes",
+            params={"video_id": sample_video.id, "tag": "极限", "search": "函数极限"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["data"]) == 1
+        assert data["data"][0]["title"] == "函数极限笔记"
+        assert data["data"][0]["video_title"] == sample_video.title
+
+    def test_add_and_delete_note_timestamp(self, client, sample_note):
+        """测试时间戳的新增与删除。"""
+        create_response = client.post(
+            f"/api/notes/notes/{sample_note.id}/timestamps",
+            params={"time_seconds": 88.2, "subtitle_text": "勾股定理重点"},
+        )
+        assert create_response.status_code == 200
+        created = create_response.json()["data"]
+        assert created["time_seconds"] == 88.2
+        assert created["subtitle_text"] == "勾股定理重点"
+
+        delete_response = client.delete(f"/api/notes/notes/{sample_note.id}/timestamps/{created['id']}")
+        assert delete_response.status_code == 200
+        assert delete_response.json()["message"] == "时间戳已删除"
 
     def test_delete_note(self, client, sample_note):
         """测试删除笔记"""

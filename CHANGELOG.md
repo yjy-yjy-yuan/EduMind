@@ -494,3 +494,56 @@
 
 - 新增 [`docs/BLITZ_EDUMIND_WORKFLOW.md`](/Users/yuan/final-work/EduMind/docs/BLITZ_EDUMIND_WORKFLOW.md)：新增面向 AI agent 和开发者的中文工作流文档，明确当前 iOS-only 架构、正确启动顺序、前端修改后的必做同步操作、`WKWebView` 调试重点、白屏排查顺序、后端连通性排查顺序，以及给 Codex / Claude / Blitz 的操作建议。
 - 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)：新增 “Blitz / Codex CLI 开发工作流” 小节，简要说明 4 个新脚本的用途、执行顺序、前端改动后必须重新同步 `WebAssets` 的约束，以及进一步查看 [`docs/BLITZ_EDUMIND_WORKFLOW.md`](/Users/yuan/final-work/EduMind/docs/BLITZ_EDUMIND_WORKFLOW.md) 的入口。
+
+## 2026-03-24
+
+### 笔记系统实施提示词落地
+
+- 新增 [`docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md)：补充一份可直接交给 Codex / Claude / Blitz 的笔记系统专用提示词，收口当前 iOS-only 架构、现有 `notes` / `note_timestamps` 基线、第一版真实可用目标、实施边界、验收要求与禁止事项。
+- 更新 [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)：新增“笔记系统实现边界”小节，明确笔记系统必须继续复用现有表结构与后端链路，并指向新的专用提示词文档。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)：在相关文档列表中新增笔记系统实施提示词入口，便于后续直接查找和复用。
+
+## 2026-03-24
+
+### 笔记后端接口与测试补强
+
+- 更新 [`backend_fastapi/app/models/note.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/note.py)、[`backend_fastapi/app/schemas/note.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/note.py)、[`backend_fastapi/app/routers/note.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/note.py)：笔记返回结构补充 `video_title`，更新接口支持修改或清空 `video_id`，并统一规范化标签字符串，继续在不改表的前提下复用现有 `notes` / `note_timestamps` 链路。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充笔记创建携带标签与时间点、列表按 `video/tag/search` 筛选、时间点新增删除、视频关联更新与标签清空等 API 回归测试。
+
+## 2026-03-24
+
+### 笔记列表筛选与视频上下文入口
+
+- 更新 [`mobile-frontend/src/api/note.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/note.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：前端笔记 API 补齐标签聚合、时间点新增/删除接口，并同步扩展 UI-only mock 数据为“视频关联 + 标签 + 时间点”的真实结构。
+- 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：笔记列表新增关键词搜索、按视频筛选、标签筛选、时间点摘要展示，以及带当前视频上下文的新建入口。
+- 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：视频详情页新增“记笔记”入口，可携带 `videoId + videoTitle` 进入新建笔记流程。
+
+## 2026-03-24
+
+### 笔记编辑页接入时间点管理
+
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：新建/编辑页新增关联视频、标签推荐、重点时间点的新增/删除/保存能力，并支持从路由 query 预填视频上下文与初始时间点。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步最新移动端前端构建产物，确保 iOS `WKWebView` 加载的是当前笔记编辑页实现。
+
+## 2026-03-24
+
+### 视频笔记回显与记忆闭环修复
+
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：当用户从视频上下文记笔记但正文为空时，编辑页会基于关联视频和重点时间点自动生成可保存的记忆内容，避免“看起来已记笔记，实际没有落库”的情况；保存成功后还会带着 `noteId` 返回笔记页。
+- 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：笔记页新增“刚保存/刚更新笔记”的回显提示、置顶与高亮逻辑，确保从视频详情页回来后能直接看到对应笔记。
+- 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：视频详情页新增“本视频笔记”预览区，直接展示当前视频最近的笔记、重点时间点摘要和进入全部笔记的入口，形成视频学习到笔记回看的记忆闭环。
+
+## 2026-03-24
+
+### 视频摘要一键导入笔记
+
+- 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：视频详情页摘要区新增“一键导入到笔记”入口；在线模式下直接复用现有笔记创建/更新接口写入 `notes` 表，标题固定使用当前视频题目，内容写入当前摘要文本，并只更新同视频下的 `summary` 类型笔记，避免误覆盖普通学习笔记。
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：从视频上下文进入新建笔记时，标题会优先预填当前视频题目，减少手工命名成本并统一视频笔记命名口径。
+
+## 2026-03-24
+
+### iOS 本地校验改为无签名构建
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：移除工程中硬编码的 `Apple Development`、`DEVELOPMENT_TEAM = 669BK65A7K` 和自动签名设置，Debug / Release 默认改为无签名构建，避免仓库继续继承历史工程里的账号配置导致本机 `xcodebuild` 失败。
+- 更新 [`ios-app/validate_ios_build.sh`](/Users/yuan/final-work/EduMind/ios-app/validate_ios_build.sh)、[`scripts/blitz_build_ios.sh`](/Users/yuan/final-work/EduMind/scripts/blitz_build_ios.sh)：本地 iOS 校验与 Agent 构建脚本统一改为无签名模式，默认走 `generic/platform=iOS`，用于验证当前容器工程与 `WebAssets` 是否可成功编译；真机安装仍需在 Xcode 中单独配置 Team / 描述文件。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`ios-app/README.md`](/Users/yuan/final-work/EduMind/ios-app/README.md)、[`docs/BLITZ_EDUMIND_WORKFLOW.md`](/Users/yuan/final-work/EduMind/docs/BLITZ_EDUMIND_WORKFLOW.md)：同步说明 `validate_ios_build.sh` 现在是“无签名本地校验”入口，避免继续把它误解为必须依赖 Apple ID 的签名构建。

@@ -66,11 +66,14 @@
         <div class="block-head">
           <div class="block-title">智能摘要</div>
           <div class="block-actions">
-            <button class="mini" @click="createSummary" :disabled="!canGenerateSummary || summaryGenerating || tagGenerating">
+            <button class="mini" @click="createSummary" :disabled="!canGenerateSummary || summaryGenerating || tagGenerating || summaryImporting">
               {{ summaryGenerating ? '生成中…' : (video.summary ? '重生成摘要' : '生成摘要') }}
             </button>
-            <button class="mini" @click="createTags" :disabled="!canGenerateTags || summaryGenerating || tagGenerating">
+            <button class="mini" @click="createTags" :disabled="!canGenerateTags || summaryGenerating || tagGenerating || summaryImporting">
               {{ tagGenerating ? '提取中…' : (tagList.length > 0 ? '重提标签' : '提取标签') }}
+            </button>
+            <button class="mini mini--primary" @click="importSummaryToNote" :disabled="!canImportSummary">
+              {{ summaryImporting ? '导入中…' : '导入到笔记' }}
             </button>
           </div>
         </div>
@@ -82,10 +85,44 @@
         </div>
       </div>
 
+      <div class="block">
+        <div class="block-head">
+          <div>
+            <div class="block-title">本视频笔记</div>
+            <div class="setting-hint">把视频里的关键结论沉淀到笔记页，形成稳定回看入口。</div>
+          </div>
+          <div class="block-actions">
+            <button class="mini" @click="openVideoNotes">查看全部</button>
+            <button class="mini" @click="takeNote">继续记笔记</button>
+          </div>
+        </div>
+
+        <div v-if="notesLoading" class="setting-hint">正在加载本视频笔记…</div>
+        <div v-else-if="videoNotes.length === 0" class="block-placeholder">当前视频还没有笔记，建议从关键知识点开始记录。</div>
+        <div v-else class="note-preview-list">
+          <button
+            v-for="note in videoNotes"
+            :key="note.id"
+            class="note-preview-card"
+            @click="openNote(note.id)"
+          >
+            <div class="note-preview-card__title">{{ note.title || '未命名笔记' }}</div>
+            <div class="note-preview-card__excerpt">{{ buildNoteExcerpt(note.content) }}</div>
+            <div class="note-preview-card__meta">
+              <span v-if="Array.isArray(note.timestamps) && note.timestamps.length > 0">
+                {{ formatNoteTimestampSummary(note.timestamps) }}
+              </span>
+              <span>{{ formatMetaTime(note.updated_at || note.created_at) }}</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
       <div class="actions">
         <button class="btn" @click="startProcess" :disabled="processDisabled">开始处理</button>
         <button class="btn btn--primary" @click="play" :disabled="!canOpenPlayerWhileProcessing">{{ playLabel }}</button>
         <button class="btn" @click="qa">问答</button>
+        <button class="btn" @click="takeNote">记笔记</button>
       </div>
 
       <button v-if="canRetry" class="retry" @click="retryProcess" :disabled="retrying || autoStarting">
@@ -101,6 +138,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi } from '@/config'
+import { createNote, getNotes, updateNote } from '@/api/note'
 import { deleteVideo, generateVideoSummary, generateVideoTags, getVideo, getVideoProcessingOptions, getVideoStatus, processVideo } from '@/api/video'
 import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
 import { OFFLINE_QUEUE_EVENT_NAME, getPendingOfflineTasks } from '@/services/offlineQueue'
@@ -137,6 +175,9 @@ const autoStarting = ref(false)
 const retrying = ref(false)
 const summaryGenerating = ref(false)
 const tagGenerating = ref(false)
+const summaryImporting = ref(false)
+const notesLoading = ref(false)
+const videoNotes = ref([])
 const processingSettings = ref(getProcessingSettings())
 const whisperModelOptions = ref(getWhisperModelOptions())
 
@@ -170,6 +211,9 @@ const canShowAnalysisBlock = computed(
 )
 const canGenerateSummary = computed(() => normalizeVideoStatus(statusValue.value) === 'completed')
 const canGenerateTags = computed(() => normalizeVideoStatus(statusValue.value) === 'completed' && Boolean(video.value?.summary))
+const canImportSummary = computed(
+  () => Boolean(normalizeText(video.value?.summary)) && !summaryGenerating.value && !tagGenerating.value && !summaryImporting.value
+)
 const summaryStyleText = computed(() => `${summaryStyleLabel(processingSettings.value.summaryStyle)}风格`)
 const processDisabled = computed(
   () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(normalizeVideoStatus(statusValue.value))
@@ -190,6 +234,8 @@ const extractErrorMessage = (err, fallback) => {
   if (typeof messageText === 'string' && messageText.trim()) return messageText.trim()
   return err?.message || fallback
 }
+
+const normalizeText = (value) => String(value || '').trim()
 
 const badgeClass = (status) => {
   return videoStatusTone(status)
@@ -329,6 +375,26 @@ const normalizeVideo = (payload) => {
   }
 }
 
+const normalizeNoteList = (payload) => {
+  const list = payload?.notes || payload?.items || payload?.data || payload || []
+  return Array.isArray(list) ? list : []
+}
+
+const normalizeNote = (payload) => payload?.note || payload?.data || payload || null
+
+const loadVideoNotes = async () => {
+  notesLoading.value = true
+  try {
+    const response = await getNotes({ video_id: Number(id.value) })
+    const list = normalizeNoteList(response?.data)
+    videoNotes.value = list.slice(0, 3)
+  } catch {
+    videoNotes.value = []
+  } finally {
+    notesLoading.value = false
+  }
+}
+
 const reload = async () => {
   loading.value = true
   error.value = ''
@@ -341,6 +407,7 @@ const reload = async () => {
       await router.replace(`/local-transcripts/${video.value.task_id}`)
       return
     }
+    await loadVideoNotes()
     await fetchStatus()
     startPollingIfNeeded()
     await tryAutoStartProcessing()
@@ -418,7 +485,101 @@ const createTags = async () => {
   }
 }
 
+const buildSummaryNotePayload = () => ({
+  title: normalizeText(video.value?.title) || '未命名视频',
+  content: normalizeText(video.value?.summary),
+  note_type: 'summary',
+  video_id: Number(id.value),
+  tags: tagList.value.join(',')
+})
+
+const findSummaryNote = async () => {
+  const response = await getNotes({ video_id: Number(id.value), per_page: 100 })
+  const currentTitle = normalizeText(video.value?.title) || '未命名视频'
+  const summaryNotes = normalizeNoteList(response?.data).filter(
+    (item) => String(item?.note_type || 'text') === 'summary' && Number(item?.video_id || 0) === Number(id.value)
+  )
+  return summaryNotes.find((item) => normalizeText(item?.title) === currentTitle) || summaryNotes[0] || null
+}
+
+const importSummaryToNote = async () => {
+  if (!canImportSummary.value) return
+  if (usingMockGateway.value) {
+    error.value = '当前未连接真实后端，摘要导入不会写入数据库；请先配置 API Base 并关闭 UI-only。'
+    return
+  }
+
+  summaryImporting.value = true
+  error.value = ''
+
+  try {
+    const payload = buildSummaryNotePayload()
+    const existing = await findSummaryNote()
+    let noteId = ''
+    let noteAction = 'created'
+
+    if (existing?.id) {
+      const response = await updateNote(existing.id, payload)
+      const updated = normalizeNote(response?.data)
+      noteId = String(updated?.id || existing.id)
+      noteAction = 'updated'
+    } else {
+      const response = await createNote(payload)
+      const created = normalizeNote(response?.data)
+      noteId = String(created?.id || '')
+    }
+
+    const query = {
+      noteAction,
+      videoId: String(id.value)
+    }
+    if (noteId) query.noteId = noteId
+
+    await router.push({ path: '/notes', query })
+  } catch (e) {
+    error.value = extractErrorMessage(e, '导入摘要失败')
+  } finally {
+    summaryImporting.value = false
+  }
+}
+
 const qa = () => router.push({ path: '/qa', query: { videoId: String(id.value) } })
+
+const openVideoNotes = () => router.push({ path: '/notes', query: { videoId: String(id.value) } })
+
+const openNote = (noteId) => router.push(`/notes/${noteId}`)
+
+const takeNote = () => {
+  router.push({
+    path: '/notes/new',
+    query: {
+      videoId: String(id.value),
+      videoTitle: String(video.value?.title || '')
+    }
+  })
+}
+
+const buildNoteExcerpt = (content) => {
+  const text = String(content || '').replace(/\s+/g, ' ').trim()
+  if (!text) return '暂无笔记正文。'
+  return text.length > 66 ? `${text.slice(0, 66)}…` : text
+}
+
+const formatNoteTimestampSummary = (timestamps) => {
+  const sorted = [...timestamps].sort((a, b) => Number(a?.time_seconds || 0) - Number(b?.time_seconds || 0))
+  const first = Number(sorted[0]?.time_seconds || 0)
+  const minutes = Math.floor(first / 60)
+  const seconds = Math.floor(first % 60)
+  const head = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+  return sorted.length > 1 ? `${head} 等 ${sorted.length} 个时间点` : `${head} 重点时间点`
+}
+
+const formatMetaTime = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleDateString()
+}
 
 const remove = async () => {
   const ok = window.confirm('确认删除该视频？')
@@ -751,6 +912,44 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+.note-preview-list {
+  display: grid;
+  gap: 10px;
+}
+
+.note-preview-card {
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  border-radius: 16px;
+  background: #fff;
+  padding: 12px;
+  text-align: left;
+  display: grid;
+  gap: 8px;
+}
+
+.note-preview-card__title {
+  font-size: 13px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.note-preview-card__excerpt {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #475569;
+  overflow-wrap: anywhere;
+}
+
+.note-preview-card__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+}
+
 .tag-pill {
   border-radius: 999px;
   padding: 6px 10px;
@@ -774,10 +973,15 @@ onUnmounted(() => {
   opacity: 0.6;
 }
 
+.mini--primary {
+  background: linear-gradient(135deg, #0f766e, #0ea5a4);
+  color: #fff;
+}
+
 .actions {
   margin-top: 14px;
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 

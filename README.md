@@ -108,7 +108,7 @@ bash scripts/blitz_build_ios.sh
 
 1. `mobile-frontend/` 任何改动后，都必须重新执行 `bash ios-app/sync_ios_web_assets.sh`
 2. iOS 容器是本地打包资源模式，不是 dev server 直连模式
-3. 若要做更完整的 iOS 校验，执行 `bash ios-app/validate_ios_build.sh`
+3. 若要做更完整的 iOS 校验，执行 `bash ios-app/validate_ios_build.sh`；该脚本默认执行无签名构建，用于验证本地代码和 `WebAssets` 能否成功编译
 4. 更详细的 Agent 接管说明见 [`docs/BLITZ_EDUMIND_WORKFLOW.md`](/Users/yuan/final-work/EduMind/docs/BLITZ_EDUMIND_WORKFLOW.md)
 
 ## 摘要生成与处理设置
@@ -319,6 +319,7 @@ bash scripts/install_git_hooks.sh
 
 - [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)
 - [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)
+- [`docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md)
 - [`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)
 - [`backend_fastapi/README_RUN.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README_RUN.md)
 - [`mobile-frontend/README.md`](/Users/yuan/final-work/EduMind/mobile-frontend/README.md)

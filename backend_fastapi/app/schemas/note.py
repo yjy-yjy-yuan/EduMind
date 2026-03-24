@@ -43,6 +43,7 @@ class NoteUpdate(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     content: Optional[str] = None
     note_type: Optional[str] = None
+    video_id: Optional[int] = None
     tags: Optional[str] = None
 
 
@@ -54,6 +55,7 @@ class NoteResponse(BaseModel):
     content: str
     note_type: str
     video_id: Optional[int] = None
+    video_title: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     tags: List[str] = []

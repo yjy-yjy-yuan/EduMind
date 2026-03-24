@@ -54,6 +54,7 @@ class Note(Base):
             "content": self.content,
             "note_type": self.note_type,
             "video_id": self.video_id,
+            "video_title": self.video.title if self.video else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "tags": self.tags.split(",") if self.tags else [],

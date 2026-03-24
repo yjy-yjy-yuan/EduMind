@@ -2,6 +2,7 @@ const nowISO = () => new Date().toISOString()
 
 let videoAutoId = 6
 let noteAutoId = 4
+let noteTimestampAutoId = 5
 let mockToken = 'ui-only-token'
 let mockUser = {
   id: 1,
@@ -85,6 +86,19 @@ const notes = [
     id: 1,
     title: '导数速记卡',
     content: '基本求导公式、复合函数求导、隐函数求导。',
+    note_type: 'text',
+    video_id: 1,
+    tags: ['导数', '求导'],
+    keywords: ['导数', '复合函数'],
+    timestamps: [
+      {
+        id: 1,
+        note_id: 1,
+        time_seconds: 125,
+        subtitle_text: '导数定义和几何意义要对应理解。',
+        created_at: nowISO()
+      }
+    ],
     created_at: nowISO(),
     updated_at: nowISO()
   },
@@ -92,6 +106,19 @@ const notes = [
     id: 2,
     title: '英语时态易错点',
     content: '现在完成时与一般过去时的常见语境区分。',
+    note_type: 'text',
+    video_id: 2,
+    tags: ['英语', '时态'],
+    keywords: ['完成时', '过去时'],
+    timestamps: [
+      {
+        id: 2,
+        note_id: 2,
+        time_seconds: 48,
+        subtitle_text: '完成时更强调结果和对现在的影响。',
+        created_at: nowISO()
+      }
+    ],
     created_at: nowISO(),
     updated_at: nowISO()
   },
@@ -99,6 +126,19 @@ const notes = [
     id: 3,
     title: 'Python 列表与字典',
     content: '列表推导式、字典常见方法与时间复杂度。',
+    note_type: 'text',
+    video_id: 3,
+    tags: ['Python', '数据结构'],
+    keywords: ['列表', '字典'],
+    timestamps: [
+      {
+        id: 3,
+        note_id: 3,
+        time_seconds: 92,
+        subtitle_text: '列表适合顺序访问，字典适合键查找。',
+        created_at: nowISO()
+      }
+    ],
     created_at: nowISO(),
     updated_at: nowISO()
   }
@@ -107,6 +147,34 @@ const notes = [
 const clone = (value) => JSON.parse(JSON.stringify(value))
 const normalizeModel = (value) => String(value || '').trim().toLowerCase() || 'base'
 const extractFormModel = (formData) => normalizeModel(formData?.get?.('model'))
+const normalizeText = (value) => String(value || '').trim()
+const normalizeTagList = (value) => {
+  const source = Array.isArray(value) ? value : String(value || '').split(',')
+  const seen = new Set()
+  return source
+    .map((item) => normalizeText(item))
+    .filter((item) => {
+      if (!item || seen.has(item)) return false
+      seen.add(item)
+      return true
+    })
+}
+const buildTimestamp = (noteId, payload) => ({
+  id: noteTimestampAutoId++,
+  note_id: Number(noteId),
+  time_seconds: Math.max(0, Number(payload?.time_seconds || 0)),
+  subtitle_text: normalizeText(payload?.subtitle_text),
+  created_at: nowISO()
+})
+const decorateNote = (note) => {
+  const cloned = clone(note)
+  const video = findVideo(cloned.video_id)
+  cloned.video_title = video?.title || null
+  cloned.tags = Array.isArray(cloned.tags) ? cloned.tags : []
+  cloned.keywords = Array.isArray(cloned.keywords) ? cloned.keywords : []
+  cloned.timestamps = Array.isArray(cloned.timestamps) ? cloned.timestamps : []
+  return cloned
+}
 
 const mockResponse = (data) =>
   Promise.resolve({
@@ -337,34 +405,111 @@ export const mockGenerateVideoTags = (videoId) => {
   return mockResponse({ success: true, tags: clone(video.tags) })
 }
 
-export const mockGetNotes = () => mockResponse({ notes: clone(sortByUpdatedDesc(notes)) })
+export const mockGetNotes = (params = {}) => {
+  const videoId = Number(params?.video_id || 0)
+  const tag = normalizeText(params?.tag)
+  const search = normalizeText(params?.search).toLowerCase()
+  const noteType = normalizeText(params?.note_type)
+
+  const filtered = sortByUpdatedDesc(notes).filter((note) => {
+    if (videoId > 0 && Number(note.video_id || 0) !== videoId) return false
+    if (tag && !normalizeTagList(note.tags).includes(tag)) return false
+    if (noteType && String(note.note_type || 'text') !== noteType) return false
+    if (search) {
+      const searchBody = [
+        note.title,
+        note.content,
+        ...(Array.isArray(note.tags) ? note.tags : []),
+        ...(Array.isArray(note.keywords) ? note.keywords : [])
+      ]
+        .join(' ')
+        .toLowerCase()
+      if (!searchBody.includes(search)) return false
+    }
+    return true
+  })
+
+  return mockResponse({ notes: filtered.map((note) => decorateNote(note)) })
+}
 
 export const mockGetNote = (noteId) => {
   const note = notes.find((item) => Number(item.id) === Number(noteId))
   if (!note) return Promise.reject(new Error('笔记不存在（UI 模式）'))
-  return mockResponse({ note: clone(note) })
+  return mockResponse({ note: decorateNote(note) })
 }
 
 export const mockCreateNote = (data) => {
+  const nextNoteId = noteAutoId
   noteAutoId += 1
+  const tags = normalizeTagList(data?.tags)
+  const timestamps = Array.isArray(data?.timestamps)
+    ? data.timestamps.map((item) => buildTimestamp(nextNoteId, item))
+    : []
   const created = {
-    id: noteAutoId,
+    id: nextNoteId,
     title: String(data?.title || '未命名笔记'),
     content: String(data?.content || ''),
+    note_type: String(data?.note_type || 'text'),
+    video_id: data?.video_id ? Number(data.video_id) : null,
+    tags,
+    keywords: [],
+    timestamps,
     created_at: nowISO(),
     updated_at: nowISO()
   }
   notes.unshift(created)
-  return mockResponse({ success: true, note: clone(created), message: 'UI 模式：已创建笔记' })
+  return mockResponse({ success: true, note: decorateNote(created), message: 'UI 模式：已创建笔记' })
 }
 
 export const mockUpdateNote = (noteId, data) => {
   const note = notes.find((item) => Number(item.id) === Number(noteId))
   if (!note) return Promise.reject(new Error('笔记不存在（UI 模式）'))
-  note.title = String(data?.title || note.title)
-  note.content = String(data?.content ?? note.content)
+  if (Object.prototype.hasOwnProperty.call(data || {}, 'title')) note.title = String(data?.title || note.title)
+  if (Object.prototype.hasOwnProperty.call(data || {}, 'content')) note.content = String(data?.content ?? note.content)
+  if (Object.prototype.hasOwnProperty.call(data || {}, 'note_type')) note.note_type = String(data?.note_type || 'text')
+  if (Object.prototype.hasOwnProperty.call(data || {}, 'video_id')) {
+    note.video_id = data?.video_id ? Number(data.video_id) : null
+  }
+  if (Object.prototype.hasOwnProperty.call(data || {}, 'tags')) {
+    note.tags = normalizeTagList(data?.tags)
+  }
   note.updated_at = nowISO()
-  return mockResponse({ success: true, note: clone(note), message: 'UI 模式：已更新笔记' })
+  return mockResponse({ success: true, note: decorateNote(note), message: 'UI 模式：已更新笔记' })
+}
+
+export const mockAddNoteTimestamp = (noteId, data = {}) => {
+  const note = notes.find((item) => Number(item.id) === Number(noteId))
+  if (!note) return Promise.reject(new Error('笔记不存在（UI 模式）'))
+  const timestamp = buildTimestamp(noteId, data)
+  note.timestamps = Array.isArray(note.timestamps) ? note.timestamps : []
+  note.timestamps.push(timestamp)
+  note.updated_at = nowISO()
+  return mockResponse({ success: true, data: clone(timestamp), message: 'UI 模式：已新增时间点' })
+}
+
+export const mockDeleteNoteTimestamp = (noteId, timestampId) => {
+  const note = notes.find((item) => Number(item.id) === Number(noteId))
+  if (!note) return Promise.reject(new Error('笔记不存在（UI 模式）'))
+  const index = (Array.isArray(note.timestamps) ? note.timestamps : []).findIndex(
+    (item) => Number(item.id) === Number(timestampId)
+  )
+  if (index < 0) return Promise.reject(new Error('时间点不存在（UI 模式）'))
+  note.timestamps.splice(index, 1)
+  note.updated_at = nowISO()
+  return mockResponse({ success: true, message: 'UI 模式：已删除时间点' })
+}
+
+export const mockGetNoteTags = () => {
+  const counter = new Map()
+  notes.forEach((note) => {
+    normalizeTagList(note.tags).forEach((tag) => {
+      counter.set(tag, Number(counter.get(tag) || 0) + 1)
+    })
+  })
+  const data = [...counter.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-Hans-CN'))
+    .map(([name, count]) => ({ name, count }))
+  return mockResponse({ data })
 }
 
 export const mockDeleteNote = (noteId) => {
