@@ -517,3 +517,10 @@
 - 更新 [`mobile-frontend/src/api/note.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/note.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：前端笔记 API 补齐标签聚合、时间点新增/删除接口，并同步扩展 UI-only mock 数据为“视频关联 + 标签 + 时间点”的真实结构。
 - 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：笔记列表新增关键词搜索、按视频筛选、标签筛选、时间点摘要展示，以及带当前视频上下文的新建入口。
 - 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：视频详情页新增“记笔记”入口，可携带 `videoId + videoTitle` 进入新建笔记流程。
+
+## 2026-03-24
+
+### 笔记编辑页接入时间点管理
+
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：新建/编辑页新增关联视频、标签推荐、重点时间点的新增/删除/保存能力，并支持从路由 query 预填视频上下文与初始时间点。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步最新移动端前端构建产物，确保 iOS `WKWebView` 加载的是当前笔记编辑页实现。
