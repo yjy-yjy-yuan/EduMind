@@ -474,3 +474,23 @@
 - 更新 [`backend_fastapi/app/models/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/video.py)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/scripts/init_db.py`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/init_db.py)：在同一张 `videos` 表中新增 `processing_origin`，明确区分 `online_backend` 与 `ios_offline`；新增 `sync-offline-transcript` 接口，将 iOS 本地离线转录结果写回 `videos` 与 `subtitles`，并基于摘要提炼最关键内容作为视频标题。
 - 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充本地离线结果写入 `videos` 表、标记 `ios_offline`、写入字幕分段，以及同一 `task_id` 更新不重复插入的 API 测试。
 - 更新 [`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)、[`mobile-frontend/src/services/nativeOfflineTranscripts.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeOfflineTranscripts.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：本地离线转录完成后会自动将结果同步进后端视频库；本地记录会保存 `syncedVideoId / syncStatus`；视频列表和首页识别 `ios_offline` 记录后优先跳转到本地详情页，避免误走在线播放器。
+
+## 2026-03-24
+
+### Agent 统一脚本与 iOS 构建入口
+
+- 新增 [`scripts/blitz_prepare_edumind.sh`](/Users/yuan/final-work/EduMind/scripts/blitz_prepare_edumind.sh)、[`scripts/blitz_start_backend.sh`](/Users/yuan/final-work/EduMind/scripts/blitz_start_backend.sh)、[`scripts/blitz_backend_healthcheck.sh`](/Users/yuan/final-work/EduMind/scripts/blitz_backend_healthcheck.sh)、[`scripts/blitz_build_ios.sh`](/Users/yuan/final-work/EduMind/scripts/blitz_build_ios.sh)：补齐面向 Blitz / Codex / Claude Code 的统一入口脚本，分别覆盖环境准备、后端启动、`/health` 健康检查和 `xcodebuild` 构建；脚本统一采用仓库相对路径、明确失败提示和可复用日志前缀，便于 Agent 在本地连续执行 EduMind 的 iOS-only 开发链路。
+
+### WebAssets 同步与前端 API 基地址诊断增强
+
+- 更新 [`ios-app/sync_ios_web_assets.sh`](/Users/yuan/final-work/EduMind/ios-app/sync_ios_web_assets.sh)：同步脚本现在会明确打印读取到的后端端口、`LocalHostName` 和最终写入的 iOS native API base URL；同步完成后还会强校验 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.html`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.html)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css) 是否存在，缺失时直接以明确错误退出，方便 Agent 自动判断下一步是重建前端还是检查 Xcode 资源拷贝。
+- 更新 [`mobile-frontend/src/config/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/config/index.js)：新增运行时 API base 解析器与 `getApiBaseSource()` 导出函数，在保持 `query -> storage -> native -> env -> empty` 既有优先级不变的前提下，补充 `console.info` 输出当前 API base 和来源，便于区分是 query 参数、localStorage、原生注入还是环境变量在生效。
+
+### iOS WebView 容器结构化诊断
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：在保留本地资源加载、`nativeConfig` 注入、console bridge、watchdog、probe 与本地离线转录能力不变的前提下，补充结构化错误页和错误码，包括 `ERR_WEB_ASSET_MISSING`、`ERR_LEGACY_ASSET_PATH`、`ERR_WEB_BUILD_LAYOUT`、`ERR_NAVIGATION_FAIL`、`ERR_NAVIGATION_INIT_FAIL`、`ERR_NAVIGATION_TIMEOUT`；同时新增 `edumindPageState` JS message handler 与 `window.__edumindReportPageState(...)` 上报入口，用于原生接收前端主动回传的 route、page、business id、mounted 状态并打印结构化日志。
+
+### Agent 工作流文档同步
+
+- 新增 [`docs/BLITZ_EDUMIND_WORKFLOW.md`](/Users/yuan/final-work/EduMind/docs/BLITZ_EDUMIND_WORKFLOW.md)：新增面向 AI agent 和开发者的中文工作流文档，明确当前 iOS-only 架构、正确启动顺序、前端修改后的必做同步操作、`WKWebView` 调试重点、白屏排查顺序、后端连通性排查顺序，以及给 Codex / Claude / Blitz 的操作建议。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)：新增 “Blitz / Codex CLI 开发工作流” 小节，简要说明 4 个新脚本的用途、执行顺序、前端改动后必须重新同步 `WebAssets` 的约束，以及进一步查看 [`docs/BLITZ_EDUMIND_WORKFLOW.md`](/Users/yuan/final-work/EduMind/docs/BLITZ_EDUMIND_WORKFLOW.md) 的入口。
