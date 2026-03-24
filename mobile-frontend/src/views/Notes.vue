@@ -69,7 +69,6 @@
     <div v-if="loading && notes.length === 0" class="skeleton">
       <div v-for="i in 4" :key="i" class="sk-card"></div>
     </div>
-
     <div v-else-if="notes.length === 0" class="empty">
       <div class="empty__title">当前没有符合条件的笔记。</div>
       <div class="empty__tip">可以从这里新建普通笔记，也可以从视频详情页带着上下文进入记笔记。</div>
@@ -272,7 +271,6 @@ const clearFocusState = async () => {
   delete query.noteAction
   await router.replace({ path: route.path, query })
 }
-
 const buildExcerpt = (content) => {
   const text = String(content || '').replace(/\s+/g, ' ').trim()
   if (!text) return '暂无内容摘要。'
@@ -356,7 +354,6 @@ onMounted(reload)
   background: rgba(15, 118, 110, 0.12);
   color: #0f766e;
 }
-
 .filter-card,
 .card {
   border-radius: 22px;
