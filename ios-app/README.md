@@ -43,7 +43,7 @@ if let indexURL = Bundle.main.url(forResource: "index", withExtension: "html", s
 
 ### 3. API 基地址配置
 
-`mobile-frontend` 默认通过环境变量（如 `VITE_MOBILE_API_BASE_URL`）访问 FastAPI 后端。  
+`mobile-frontend` 默认通过环境变量（如 `VITE_MOBILE_API_BASE_URL`）访问 FastAPI 后端。
 在 iOS WebView 中：
 
 - H5 启动时会优先读取原生注入的 `window.__edumindNativeConfig.apiBaseUrl`；
@@ -128,7 +128,7 @@ xcodebuild -project ios-app/EduMindIOS/EduMindIOS.xcodeproj \
   build
 ```
 
-如果你要连同前端资源同步、自动签名更新和构建日志一起做一遍本地校验，可直接执行：
+如果你要连同前端资源同步和构建日志一起做一遍本地校验，可直接执行：
 
 ```bash
 bash ios-app/validate_ios_build.sh
@@ -137,8 +137,13 @@ bash ios-app/validate_ios_build.sh
 该脚本会：
 
 1. 先执行 `bash ios-app/sync_ios_web_assets.sh`
-2. 再用 `xcodebuild -allowProvisioningUpdates` 构建 iOS 工程
-3. 构建失败时输出更聚焦的签名 / CoreSimulator / `actool` 排查提示
+2. 再用无签名模式构建 iOS 工程，默认目标是 `generic/platform=iOS`
+3. 构建失败时输出更聚焦的签名链路误入 / CoreSimulator / `actool` 排查提示
+
+说明：
+
+- 这个脚本的目标是验证当前仓库代码和 `WKWebView` 资源能否成功编译，不要求本机已登录 Apple ID
+- 如果你要做真机安装或归档，再在 Xcode 里单独配置 Team / 描述文件并执行签名构建
 
 ### 7. 视频上传权限说明
 

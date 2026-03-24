@@ -45,6 +45,8 @@ bash scripts/blitz_build_ios.sh
 bash ios-app/validate_ios_build.sh
 ```
 
+这个脚本默认执行无签名构建，目标是验证当前 iOS 容器和 `WebAssets` 是否可编译，不依赖本机 Apple ID。
+
 ## 3. 前端修改后的必做操作
 
 只要改了 `mobile-frontend/`，无论改的是页面、配置还是 bridge 调试代码，都必须执行：

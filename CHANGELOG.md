@@ -539,3 +539,11 @@
 
 - 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：视频详情页摘要区新增“一键导入到笔记”入口；在线模式下直接复用现有笔记创建/更新接口写入 `notes` 表，标题固定使用当前视频题目，内容写入当前摘要文本，并只更新同视频下的 `summary` 类型笔记，避免误覆盖普通学习笔记。
 - 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：从视频上下文进入新建笔记时，标题会优先预填当前视频题目，减少手工命名成本并统一视频笔记命名口径。
+
+## 2026-03-24
+
+### iOS 本地校验改为无签名构建
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：移除工程中硬编码的 `Apple Development`、`DEVELOPMENT_TEAM = 669BK65A7K` 和自动签名设置，Debug / Release 默认改为无签名构建，避免仓库继续继承历史工程里的账号配置导致本机 `xcodebuild` 失败。
+- 更新 [`ios-app/validate_ios_build.sh`](/Users/yuan/final-work/EduMind/ios-app/validate_ios_build.sh)、[`scripts/blitz_build_ios.sh`](/Users/yuan/final-work/EduMind/scripts/blitz_build_ios.sh)：本地 iOS 校验与 Agent 构建脚本统一改为无签名模式，默认走 `generic/platform=iOS`，用于验证当前容器工程与 `WebAssets` 是否可成功编译；真机安装仍需在 Xcode 中单独配置 Team / 描述文件。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`ios-app/README.md`](/Users/yuan/final-work/EduMind/ios-app/README.md)、[`docs/BLITZ_EDUMIND_WORKFLOW.md`](/Users/yuan/final-work/EduMind/docs/BLITZ_EDUMIND_WORKFLOW.md)：同步说明 `validate_ios_build.sh` 现在是“无签名本地校验”入口，避免继续把它误解为必须依赖 Apple ID 的签名构建。

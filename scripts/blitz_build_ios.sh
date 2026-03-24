@@ -6,7 +6,7 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT_PATH="$REPO_DIR/ios-app/EduMindIOS/EduMindIOS.xcodeproj"
 SCHEME_NAME="EduMindIOS"
 CONFIGURATION="${BLITZ_IOS_CONFIGURATION:-Debug}"
-DESTINATION="${BLITZ_IOS_DESTINATION:-generic/platform=iOS Simulator}"
+DESTINATION="${BLITZ_IOS_DESTINATION:-generic/platform=iOS}"
 DERIVED_DATA_PATH="${BLITZ_IOS_DERIVED_DATA:-$REPO_DIR/.xcode-derived}"
 BUILD_LOG_PATH="$DERIVED_DATA_PATH/blitz-ios-build.log"
 
@@ -37,6 +37,9 @@ xcodebuild \
   -configuration "$CONFIGURATION" \
   -destination "$DESTINATION" \
   -derivedDataPath "$DERIVED_DATA_PATH" \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGN_IDENTITY="" \
   build 2>&1 | tee "$BUILD_LOG_PATH"
 BUILD_EXIT_CODE=${PIPESTATUS[0]}
 set -e
@@ -46,3 +49,4 @@ if [ "$BUILD_EXIT_CODE" -ne 0 ]; then
 fi
 
 log "iOS 构建成功。日志：$BUILD_LOG_PATH"
+log "本次为无签名构建；如需真机安装，请在 Xcode 中单独执行签名构建。"
