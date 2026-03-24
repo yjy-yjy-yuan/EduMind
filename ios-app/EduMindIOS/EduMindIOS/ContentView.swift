@@ -110,6 +110,15 @@ private enum WebAssets {
 }
 
 private struct H5WebView: UIViewRepresentable {
+    private enum WebViewErrorCode: String {
+        case webAssetMissing = "ERR_WEB_ASSET_MISSING"
+        case legacyAssetPath = "ERR_LEGACY_ASSET_PATH"
+        case webBuildLayout = "ERR_WEB_BUILD_LAYOUT"
+        case navigationFail = "ERR_NAVIGATION_FAIL"
+        case navigationInitFail = "ERR_NAVIGATION_INIT_FAIL"
+        case navigationTimeout = "ERR_NAVIGATION_TIMEOUT"
+    }
+
     private static let nativeConfigScript = """
         (function() {
           window.__edumindNativeConfig = Object.assign({}, window.__edumindNativeConfig || {}, \(nativeConfigJSONString()));
@@ -130,6 +139,7 @@ private struct H5WebView: UIViewRepresentable {
         configuration.setURLSchemeHandler(context.coordinator, forURLScheme: Coordinator.offlineVideoScheme)
         configuration.userContentController.add(context.coordinator, name: Coordinator.logHandlerName)
         configuration.userContentController.add(context.coordinator, name: Coordinator.nativeBridgeHandlerName)
+        configuration.userContentController.add(context.coordinator, name: Coordinator.pageStateHandlerName)
         configuration.userContentController.addUserScript(WKUserScript(
             source: Self.nativeConfigScript,
             injectionTime: .atDocumentStart,
@@ -142,6 +152,11 @@ private struct H5WebView: UIViewRepresentable {
         ))
         configuration.userContentController.addUserScript(WKUserScript(
             source: Coordinator.consoleBridgeScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        ))
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: Coordinator.pageStateBridgeScript,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: false
         ))
@@ -172,14 +187,18 @@ private struct H5WebView: UIViewRepresentable {
         uiView.navigationDelegate = nil
         uiView.configuration.userContentController.removeScriptMessageHandler(forName: Coordinator.logHandlerName)
         uiView.configuration.userContentController.removeScriptMessageHandler(forName: Coordinator.nativeBridgeHandlerName)
+        uiView.configuration.userContentController.removeScriptMessageHandler(forName: Coordinator.pageStateHandlerName)
     }
 
     private func loadContent(into webView: WKWebView) {
         guard let indexURL = WebAssets.indexURL() else {
             EduMindLog.error("WebView", "index.html not found in bundle. resourceURL=\(Bundle.main.resourceURL?.path ?? "<nil>")")
-            webView.loadHTMLString(
-                "<h2 style=\"font-family:-apple-system\">未找到前端资源</h2><p style=\"font-family:-apple-system\">请执行：bash ios-app/sync_ios_web_assets.sh</p>",
-                baseURL: nil
+            Self.renderErrorPage(
+                in: webView,
+                code: .webAssetMissing,
+                title: "未找到前端资源",
+                details: "Bundle 内未找到 WebAssets/index.html。",
+                recovery: "请执行：bash ios-app/sync_ios_web_assets.sh，并确认 iOS 包内已包含 WebAssets/index.html。"
             )
             return
         }
@@ -188,27 +207,46 @@ private struct H5WebView: UIViewRepresentable {
         EduMindLog.info("WebView", "loading index from \(indexURL.path)")
         EduMindLog.info("WebView", "allowing read access to \(allowedPath.path)")
         EduMindLog.debug("WebView", "bundle resourceURL=\(Bundle.main.resourceURL?.path ?? "<nil>")")
+        let missingAssets = missingRequiredAssets(near: indexURL)
+        if !missingAssets.isEmpty {
+            let missingText = missingAssets.joined(separator: ", ")
+            EduMindLog.error("WebView", "missing required web assets: \(missingText)")
+            Self.renderErrorPage(
+                in: webView,
+                code: .webAssetMissing,
+                title: "前端资源不完整",
+                details: "缺少关键文件：\(missingText)",
+                recovery: "请执行：bash ios-app/sync_ios_web_assets.sh，并确认 iOS 包内包含 index.html、index.js、index.css。"
+            )
+            return
+        }
         do {
             let html = try String(contentsOf: indexURL, encoding: .utf8)
             EduMindLog.debug("WebView", "index.html chars=\(html.count)")
             if usesLegacyAbsoluteAssetPaths(in: html) {
                 EduMindLog.error("WebView", "detected legacy absolute asset paths in \(indexURL.path)")
-                webView.loadHTMLString(
-                    "<h2 style=\"font-family:-apple-system\">前端资源路径不兼容</h2><p style=\"font-family:-apple-system\">请执行：bash ios-app/sync_ios_web_assets.sh</p>",
-                    baseURL: nil
+                Self.renderErrorPage(
+                    in: webView,
+                    code: .legacyAssetPath,
+                    title: "前端资源路径不兼容",
+                    details: "检测到 index.html 使用了绝对资源路径，WKWebView 本地资源模式无法正确加载。",
+                    recovery: "请执行：bash ios-app/sync_ios_web_assets.sh，确认当前使用的是 iOS 打包资源而不是旧网页构建产物。"
                 )
                 return
             }
             if usesWebBuildAssetLayout(in: html) {
                 EduMindLog.error("WebView", "detected web build asset layout in \(indexURL.path)")
-                webView.loadHTMLString(
-                    "<h2 style=\"font-family:-apple-system\">检测到错误的前端构建产物</h2><p style=\"font-family:-apple-system\">当前 iOS 容器需要 index.js/index.css 结构，请执行：bash ios-app/sync_ios_web_assets.sh</p>",
-                    baseURL: nil
+                Self.renderErrorPage(
+                    in: webView,
+                    code: .webBuildLayout,
+                    title: "检测到错误的前端构建产物",
+                    details: "当前 iOS 容器需要 index.js / index.css 稳定布局，但 index.html 仍指向 ./assets/* 路径。",
+                    recovery: "请执行：bash ios-app/sync_ios_web_assets.sh，确认 mobile-frontend 使用的是 iOS 构建模式。"
                 )
                 return
             }
         } catch {
-            // Ignore and continue with direct file loading.
+            EduMindLog.notice("WebView", "failed to inspect index.html before load: \(error.localizedDescription)")
         }
 
         webView.loadFileURL(indexURL, allowingReadAccessTo: allowedPath)
@@ -244,7 +282,57 @@ private struct H5WebView: UIViewRepresentable {
     }
 
     private func usesWebBuildAssetLayout(in html: String) -> Bool {
-        html.contains("src=\"./assets/index-") || html.contains("src='./assets/index-")
+        html.contains("src=\"./assets/") ||
+            html.contains("src='./assets/") ||
+            html.contains("href=\"./assets/") ||
+            html.contains("href='./assets/")
+    }
+
+    private func missingRequiredAssets(near indexURL: URL) -> [String] {
+        let baseURL = indexURL.deletingLastPathComponent()
+        let requiredFiles = ["index.html", "index.js", "index.css"]
+        return requiredFiles.filter { requiredFile in
+            !FileManager.default.fileExists(atPath: baseURL.appendingPathComponent(requiredFile).path)
+        }
+    }
+
+    private static func renderErrorPage(
+        in webView: WKWebView,
+        code: WebViewErrorCode,
+        title: String,
+        details: String,
+        recovery: String
+    ) {
+        EduMindLog.error("WebView", "render error page code=\(code.rawValue) title=\(title) details=\(details)")
+        webView.loadHTMLString(
+            errorPageHTML(code: code.rawValue, title: title, details: details, recovery: recovery),
+            baseURL: nil
+        )
+    }
+
+    private static func errorPageHTML(code: String, title: String, details: String, recovery: String) -> String {
+        """
+        <div style="font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:20px;color:#111827;background:#f8fafc;min-height:100vh;box-sizing:border-box;">
+          <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:18px;padding:20px;box-shadow:0 12px 30px rgba(15,23,42,0.08);">
+            <div style="display:inline-block;margin-bottom:12px;padding:4px 10px;border-radius:999px;background:#fee2e2;color:#b91c1c;font-size:12px;font-weight:600;">\(escapeHTML(code))</div>
+            <h2 style="margin:0 0 10px;font-size:22px;line-height:1.35;">\(escapeHTML(title))</h2>
+            <p style="margin:0 0 14px;color:#475569;line-height:1.7;">\(escapeHTML(details))</p>
+            <div style="margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0;color:#0f172a;line-height:1.7;">
+              <strong>建议处理：</strong><br />\(escapeHTML(recovery))
+            </div>
+            <div style="font-size:13px;color:#64748b;line-height:1.6;">请同时查看 Xcode 控制台中的 <code>[EduMindWeb]</code> 日志、probe 日志和 mount watchdog 输出。</div>
+          </div>
+        </div>
+        """
+    }
+
+    private static func escapeHTML(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "\n", with: "<br />")
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKURLSchemeHandler {
@@ -315,6 +403,7 @@ private struct H5WebView: UIViewRepresentable {
 
         static let logHandlerName = "edumindLog"
         static let nativeBridgeHandlerName = "edumindNative"
+        static let pageStateHandlerName = "edumindPageState"
         static let offlineVideoScheme = "edumind-local"
         private static let offlineVideoHost = "offline-video"
         private static let offlineVideoManifestKey = "edumind.offline-video-manifest"
@@ -390,6 +479,36 @@ private struct H5WebView: UIViewRepresentable {
                 handlerName: handlerName,
                 version: version
               });
+            })();
+        """
+
+        static let pageStateBridgeScript = """
+            (function() {
+              if (window.__edumindPageStateBridge) return;
+
+              function normalizePayload(payload) {
+                if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+                  return payload;
+                }
+                return {
+                  rawValue: payload == null ? '' : String(payload)
+                };
+              }
+
+              function report(payload) {
+                try {
+                  window.webkit.messageHandlers.edumindPageState.postMessage(normalizePayload(payload));
+                  return true;
+                } catch (error) {
+                  return false;
+                }
+              }
+
+              window.__edumindPageStateBridge = {
+                report: report
+              };
+
+              window.__edumindReportPageState = report;
             })();
         """
 
@@ -641,8 +760,10 @@ private struct H5WebView: UIViewRepresentable {
                 EduMindLog.error("Lifecycle", "load timeout watchdog fired")
                 self?.showErrorPage(
                     in: webView,
+                    code: .navigationTimeout,
                     title: "页面加载超时",
-                    details: "请执行：bash ios-app/sync_ios_web_assets.sh\n若仍失败，请检查 WebAssets/index.html 与 index.js 是否在 App 包内。"
+                    details: "页面在预期时间内未完成加载，请检查前端资源是否已经同步到 App 包内。",
+                    recovery: "请执行：bash ios-app/sync_ios_web_assets.sh；若仍失败，再检查 WebAssets/index.html、index.js、index.css 是否在 App 包内。"
                 )
             }
             loadTimeoutWorkItem = work
@@ -719,6 +840,8 @@ private struct H5WebView: UIViewRepresentable {
                 "bridgeVersion": 1,
                 "supportsOfflineTranscription": true,
                 "supportsNativeVideoPicker": true,
+                "supportsPageStateReporting": true,
+                "pageStateHandlerName": Self.pageStateHandlerName,
                 "transcriptionEngine": "apple_speech_on_device",
                 "requiresSpeechAuthorization": true,
                 "availableActions": [
@@ -727,6 +850,63 @@ private struct H5WebView: UIViewRepresentable {
                     "startOfflineTranscription"
                 ]
             ]
+        }
+
+        private func jsonString(from value: Any) -> String {
+            guard JSONSerialization.isValidJSONObject(value),
+                  let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+                  let text = String(data: data, encoding: .utf8)
+            else {
+                return String(describing: value)
+            }
+            return text
+        }
+
+        private func firstString(in payload: [String: Any], keys: [String]) -> String {
+            for key in keys {
+                let rawValue = payload[key]
+                let text = String(describing: rawValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                if !text.isEmpty, text != "<null>" {
+                    return text
+                }
+            }
+            return ""
+        }
+
+        private func firstBool(in payload: [String: Any], keys: [String]) -> Bool? {
+            for key in keys {
+                guard let rawValue = payload[key] else { continue }
+                if let boolValue = rawValue as? Bool {
+                    return boolValue
+                }
+                let text = String(describing: rawValue).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                switch text {
+                case "true", "1", "yes", "on":
+                    return true
+                case "false", "0", "no", "off":
+                    return false
+                default:
+                    continue
+                }
+            }
+            return nil
+        }
+
+        private func handlePageStateMessage(_ body: Any) {
+            guard let payload = body as? [String: Any] else {
+                EduMindLog.notice("PageState", "received non-object page state payload: \(String(describing: body))")
+                return
+            }
+
+            let route = firstString(in: payload, keys: ["route", "path", "href"])
+            let pageName = firstString(in: payload, keys: ["pageName", "page", "name"])
+            let businessId = firstString(in: payload, keys: ["businessId", "videoId", "noteId", "taskId", "id"])
+            let stage = firstString(in: payload, keys: ["stage", "status"])
+            let mounted = firstBool(in: payload, keys: ["mounted", "isMounted"])
+            EduMindLog.info(
+                "PageState",
+                "route=\(route.isEmpty ? "<unknown>" : route) page=\(pageName.isEmpty ? "<unknown>" : pageName) businessId=\(businessId.isEmpty ? "<none>" : businessId) mounted=\(mounted.map(String.init) ?? "<unknown>") stage=\(stage.isEmpty ? "<none>" : stage) payload=\(jsonString(from: payload))"
+            )
         }
 
         private func respondToNativeRequest(
@@ -1575,6 +1755,11 @@ private struct H5WebView: UIViewRepresentable {
                 return
             }
 
+            if message.name == Self.pageStateHandlerName {
+                handlePageStateMessage(message.body)
+                return
+            }
+
             guard message.name == Self.nativeBridgeHandlerName else { return }
             guard let body = message.body as? [String: Any] else {
                 EduMindLog.error("Bridge", "received invalid native bridge payload: \(String(describing: message.body))")
@@ -1592,24 +1777,41 @@ private struct H5WebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
             finishLoad()
             EduMindLog.error("WebView", "didFail navigation: \(error.localizedDescription)")
-            showErrorPage(in: webView, title: "页面加载失败", details: error.localizedDescription)
+            showErrorPage(
+                in: webView,
+                code: .navigationFail,
+                title: "页面加载失败",
+                details: error.localizedDescription,
+                recovery: "请优先检查 Xcode 控制台中的导航错误、WebAssets 是否完整，以及 index.html 是否引用了正确的 index.js/index.css。"
+            )
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             finishLoad()
             EduMindLog.error("WebView", "didFailProvisionalNavigation: \(error.localizedDescription)")
-            showErrorPage(in: webView, title: "页面初始化失败", details: error.localizedDescription)
+            showErrorPage(
+                in: webView,
+                code: .navigationInitFail,
+                title: "页面初始化失败",
+                details: error.localizedDescription,
+                recovery: "请优先检查本地 index.html 是否存在、read access 路径是否正确，以及前端是否仍输出 iOS 预期的打包布局。"
+            )
         }
 
-        private func showErrorPage(in webView: WKWebView, title: String, details: String) {
-            EduMindLog.error("WebView", "showErrorPage title=\(title) details=\(details)")
-            let html = """
-            <div style="font-family:-apple-system;padding:20px;color:#111827;">
-              <h2 style="margin:0 0 10px;">\(title)</h2>
-              <pre style="white-space:pre-wrap;background:#f3f4f6;border-radius:10px;padding:12px;">\(details)</pre>
-            </div>
-            """
-            webView.loadHTMLString(html, baseURL: nil)
+        private func showErrorPage(
+            in webView: WKWebView,
+            code: WebViewErrorCode,
+            title: String,
+            details: String,
+            recovery: String
+        ) {
+            H5WebView.renderErrorPage(
+                in: webView,
+                code: code,
+                title: title,
+                details: details,
+                recovery: recovery
+            )
         }
 
         func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
