@@ -87,18 +87,38 @@ async def get_video_subtitles(video_id: int, db: Session = Depends(get_db)):
     if not video:
         raise HTTPException(status_code=404, detail=f"未找到ID为{video_id}的视频")
 
-    subtitles = db.query(Subtitle).filter(Subtitle.video_id == video_id).all()
+    subtitles = db.query(Subtitle).filter(Subtitle.video_id == video_id).order_by(Subtitle.start_time.asc()).all()
 
-    subtitle_list = [
-        {
-            "id": sub.id,
-            "start_time": sub.start_time,
-            "end_time": sub.end_time,
-            "text": sub.text,
-            "language": sub.language,
-        }
-        for sub in subtitles
-    ]
+    if subtitles:
+        subtitle_list = [
+            {
+                "id": sub.id,
+                "start_time": sub.start_time,
+                "end_time": sub.end_time,
+                "text": sub.text,
+                "language": sub.language,
+            }
+            for sub in subtitles
+        ]
+    else:
+        subtitle_list = []
+        if video.subtitle_filepath and os.path.exists(video.subtitle_filepath):
+            try:
+                with open(video.subtitle_filepath, "r", encoding="utf-8") as handle:
+                    subtitle_content = handle.read()
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail=f"读取字幕文件时出错: {str(exc)}")
+
+            subtitle_list = [
+                {
+                    "id": None,
+                    "start_time": item["start_time"],
+                    "end_time": item["end_time"],
+                    "text": item["text"],
+                    "language": "zh",
+                }
+                for item in parse_srt_content(subtitle_content)
+            ]
 
     return {
         "status": "success",

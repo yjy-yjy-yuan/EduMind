@@ -81,6 +81,79 @@ const videos = [
   }
 ]
 
+const subtitleLibrary = {
+  1: [
+    { id: 101, video_id: 1, start_time: 8, end_time: 18, text: '导数本质上描述函数变化率，可以理解为切线斜率的极限。', source: 'asr', language: 'zh' },
+    { id: 102, video_id: 1, start_time: 22, end_time: 34, text: '当自变量增量趋近于零时，平均变化率就逼近瞬时变化率。', source: 'asr', language: 'zh' },
+    { id: 103, video_id: 1, start_time: 40, end_time: 52, text: '几何意义上，导数对应曲线在某一点的切线斜率。', source: 'asr', language: 'zh' },
+    { id: 104, video_id: 1, start_time: 60, end_time: 74, text: '常见求导法则包括常数法则、幂函数法则和和差法则。', source: 'asr', language: 'zh' },
+    { id: 105, video_id: 1, start_time: 76, end_time: 92, text: '复合函数求导要用链式法则，先求外层再乘内层导数。', source: 'asr', language: 'zh' },
+    { id: 106, video_id: 1, start_time: 96, end_time: 110, text: '遇到隐函数求导时，要对两边同时求导并整理 dy/dx。', source: 'asr', language: 'zh' }
+  ],
+  2: [
+    { id: 201, video_id: 2, start_time: 10, end_time: 24, text: '一般现在时强调习惯、事实和经常发生的动作。', source: 'asr', language: 'zh' },
+    { id: 202, video_id: 2, start_time: 28, end_time: 42, text: '一般过去时用于描述已经完成并结束的动作。', source: 'asr', language: 'zh' },
+    { id: 203, video_id: 2, start_time: 45, end_time: 60, text: '现在完成时更强调结果以及对现在的影响。', source: 'asr', language: 'zh' },
+    { id: 204, video_id: 2, start_time: 64, end_time: 80, text: '判断时态时要看时间状语和语境，而不是只背固定词。', source: 'asr', language: 'zh' }
+  ],
+  3: [
+    { id: 301, video_id: 3, start_time: 12, end_time: 26, text: '列表适合按顺序存储和遍历，支持通过索引访问元素。', source: 'asr', language: 'zh' },
+    { id: 302, video_id: 3, start_time: 30, end_time: 46, text: '字典适合键值映射场景，查找和更新通常更高效。', source: 'asr', language: 'zh' },
+    { id: 303, video_id: 3, start_time: 50, end_time: 68, text: '选择列表还是字典，要根据访问方式和数据组织方式来定。', source: 'asr', language: 'zh' }
+  ]
+}
+
+const semanticSubtitleLibrary = {
+  1: [
+    {
+      start_time: 8,
+      end_time: 34,
+      title: '导数定义',
+      text: '导数本质上描述函数变化率，可以理解为切线斜率的极限。当自变量增量趋近于零时，平均变化率就逼近瞬时变化率。'
+    },
+    {
+      start_time: 40,
+      end_time: 52,
+      title: '几何意义',
+      text: '几何意义上，导数对应曲线在某一点的切线斜率。'
+    },
+    {
+      start_time: 60,
+      end_time: 110,
+      title: '求导法则',
+      text: '常见求导法则包括常数法则、幂函数法则和和差法则。复合函数求导要用链式法则，先求外层再乘内层导数。遇到隐函数求导时，要对两边同时求导并整理 dy/dx。'
+    }
+  ],
+  2: [
+    {
+      start_time: 10,
+      end_time: 42,
+      title: '基础时态',
+      text: '一般现在时强调习惯、事实和经常发生的动作。一般过去时用于描述已经完成并结束的动作。'
+    },
+    {
+      start_time: 45,
+      end_time: 80,
+      title: '完成时辨析',
+      text: '现在完成时更强调结果以及对现在的影响。判断时态时要看时间状语和语境，而不是只背固定词。'
+    }
+  ],
+  3: [
+    {
+      start_time: 12,
+      end_time: 46,
+      title: '列表与字典',
+      text: '列表适合按顺序存储和遍历，支持通过索引访问元素。字典适合键值映射场景，查找和更新通常更高效。'
+    },
+    {
+      start_time: 50,
+      end_time: 68,
+      title: '结构选择',
+      text: '选择列表还是字典，要根据访问方式和数据组织方式来定。'
+    }
+  ]
+}
+
 const notes = [
   {
     id: 1,
@@ -184,6 +257,8 @@ const mockResponse = (data) =>
   })
 
 const findVideo = (videoId) => videos.find((item) => Number(item.id) === Number(videoId))
+const findVideoSubtitles = (videoId) => clone(subtitleLibrary[Number(videoId)] || [])
+const findMergedVideoSubtitles = (videoId) => clone(semanticSubtitleLibrary[Number(videoId)] || [])
 
 const tickVideoProgress = (video) => {
   if (!video) return
@@ -403,6 +478,23 @@ export const mockGenerateVideoTags = (videoId) => {
   video.tags = Array.isArray(video.tags) && video.tags.length > 0 ? video.tags : ['重点知识', '视频复盘', '学习标签']
   video.updated_at = nowISO()
   return mockResponse({ success: true, tags: clone(video.tags) })
+}
+
+export const mockGetVideoSubtitles = (videoId) => {
+  const video = findVideo(videoId)
+  if (!video) return Promise.reject(new Error('视频不存在（UI 模式）'))
+  return mockResponse({
+    status: 'success',
+    video_id: Number(videoId),
+    video_status: String(video.status || ''),
+    subtitles: findVideoSubtitles(videoId)
+  })
+}
+
+export const mockGetMergedVideoSubtitles = (videoId) => {
+  const video = findVideo(videoId)
+  if (!video) return Promise.reject(new Error('视频不存在（UI 模式）'))
+  return mockResponse(findMergedVideoSubtitles(videoId))
 }
 
 export const mockGetNotes = (params = {}) => {
