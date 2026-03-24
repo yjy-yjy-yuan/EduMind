@@ -381,7 +381,6 @@ const normalizeNoteList = (payload) => {
 }
 
 const normalizeNote = (payload) => payload?.note || payload?.data || payload || null
-
 const loadVideoNotes = async () => {
   notesLoading.value = true
   try {
