@@ -12,22 +12,28 @@ from typing import Optional
 
 from app.core.config import settings
 from app.core.database import get_db
+from app.models.subtitle import Subtitle
 from app.models.video import Video
+from app.models.video import VideoProcessingOrigin
 from app.models.video import VideoStatus
+from app.schemas.video import OfflineTranscriptSyncRequest
+from app.schemas.video import TranscriptSummaryRequest
 from app.schemas.video import VideoDetail
 from app.schemas.video import VideoListResponse
 from app.schemas.video import VideoProcessingOptionsResponse
 from app.schemas.video import VideoProcessRequest
+from app.schemas.video import VideoStatusResponse
 from app.schemas.video import VideoSummaryRequest
 from app.schemas.video import VideoTagRequest
 from app.schemas.video import VideoUploadResponse
 from app.schemas.video import VideoUploadURL
-from app.schemas.video import VideoStatusResponse
+from app.services.video_content_service import generate_primary_topic_name
+from app.services.video_content_service import generate_video_summary
+from app.services.video_content_service import normalize_summary_style
+from app.services.video_content_service import read_subtitle_text
 from app.services.video_processing_registry import forget_video_processing_request
 from app.services.video_processing_registry import get_video_processing_request
 from app.services.video_processing_registry import remember_video_processing_request
-from app.services.video_content_service import normalize_summary_style
-from app.services.video_content_service import read_subtitle_text
 from app.services.whisper_runtime import get_supported_whisper_models
 from app.services.whisper_runtime import get_whisper_model_catalog
 from app.services.whisper_runtime import normalize_whisper_model_name
@@ -205,7 +211,9 @@ def infer_model_from_step(step: Optional[str]) -> Optional[str]:
 
 def build_processing_metadata(video: Video) -> dict:
     request_meta = get_video_processing_request(video.id) or {}
-    requested_model = str(request_meta.get("requested_model") or "").strip() or infer_model_from_step(video.current_step)
+    requested_model = str(request_meta.get("requested_model") or "").strip() or infer_model_from_step(
+        video.current_step
+    )
     effective_model = str(request_meta.get("effective_model") or requested_model or "").strip() or None
     requested_language = str(request_meta.get("requested_language") or "").strip() or None
     return {
@@ -219,6 +227,63 @@ def serialize_video(video: Video) -> dict:
     payload = video.to_dict()
     payload.update(build_processing_metadata(video))
     return payload
+
+
+def normalize_offline_filename(original_name: str, original_ext: str = "") -> str:
+    text = secure_filename_with_chinese(str(original_name or "").strip()) or "ios-offline-video"
+    ext = str(original_ext or "").strip().lower()
+    if ext and not ext.startswith("."):
+        ext = f".{ext}"
+    return f"{text}{ext}" if ext and not text.lower().endswith(ext) else text
+
+
+def build_offline_video_title(summary: str, *, fallback_title: str = "") -> str:
+    result = generate_primary_topic_name(summary, title=fallback_title)
+    if result.get("success"):
+        return str(result["name"]).strip()
+    fallback = secure_filename_with_chinese(fallback_title) or "iOS离线视频"
+    return fallback[:80]
+
+
+def sync_offline_subtitles(db: Session, video_id: int, transcript_text: str, segments, *, locale: str = "") -> int:
+    db.query(Subtitle).filter(Subtitle.video_id == video_id).delete()
+    rows = []
+    language = "en" if str(locale or "").lower().startswith("en") else "zh"
+
+    for segment in segments or []:
+        text = str(segment.text or "").strip()
+        if not text:
+            continue
+        start = max(0.0, float(segment.start or 0.0))
+        duration = max(0.0, float(segment.duration or 0.0))
+        end = start + duration if duration > 0 else start
+        rows.append(
+            Subtitle(
+                video_id=video_id,
+                start_time=start,
+                end_time=end,
+                text=text,
+                source="asr",
+                language=language,
+            )
+        )
+
+    if not rows and str(transcript_text or "").strip():
+        rows.append(
+            Subtitle(
+                video_id=video_id,
+                start_time=0.0,
+                end_time=0.0,
+                text=str(transcript_text).strip(),
+                source="asr",
+                language=language,
+            )
+        )
+
+    if rows:
+        db.add_all(rows)
+    db.commit()
+    return len(rows)
 
 
 def extract_video_transcript_text(video: Video) -> str:
@@ -439,7 +504,9 @@ async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
     if existing_video:
         return VideoUploadResponse(
             id=existing_video.id,
-            status=existing_video.status.value if hasattr(existing_video.status, "value") else str(existing_video.status),
+            status=(
+                existing_video.status.value if hasattr(existing_video.status, "value") else str(existing_video.status)
+            ),
             message="该视频链接已提交过",
             duplicate=True,
             data=serialize_video(existing_video),
@@ -569,6 +636,15 @@ async def get_video_list(
                     "process_progress": video.process_progress or 0,
                     "current_step": video.current_step,
                     "error_message": video.error_message,
+                    "task_id": video.task_id,
+                    "processing_origin": (
+                        video.processing_origin.value
+                        if hasattr(video.processing_origin, "value")
+                        else str(video.processing_origin)
+                    ),
+                    "processing_origin_label": (
+                        "iOS 离线处理" if video.processing_origin == VideoProcessingOrigin.IOS_OFFLINE else "在线处理"
+                    ),
                 }
                 video_data.update(build_processing_metadata(video))
                 result.append(video_data)
@@ -641,6 +717,12 @@ async def get_video_status(video_id: int, db: Session = Depends(get_db)):
         "current_step": video.current_step or "",
         "task_id": video.task_id,
         "error_message": video.error_message,
+        "processing_origin": (
+            video.processing_origin.value if hasattr(video.processing_origin, "value") else str(video.processing_origin)
+        ),
+        "processing_origin_label": (
+            "iOS 离线处理" if video.processing_origin == VideoProcessingOrigin.IOS_OFFLINE else "在线处理"
+        ),
         **build_processing_metadata(video),
     }
 
@@ -651,6 +733,8 @@ async def process_video_route(video_id: int, request: VideoProcessRequest, db: S
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="视频不存在")
+    if video.processing_origin == VideoProcessingOrigin.IOS_OFFLINE:
+        raise HTTPException(status_code=400, detail="该记录来自 iOS 本地离线处理，不能走后端重新处理")
 
     allowed_statuses = [VideoStatus.UPLOADED, VideoStatus.PENDING, VideoStatus.FAILED, VideoStatus.COMPLETED]
     if video.status not in allowed_statuses:
@@ -817,6 +901,119 @@ async def generate_summary(video_id: int, request: VideoSummaryRequest, db: Sess
     except Exception as exc:
         logger.error("生成视频摘要失败 | video_id=%s | error=%s", video_id, exc)
         raise HTTPException(status_code=500, detail="摘要生成失败，请稍后重试")
+
+
+@router.post("/generate-summary-from-transcript")
+async def generate_summary_from_transcript(request: TranscriptSummaryRequest):
+    """基于转录文本直接生成摘要，供本地离线转录结果复用在线摘要能力。"""
+    transcript_text = (request.transcript_text or "").strip()
+    if not transcript_text:
+        raise HTTPException(status_code=400, detail="转录文本为空，无法生成摘要")
+
+    try:
+        from app.services.video_content_service import generate_video_summary
+
+        result = generate_video_summary(
+            0,
+            "",
+            transcript_text=transcript_text,
+            title=request.title or "",
+            style=request.style,
+        )
+        if not result["success"]:
+            raise HTTPException(status_code=500, detail=f"生成摘要失败: {result['error']}")
+
+        return {
+            "success": True,
+            "summary": result["summary"],
+            "style": result.get("style"),
+            "provider": result.get("provider"),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("基于转录文本生成摘要失败 | error=%s", exc)
+        raise HTTPException(status_code=500, detail="摘要生成失败，请稍后重试")
+
+
+@router.post("/sync-offline-transcript")
+async def sync_offline_transcript(request: OfflineTranscriptSyncRequest, db: Session = Depends(get_db)):
+    """将 iOS 本地离线转录结果同步到 videos 表与 subtitles 表。"""
+    transcript_text = str(request.transcript_text or "").strip()
+    if not transcript_text:
+        raise HTTPException(status_code=400, detail="转录文本为空，无法同步到视频库")
+
+    summary_text = str(request.summary or "").strip()
+    normalized_style = normalize_summary_style(request.summary_style)
+    if not summary_text:
+        summary_result = generate_video_summary(
+            0,
+            "",
+            transcript_text=transcript_text,
+            title=request.file_name or "",
+            style=normalized_style,
+        )
+        if not summary_result.get("success"):
+            raise HTTPException(status_code=500, detail=f"生成摘要失败: {summary_result.get('error')}")
+        summary_text = str(summary_result.get("summary") or "").strip()
+
+    title = build_offline_video_title(summary_text, fallback_title=request.file_name or "")
+    filename = normalize_offline_filename(request.file_name, request.file_ext)
+    task_id = str(request.task_id or "").strip()
+    video = (
+        db.query(Video)
+        .filter(Video.task_id == task_id, Video.processing_origin == VideoProcessingOrigin.IOS_OFFLINE)
+        .first()
+    )
+    is_new = video is None
+
+    if is_new:
+        video = Video(
+            title=title,
+            filename=filename,
+            filepath=None,
+            status=VideoStatus.COMPLETED,
+            process_progress=100.0,
+            current_step="iOS 本地离线转录已同步",
+            summary=summary_text,
+            task_id=task_id,
+            processing_origin=VideoProcessingOrigin.IOS_OFFLINE,
+        )
+        db.add(video)
+        db.commit()
+        db.refresh(video)
+    else:
+        video.title = title
+        video.filename = filename
+        video.status = VideoStatus.COMPLETED
+        video.process_progress = 100.0
+        video.current_step = "iOS 本地离线转录已同步"
+        video.summary = summary_text
+        video.error_message = None
+        video.processing_origin = VideoProcessingOrigin.IOS_OFFLINE
+        db.commit()
+        db.refresh(video)
+
+    subtitle_count = sync_offline_subtitles(
+        db,
+        video.id,
+        transcript_text,
+        request.segments,
+        locale=request.locale,
+    )
+    payload = serialize_video(video)
+    payload["offline_engine"] = request.engine
+    payload["offline_locale"] = request.locale
+    payload["subtitle_count"] = subtitle_count
+    payload["file_size"] = request.file_size
+
+    return {
+        "success": True,
+        "id": video.id,
+        "duplicate": not is_new,
+        "message": "本地离线转录结果已同步到视频库",
+        "video": payload,
+    }
 
 
 @router.post("/{video_id}/generate-tags")

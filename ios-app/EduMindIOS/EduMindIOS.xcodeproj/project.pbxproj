@@ -266,6 +266,7 @@
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "用于在同一局域网内访问 MacBook 上运行的 EduMind FastAPI 服务。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "用于录制学习视频时采集音频。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于从照片中选择并上传学习视频。";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "用于将本地学习视频中的语音内容转换为文字。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -314,6 +315,7 @@
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "用于在同一局域网内访问 MacBook 上运行的 EduMind FastAPI 服务。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "用于录制学习视频时采集音频。";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于从照片中选择并上传学习视频。";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "用于将本地学习视频中的语音内容转换为文字。";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

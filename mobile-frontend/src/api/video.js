@@ -1,5 +1,6 @@
 import request from '@/utils/request'
 import { shouldUseMockApi } from '@/config'
+import { getBackendUnavailableMessage, hasReachableBackendConfig, isBackendUnavailableError } from '@/services/networkStatus'
 import {
   mockDeleteVideo,
   mockGenerateVideoSummary,
@@ -11,6 +12,11 @@ import {
   mockUploadLocalVideo,
   mockUploadVideoUrl
 } from '@/api/mockGateway'
+
+export const hasLiveVideoBackend = () => hasReachableBackendConfig()
+export const isVideoUploadQueueableError = (error) => isBackendUnavailableError(error)
+export const getVideoUploadQueueableMessage = (error, fallback = '后端暂时不可达') =>
+  getBackendUnavailableMessage(error, fallback)
 
 export function getVideoList(page = 1, pageSize = 10) {
   if (shouldUseMockApi()) return mockGetVideoList(page, pageSize)
@@ -70,6 +76,61 @@ export function uploadVideoUrl(data) {
 export function generateVideoSummary(videoId, data = {}) {
   if (shouldUseMockApi()) return mockGenerateVideoSummary(videoId, data)
   return request({ url: `/api/videos/${videoId}/generate-summary`, method: 'post', data, timeout: 120000, retry: 0 })
+}
+
+export function generateTranscriptSummary(data = {}) {
+  if (shouldUseMockApi()) {
+    const source = String(data?.transcript_text || '').trim()
+    const trimmed = source.replace(/\s+/g, ' ')
+    const preview = trimmed.slice(0, 120)
+    return Promise.resolve({
+      data: {
+        success: true,
+        style: String(data?.style || 'study'),
+        provider: 'mock',
+        summary: preview ? `UI 模式摘要：${preview}${trimmed.length > preview.length ? '…' : ''}` : 'UI 模式摘要：当前转录文本为空。'
+      },
+      status: 200
+    })
+  }
+  return request({
+    url: '/api/videos/generate-summary-from-transcript',
+    method: 'post',
+    data,
+    timeout: 120000,
+    retry: 0
+  })
+}
+
+export function syncOfflineTranscriptToVideo(data = {}) {
+  if (shouldUseMockApi()) {
+    return Promise.resolve({
+      data: {
+        success: true,
+        id: Number(data?.video_id || 900001),
+        duplicate: false,
+        message: 'UI 模式：本地离线转录结果已同步到视频库',
+        video: {
+          id: Number(data?.video_id || 900001),
+          title: String(data?.file_name || '本地视频'),
+          status: 'completed',
+          task_id: String(data?.task_id || ''),
+          processing_origin: 'ios_offline',
+          processing_origin_label: 'iOS 离线处理',
+          upload_source: 'ios_offline',
+          upload_source_label: 'iOS 离线处理'
+        }
+      },
+      status: 200
+    })
+  }
+  return request({
+    url: '/api/videos/sync-offline-transcript',
+    method: 'post',
+    data,
+    timeout: 120000,
+    retry: 0
+  })
 }
 
 export function generateVideoTags(videoId, data = {}) {

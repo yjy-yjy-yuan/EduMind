@@ -1,5 +1,22 @@
 # 变更日志
 
+## 2026-03-23
+
+### 离线补跑提示与链接幂等测试补强
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：最近上传卡片右侧标签改为区分“离线队列 / 补跑中 / 在线任务 / 重复”，避免把离线排队任务误读成已经在线成功。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充链接导入重复提交复用 existing video，以及历史 `FAILED` 链接允许重新提交的 API 测试，固化当前后端幂等行为。
+
+## 2026-03-21
+
+### Upload 页接入离线排队与自动补跑触发
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/App.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/App.vue)、[`mobile-frontend/src/services/offlineQueue.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/offlineQueue.js)：上传页在本地文件/链接导入遇到后端不可达、超时或可重试 5xx 时，会将任务写入 IndexedDB 离线队列并立刻展示到最近上传；应用启动、Upload 页进入以及页面从后台回到前台时会自动触发离线补跑，补跑成功后再接回现有 `videoId + 状态轮询` 链路。
+- 更新 [`mobile-frontend/src/services/videoStatus.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/videoStatus.js)：补充离线排队与自动补跑中的状态文案，便于最近上传列表区分在线处理和离线补跑阶段。
+- 更新 [`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：将“是否可加入离线队列”的错误判定收口到视频 API 层，并在列表页/详情页增加离线补跑提示，明确无视频 ID 的任务仍在上传页等待自动补跑。
+
+### 离线队列基础设施
+- 新增 [`mobile-frontend/src/services/offlineQueue.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/offlineQueue.js)：补充基于 IndexedDB 的离线任务存取层，固定使用 `edumind_offline_queue / offline_tasks / taskId` 结构，并预置本地上传、链接导入、失败退避、状态更新等基础能力，供后续 Upload 页接入离线补跑。
+- 新增 [`mobile-frontend/src/services/networkStatus.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/networkStatus.js)：统一识别“后端地址已配置但后端不可达”的网络错误、超时与可重试 5xx，作为上传失败进入离线队列的判定基础。
+
 ## 2026-03-20
 
 ### 用户资料支持修改用户名与头像
@@ -381,3 +398,79 @@
 
 - 更正 [`mobile-frontend/src/api/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/auth.js)、[`mobile-frontend/src/store/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/store/auth.js)：认证相关请求不再只要 `UI_ONLY_MODE` 打开就强制走 mock；现在与视频接口保持一致，仅在“没有配置后端地址时”才使用 UI-only 数据。已有的假 token / 假用户缓存也会在切回真实后端时自动清理，避免页面继续显示 `demo_user` 却不写入 MySQL `users` 表。
 - 更正 [`mobile-frontend/src/config/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/config/index.js)、[`mobile-frontend/src/api/note.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/note.js)、[`mobile-frontend/src/views/Login.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Login.vue)、[`mobile-frontend/src/views/Register.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Register.vue)：前端默认不再静默开启 UI-only 模式；笔记接口也与认证/视频统一按“无后端地址时才 mock”处理，登录注册失败时会优先展示后端返回的真实错误，避免页面看似可用但 MySQL 一直没有新数据。
+
+## 2026-03-23
+
+### iOS 原生离线转录架构规则与桥接骨架
+
+- 更新 [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)：正式将 `ios-app/` 收口为“`WKWebView` 容器 + 原生离线执行层”，允许 iOS 本地文件访问、音频提取、原生桥接和端侧转录，并要求前端通过 `WKWebView` bridge 与原生层通信。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：新增 `edumindNative` 原生桥 handler，在 WebView 注入统一的请求/响应协议，首批支持 `ping` 和 `getCapabilities`，为后续本地视频选择、音频提取和端侧转录预留稳定入口。
+- 新增 [`mobile-frontend/src/services/nativeBridge.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeBridge.js)、更新 [`mobile-frontend/src/main.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/main.js)：前端新增原生桥服务层并在启动时自动探测 iOS 原生桥能力，后续页面只通过该服务访问原生离线能力，不直接散落 `window.webkit.messageHandlers` 调用。
+
+### iOS 本地视频离线转录最小闭环
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)、[`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：新增 `startOfflineTranscription` 原生 action，接入 iOS 本地视频选择、音频提取、Apple Speech 端侧识别、进度事件和完成/失败回传，并补充语音识别权限文案。
+- 更新 [`mobile-frontend/src/services/nativeBridge.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeBridge.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/services/videoStatus.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/videoStatus.js)：上传页新增 “iOS 本地离线转录” 入口和结果展示区，前端通过原生桥发起本地转录，并统一展示 `preparing / extracting / transcribing / completed / failed` 状态。
+
+### 本地离线转录结果持久化与详情页
+
+- 新增 [`mobile-frontend/src/services/nativeOfflineTranscripts.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeOfflineTranscripts.js)：使用 IndexedDB 持久化 iOS 本地离线转录结果，保存状态、文本、分段、语言和更新时间，并通过前端事件通知页面同步刷新。
+- 新增 [`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)、更新 [`mobile-frontend/src/router/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/router/index.js)：增加本地离线转录详情路由 `/local-transcripts/:taskId`，支持查看完整文本、复制结果和删除本地记录。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：本地离线转录现在会在每次进度/完成/失败事件后自动写入 IndexedDB，并在上传页展示“本地转录历史”，支持从历史记录进入本地详情页。
+
+### 本地离线转录增加全局入口
+
+- 新增 [`mobile-frontend/src/views/LocalTranscripts.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscripts.vue)、更新 [`mobile-frontend/src/router/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/router/index.js)：新增本地离线转录列表页 `/local-transcripts`，支持按状态筛选、查看详情和删除结果。
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：首页和视频页增加本地离线转录入口，避免用户只能从上传页找到本地处理结果。
+
+### iOS 本地离线转录语言映射修正
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：原生离线转录现在会优先读取 `locale`，并将 `Other / 中文 / 中文/其他 / English / 英文` 等前端语言值统一归一成可用的 Apple Speech locale，避免把 `other` 直接传给 `SFSpeechRecognizer` 导致识别器初始化失败；同时补充任务启动时的请求语言和归一化 locale 日志，便于真机排查。
+- 更新 [`mobile-frontend/src/services/processingSettings.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/processingSettings.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：上传页发起 iOS 本地离线转录时，先将页面处理设置中的语言选项转换为原生侧可识别的 locale（例如 `zh-CN`、`en-US`），降低前后端枚举不一致造成的失败概率。
+
+### iOS 本地离线转录切片识别与本地缓存忽略规则
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：原生离线转录不再只把整段音频一次性交给 Apple Speech，而是将较长音频切成多个小片段顺序识别，并在最终结果中合并文本与时间片段；单个片段若返回 `No speech detected` 会记日志后跳过，不再直接让整条任务失败，从而提高长视频或含静音片段视频的稳定性。
+- 更新 [`.gitignore`](/Users/yuan/final-work/EduMind/.gitignore)：新增 `.swift-module-cache/`、`.xcode-derived*/`、`DerivedData/` 等本地 Xcode / Swift 构建缓存忽略规则，避免真机调试后的缓存文件误入 Git 暂存区并触发大文件 hook。
+
+### iOS 本地离线转录增加 Xcode 进度日志
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：每次本地离线转录进度事件、失败事件和完成事件现在都会直接写入 Xcode 控制台日志，日志中包含 `taskId / phase / progress / locale / message`，便于真机排查当前卡在音频提取、分片识别还是结果合并阶段。
+
+### iOS 本地离线转录日志增加文本进度条
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：Xcode 控制台中的原生离线转录日志现在会附带与在线处理风格接近的文本进度条，例如 `[██████░░░░░░░░] 45%`，便于快速判断当前任务推进到了哪个阶段。
+
+### iOS 本地离线转录改为重叠分片与去重合并
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：本地离线转录的音频分片从较长整段切换为更短的重叠分片，并在合并结果时对相邻片段做文本重叠去重；同时在进度日志里带出当前片段的 `start/duration`，用于定位漏句、断句和跨片段识别不连续的问题。
+
+### iOS 本地离线转录增加 16kHz 单声道预处理
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：每个待识别音频片段在送入 Apple Speech 前，会先转换为 `16kHz / 单声道 / PCM` 的识别友好格式；如果预处理失败则记录日志并回退到原始音频，优先提升长视频、远场收音和双声道视频的本地识别稳定性。
+
+### iOS 本地离线转录增加单任务保护
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：原生侧现在会拒绝在已有离线转录任务执行时再次启动新任务；上传页的“iOS 本地离线转录”按钮也会在任务真正完成或失败前保持忙碌态，避免用户重复点击导致并发转录、内存压力上升甚至真机进程被系统终止。
+
+### iOS 本地离线转录增加方言 / locale 明确选择
+
+- 更新 [`mobile-frontend/src/services/processingSettings.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/processingSettings.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)：为 iOS 本地离线转录新增独立的“本地识别语言/方言”设置，可明确选择普通话、粤语、吴语、繁体中文或英语，并单独持久化，不影响后端在线 Whisper 的语言参数。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)、[`mobile-frontend/src/views/LocalTranscripts.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscripts.vue)：原生离线转录对 `yue-CN`、`wuu-CN` 等 locale 增加识别器 fallback，前端各处本地结果页面也统一显示对应方言/语言标签，便于用户确认当前任务是否按正确 locale 识别。
+
+### 离线详情页对齐在线布局并增加本地视频播放器
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：iOS 容器新增 `edumind-local://offline-video/<taskId>` 本地视频自定义 scheme，并在离线任务创建时持久化任务到本地视频文件路径的映射，供 `WKWebView` 直接播放离线原始视频。
+- 更新 [`mobile-frontend/src/services/nativeBridge.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeBridge.js)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)：本地离线转录详情页的布局对齐在线视频详情页，新增 hero 区、状态/进度展示和动作按钮，并内嵌本地视频播放器；在 iOS 原生容器中可直接播放对应离线任务的本地原始视频，不再只显示转录文本。
+
+### 本地离线转录复用在线摘要生成
+
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)：新增基于 `transcript_text` 直接生成摘要的后端接口，复用现有 `video_content_service.generate_video_summary()`，避免把摘要逻辑下沉到前端页面。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充“本地转录文本生成摘要成功”和“空转录文本被拒绝”的 API 测试，覆盖新增摘要接口的主路径和错误路径。
+- 更新 [`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)、[`mobile-frontend/src/services/nativeOfflineTranscripts.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeOfflineTranscripts.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)：本地离线转录结果新增 `summary / summaryStatus / summaryStyle` 持久化字段；上传页在本地转录完成后会按当前处理设置自动尝试提取摘要，本地详情页新增与在线视频详情页一致的摘要区，并支持手动重生成。
+
+### 本地离线转录结果同步到 videos 表并生成主标题
+
+- 更新 [`backend_fastapi/app/models/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/video.py)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/scripts/init_db.py`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/init_db.py)：在同一张 `videos` 表中新增 `processing_origin`，明确区分 `online_backend` 与 `ios_offline`；新增 `sync-offline-transcript` 接口，将 iOS 本地离线转录结果写回 `videos` 与 `subtitles`，并基于摘要提炼最关键内容作为视频标题。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充本地离线结果写入 `videos` 表、标记 `ios_offline`、写入字幕分段，以及同一 `task_id` 更新不重复插入的 API 测试。
+- 更新 [`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)、[`mobile-frontend/src/services/nativeOfflineTranscripts.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeOfflineTranscripts.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：本地离线转录完成后会自动将结果同步进后端视频库；本地记录会保存 `syncedVideoId / syncStatus`；视频列表和首页识别 `ios_offline` 记录后优先跳转到本地详情页，避免误走在线播放器。

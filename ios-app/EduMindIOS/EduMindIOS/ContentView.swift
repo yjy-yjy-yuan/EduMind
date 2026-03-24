@@ -5,9 +5,13 @@
 //  Created by yuan on 2026/3/12.
 //
 
+@preconcurrency import AVFoundation
 import Foundation
 import OSLog
+import Speech
 import SwiftUI
+import UniformTypeIdentifiers
+import UIKit
 import WebKit
 
 private enum EduMindLogLevel {
@@ -123,9 +127,16 @@ private struct H5WebView: UIViewRepresentable {
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.allowsPictureInPictureMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
+        configuration.setURLSchemeHandler(context.coordinator, forURLScheme: Coordinator.offlineVideoScheme)
         configuration.userContentController.add(context.coordinator, name: Coordinator.logHandlerName)
+        configuration.userContentController.add(context.coordinator, name: Coordinator.nativeBridgeHandlerName)
         configuration.userContentController.addUserScript(WKUserScript(
             source: Self.nativeConfigScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: Coordinator.nativeBridgeScript,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))
@@ -146,6 +157,7 @@ private struct H5WebView: UIViewRepresentable {
         webView.backgroundColor = .systemBackground
         webView.isOpaque = false
         webView.navigationDelegate = context.coordinator
+        context.coordinator.attach(webView: webView)
         if #available(iOS 16.4, *) {
             webView.isInspectable = true
         }
@@ -159,6 +171,7 @@ private struct H5WebView: UIViewRepresentable {
     static func dismantleUIView(_ uiView: WKWebView, coordinator: Coordinator) {
         uiView.navigationDelegate = nil
         uiView.configuration.userContentController.removeScriptMessageHandler(forName: Coordinator.logHandlerName)
+        uiView.configuration.userContentController.removeScriptMessageHandler(forName: Coordinator.nativeBridgeHandlerName)
     }
 
     private func loadContent(into webView: WKWebView) {
@@ -234,8 +247,151 @@ private struct H5WebView: UIViewRepresentable {
         html.contains("src=\"./assets/index-") || html.contains("src='./assets/index-")
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKURLSchemeHandler {
+        private struct NativeSelectedVideo {
+            let taskId: String
+            let workingURL: URL
+            let fileName: String
+            let fileSize: Int
+            let fileExt: String
+        }
+
+        private struct NativeTranscriptionResult {
+            let text: String
+            let segments: [[String: Any]]
+            let localeIdentifier: String
+        }
+
+        private struct NativeAudioChunk {
+            let index: Int
+            let total: Int
+            let startSeconds: Double
+            let durationSeconds: Double
+            let url: URL
+            let requiresCleanup: Bool
+        }
+
+        private enum NativeOfflineTranscriptionError: LocalizedError {
+            case presenterUnavailable
+            case pickerBusy
+            case transcriptionBusy
+            case pickerCancelled
+            case invalidSelection
+            case audioExtractionUnavailable
+            case speechAuthorizationDenied
+            case recognizerUnavailable
+            case onDeviceRecognitionUnavailable
+            case emptyTranscript
+
+            var errorDescription: String? {
+                switch self {
+                case .presenterUnavailable:
+                    return "当前 iOS 容器无法打开本地视频选择器"
+                case .pickerBusy:
+                    return "已有一个原生离线转录任务正在选择视频，请稍后再试"
+                case .transcriptionBusy:
+                    return "已有一个原生离线转录任务正在执行，请等待完成后再试"
+                case .pickerCancelled:
+                    return "已取消本地视频选择"
+                case .invalidSelection:
+                    return "未能读取所选视频文件"
+                case .audioExtractionUnavailable:
+                    return "当前视频无法提取音频，无法进行本地转录"
+                case .speechAuthorizationDenied:
+                    return "未获得语音识别权限，无法进行本地离线转录"
+                case .recognizerUnavailable:
+                    return "当前设备不支持所选语言的语音识别"
+                case .onDeviceRecognitionUnavailable:
+                    return "当前设备或当前语言暂不支持 Apple 端侧离线识别"
+                case .emptyTranscript:
+                    return "本地识别已完成，但未生成可用文本"
+                }
+            }
+        }
+
+        private let offlineChunkDurationSeconds: Double = 15
+        private let offlineChunkOverlapSeconds: Double = 1.5
+        private let offlineMinimumChunkSeconds: Double = 1
+
         static let logHandlerName = "edumindLog"
+        static let nativeBridgeHandlerName = "edumindNative"
+        static let offlineVideoScheme = "edumind-local"
+        private static let offlineVideoHost = "offline-video"
+        private static let offlineVideoManifestKey = "edumind.offline-video-manifest"
+
+        static let nativeBridgeScript = """
+            (function() {
+              if (window.__edumindNativeBridge) return;
+
+              var handlerName = 'edumindNative';
+              var version = '1';
+              var eventPrefix = 'edumind-native:';
+              var seq = 0;
+              var pending = Object.create(null);
+
+              function dispatchEvent(name, detail) {
+                window.dispatchEvent(new CustomEvent(eventPrefix + name, {
+                  detail: detail || {}
+                }));
+              }
+
+              function send(action, payload) {
+                return new Promise(function(resolve, reject) {
+                  var requestId = 'native-' + Date.now() + '-' + (++seq);
+                  pending[requestId] = { resolve: resolve, reject: reject };
+                  try {
+                    window.webkit.messageHandlers[handlerName].postMessage({
+                      requestId: requestId,
+                      action: String(action || ''),
+                      payload: payload || {}
+                    });
+                  } catch (error) {
+                    delete pending[requestId];
+                    reject(error);
+                  }
+                });
+              }
+
+              window.__edumindHandleNativeResponse = function(message) {
+                var body = message || {};
+                var requestId = String(body.requestId || '');
+                var entry = pending[requestId];
+                if (!entry) return false;
+                delete pending[requestId];
+                if (body.success === false) {
+                  entry.reject(new Error(String(body.error || 'Native bridge request failed')));
+                  return true;
+                }
+                entry.resolve(body.payload || {});
+                return true;
+              };
+
+              window.__edumindReceiveNativeEvent = function(name, payload) {
+                dispatchEvent(String(name || 'event'), payload || {});
+                return true;
+              };
+
+              window.__edumindNativeBridge = {
+                version: version,
+                isAvailable: function() {
+                  return true;
+                },
+                send: send,
+                on: function(name, listener) {
+                  var eventName = eventPrefix + String(name || '');
+                  window.addEventListener(eventName, listener);
+                  return function() {
+                    window.removeEventListener(eventName, listener);
+                  };
+                }
+              };
+
+              dispatchEvent('bridge-ready', {
+                handlerName: handlerName,
+                version: version
+              });
+            })();
+        """
 
         static let consoleBridgeScript = """
             (function() {
@@ -350,6 +506,131 @@ private struct H5WebView: UIViewRepresentable {
 
         private var loadTimeoutWorkItem: DispatchWorkItem?
         private var probeWorkItems: [DispatchWorkItem] = []
+        private weak var webView: WKWebView?
+        private var pendingVideoPickerRequestId: String?
+        private var pendingVideoPickerPayload: [String: Any] = [:]
+        private var activeOfflineTasks: [String: Task<Void, Never>] = [:]
+
+        private func offlineVideoManifest() -> [String: String] {
+            UserDefaults.standard.dictionary(forKey: Self.offlineVideoManifestKey) as? [String: String] ?? [:]
+        }
+
+        private func saveOfflineVideoManifest(_ manifest: [String: String]) {
+            UserDefaults.standard.set(manifest, forKey: Self.offlineVideoManifestKey)
+        }
+
+        private func persistOfflineVideoURL(taskId: String, videoURL: URL) {
+            guard !taskId.isEmpty else { return }
+            var manifest = offlineVideoManifest()
+            manifest[taskId] = videoURL.path
+            saveOfflineVideoManifest(manifest)
+            EduMindLog.info("OfflineVideo", "taskId=\(taskId) stored path=\(videoURL.path)")
+        }
+
+        private func resolveOfflineVideoURL(taskId: String) -> URL? {
+            guard !taskId.isEmpty else { return nil }
+            let manifest = offlineVideoManifest()
+            guard let path = manifest[taskId], !path.isEmpty else { return nil }
+            let url = URL(fileURLWithPath: path)
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                var nextManifest = manifest
+                nextManifest.removeValue(forKey: taskId)
+                saveOfflineVideoManifest(nextManifest)
+                EduMindLog.notice("OfflineVideo", "taskId=\(taskId) missing file path=\(path)")
+                return nil
+            }
+            return url
+        }
+
+        private func mimeType(for fileURL: URL) -> String {
+            let ext = fileURL.pathExtension.lowercased()
+            if let type = UTType(filenameExtension: ext), let mimeType = type.preferredMIMEType {
+                return mimeType
+            }
+            return "video/mp4"
+        }
+
+        private func parseByteRange(_ rangeHeader: String, totalLength: Int64) -> (start: Int64, end: Int64)? {
+            let normalized = rangeHeader.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard normalized.hasPrefix("bytes=") else { return nil }
+            let rawRange = normalized.replacingOccurrences(of: "bytes=", with: "")
+            let parts = rawRange.split(separator: "-", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { return nil }
+
+            if parts[0].isEmpty {
+                guard let suffixLength = Int64(parts[1]), suffixLength > 0 else { return nil }
+                let clampedLength = min(suffixLength, totalLength)
+                return (max(0, totalLength - clampedLength), max(0, totalLength - 1))
+            }
+
+            guard let start = Int64(parts[0]), start >= 0 else { return nil }
+            let end = Int64(parts[1]) ?? (totalLength - 1)
+            guard start <= end else { return nil }
+            return (start, min(end, totalLength - 1))
+        }
+
+        private func respondWithOfflineVideo(
+            requestURL: URL,
+            videoURL: URL,
+            byteRangeHeader: String?,
+            to urlSchemeTask: WKURLSchemeTask
+        ) throws {
+            let attributes = try FileManager.default.attributesOfItem(atPath: videoURL.path)
+            let totalLength = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+            let mimeType = mimeType(for: videoURL)
+            let selectedRange = byteRangeHeader.flatMap { parseByteRange($0, totalLength: totalLength) }
+            let start = selectedRange?.start ?? 0
+            let end = selectedRange?.end ?? max(0, totalLength - 1)
+            let contentLength = max(0, end - start + 1)
+            let statusCode = selectedRange == nil ? 200 : 206
+
+            var headers: [String: String] = [
+                "Content-Type": mimeType,
+                "Accept-Ranges": "bytes",
+                "Content-Length": "\(contentLength)",
+                "Cache-Control": "no-store"
+            ]
+            if statusCode == 206 {
+                headers["Content-Range"] = "bytes \(start)-\(end)/\(totalLength)"
+            }
+
+            guard let response = HTTPURLResponse(
+                url: requestURL,
+                statusCode: statusCode,
+                httpVersion: "HTTP/1.1",
+                headerFields: headers
+            ) else {
+                throw NSError(domain: NSURLErrorDomain, code: NSURLErrorCannotDecodeContentData)
+            }
+
+            let handle = try FileHandle(forReadingFrom: videoURL)
+            defer {
+                try? handle.close()
+            }
+
+            try handle.seek(toOffset: UInt64(start))
+            urlSchemeTask.didReceive(response)
+
+            var remaining = contentLength
+            let chunkSize = 256 * 1024
+            while remaining > 0 {
+                let nextChunk = Int(min(Int64(chunkSize), remaining))
+                let data = try handle.read(upToCount: nextChunk) ?? Data()
+                if data.isEmpty { break }
+                urlSchemeTask.didReceive(data)
+                remaining -= Int64(data.count)
+            }
+
+            urlSchemeTask.didFinish()
+            EduMindLog.info(
+                "OfflineVideo",
+                "served taskUrl=\(requestURL.absoluteString) file=\(videoURL.lastPathComponent) status=\(statusCode) bytes=\(start)-\(end)"
+            )
+        }
+
+        func attach(webView: WKWebView) {
+            self.webView = webView
+        }
 
         func startLoadTimeout(for webView: WKWebView) {
             loadTimeoutWorkItem?.cancel()
@@ -432,15 +713,874 @@ private struct H5WebView: UIViewRepresentable {
             }
         }
 
-        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard message.name == Self.logHandlerName else { return }
-            if let body = message.body as? [String: Any] {
-                let level = String(describing: body["level"] ?? "log")
-                let payload = String(describing: body["payload"] ?? "")
-                EduMindLog.write(nativeLogLevel(for: level), payload)
+        private func nativeBridgeCapabilities() -> [String: Any] {
+            [
+                "platform": "ios",
+                "bridgeVersion": 1,
+                "supportsOfflineTranscription": true,
+                "supportsNativeVideoPicker": true,
+                "transcriptionEngine": "apple_speech_on_device",
+                "requiresSpeechAuthorization": true,
+                "availableActions": [
+                    "ping",
+                    "getCapabilities",
+                    "startOfflineTranscription"
+                ]
+            ]
+        }
+
+        private func respondToNativeRequest(
+            requestId: String,
+            success: Bool,
+            payload: [String: Any] = [:],
+            errorMessage: String? = nil
+        ) {
+            var responseBody: [String: Any] = [
+                "requestId": requestId,
+                "success": success,
+                "payload": payload
+            ]
+            responseBody["error"] = errorMessage ?? NSNull()
+
+            guard
+                let webView,
+                let data = try? JSONSerialization.data(
+                    withJSONObject: responseBody,
+                    options: []
+                ),
+                let json = String(data: data, encoding: .utf8)
+            else {
+                EduMindLog.error("Bridge", "failed to serialize native bridge response for requestId=\(requestId)")
                 return
             }
-            EduMindLog.notice("Bridge", String(describing: message.body))
+
+            let js = """
+            (function() {
+              if (typeof window.__edumindHandleNativeResponse === 'function') {
+                window.__edumindHandleNativeResponse(\(json));
+              }
+            })();
+            """
+            DispatchQueue.main.async {
+                webView.evaluateJavaScript(js) { _, error in
+                    if let error {
+                        EduMindLog.error("Bridge", "native response delivery failed requestId=\(requestId) error=\(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+
+        private func sendNativeEvent(name: String, payload: [String: Any]) {
+            guard
+                let webView,
+                let data = try? JSONSerialization.data(withJSONObject: payload, options: []),
+                let json = String(data: data, encoding: .utf8)
+            else {
+                EduMindLog.error("Bridge", "failed to serialize native event payload name=\(name)")
+                return
+            }
+
+            let escapedName = name
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "'", with: "\\'")
+
+            let js = """
+            (function() {
+              if (typeof window.__edumindReceiveNativeEvent === 'function') {
+                window.__edumindReceiveNativeEvent('\(escapedName)', \(json));
+              }
+            })();
+            """
+            DispatchQueue.main.async {
+                webView.evaluateJavaScript(js) { _, error in
+                    if let error {
+                        EduMindLog.error("Bridge", "native event delivery failed name=\(name) error=\(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+
+        private func topViewController() -> UIViewController? {
+            if let root = webView?.window?.rootViewController {
+                var current: UIViewController? = root
+                while let presented = current?.presentedViewController {
+                    current = presented
+                }
+                return current
+            }
+
+            let root = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap(\.windows)
+                .first(where: \.isKeyWindow)?
+                .rootViewController
+
+            var current = root
+            while let presented = current?.presentedViewController {
+                current = presented
+            }
+            return current
+        }
+
+        private func normalizeSpeechLocaleIdentifier(from payload: [String: Any]) -> String {
+            let source = payload["locale"] ?? payload["language"] ?? ""
+            let raw = String(describing: source).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if raw.isEmpty || raw == "auto" {
+                return Locale.preferredLanguages.first ?? "zh-CN"
+            }
+
+            switch raw {
+            case "other", "zh", "zh-cn", "zh_hans", "zh-hans", "chinese", "中文", "中文/其他":
+                return "zh-CN"
+            case "yue", "yue-cn", "粤语":
+                return "yue-CN"
+            case "wuu", "wuu-cn", "吴语":
+                return "wuu-CN"
+            case "zh-tw", "zh_hant", "zh-hant", "繁体中文":
+                return "zh-TW"
+            case "en", "en-us", "english", "英文":
+                return "en-US"
+            case "ja", "ja-jp", "japanese", "日文":
+                return "ja-JP"
+            default:
+                return raw
+            }
+        }
+
+        private func createWorkingDirectory() throws -> URL {
+            let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory
+            let dir = base.appendingPathComponent("OfflineTranscription", isDirectory: true)
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            return dir
+        }
+
+        private func copySelectedVideoToWorkingDirectory(from sourceURL: URL) throws -> URL {
+            let dir = try createWorkingDirectory()
+            let ext = sourceURL.pathExtension.isEmpty ? "mov" : sourceURL.pathExtension.lowercased()
+            let destinationURL = dir.appendingPathComponent("\(UUID().uuidString).\(ext)")
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+            try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+            return destinationURL
+        }
+
+        private func buildSelectedVideoMetadata(from sourceURL: URL) throws -> NativeSelectedVideo {
+            let workingURL = try copySelectedVideoToWorkingDirectory(from: sourceURL)
+            let values = try workingURL.resourceValues(forKeys: [.nameKey, .fileSizeKey])
+            let fileName = values.name ?? sourceURL.lastPathComponent
+            let fileSize = values.fileSize ?? 0
+            let fileExt = workingURL.pathExtension.lowercased()
+            return NativeSelectedVideo(
+                taskId: UUID().uuidString,
+                workingURL: workingURL,
+                fileName: fileName,
+                fileSize: fileSize,
+                fileExt: fileExt
+            )
+        }
+
+        private func startOfflineTranscriptionFlow(requestId: String, payload: [String: Any]) {
+            guard pendingVideoPickerRequestId == nil else {
+                respondToNativeRequest(
+                    requestId: requestId,
+                    success: false,
+                    errorMessage: NativeOfflineTranscriptionError.pickerBusy.localizedDescription
+                )
+                return
+            }
+
+            guard activeOfflineTasks.isEmpty else {
+                respondToNativeRequest(
+                    requestId: requestId,
+                    success: false,
+                    errorMessage: NativeOfflineTranscriptionError.transcriptionBusy.localizedDescription
+                )
+                return
+            }
+
+            guard let presenter = topViewController() else {
+                respondToNativeRequest(
+                    requestId: requestId,
+                    success: false,
+                    errorMessage: NativeOfflineTranscriptionError.presenterUnavailable.localizedDescription
+                )
+                return
+            }
+
+            pendingVideoPickerRequestId = requestId
+            pendingVideoPickerPayload = payload
+
+            let picker = UIDocumentPickerViewController(
+                forOpeningContentTypes: [UTType.movie, UTType.video],
+                asCopy: true
+            )
+            picker.delegate = self
+            picker.allowsMultipleSelection = false
+            presenter.present(picker, animated: true)
+        }
+
+        private func clearPendingVideoPickerState() {
+            pendingVideoPickerRequestId = nil
+            pendingVideoPickerPayload = [:]
+        }
+
+        private func offlineProgressBar(_ progress: Int, width: Int = 16) -> String {
+            let clamped = max(0, min(100, progress))
+            let filled = Int(round((Double(clamped) / 100.0) * Double(width)))
+            let fullBlocks = String(repeating: "█", count: max(0, min(width, filled)))
+            let emptyBlocks = String(repeating: "░", count: max(0, width - filled))
+            return "[\(fullBlocks)\(emptyBlocks)] \(String(format: "%3d%%", clamped))"
+        }
+
+        private func sendOfflineProgressEvent(
+            taskId: String,
+            fileName: String,
+            fileSize: Int,
+            phase: String,
+            progress: Int,
+            message: String,
+            localeIdentifier: String = ""
+        ) {
+            EduMindLog.info(
+                "OfflineTranscription",
+                "\(offlineProgressBar(progress)) taskId=\(taskId) phase=\(phase) locale=\(localeIdentifier.isEmpty ? "<auto>" : localeIdentifier) message=\(message)"
+            )
+            sendNativeEvent(name: "offline-transcription-progress", payload: [
+                "taskId": taskId,
+                "fileName": fileName,
+                "fileSize": fileSize,
+                "phase": phase,
+                "status": phase,
+                "progress": progress,
+                "message": message,
+                "locale": localeIdentifier,
+                "engine": "apple_speech_on_device"
+            ])
+        }
+
+        private func sendOfflineFailureEvent(
+            taskId: String,
+            fileName: String,
+            fileSize: Int,
+            message: String
+        ) {
+            EduMindLog.error(
+                "OfflineTranscription",
+                "\(offlineProgressBar(0)) taskId=\(taskId) phase=failed message=\(message)"
+            )
+            sendNativeEvent(name: "offline-transcription-failed", payload: [
+                "taskId": taskId,
+                "fileName": fileName,
+                "fileSize": fileSize,
+                "status": "failed",
+                "progress": 0,
+                "message": message,
+                "engine": "apple_speech_on_device"
+            ])
+        }
+
+        private func requestSpeechAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
+            await withCheckedContinuation { continuation in
+                SFSpeechRecognizer.requestAuthorization { status in
+                    continuation.resume(returning: status)
+                }
+            }
+        }
+
+        private func exportAudioTrack(from videoURL: URL, taskId: String) async throws -> URL {
+            let asset = AVURLAsset(url: videoURL)
+            guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+                throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+            }
+
+            let workingDirectory = try createWorkingDirectory()
+            let outputURL = workingDirectory.appendingPathComponent("\(taskId).m4a")
+            if FileManager.default.fileExists(atPath: outputURL.path) {
+                try FileManager.default.removeItem(at: outputURL)
+            }
+
+            exportSession.outputURL = outputURL
+            exportSession.outputFileType = .m4a
+            exportSession.shouldOptimizeForNetworkUse = false
+
+            return try await withCheckedThrowingContinuation { continuation in
+                exportSession.exportAsynchronously {
+                    switch exportSession.status {
+                    case .completed:
+                        continuation.resume(returning: outputURL)
+                    case .failed:
+                        continuation.resume(throwing: exportSession.error ?? NativeOfflineTranscriptionError.audioExtractionUnavailable)
+                    case .cancelled:
+                        continuation.resume(throwing: NativeOfflineTranscriptionError.pickerCancelled)
+                    default:
+                        continuation.resume(throwing: exportSession.error ?? NativeOfflineTranscriptionError.audioExtractionUnavailable)
+                    }
+                }
+            }
+        }
+
+        private func exportAudioChunk(
+            from audioURL: URL,
+            taskId: String,
+            chunkIndex: Int,
+            startSeconds: Double,
+            durationSeconds: Double
+        ) async throws -> URL {
+            let asset = AVURLAsset(url: audioURL)
+            guard let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+                throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+            }
+
+            let workingDirectory = try createWorkingDirectory()
+            let outputURL = workingDirectory.appendingPathComponent("\(taskId)-chunk-\(chunkIndex).m4a")
+            if FileManager.default.fileExists(atPath: outputURL.path) {
+                try FileManager.default.removeItem(at: outputURL)
+            }
+
+            exportSession.outputURL = outputURL
+            exportSession.outputFileType = .m4a
+            exportSession.shouldOptimizeForNetworkUse = false
+            exportSession.timeRange = CMTimeRange(
+                start: CMTime(seconds: startSeconds, preferredTimescale: 600),
+                duration: CMTime(seconds: durationSeconds, preferredTimescale: 600)
+            )
+
+            return try await withCheckedThrowingContinuation { continuation in
+                exportSession.exportAsynchronously {
+                    switch exportSession.status {
+                    case .completed:
+                        continuation.resume(returning: outputURL)
+                    case .failed:
+                        continuation.resume(throwing: exportSession.error ?? NativeOfflineTranscriptionError.audioExtractionUnavailable)
+                    case .cancelled:
+                        continuation.resume(throwing: NativeOfflineTranscriptionError.pickerCancelled)
+                    default:
+                        continuation.resume(throwing: exportSession.error ?? NativeOfflineTranscriptionError.audioExtractionUnavailable)
+                    }
+                }
+            }
+        }
+
+        private func normalizeAudioForSpeechRecognition(
+            sourceURL: URL,
+            taskId: String,
+            chunkIndex: Int
+        ) throws -> URL {
+            let inputFile = try AVAudioFile(forReading: sourceURL)
+            guard let outputFormat = AVAudioFormat(
+                commonFormat: .pcmFormatInt16,
+                sampleRate: 16_000,
+                channels: 1,
+                interleaved: false
+            ) else {
+                throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+            }
+            guard let converter = AVAudioConverter(from: inputFile.processingFormat, to: outputFormat) else {
+                throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+            }
+
+            converter.sampleRateConverterQuality = AVAudioQuality.max.rawValue
+
+            let workingDirectory = try createWorkingDirectory()
+            let outputURL = workingDirectory.appendingPathComponent("\(taskId)-speech-\(chunkIndex).caf")
+            if FileManager.default.fileExists(atPath: outputURL.path) {
+                try FileManager.default.removeItem(at: outputURL)
+            }
+
+            let outputFile = try AVAudioFile(
+                forWriting: outputURL,
+                settings: outputFormat.settings,
+                commonFormat: outputFormat.commonFormat,
+                interleaved: outputFormat.isInterleaved
+            )
+
+            let inputFrameCapacity: AVAudioFrameCount = 8_192
+            let ratio = outputFormat.sampleRate / max(inputFile.processingFormat.sampleRate, 1)
+            let outputFrameCapacity = AVAudioFrameCount(max(4_096, Int(Double(inputFrameCapacity) * ratio) + 1_024))
+
+            while true {
+                guard let inputBuffer = AVAudioPCMBuffer(
+                    pcmFormat: inputFile.processingFormat,
+                    frameCapacity: inputFrameCapacity
+                ) else {
+                    throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+                }
+                try inputFile.read(into: inputBuffer)
+                if inputBuffer.frameLength == 0 {
+                    break
+                }
+
+                guard let outputBuffer = AVAudioPCMBuffer(
+                    pcmFormat: outputFormat,
+                    frameCapacity: outputFrameCapacity
+                ) else {
+                    throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+                }
+
+                var conversionError: NSError?
+                let status = converter.convert(to: outputBuffer, error: &conversionError) { _, outStatus in
+                    outStatus.pointee = .haveData
+                    return inputBuffer
+                }
+
+                if let conversionError {
+                    throw conversionError
+                }
+                if status == .error {
+                    throw NativeOfflineTranscriptionError.audioExtractionUnavailable
+                }
+                if outputBuffer.frameLength > 0 {
+                    try outputFile.write(from: outputBuffer)
+                }
+            }
+
+            EduMindLog.info(
+                "OfflineTranscription",
+                "taskId=\(taskId) prepared speech audio chunk=\(chunkIndex + 1) sourceRate=\(String(format: "%.0f", inputFile.processingFormat.sampleRate))Hz sourceChannels=\(inputFile.processingFormat.channelCount) targetRate=16000Hz targetChannels=1"
+            )
+            return outputURL
+        }
+
+        private func buildAudioChunks(audioURL: URL, taskId: String) async throws -> [NativeAudioChunk] {
+            let asset = AVURLAsset(url: audioURL)
+            let loadedDuration = try await asset.load(.duration)
+            let duration = CMTimeGetSeconds(loadedDuration)
+            let safeDuration = duration.isFinite && duration > 0 ? duration : 0
+
+            guard safeDuration > offlineChunkDurationSeconds else {
+                return [
+                    NativeAudioChunk(
+                        index: 0,
+                        total: 1,
+                        startSeconds: 0,
+                        durationSeconds: max(safeDuration, offlineMinimumChunkSeconds),
+                        url: audioURL,
+                        requiresCleanup: false
+                    )
+                ]
+            }
+
+            let stepSeconds = max(offlineChunkDurationSeconds - offlineChunkOverlapSeconds, offlineMinimumChunkSeconds)
+            var rawChunks: [(start: Double, duration: Double, url: URL)] = []
+            var startSeconds = 0.0
+            var chunkIndex = 0
+
+            while startSeconds < safeDuration {
+                let remaining = safeDuration - startSeconds
+                let durationSeconds = max(min(offlineChunkDurationSeconds, remaining), offlineMinimumChunkSeconds)
+                let chunkURL = try await exportAudioChunk(
+                    from: audioURL,
+                    taskId: taskId,
+                    chunkIndex: chunkIndex,
+                    startSeconds: startSeconds,
+                    durationSeconds: durationSeconds
+                )
+                rawChunks.append((
+                    start: startSeconds,
+                    duration: durationSeconds,
+                    url: chunkURL
+                ))
+                if startSeconds + durationSeconds >= safeDuration {
+                    break
+                }
+                startSeconds += stepSeconds
+                chunkIndex += 1
+            }
+
+            let chunkCount = rawChunks.count
+            let chunks = rawChunks.enumerated().map { index, chunk in
+                NativeAudioChunk(
+                    index: index,
+                    total: chunkCount,
+                    startSeconds: chunk.start,
+                    durationSeconds: chunk.duration,
+                    url: chunk.url,
+                    requiresCleanup: true
+                )
+            }
+
+            EduMindLog.info(
+                "OfflineTranscription",
+                "taskId=\(taskId) audioDuration=\(String(format: "%.2f", safeDuration))s chunkDuration=\(String(format: "%.1f", offlineChunkDurationSeconds))s overlap=\(String(format: "%.1f", offlineChunkOverlapSeconds))s chunks=\(chunkCount)"
+            )
+            return chunks
+        }
+
+        private func mergeTranscriptionText(_ existingText: String, _ nextText: String) -> String {
+            let left = existingText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let right = nextText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if left.isEmpty { return right }
+            if right.isEmpty { return left }
+            if left.hasSuffix(right) { return left }
+            if right.hasPrefix(left) { return right }
+
+            let leftChars = Array(left)
+            let rightChars = Array(right)
+            let maxOverlap = min(48, min(leftChars.count, rightChars.count))
+
+            if maxOverlap >= 4 {
+                for length in stride(from: maxOverlap, through: 4, by: -1) {
+                    if Array(leftChars.suffix(length)) == Array(rightChars.prefix(length)) {
+                        return left + String(rightChars.dropFirst(length))
+                    }
+                }
+            }
+
+            let suffixSample = String(leftChars.suffix(min(8, leftChars.count)))
+            let prefixSample = String(rightChars.prefix(min(8, rightChars.count)))
+            if !suffixSample.isEmpty, suffixSample == prefixSample {
+                return left + String(rightChars.dropFirst(suffixSample.count))
+            }
+
+            return left + "\n" + right
+        }
+
+        private func isNoSpeechDetectedError(_ error: Error) -> Bool {
+            let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return message.contains("no speech detected") || message.contains("未检测到语音")
+        }
+
+        private func buildSpeechRecognizer(localeIdentifier: String) throws -> SFSpeechRecognizer {
+            let fallbackCandidates: [String]
+            switch localeIdentifier.lowercased() {
+            case "yue-cn":
+                fallbackCandidates = ["yue-CN", "zh-HK", "zh-CN", "zh-TW"]
+            case "wuu-cn":
+                fallbackCandidates = ["wuu-CN", "zh-CN", "zh-HK"]
+            case "zh-tw":
+                fallbackCandidates = ["zh-TW", "zh-HK", "zh-CN"]
+            case "en-us":
+                fallbackCandidates = ["en-US", "en-GB"]
+            default:
+                fallbackCandidates = [localeIdentifier, Locale.preferredLanguages.first ?? "", "zh-CN", "en-US"]
+            }
+            let candidates = Array(NSOrderedSet(array: fallbackCandidates.filter { !$0.isEmpty })) as? [String] ?? fallbackCandidates.filter { !$0.isEmpty }
+
+            for candidate in candidates {
+                if let recognizer = SFSpeechRecognizer(locale: Locale(identifier: candidate)) {
+                    EduMindLog.info("OfflineTranscription", "using recognizer locale=\(recognizer.locale.identifier) requested=\(localeIdentifier)")
+                    return recognizer
+                }
+            }
+
+            throw NativeOfflineTranscriptionError.recognizerUnavailable
+        }
+
+        private func transcribeAudioChunk(
+            recognizer: SFSpeechRecognizer,
+            audioChunk: NativeAudioChunk,
+            taskId: String,
+            fileName: String,
+            fileSize: Int
+        ) async throws -> NativeTranscriptionResult {
+            let chunkLabel = audioChunk.total > 1 ? "（\(audioChunk.index + 1)/\(audioChunk.total)）" : ""
+            let progressBase = 55 + Int((Double(audioChunk.index) / Double(max(audioChunk.total, 1))) * 30)
+            let progressPeak = min(progressBase + 25, 95)
+            let chunkWindow = "start=\(String(format: "%.1f", audioChunk.startSeconds))s duration=\(String(format: "%.1f", audioChunk.durationSeconds))s"
+            var preparedAudioURL: URL? = nil
+
+            do {
+                preparedAudioURL = try normalizeAudioForSpeechRecognition(
+                    sourceURL: audioChunk.url,
+                    taskId: taskId,
+                    chunkIndex: audioChunk.index
+                )
+            } catch {
+                EduMindLog.notice(
+                    "OfflineTranscription",
+                    "taskId=\(taskId) chunk=\(audioChunk.index + 1)/\(audioChunk.total) normalize-audio-failed fallback=original reason=\(error.localizedDescription)"
+                )
+            }
+
+            let recognitionAudioURL = preparedAudioURL ?? audioChunk.url
+            defer {
+                if let preparedAudioURL {
+                    try? FileManager.default.removeItem(at: preparedAudioURL)
+                }
+            }
+
+            sendOfflineProgressEvent(
+                taskId: taskId,
+                fileName: fileName,
+                fileSize: fileSize,
+                phase: "transcribing",
+                progress: progressBase,
+                message: "正在进行本地语音识别\(chunkLabel) · \(chunkWindow)",
+                localeIdentifier: recognizer.locale.identifier
+            )
+
+            let request = SFSpeechURLRecognitionRequest(url: recognitionAudioURL)
+            request.requiresOnDeviceRecognition = true
+            request.shouldReportPartialResults = true
+            if #available(iOS 16.0, *) {
+                request.addsPunctuation = true
+            }
+            request.taskHint = .dictation
+
+            return try await withCheckedThrowingContinuation { continuation in
+                var hasResumed = false
+                var recognitionTask: SFSpeechRecognitionTask?
+
+                recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+                    guard let self else { return }
+
+                    if let result {
+                        let partialText = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !partialText.isEmpty {
+                            self.sendOfflineProgressEvent(
+                                taskId: taskId,
+                                fileName: fileName,
+                                fileSize: fileSize,
+                                phase: "transcribing",
+                                progress: result.isFinal ? progressPeak : min(progressBase + 10, progressPeak - 5),
+                                message: "正在进行本地语音识别\(chunkLabel) · \(chunkWindow)",
+                                localeIdentifier: recognizer.locale.identifier
+                            )
+                        }
+
+                        if result.isFinal && !hasResumed {
+                            hasResumed = true
+                            let text = partialText
+                            let segments = result.bestTranscription.segments.map { segment in
+                                [
+                                    "text": segment.substring,
+                                    "start": segment.timestamp + audioChunk.startSeconds,
+                                    "duration": segment.duration,
+                                    "confidence": segment.confidence
+                                ]
+                            }
+                            if text.isEmpty {
+                                continuation.resume(throwing: NativeOfflineTranscriptionError.emptyTranscript)
+                            } else {
+                                continuation.resume(returning: NativeTranscriptionResult(
+                                    text: text,
+                                    segments: segments,
+                                    localeIdentifier: recognizer.locale.identifier
+                                ))
+                            }
+                            recognitionTask?.cancel()
+                            recognitionTask = nil
+                            return
+                        }
+                    }
+
+                    if let error, !hasResumed {
+                        hasResumed = true
+                        continuation.resume(throwing: error)
+                        recognitionTask?.cancel()
+                        recognitionTask = nil
+                    }
+                }
+            }
+        }
+
+        private func transcribeAudioFile(
+            taskId: String,
+            audioURL: URL,
+            fileName: String,
+            fileSize: Int,
+            localeIdentifier: String
+        ) async throws -> NativeTranscriptionResult {
+            let authorizationStatus = await requestSpeechAuthorization()
+            guard authorizationStatus == .authorized else {
+                throw NativeOfflineTranscriptionError.speechAuthorizationDenied
+            }
+
+            let recognizer = try buildSpeechRecognizer(localeIdentifier: localeIdentifier)
+            guard recognizer.supportsOnDeviceRecognition else {
+                throw NativeOfflineTranscriptionError.onDeviceRecognitionUnavailable
+            }
+            let chunks = try await buildAudioChunks(audioURL: audioURL, taskId: taskId)
+            var mergedText = ""
+            var chunkSegments: [[String: Any]] = []
+
+            for chunk in chunks {
+                do {
+                    let chunkResult = try await transcribeAudioChunk(
+                        recognizer: recognizer,
+                        audioChunk: chunk,
+                        taskId: taskId,
+                        fileName: fileName,
+                        fileSize: fileSize
+                    )
+                    if !chunkResult.text.isEmpty {
+                        let nextMergedText = mergeTranscriptionText(mergedText, chunkResult.text)
+                        if nextMergedText != mergedText {
+                            mergedText = nextMergedText
+                        }
+                    }
+                    chunkSegments.append(contentsOf: chunkResult.segments)
+                } catch {
+                    if isNoSpeechDetectedError(error) {
+                        EduMindLog.notice(
+                            "OfflineTranscription",
+                            "taskId=\(taskId) skip chunk \(chunk.index + 1)/\(chunk.total) start=\(String(format: "%.2f", chunk.startSeconds))s reason=no-speech"
+                        )
+                    } else {
+                        if chunk.requiresCleanup {
+                            try? FileManager.default.removeItem(at: chunk.url)
+                        }
+                        throw error
+                    }
+                }
+
+                if chunk.requiresCleanup {
+                    try? FileManager.default.removeItem(at: chunk.url)
+                }
+            }
+
+            let finalText = mergedText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if finalText.isEmpty {
+                throw NativeOfflineTranscriptionError.emptyTranscript
+            }
+
+            return NativeTranscriptionResult(
+                text: finalText,
+                segments: chunkSegments,
+                localeIdentifier: recognizer.locale.identifier
+            )
+        }
+
+        private func runOfflineTranscription(task: NativeSelectedVideo, payload: [String: Any]) async {
+            let localeIdentifier = normalizeSpeechLocaleIdentifier(from: payload)
+            let requestedLanguage = String(describing: payload["locale"] ?? payload["language"] ?? "")
+            EduMindLog.info(
+                "OfflineTranscription",
+                "taskId=\(task.taskId) requestedLanguage=\(requestedLanguage) normalizedLocale=\(localeIdentifier)"
+            )
+
+            do {
+                sendOfflineProgressEvent(
+                    taskId: task.taskId,
+                    fileName: task.fileName,
+                    fileSize: task.fileSize,
+                    phase: "preparing",
+                    progress: 5,
+                    message: "已选择本地视频，准备提取音频",
+                    localeIdentifier: localeIdentifier
+                )
+
+                sendOfflineProgressEvent(
+                    taskId: task.taskId,
+                    fileName: task.fileName,
+                    fileSize: task.fileSize,
+                    phase: "extracting",
+                    progress: 25,
+                    message: "正在提取本地视频音频",
+                    localeIdentifier: localeIdentifier
+                )
+                let audioURL = try await exportAudioTrack(from: task.workingURL, taskId: task.taskId)
+
+                sendOfflineProgressEvent(
+                    taskId: task.taskId,
+                    fileName: task.fileName,
+                    fileSize: task.fileSize,
+                    phase: "transcribing",
+                    progress: 55,
+                    message: "音频提取完成，开始本地离线识别",
+                    localeIdentifier: localeIdentifier
+                )
+                let transcription = try await transcribeAudioFile(
+                    taskId: task.taskId,
+                    audioURL: audioURL,
+                    fileName: task.fileName,
+                    fileSize: task.fileSize,
+                    localeIdentifier: localeIdentifier
+                )
+
+                EduMindLog.info(
+                    "OfflineTranscription",
+                    "\(offlineProgressBar(100)) taskId=\(task.taskId) phase=completed textLength=\(transcription.text.count) segments=\(transcription.segments.count)"
+                )
+                sendNativeEvent(name: "offline-transcription-completed", payload: [
+                    "taskId": task.taskId,
+                    "fileName": task.fileName,
+                    "fileSize": task.fileSize,
+                    "fileExt": task.fileExt,
+                    "status": "completed",
+                    "progress": 100,
+                    "message": "本地离线转录完成",
+                    "locale": transcription.localeIdentifier,
+                    "engine": "apple_speech_on_device",
+                    "transcriptText": transcription.text,
+                    "segments": transcription.segments
+                ])
+            } catch {
+                EduMindLog.error("OfflineTranscription", "taskId=\(task.taskId) failed error=\(error.localizedDescription)")
+                sendOfflineFailureEvent(
+                    taskId: task.taskId,
+                    fileName: task.fileName,
+                    fileSize: task.fileSize,
+                    message: error.localizedDescription
+                )
+            }
+
+            activeOfflineTasks[task.taskId] = nil
+        }
+
+        private func handleNativeBridgeMessage(_ body: [String: Any]) {
+            let requestId = String(describing: body["requestId"] ?? "")
+            let action = String(describing: body["action"] ?? "")
+            let payload = body["payload"] as? [String: Any] ?? [:]
+
+            guard !requestId.isEmpty else {
+                EduMindLog.error("Bridge", "received native bridge message without requestId")
+                return
+            }
+
+            EduMindLog.info("Bridge", "native action=\(action) payload=\(payload)")
+
+            switch action {
+            case "ping":
+                let formatter = ISO8601DateFormatter()
+                respondToNativeRequest(
+                    requestId: requestId,
+                    success: true,
+                    payload: [
+                        "platform": "ios",
+                        "bridgeVersion": 1,
+                        "timestamp": formatter.string(from: Date())
+                    ]
+                )
+            case "getCapabilities":
+                respondToNativeRequest(
+                    requestId: requestId,
+                    success: true,
+                    payload: nativeBridgeCapabilities()
+                )
+            case "startOfflineTranscription":
+                startOfflineTranscriptionFlow(requestId: requestId, payload: payload)
+            default:
+                respondToNativeRequest(
+                    requestId: requestId,
+                    success: false,
+                    errorMessage: "Unsupported native bridge action: \(action)"
+                )
+            }
+        }
+
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == Self.logHandlerName {
+                if let body = message.body as? [String: Any] {
+                    let level = String(describing: body["level"] ?? "log")
+                    let payload = String(describing: body["payload"] ?? "")
+                    EduMindLog.write(nativeLogLevel(for: level), payload)
+                    return
+                }
+                EduMindLog.notice("Bridge", String(describing: message.body))
+                return
+            }
+
+            guard message.name == Self.nativeBridgeHandlerName else { return }
+            guard let body = message.body as? [String: Any] else {
+                EduMindLog.error("Bridge", "received invalid native bridge payload: \(String(describing: message.body))")
+                return
+            }
+            handleNativeBridgeMessage(body)
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -470,6 +1610,99 @@ private struct H5WebView: UIViewRepresentable {
             </div>
             """
             webView.loadHTMLString(html, baseURL: nil)
+        }
+
+        func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
+            guard let requestURL = urlSchemeTask.request.url else {
+                urlSchemeTask.didFailWithError(NSError(domain: NSURLErrorDomain, code: NSURLErrorBadURL))
+                return
+            }
+
+            guard requestURL.host == Self.offlineVideoHost else {
+                urlSchemeTask.didFailWithError(NSError(domain: NSURLErrorDomain, code: NSURLErrorUnsupportedURL))
+                return
+            }
+
+            let taskId = requestURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).removingPercentEncoding ?? ""
+            guard let videoURL = resolveOfflineVideoURL(taskId: taskId) else {
+                EduMindLog.error("OfflineVideo", "taskId=\(taskId) unresolved request=\(requestURL.absoluteString)")
+                urlSchemeTask.didFailWithError(NSError(domain: NSURLErrorDomain, code: NSURLErrorFileDoesNotExist))
+                return
+            }
+
+            do {
+                try respondWithOfflineVideo(
+                    requestURL: requestURL,
+                    videoURL: videoURL,
+                    byteRangeHeader: urlSchemeTask.request.value(forHTTPHeaderField: "Range"),
+                    to: urlSchemeTask
+                )
+            } catch {
+                EduMindLog.error("OfflineVideo", "taskId=\(taskId) failed error=\(error.localizedDescription)")
+                urlSchemeTask.didFailWithError(error)
+            }
+        }
+
+        func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {
+            guard let requestURL = urlSchemeTask.request.url else { return }
+            EduMindLog.debug("OfflineVideo", "stop request=\(requestURL.absoluteString)")
+        }
+    }
+}
+
+extension H5WebView.Coordinator: UIDocumentPickerDelegate {
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        guard let requestId = pendingVideoPickerRequestId else { return }
+        clearPendingVideoPickerState()
+        respondToNativeRequest(
+            requestId: requestId,
+            success: false,
+            errorMessage: NativeOfflineTranscriptionError.pickerCancelled.localizedDescription
+        )
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let requestId = pendingVideoPickerRequestId else { return }
+        let payload = pendingVideoPickerPayload
+        clearPendingVideoPickerState()
+
+        guard let sourceURL = urls.first else {
+            respondToNativeRequest(
+                requestId: requestId,
+                success: false,
+                errorMessage: NativeOfflineTranscriptionError.invalidSelection.localizedDescription
+            )
+            return
+        }
+
+        do {
+            let task = try buildSelectedVideoMetadata(from: sourceURL)
+            persistOfflineVideoURL(taskId: task.taskId, videoURL: task.workingURL)
+            respondToNativeRequest(
+                requestId: requestId,
+                success: true,
+                payload: [
+                    "taskId": task.taskId,
+                    "fileName": task.fileName,
+                    "fileSize": task.fileSize,
+                    "fileExt": task.fileExt,
+                    "status": "preparing",
+                    "engine": "apple_speech_on_device",
+                    "message": "已选择本地视频，开始本地离线转录"
+                ]
+            )
+
+            let work = Task { [weak self] in
+                guard let self else { return }
+                await self.runOfflineTranscription(task: task, payload: payload)
+            }
+            activeOfflineTasks[task.taskId] = work
+        } catch {
+            respondToNativeRequest(
+                requestId: requestId,
+                success: false,
+                errorMessage: error.localizedDescription
+            )
         }
     }
 }

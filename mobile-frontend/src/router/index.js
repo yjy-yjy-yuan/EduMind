@@ -6,6 +6,8 @@ import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
 import Videos from '@/views/Videos.vue'
 import VideoDetail from '@/views/VideoDetail.vue'
+import LocalTranscripts from '@/views/LocalTranscripts.vue'
+import LocalTranscriptDetail from '@/views/LocalTranscriptDetail.vue'
 import Player from '@/views/Player.vue'
 import Upload from '@/views/Upload.vue'
 import Notes from '@/views/Notes.vue'
@@ -23,7 +25,9 @@ const router = createRouter({
   routes: [
     { path: '/', name: 'Home', component: Home, meta: { title: '首页' } },
     { path: '/videos', name: 'Videos', component: Videos, meta: { title: '视频' } },
+    { path: '/local-transcripts', name: 'LocalTranscripts', component: LocalTranscripts, meta: { title: '本地转录' } },
     { path: '/videos/:id', name: 'VideoDetail', component: VideoDetail, meta: { title: '视频详情' } },
+    { path: '/local-transcripts/:taskId', name: 'LocalTranscriptDetail', component: LocalTranscriptDetail, meta: { title: '本地转录详情' } },
     { path: '/player/:id', name: 'Player', component: Player, meta: { title: '播放', hideTabBar: true } },
     { path: '/upload', name: 'Upload', component: Upload, meta: { title: '上传' } },
     { path: '/notes', name: 'Notes', component: Notes, meta: { title: '笔记', requiresAuth: true } },

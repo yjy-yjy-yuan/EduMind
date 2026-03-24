@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
+import { bootstrapNativeBridge } from '@/services/nativeBridge'
 import './styles.css'
 
 window.__edumindBootStarted = true
@@ -40,6 +41,18 @@ pushBootTrace('main:module-start', `protocol=${window.location.protocol}`)
 pushBootTrace('document:readyState', document.readyState)
 pushBootInfo('Bootstrap', 'started', `href=${window.location.href}`)
 pushBootDebug('Bootstrap', 'user-agent', navigator.userAgent)
+
+bootstrapNativeBridge()
+  .then((state) => {
+    if (!state?.available) {
+      pushBootDebug('NativeBridge', 'unavailable', 'running without iOS native bridge')
+      return
+    }
+    pushBootInfo('NativeBridge', 'ready', JSON.stringify(state.capabilities || {}))
+  })
+  .catch((error) => {
+    pushBootError('NativeBridge', 'bootstrap-failed', error?.message || String(error || 'Unknown native bridge error'))
+  })
 
 document.addEventListener('DOMContentLoaded', () => {
   pushBootTrace('document:DOMContentLoaded', describeContainer())

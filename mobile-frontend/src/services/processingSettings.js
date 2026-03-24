@@ -5,6 +5,7 @@ const MODEL_CATALOG_STORAGE_KEY = 'm_whisper_model_catalog'
 
 export const PROCESSING_DEFAULTS = Object.freeze({
   language: 'Other',
+  nativeLocale: 'auto',
   model: 'base',
   autoGenerateSummary: true,
   autoGenerateTags: true,
@@ -52,7 +53,17 @@ export const LANGUAGE_OPTIONS = Object.freeze([
   { value: 'English', label: '英文' }
 ])
 
+export const NATIVE_LOCALE_OPTIONS = Object.freeze([
+  { value: 'auto', label: '自动选择' },
+  { value: 'zh-CN', label: '普通话（简体中文）' },
+  { value: 'yue-CN', label: '粤语' },
+  { value: 'wuu-CN', label: '吴语' },
+  { value: 'zh-TW', label: '繁体中文' },
+  { value: 'en-US', label: '英语（美国）' }
+])
+
 const ALLOWED_LANGUAGES = new Set(LANGUAGE_OPTIONS.map((item) => item.value))
+const ALLOWED_NATIVE_LOCALES = new Set(NATIVE_LOCALE_OPTIONS.map((item) => item.value))
 const ALLOWED_SUMMARY_STYLES = new Set(SUMMARY_STYLE_OPTIONS.map((item) => item.value))
 const DEFAULT_MODEL_OPTIONS = WHISPER_MODEL_OPTIONS.map((item) => ({ ...item }))
 const DEFAULT_MODEL_META = { ...WHISPER_MODEL_META }
@@ -135,6 +146,7 @@ export const normalizeProcessingSettings = (input = {}) => {
   const modelCatalog = getWhisperModelCatalog()
   const next = {
     language: ALLOWED_LANGUAGES.has(String(raw.language || '').trim()) ? String(raw.language).trim() : PROCESSING_DEFAULTS.language,
+    nativeLocale: ALLOWED_NATIVE_LOCALES.has(String(raw.nativeLocale || '').trim()) ? String(raw.nativeLocale).trim() : PROCESSING_DEFAULTS.nativeLocale,
     model: isAllowedModel(raw.model)
       ? String(raw.model).trim().toLowerCase()
       : modelCatalog.defaultModel,
@@ -191,3 +203,28 @@ export const whisperModelHighlight = (value) => {
   return getWhisperModelCatalog().meta[normalized]?.highlight || '适合当前视频处理场景。'
 }
 export const languageLabel = (value) => LANGUAGE_OPTIONS.find((item) => item.value === value)?.label || '中文/其他'
+
+export const nativeLocaleLabel = (value) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (!normalized || normalized === 'auto') return '自动语言'
+  return NATIVE_LOCALE_OPTIONS.find((item) => item.value.toLowerCase() === normalized)?.label || String(value || '')
+}
+
+export const nativeTranscriptionLocale = (value) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (!normalized || normalized === 'auto') return ''
+  if (['other', 'zh', 'zh-cn', 'chinese', '中文', '中文/其他'].includes(normalized)) return 'zh-CN'
+  if (['english', 'en', 'en-us', '英文'].includes(normalized)) return 'en-US'
+  if (['yue', 'yue-cn', '粤语'].includes(normalized)) return 'yue-CN'
+  if (['wuu', 'wuu-cn', '吴语'].includes(normalized)) return 'wuu-CN'
+  if (['ja', 'ja-jp', 'japanese', '日文'].includes(normalized)) return 'ja-JP'
+  return String(value || '').trim()
+}
+
+export const resolveNativeTranscriptionLocale = (input = {}) => {
+  const next = normalizeProcessingSettings(input)
+  if (next.nativeLocale && next.nativeLocale !== 'auto') {
+    return nativeTranscriptionLocale(next.nativeLocale)
+  }
+  return nativeTranscriptionLocale(next.language)
+}

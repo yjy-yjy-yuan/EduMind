@@ -11,10 +11,37 @@
 </template>
 
 <script setup>
+import { onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import TabBar from '@/components/TabBar.vue'
+import { flushOfflineQueue } from '@/services/offlineQueue'
 
 const route = useRoute()
+let wasHidden = typeof document !== 'undefined' ? document.visibilityState === 'hidden' : false
+
+const handleVisibilityChange = async () => {
+  if (typeof document === 'undefined') return
+  if (document.visibilityState === 'hidden') {
+    wasHidden = true
+    return
+  }
+  if (!wasHidden) return
+  wasHidden = false
+  await flushOfflineQueue()
+}
+
+onMounted(async () => {
+  await flushOfflineQueue()
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }
+})
 </script>
 
 <style scoped>

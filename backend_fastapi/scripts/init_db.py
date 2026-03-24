@@ -115,6 +115,35 @@ def sync_users_table_schema():
     print("users 表认证字段同步完成。")
 
 
+def sync_videos_table_schema():
+    """为现有 videos 表补齐离线同步字段。"""
+    if engine.dialect.name != "mysql":
+        return
+
+    inspector = inspect(engine)
+    if "videos" not in inspector.get_table_names():
+        return
+
+    columns = {column["name"]: column for column in inspector.get_columns("videos")}
+    statements = []
+
+    if "processing_origin" not in columns:
+        statements.append(
+            "ALTER TABLE videos ADD COLUMN processing_origin "
+            "ENUM('ONLINE_BACKEND','IOS_OFFLINE') NOT NULL DEFAULT 'ONLINE_BACKEND'"
+        )
+
+    if not statements:
+        print("videos 表离线同步字段已是最新结构。")
+        return
+
+    print("正在同步 videos 表离线同步字段...")
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
+    print("videos 表离线同步字段同步完成。")
+
+
 def init_database():
     """创建缺失的后端业务表，不删除现有数据。"""
     managed_tables = get_managed_tables()
@@ -122,6 +151,7 @@ def init_database():
     print("正在创建缺失的数据库表...")
     Base.metadata.create_all(bind=engine, tables=managed_tables, checkfirst=True)
     sync_users_table_schema()
+    sync_videos_table_schema()
     print("数据库表创建完成。")
     print_managed_tables()
 

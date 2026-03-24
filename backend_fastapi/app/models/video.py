@@ -33,6 +33,13 @@ class VideoStatus(str, Enum):
     DOWNLOADING = "downloading"  # 下载中（用于视频链接上传）
 
 
+class VideoProcessingOrigin(str, Enum):
+    """视频处理来源枚举"""
+
+    ONLINE_BACKEND = "online_backend"
+    IOS_OFFLINE = "ios_offline"
+
+
 class Video(Base):
     """视频模型"""
 
@@ -78,6 +85,11 @@ class Video(Base):
     # 内容分析
     summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tags: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON 字符串
+    processing_origin: Mapped[VideoProcessingOrigin] = mapped_column(
+        SQLEnum(VideoProcessingOrigin),
+        default=VideoProcessingOrigin.ONLINE_BACKEND,
+        nullable=False,
+    )
 
     # 关系
     subtitles: Mapped[List["Subtitle"]] = relationship("Subtitle", back_populates="video", lazy="selectin")
@@ -87,10 +99,14 @@ class Video(Base):
 
     def get_upload_source(self) -> str:
         """上传来源标识：本地文件或链接导入"""
+        if self.processing_origin == VideoProcessingOrigin.IOS_OFFLINE:
+            return "ios_offline"
         return "url_import" if self.url else "local_file"
 
     def get_upload_source_label(self) -> str:
         """上传来源中文标签"""
+        if self.processing_origin == VideoProcessingOrigin.IOS_OFFLINE:
+            return "iOS 离线处理"
         return "链接导入" if self.url else "本地上传"
 
     def get_upload_source_value(self) -> Optional[str]:
@@ -121,7 +137,16 @@ class Video(Base):
             "subtitle_filepath": self.subtitle_filepath,
             "process_progress": self.process_progress,
             "current_step": self.current_step,
+            "task_id": self.task_id,
             "error_message": self.error_message,
+            "processing_origin": (
+                self.processing_origin.value
+                if isinstance(self.processing_origin, VideoProcessingOrigin)
+                else self.processing_origin
+            ),
+            "processing_origin_label": (
+                "iOS 离线处理" if self.processing_origin == VideoProcessingOrigin.IOS_OFFLINE else "在线处理"
+            ),
             "upload_source": self.get_upload_source(),
             "upload_source_label": self.get_upload_source_label(),
             "upload_source_value": self.get_upload_source_value(),

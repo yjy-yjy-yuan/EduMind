@@ -32,12 +32,31 @@
       <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
         {{ busy ? '上传中…' : '开始上传' }}
       </button>
+      <button class="btn btn--native" @click="startNativeOfflineTranscriptionFlow" :disabled="busy || nativeBusy">
+        {{ nativeBusy ? '准备本地离线转录…' : 'iOS 本地离线转录' }}
+      </button>
+      <label class="field field--native">
+        <span class="field-label">本地识别语言/方言</span>
+        <select
+          class="input"
+          :value="processingSettings.nativeLocale"
+          :disabled="busy || nativeBusy"
+          @change="selectNativeLocale($event.target.value)"
+        >
+          <option v-for="option in NATIVE_LOCALE_OPTIONS" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
       <div class="muted">当前处理：{{ processingSettingsSummary }}</div>
+      <div class="muted">本地离线转录优先使用 iOS 原生识别能力，只处理当前设备上的本地视频，不依赖 FastAPI。</div>
+      <div class="muted">如果视频是粤语、吴语、繁体中文或明显口音内容，请先切换到更接近的本地识别语言/方言。</div>
 
       <div v-if="busy" class="progress">
         <div class="bar" :style="{ width: `${progress}%` }"></div>
       </div>
       <div v-if="busy" class="muted">进度：{{ progress }}%</div>
+      <div class="muted">离线补跑仅适用于已配置真实后端地址但暂时不可达；纯 UI ONLY 演示模式不会进入真实离线补跑。</div>
     </div>
 
     <div class="card">
@@ -46,6 +65,57 @@
       <button class="btn" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交链接' }}</button>
       <div class="muted">支持：B站、YouTube、中国大学慕课（icourse163）</div>
       <div class="muted">将沿用当前处理设置：{{ processingSettingsSummary }}</div>
+    </div>
+
+    <div v-if="nativeTask" class="card">
+      <div class="card-head">
+        <div class="card-title">iOS 本地离线转录</div>
+        <div class="card-head-actions">
+          <button class="link link--small" @click="openNativeTaskDetail(nativeTask.taskId)" :disabled="!nativeTask.taskId">查看详情</button>
+          <button class="link link--small" @click="clearNativeTask" :disabled="nativeBusy">清除结果</button>
+        </div>
+      </div>
+      <div class="recent-title">{{ nativeTask.fileName || '本地视频' }}</div>
+      <div class="muted">
+        {{ readableSize(nativeTask.fileSize) }} · {{ nativeTask.engineLabel }} · {{ nativeTask.localeLabel }}
+      </div>
+      <div class="recent-meta">
+        <span class="status" :class="statusClass(nativeTask.status)">{{ statusText(nativeTask.status) }}</span>
+      </div>
+      <div class="recent-progress">
+        <div class="recent-progress__text">{{ displayProgress(nativeTask.progress) }}% · {{ nativeTask.currentStep }}</div>
+        <div class="progress progress--compact">
+          <div class="bar bar--native" :style="{ width: `${displayProgress(nativeTask.progress)}%` }"></div>
+        </div>
+      </div>
+      <div v-if="nativeTask.transcriptText" class="native-result">
+        <div class="card-title">转录文本</div>
+        <pre class="native-result__text">{{ nativeTask.transcriptText }}</pre>
+      </div>
+      <div v-if="nativeTask.errorMessage" class="alert alert--bad">{{ nativeTask.errorMessage }}</div>
+    </div>
+
+    <div v-if="nativeHistory.length > 0" class="card">
+      <div class="card-head">
+        <div class="card-title">本地转录历史</div>
+        <button class="link link--small" @click="reloadNativeHistory" :disabled="nativeBusy">刷新</button>
+      </div>
+      <div class="recent-list">
+        <div v-for="item in nativeHistory" :key="item.taskId" class="recent-item">
+          <div class="recent-main">
+            <div class="recent-title">{{ item.fileName || '本地视频' }}</div>
+            <div class="muted">{{ readableSize(item.fileSize) }} · {{ formatTimeText(item.updatedAt || item.createdAt) }}</div>
+            <div class="muted">{{ nativeEngineLabel(item.engine) }} · {{ nativeLocaleLabel(item.locale) }}</div>
+            <div class="recent-meta">
+              <span class="status" :class="statusClass(item.status)">{{ statusText(item.status) }}</span>
+            </div>
+          </div>
+          <div class="recent-actions">
+            <button class="mini" @click="openNativeTaskDetail(item.taskId)">查看</button>
+            <button class="mini mini--warn" @click="removeNativeHistoryItem(item.taskId)" :disabled="nativeBusy">删除</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div v-if="recentUploads.length > 0" class="card">
@@ -86,12 +156,12 @@
             </div>
           </div>
           <div class="recent-actions">
-            <span class="recent-tag" :class="{ 'recent-tag--dup': item.duplicate }">
-              {{ item.duplicate ? '重复' : '正常' }}
+            <span class="recent-tag" :class="recentTagClass(item)">
+              {{ recentTagText(item) }}
             </span>
             <button class="mini" @click="openRecent(item)" :disabled="!item.videoId">查看</button>
             <button
-              v-if="item.status === 'failed'"
+              v-if="item.status === 'failed' && item.videoId"
               class="mini mini--warn"
               @click="retryRecent(item)"
               :disabled="busy || syncingRecent || item.retrying || !item.videoId"
@@ -112,20 +182,59 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getVideoProcessingOptions, getVideoStatus, processVideo, uploadLocalVideo, uploadVideoUrl } from '@/api/video'
+import {
+  generateTranscriptSummary,
+  getVideoProcessingOptions,
+  getVideoStatus,
+  hasLiveVideoBackend,
+  getVideoUploadQueueableMessage,
+  isVideoUploadQueueableError,
+  processVideo,
+  syncOfflineTranscriptToVideo,
+  uploadLocalVideo,
+  uploadVideoUrl
+} from '@/api/video'
 import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
+import {
+  OFFLINE_QUEUE_EVENT_NAME,
+  OFFLINE_TASK_STATUSES,
+  createLocalUploadTask,
+  createUrlImportTask,
+  deleteOfflineTask,
+  flushOfflineQueue,
+  getOfflineTasks
+} from '@/services/offlineQueue'
 import {
   appendProcessingSettingsToFormData,
   buildProcessPayload,
   getProcessingSettings,
   getWhisperModelOptions,
   languageLabel,
+  NATIVE_LOCALE_OPTIONS,
+  nativeLocaleLabel,
+  resolveNativeTranscriptionLocale,
   saveWhisperModelCatalog,
   saveProcessingSettings,
   summaryStyleLabel,
   whisperModelLabel
 } from '@/services/processingSettings'
 import { normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
+import {
+  NATIVE_OFFLINE_TRANSCRIPTION_COMPLETED_EVENT,
+  NATIVE_OFFLINE_TRANSCRIPTION_FAILED_EVENT,
+  NATIVE_OFFLINE_TRANSCRIPTION_PROGRESS_EVENT,
+  hasNativeBridge,
+  onNativeEvent,
+  startNativeOfflineTranscription
+} from '@/services/nativeBridge'
+import {
+  NATIVE_OFFLINE_TRANSCRIPTS_EVENT_NAME,
+  deleteNativeOfflineTranscript,
+  getNativeOfflineTranscript,
+  getLatestNativeOfflineTranscript,
+  listNativeOfflineTranscripts,
+  saveNativeOfflineTranscript
+} from '@/services/nativeOfflineTranscripts'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
 const router = useRouter()
@@ -135,10 +244,13 @@ const file = ref(null)
 const savedFileMeta = ref(null)
 const videoUrl = ref('')
 const busy = ref(false)
+const nativeBusy = ref(false)
 const progress = ref(0)
 const message = ref('')
 const error = ref('')
 const recentUploads = ref([])
+const nativeTask = ref(null)
+const nativeHistory = ref([])
 const syncingRecent = ref(false)
 const statusFilter = ref('all')
 let recentStatusTimer = null
@@ -155,14 +267,21 @@ const STATUS_FILTERS = [
   { value: 'active', label: '进行中' },
   { value: 'completed', label: '已完成' }
 ]
+let syncingOfflineRecent = false
+const nativeEventDisposers = []
 
 const processingSettingsSummary = computed(() => {
   const current = processingSettings.value || getProcessingSettings()
   const parts = [
     `${whisperModelLabel(current.model)} 模型`,
-    languageLabel(current.language),
-    `${summaryStyleLabel(current.summaryStyle)}摘要`
+    languageLabel(current.language)
   ]
+  if (current.nativeLocale && current.nativeLocale !== 'auto') {
+    parts.push(`端侧${nativeLocaleLabel(current.nativeLocale)}`)
+  }
+  parts.push(
+    `${summaryStyleLabel(current.summaryStyle)}摘要`
+  )
   if (current.autoGenerateSummary) parts.push('自动摘要')
   if (current.autoGenerateTags) parts.push('自动标签')
   return parts.join(' · ')
@@ -173,6 +292,14 @@ const selectProcessingModel = (model) => {
   processingSettings.value = saveProcessingSettings({
     ...processingSettings.value,
     model
+  })
+}
+
+const selectNativeLocale = (nativeLocale) => {
+  if (busy.value || nativeBusy.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    nativeLocale: String(nativeLocale || '').trim()
   })
 }
 
@@ -226,6 +353,229 @@ const statusClass = (status) => {
   return 'status--info'
 }
 
+const nativeEngineLabel = (engine) => {
+  if (String(engine || '').trim() === 'apple_speech_on_device') return 'Apple 端侧识别'
+  return 'iOS 原生识别'
+}
+
+const upsertNativeTask = (patch = {}) => {
+  const current = nativeTask.value || {}
+  const next = {
+    taskId: String(patch.taskId || current.taskId || ''),
+    fileName: String(patch.fileName || current.fileName || '本地视频'),
+    fileSize: Number(patch.fileSize ?? current.fileSize ?? 0),
+    fileExt: String(patch.fileExt || current.fileExt || ''),
+    status: normalizeVideoStatus(patch.status || current.status || 'pending'),
+    progress: displayProgress(patch.progress ?? current.progress ?? 0),
+    currentStep: String(patch.currentStep || patch.message || current.currentStep || '准备本地离线转录'),
+    transcriptText: String(patch.transcriptText ?? current.transcriptText ?? ''),
+    errorMessage: String(patch.errorMessage ?? current.errorMessage ?? ''),
+    summary: String(patch.summary ?? current.summary ?? ''),
+    summaryStyle: String(patch.summaryStyle || current.summaryStyle || processingSettings.value.summaryStyle || 'study'),
+    summaryStatus: String(patch.summaryStatus || current.summaryStatus || 'idle').trim().toLowerCase() || 'idle',
+    summaryErrorMessage: String(patch.summaryErrorMessage ?? current.summaryErrorMessage ?? ''),
+    summaryUpdatedAt: String(patch.summaryUpdatedAt || current.summaryUpdatedAt || ''),
+    autoGenerateSummary: typeof patch.autoGenerateSummary === 'boolean'
+      ? patch.autoGenerateSummary
+      : Boolean(current.autoGenerateSummary),
+    syncedVideoId: Number(patch.syncedVideoId ?? current.syncedVideoId ?? 0) || 0,
+    syncStatus: String(patch.syncStatus || current.syncStatus || 'idle').trim().toLowerCase() || 'idle',
+    syncErrorMessage: String(patch.syncErrorMessage ?? current.syncErrorMessage ?? ''),
+    syncUpdatedAt: String(patch.syncUpdatedAt || current.syncUpdatedAt || ''),
+    locale: String(patch.locale || current.locale || ''),
+    localeLabel: nativeLocaleLabel(patch.locale || current.locale || ''),
+    engine: String(patch.engine || current.engine || 'apple_speech_on_device'),
+    engineLabel: nativeEngineLabel(patch.engine || current.engine || 'apple_speech_on_device')
+  }
+  nativeTask.value = next
+  return next
+}
+
+const clearNativeTask = () => {
+  if (nativeBusy.value) return
+  nativeTask.value = null
+}
+
+const reloadNativeHistory = async () => {
+  try {
+    nativeHistory.value = await listNativeOfflineTranscripts()
+    if (!nativeTask.value) {
+      const latest = await getLatestNativeOfflineTranscript()
+      if (latest) upsertNativeTask(latest)
+    }
+  } catch (e) {
+    error.value = e?.message || '加载本地转录历史失败'
+  }
+}
+
+const persistNativeTask = async (patch = {}) => {
+  const next = upsertNativeTask(patch)
+  if (!next.taskId) return next
+  await saveNativeOfflineTranscript(next)
+  return next
+}
+
+const syncOfflineTranscriptRecord = async (taskId, { silent = false } = {}) => {
+  const id = String(taskId || '').trim()
+  if (!id) return null
+
+  const current = await getNativeOfflineTranscript(id)
+  if (!current?.transcriptText?.trim()) return null
+
+  if (!hasLiveVideoBackend()) {
+    const skipped = await saveNativeOfflineTranscript({
+      taskId: id,
+      syncStatus: 'failed',
+      syncErrorMessage: '当前未配置可用后端，无法写入视频库；可在后端恢复后再次同步。'
+    })
+    upsertNativeTask(skipped)
+    return null
+  }
+
+  const pending = await persistNativeTask({
+    taskId: id,
+    syncStatus: 'syncing',
+    syncErrorMessage: ''
+  })
+
+  try {
+    const res = await syncOfflineTranscriptToVideo({
+      task_id: pending.taskId,
+      file_name: pending.fileName,
+      file_ext: pending.fileExt,
+      file_size: pending.fileSize,
+      locale: pending.locale,
+      engine: pending.engine,
+      transcript_text: pending.transcriptText,
+      summary: pending.summary || '',
+      summary_style: pending.summaryStyle || processingSettings.value.summaryStyle || 'study',
+      segments: Array.isArray(current.segments) ? current.segments : []
+    })
+    const data = res?.data || {}
+    const videoId = resolveVideoId(data)
+    const title = data?.video?.title || pending.fileName || '本地视频'
+    const saved = await persistNativeTask({
+      taskId: id,
+      syncedVideoId: videoId || 0,
+      syncStatus: 'completed',
+      syncErrorMessage: '',
+      syncUpdatedAt: new Date().toISOString(),
+      fileName: title
+    })
+    upsertRecentUpload({
+      key: `offline-synced-${videoId || id}`,
+      videoId: videoId || null,
+      title,
+      typeText: 'iOS 离线处理',
+      time: new Date().toISOString(),
+      status: 'completed',
+      progress: 100,
+      currentStep: 'iOS 本地离线结果已写入视频库',
+      offlineTaskId: id,
+      tempKey: `ios-offline-${id}`,
+      requestedModel: '',
+      effectiveModel: ''
+    })
+    if (!silent) {
+      message.value = '本地离线转录结果已写入视频库'
+    }
+    return saved
+  } catch (e) {
+    const saved = await persistNativeTask({
+      taskId: id,
+      syncStatus: 'failed',
+      syncErrorMessage: extractErrorMessage(e, '写入视频库失败'),
+      syncUpdatedAt: new Date().toISOString()
+    })
+    if (!silent) {
+      error.value = saved.syncErrorMessage || '写入视频库失败'
+    }
+    return saved
+  }
+}
+
+const generateOfflineTranscriptSummaryForTask = async (taskId, { silent = false } = {}) => {
+  const id = String(taskId || '').trim()
+  if (!id) return null
+
+  const current = await getNativeOfflineTranscript(id)
+  if (!current?.transcriptText?.trim()) return null
+
+  if (!hasLiveVideoBackend()) {
+    const skipped = await saveNativeOfflineTranscript({
+      taskId: id,
+      summaryStatus: 'failed',
+      summaryErrorMessage: '当前未配置可用后端，无法提取摘要；可在后端恢复后进入详情页重试。'
+    })
+    upsertNativeTask(skipped)
+    return null
+  }
+
+  await persistNativeTask({
+    taskId: id,
+    summaryStatus: 'generating',
+    summaryErrorMessage: '',
+    currentStep: current.status === 'completed' ? '转录完成，正在提取摘要' : current.currentStep
+  })
+
+  try {
+    const style = String(current.summaryStyle || processingSettings.value.summaryStyle || 'study')
+    const res = await generateTranscriptSummary({
+      title: current.fileName || '本地视频',
+      transcript_text: current.transcriptText,
+      style
+    })
+    const data = res?.data || {}
+    const saved = await persistNativeTask({
+      taskId: id,
+      summary: data.summary || '',
+      summaryStyle: data.style || style,
+      summaryStatus: 'completed',
+      summaryErrorMessage: '',
+      summaryUpdatedAt: new Date().toISOString(),
+      currentStep: current.status === 'completed' ? '本地离线转录完成' : current.currentStep
+    })
+    await syncOfflineTranscriptRecord(id, { silent })
+    if (!silent) {
+      message.value = saved.summary ? 'iOS 本地离线转录完成，摘要已生成' : 'iOS 本地离线转录完成'
+    }
+    return saved
+  } catch (e) {
+    const saved = await persistNativeTask({
+      taskId: id,
+      summaryStatus: 'failed',
+      summaryErrorMessage: extractErrorMessage(e, '摘要提取失败'),
+      currentStep: current.status === 'completed' ? '本地离线转录完成' : current.currentStep
+    })
+    if (!silent) {
+      error.value = saved.summaryErrorMessage || '摘要提取失败'
+    }
+    return saved
+  }
+}
+
+const openNativeTaskDetail = (taskId) => {
+  const id = String(taskId || '').trim()
+  if (!id) return
+  router.push(`/local-transcripts/${id}`)
+}
+
+const removeNativeHistoryItem = async (taskId) => {
+  const id = String(taskId || '').trim()
+  if (!id) return
+  try {
+    await deleteNativeOfflineTranscript(id)
+    if (nativeTask.value?.taskId === id) nativeTask.value = null
+    await reloadNativeHistory()
+  } catch (e) {
+    error.value = e?.message || '删除本地转录历史失败'
+  }
+}
+
+const handleNativeTranscriptStoreEvent = async () => {
+  await reloadNativeHistory()
+}
+
 const formatTimeText = (isoText) => {
   if (!isoText) return ''
   try {
@@ -252,6 +602,8 @@ const normalizeRecentUploads = (list) => {
       status: normalizeVideoStatus(item.status || (item.duplicate ? 'uploaded' : 'pending')),
       progress: displayProgress(item.progress),
       currentStep: String(item.currentStep || ''),
+      offlineTaskId: item.offlineTaskId ? String(item.offlineTaskId) : '',
+      tempKey: item.tempKey ? String(item.tempKey) : '',
       requestedModel: String(item.requestedModel || item.requested_model || '').trim().toLowerCase(),
       effectiveModel: String(item.effectiveModel || item.effective_model || item.requestedModel || item.requested_model || '').trim().toLowerCase(),
       retrying: false
@@ -264,12 +616,27 @@ const recentModelText = (item) => {
   return model ? `本次任务：${whisperModelLabel(model)} 模型` : ''
 }
 
+const recentTagText = (item) => {
+  if (item?.duplicate) return '重复'
+  if (normalizeVideoStatus(item?.status) === 'uploading') return '补跑中'
+  if (item?.offlineTaskId && !item?.videoId) return '离线队列'
+  return '在线任务'
+}
+
+const recentTagClass = (item) => ({
+  'recent-tag--dup': Boolean(item?.duplicate),
+  'recent-tag--offline': Boolean(item?.offlineTaskId) && !item?.duplicate
+})
+
 const hasActiveRecentUploads = computed(() => recentUploads.value.some((item) => isActiveStatus(item.status)))
+const isRecentQueueStatus = (status) => ['offline_queued', 'uploading'].includes(normalizeVideoStatus(status))
 
 const filteredRecentUploads = computed(() => {
   if (statusFilter.value === 'all') return recentUploads.value
   if (statusFilter.value === 'active') {
-    return recentUploads.value.filter((item) => ['pending', 'processing', 'downloading'].includes(normalizeVideoStatus(item.status)))
+    return recentUploads.value.filter((item) =>
+      ['pending', 'processing', 'downloading', 'offline_queued', 'uploading'].includes(normalizeVideoStatus(item.status))
+    )
   }
   return recentUploads.value.filter((item) => normalizeVideoStatus(item.status) === statusFilter.value)
 })
@@ -303,6 +670,31 @@ const refreshWhisperModelOptions = async () => {
   }
 }
 
+const findRecentUploadIndex = (item = {}) =>
+  recentUploads.value.findIndex((current) => {
+    if (item.key && current.key === item.key) return true
+    if (item.offlineTaskId && current.offlineTaskId === item.offlineTaskId) return true
+    if (item.tempKey && current.tempKey === item.tempKey) return true
+    if (item.videoId && current.videoId && Number(current.videoId) === Number(item.videoId)) return true
+    return false
+  })
+
+const upsertRecentUpload = (item) => {
+  const normalized = normalizeRecentUploads([item])[0]
+  if (!normalized) return
+
+  const next = [...recentUploads.value]
+  const idx = findRecentUploadIndex(normalized)
+  if (idx >= 0) {
+    next[idx] = { ...next[idx], ...normalized }
+    recentUploads.value = next
+  } else {
+    recentUploads.value = [normalized, ...next].slice(0, MAX_RECENT_UPLOADS)
+  }
+
+  persistRecentUploads()
+}
+
 const addRecentUpload = ({
   videoId,
   title,
@@ -329,10 +721,69 @@ const addRecentUpload = ({
     effectiveModel: String(effectiveModel || requestedModel || '').trim().toLowerCase(),
     retrying: false
   }
-  const merged = [item, ...recentUploads.value.filter((x) => x.videoId !== item.videoId || !item.videoId)]
-  recentUploads.value = merged.slice(0, MAX_RECENT_UPLOADS)
-  persistRecentUploads()
+  upsertRecentUpload(item)
   scheduleRecentStatusSync()
+}
+
+const buildOfflineCurrentStep = (task) => {
+  if (task.status === OFFLINE_TASK_STATUSES.UPLOADING) return '后端已恢复，正在自动补跑'
+  if (task.status === OFFLINE_TASK_STATUSES.FAILED) return task.lastError || '自动补跑失败，等待稍后重试'
+  if (task.status === OFFLINE_TASK_STATUSES.COMPLETED && task.videoId) return '离线补跑成功，正在同步处理状态'
+  return '已加入离线队列，等待后端恢复自动补跑'
+}
+
+const buildRecentUploadFromOfflineTask = (task, current = {}) => {
+  const requestedModel = String(task?.processing?.model || current.requestedModel || '').trim().toLowerCase()
+  const liveStatus =
+    task.status === OFFLINE_TASK_STATUSES.COMPLETED && task.videoId
+      ? normalizeVideoStatus(current.status || 'pending')
+      : normalizeVideoStatus(task.status)
+  const time = current.time || task.createdAt
+  return {
+    key: current.key || task.tempKey || `offline-${task.taskId}`,
+    offlineTaskId: task.taskId,
+    tempKey: task.tempKey || current.tempKey || `offline-${task.taskId}`,
+    videoId: task.videoId || current.videoId || null,
+    title: current.title || task.fileName || task.videoUrl || '离线任务',
+    typeText:
+      current.typeText
+      || (task.type === 'local_upload' ? `本地文件 · ${readableSize(task.fileSize)}` : '链接导入'),
+    time,
+    timeText: formatTimeText(time),
+    duplicate: Boolean(current.duplicate),
+    status: liveStatus,
+    progress: task.videoId ? current.progress || 0 : 0,
+    currentStep: buildOfflineCurrentStep(task),
+    requestedModel,
+    effectiveModel: String(current.effectiveModel || requestedModel).trim().toLowerCase(),
+    retrying: false
+  }
+}
+
+const syncOfflineRecentUploads = async () => {
+  if (syncingOfflineRecent) return false
+  syncingOfflineRecent = true
+
+  try {
+    const tasks = await getOfflineTasks()
+    let promoted = false
+
+    for (const task of tasks) {
+      const current = recentUploads.value[findRecentUploadIndex({ offlineTaskId: task.taskId, tempKey: task.tempKey, videoId: task.videoId })] || {}
+      const nextItem = buildRecentUploadFromOfflineTask(task, current)
+      upsertRecentUpload(nextItem)
+
+      if (task.status === OFFLINE_TASK_STATUSES.COMPLETED && task.videoId) {
+        promoted = true
+        await deleteOfflineTask(task.taskId)
+      }
+    }
+
+    scheduleRecentStatusSync()
+    return promoted
+  } finally {
+    syncingOfflineRecent = false
+  }
 }
 
 const clearRecentStatusSync = () => {
@@ -409,8 +860,17 @@ const clearRecentUploads = () => {
 }
 
 const openRecent = (item) => {
+  if (item?.offlineTaskId) {
+    router.push(`/local-transcripts/${item.offlineTaskId}`)
+    return
+  }
   if (!item?.videoId) return
   router.push(`/videos/${item.videoId}`)
+}
+
+const handleOfflineQueueEvent = async () => {
+  const promoted = await syncOfflineRecentUploads()
+  if (promoted) await syncRecentStatuses()
 }
 
 const retryRecent = async (item) => {
@@ -440,6 +900,30 @@ const retryRecent = async (item) => {
     recentUploads.value[idx] = { ...recentUploads.value[idx], retrying: false }
     error.value = extractErrorMessage(e, '重试失败')
   }
+}
+
+const queueOfflineLocalUpload = async (selectedFile) => {
+  const task = await createLocalUploadTask({
+    file: selectedFile,
+    processing: processingSettings.value
+  })
+  upsertRecentUpload(buildRecentUploadFromOfflineTask(task))
+  savedFileMeta.value = { name: selectedFile.name, size: Number(selectedFile.size || 0) }
+  file.value = null
+  progress.value = 0
+  if (fileInputRef.value) fileInputRef.value.value = ''
+  message.value = '后端暂时不可达，已加入离线队列，等待后端恢复后自动补跑'
+}
+
+const queueOfflineUrlImport = async (trimmedUrl) => {
+  const task = await createUrlImportTask({
+    videoUrl: trimmedUrl,
+    processing: processingSettings.value
+  })
+  upsertRecentUpload(buildRecentUploadFromOfflineTask(task))
+  videoUrl.value = ''
+  progress.value = 0
+  message.value = '链接任务已加入离线队列，等待后端恢复后自动补跑'
 }
 
 const validateVideoUrl = (url) => {
@@ -485,6 +969,111 @@ const resetAll = () => {
   progress.value = 0
   message.value = ''
   error.value = ''
+  if (!nativeBusy.value) nativeTask.value = null
+}
+
+const startNativeOfflineTranscriptionFlow = async () => {
+  if (busy.value || nativeBusy.value) return
+  processingSettings.value = getProcessingSettings()
+  message.value = ''
+  error.value = ''
+
+  if (!hasNativeBridge()) {
+    error.value = '当前环境不是 iOS 原生容器，无法进行本地离线转录'
+    return
+  }
+
+  nativeBusy.value = true
+  let started = false
+  try {
+    const requestedLocale = resolveNativeTranscriptionLocale(processingSettings.value)
+    const response = await startNativeOfflineTranscription({
+      locale: requestedLocale,
+      language: processingSettings.value.language,
+      model: processingSettings.value.model
+    })
+    started = true
+    await persistNativeTask({
+      taskId: response?.taskId,
+      fileName: response?.fileName,
+      fileSize: response?.fileSize,
+      fileExt: response?.fileExt,
+      status: response?.status || 'preparing',
+      progress: 5,
+      currentStep: response?.message || '已选择本地视频，准备本地离线转录',
+      locale: response?.locale || requestedLocale || processingSettings.value.language,
+      engine: response?.engine || 'apple_speech_on_device',
+      autoGenerateSummary: processingSettings.value.autoGenerateSummary,
+      summaryStyle: processingSettings.value.summaryStyle,
+      summary: '',
+      summaryStatus: 'idle',
+      summaryErrorMessage: '',
+      syncStatus: 'idle',
+      syncErrorMessage: '',
+      syncedVideoId: 0,
+      transcriptText: '',
+      errorMessage: ''
+    })
+    message.value = '已启动 iOS 本地离线转录'
+  } catch (e) {
+    error.value = extractErrorMessage(e, '无法启动 iOS 本地离线转录')
+  } finally {
+    if (!started) nativeBusy.value = false
+  }
+}
+
+const handleNativeProgressEvent = async (detail = {}) => {
+  nativeBusy.value = true
+  await persistNativeTask({
+    taskId: detail.taskId,
+    fileName: detail.fileName,
+    fileSize: detail.fileSize,
+    status: detail.status || detail.phase || 'processing',
+    progress: detail.progress,
+    currentStep: detail.message || '正在本地离线转录',
+    locale: detail.locale,
+    engine: detail.engine
+  })
+}
+
+const handleNativeCompletedEvent = async (detail = {}) => {
+  nativeBusy.value = false
+  const saved = await persistNativeTask({
+    taskId: detail.taskId,
+    fileName: detail.fileName,
+    fileSize: detail.fileSize,
+    fileExt: detail.fileExt,
+    status: detail.status || 'completed',
+    progress: detail.progress ?? 100,
+    currentStep: detail.message || '本地离线转录完成',
+    transcriptText: detail.transcriptText || '',
+    errorMessage: '',
+    locale: detail.locale,
+    engine: detail.engine
+  })
+  if (saved?.autoGenerateSummary) {
+    message.value = 'iOS 本地离线转录完成，正在提取摘要'
+    void generateOfflineTranscriptSummaryForTask(saved.taskId)
+    return
+  }
+  void syncOfflineTranscriptRecord(saved.taskId)
+  message.value = 'iOS 本地离线转录完成'
+}
+
+const handleNativeFailedEvent = async (detail = {}) => {
+  nativeBusy.value = false
+  await persistNativeTask({
+    taskId: detail.taskId,
+    fileName: detail.fileName,
+    fileSize: detail.fileSize,
+    status: detail.status || 'failed',
+    progress: detail.progress ?? 0,
+    currentStep: detail.message || '本地离线转录失败',
+    errorMessage: detail.message || '本地离线转录失败',
+    locale: detail.locale,
+    engine: detail.engine
+  })
+  error.value = detail.message || 'iOS 本地离线转录失败'
 }
 
 const uploadFile = async () => {
@@ -525,7 +1114,15 @@ const uploadFile = async () => {
         : '/videos'
     )
   } catch (e) {
-    error.value = extractErrorMessage(e, '上传失败')
+    if (isVideoUploadQueueableError(e)) {
+      try {
+        await queueOfflineLocalUpload(file.value)
+      } catch (queueError) {
+        error.value = `${getVideoUploadQueueableMessage(e, '后端暂时不可达')}；当前设备无法写入离线队列`
+      }
+    } else {
+      error.value = extractErrorMessage(e, '上传失败')
+    }
   } finally {
     busy.value = false
   }
@@ -564,22 +1161,42 @@ const uploadUrl = async () => {
         : '/videos'
     )
   } catch (e) {
-    error.value = extractErrorMessage(e, '提交失败')
+    if (isVideoUploadQueueableError(e)) {
+      try {
+        await queueOfflineUrlImport(String(videoUrl.value).trim())
+      } catch (queueError) {
+        error.value = `${getVideoUploadQueueableMessage(e, '后端暂时不可达')}；当前设备无法写入离线队列`
+      }
+    } else {
+      error.value = extractErrorMessage(e, '提交失败')
+    }
   } finally {
     busy.value = false
   }
 }
 
 onMounted(async () => {
+  nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_PROGRESS_EVENT, handleNativeProgressEvent))
+  nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_COMPLETED_EVENT, handleNativeCompletedEvent))
+  nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_FAILED_EVENT, handleNativeFailedEvent))
+  window.addEventListener(NATIVE_OFFLINE_TRANSCRIPTS_EVENT_NAME, handleNativeTranscriptStoreEvent)
   processingSettings.value = getProcessingSettings()
   await refreshWhisperModelOptions()
+  await reloadNativeHistory()
   loadRecentUploads()
+  window.addEventListener(OFFLINE_QUEUE_EVENT_NAME, handleOfflineQueueEvent)
+  await syncOfflineRecentUploads()
+  await flushOfflineQueue()
+  await syncOfflineRecentUploads()
   await syncRecentStatuses()
   scheduleRecentStatusSync()
 })
 
 onUnmounted(() => {
   clearRecentStatusSync()
+  window.removeEventListener(OFFLINE_QUEUE_EVENT_NAME, handleOfflineQueueEvent)
+  window.removeEventListener(NATIVE_OFFLINE_TRANSCRIPTS_EVENT_NAME, handleNativeTranscriptStoreEvent)
+  nativeEventDisposers.splice(0).forEach((dispose) => dispose?.())
 })
 </script>
 
@@ -696,6 +1313,12 @@ onUnmounted(() => {
   background: linear-gradient(135deg, #667eea, #764ba2);
 }
 
+.btn--native {
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  color: #065f46;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(45, 212, 191, 0.08));
+}
+
 .btn:disabled {
   opacity: 0.6;
 }
@@ -710,6 +1333,10 @@ onUnmounted(() => {
 .bar {
   height: 100%;
   background: linear-gradient(90deg, #667eea, #764ba2);
+}
+
+.bar--native {
+  background: linear-gradient(90deg, #10b981, #14b8a6);
 }
 
 .muted {
@@ -808,6 +1435,26 @@ onUnmounted(() => {
   margin-left: auto;
 }
 
+.native-result {
+  display: grid;
+  gap: 8px;
+}
+
+.native-result__text {
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--border);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  max-height: 260px;
+  overflow: auto;
+}
+
 .recent-tag {
   border-radius: 999px;
   padding: 3px 9px;
@@ -822,6 +1469,11 @@ onUnmounted(() => {
 .recent-tag--dup {
   background: rgba(245, 158, 11, 0.14);
   color: #92400e;
+}
+
+.recent-tag--offline {
+  background: rgba(31, 122, 140, 0.12);
+  color: #155e75;
 }
 
 .mini {

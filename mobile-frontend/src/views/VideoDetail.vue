@@ -38,6 +38,10 @@
         <span v-if="isInProgress(statusValue)" class="muted">{{ progressValue }}% · {{ stepValue || '处理中' }}</span>
       </div>
 
+      <div v-if="offlineTaskCount > 0" class="inline-tip inline-tip--queue">
+        上传页还有 {{ offlineTaskCount }} 个离线任务等待自动补跑；本页只展示已经拿到视频 ID 的在线处理状态。
+      </div>
+
       <div v-if="activeModelText" class="setting-hint">本次任务模型：{{ activeModelText }}</div>
 
       <div v-if="isInProgress(statusValue)" class="progress">
@@ -99,6 +103,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi } from '@/config'
 import { deleteVideo, generateVideoSummary, generateVideoTags, getVideo, getVideoProcessingOptions, getVideoStatus, processVideo } from '@/api/video'
 import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
+import { OFFLINE_QUEUE_EVENT_NAME, getPendingOfflineTasks } from '@/services/offlineQueue'
 import {
   buildProcessPayload,
   getProcessingSettings,
@@ -126,6 +131,7 @@ const id = computed(() => route.params.id)
 const loading = ref(false)
 const error = ref('')
 const video = ref(null)
+const offlineTaskCount = ref(0)
 const statusInfo = ref({ status: '', progress: 0, current_step: '' })
 const autoStarting = ref(false)
 const retrying = ref(false)
@@ -303,6 +309,15 @@ const startPollingIfNeeded = () => {
   poller.start()
 }
 
+const reloadOfflineTaskCount = async () => {
+  try {
+    const tasks = await getPendingOfflineTasks()
+    offlineTaskCount.value = tasks.length
+  } catch {
+    offlineTaskCount.value = 0
+  }
+}
+
 const normalizeVideo = (payload) => {
   const current = payload?.video || payload?.data || payload || null
   if (!current) return null
@@ -322,6 +337,10 @@ const reload = async () => {
     processingSettings.value = getProcessingSettings()
     const res = await getVideo(id.value)
     video.value = normalizeVideo(res.data)
+    if (video.value?.processing_origin === 'ios_offline' && video.value?.task_id) {
+      await router.replace(`/local-transcripts/${video.value.task_id}`)
+      return
+    }
     await fetchStatus()
     startPollingIfNeeded()
     await tryAutoStartProcessing()
@@ -412,8 +431,16 @@ const remove = async () => {
   }
 }
 
-onMounted(reload)
-onUnmounted(() => statusPoller?.stop())
+onMounted(async () => {
+  window.addEventListener(OFFLINE_QUEUE_EVENT_NAME, reloadOfflineTaskCount)
+  await reloadOfflineTaskCount()
+  await reload()
+})
+
+onUnmounted(() => {
+  statusPoller?.stop()
+  window.removeEventListener(OFFLINE_QUEUE_EVENT_NAME, reloadOfflineTaskCount)
+})
 </script>
 
 <style scoped>
@@ -657,6 +684,10 @@ onUnmounted(() => statusPoller?.stop())
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.inline-tip--queue {
+  margin-bottom: 2px;
 }
 
 .block {
