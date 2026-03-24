@@ -509,3 +509,11 @@
 
 - 更新 [`backend_fastapi/app/models/note.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/note.py)、[`backend_fastapi/app/schemas/note.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/note.py)、[`backend_fastapi/app/routers/note.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/note.py)：笔记返回结构补充 `video_title`，更新接口支持修改或清空 `video_id`，并统一规范化标签字符串，继续在不改表的前提下复用现有 `notes` / `note_timestamps` 链路。
 - 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充笔记创建携带标签与时间点、列表按 `video/tag/search` 筛选、时间点新增删除、视频关联更新与标签清空等 API 回归测试。
+
+## 2026-03-24
+
+### 笔记列表筛选与视频上下文入口
+
+- 更新 [`mobile-frontend/src/api/note.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/note.js)、[`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：前端笔记 API 补齐标签聚合、时间点新增/删除接口，并同步扩展 UI-only mock 数据为“视频关联 + 标签 + 时间点”的真实结构。
+- 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：笔记列表新增关键词搜索、按视频筛选、标签筛选、时间点摘要展示，以及带当前视频上下文的新建入口。
+- 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：视频详情页新增“记笔记”入口，可携带 `videoId + videoTitle` 进入新建笔记流程。

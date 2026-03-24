@@ -86,6 +86,7 @@
         <button class="btn" @click="startProcess" :disabled="processDisabled">开始处理</button>
         <button class="btn btn--primary" @click="play" :disabled="!canOpenPlayerWhileProcessing">{{ playLabel }}</button>
         <button class="btn" @click="qa">问答</button>
+        <button class="btn" @click="takeNote">记笔记</button>
       </div>
 
       <button v-if="canRetry" class="retry" @click="retryProcess" :disabled="retrying || autoStarting">
@@ -419,6 +420,16 @@ const createTags = async () => {
 }
 
 const qa = () => router.push({ path: '/qa', query: { videoId: String(id.value) } })
+
+const takeNote = () => {
+  router.push({
+    path: '/notes/new',
+    query: {
+      videoId: String(id.value),
+      videoTitle: String(video.value?.title || '')
+    }
+  })
+}
 
 const remove = async () => {
   const ok = window.confirm('确认删除该视频？')
@@ -777,7 +788,7 @@ onUnmounted(() => {
 .actions {
   margin-top: 14px;
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
