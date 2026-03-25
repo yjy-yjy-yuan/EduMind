@@ -601,3 +601,9 @@
 
 - 新增 [`mobile-frontend/src/api/recommendation.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/recommendation.js)，并更新 [`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：前端增加推荐接口封装与 UI-only mock 数据源，为首页推荐位和后续推荐页提供稳定调用入口。
 - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：在保留原有首页骨架的前提下新增“推荐视频”区，并接入首页推荐接口，优先展示值得继续处理或复盘的视频。
+
+## 2026-03-25
+
+### 首页层级与视觉收束
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：首页改为“首要动作 / 继续学习 / 辅助入口 / 推荐视频”四段结构，收掉过重的面板堆叠，保留推荐链路的同时把主任务入口、继续学习和辅助入口分层展示。
