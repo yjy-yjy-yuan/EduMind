@@ -77,6 +77,42 @@
         </button>
       </div>
     </section>
+
+    <section class="recent ios-card">
+      <div class="recent__head">
+        <h3>推荐视频</h3>
+        <button class="refresh-btn" @click="reloadRecommendations" :disabled="recommendationLoading">
+          {{ recommendationLoading ? '加载中…' : '刷新' }}
+        </button>
+      </div>
+
+      <div v-if="recommendationLoading && recommendations.length === 0" class="skeleton-list">
+        <div v-for="i in 3" :key="`recommend-${i}`" class="skeleton-item"></div>
+      </div>
+
+      <div v-else-if="recommendations.length === 0" class="message">
+        {{ recommendationEmptyText }}
+        <button class="message__link" @click="go('/recommendations')">打开推荐页</button>
+      </div>
+
+      <div v-else class="video-list">
+        <button
+          v-for="item in recommendations"
+          :key="recommendationKey(item)"
+          class="video-item"
+          @click="openRecommendation(item)"
+        >
+          <div class="video-item__info">
+            <p class="video-item__title">{{ item.title || '未命名视频' }}</p>
+            <p class="video-item__desc">{{ item.reason_text || item.summary || '从这里继续进入学习。' }}</p>
+            <span class="video-item__status" :class="recommendationStatusClass(item)">
+              {{ recommendationStatusLabel(item) }}
+            </span>
+          </div>
+          <span class="video-item__arrow">›</span>
+        </button>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -84,6 +120,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BrandLogo from '@/components/BrandLogo.vue'
+import { getVideoRecommendations } from '@/api/recommendation'
 import { getVideoList } from '@/api/video'
 import { listNativeOfflineTranscripts } from '@/services/nativeOfflineTranscripts'
 import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
@@ -94,18 +131,27 @@ const quickActions = [
   { route: '/local-transcripts', tag: '本地', tagClass: 'tag--mint', title: '本地转录', desc: '查看 iOS 离线转录结果' },
   { route: '/notes', tag: '笔记', tagClass: 'tag--leaf', title: '学习笔记', desc: '随学随记，整理知识片段' },
   { route: '/qa', tag: '问答', tagClass: 'tag--amber', title: 'AI 问答', desc: '基于课程内容即时提问' },
+  { route: '/recommendations', tag: '推荐', tagClass: 'tag--cobalt', title: '推荐学习', desc: '集中查看继续学习、复盘与相关推荐' },
   { route: '/learning-path', tag: '路径', tagClass: 'tag--teal', title: '学习路径', desc: '获取下一步学习建议' }
 ]
 
 const router = useRouter()
 const loading = ref(false)
+const recommendationLoading = ref(false)
 const error = ref('')
+const recommendationError = ref('')
 const allVideos = ref([])
 const localTranscriptCount = ref(0)
+const recommendations = ref([])
 
 const normalizeList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
   return Array.isArray(list) ? list : []
+}
+
+const normalizeRecommendationItems = (payload) => {
+  const items = payload?.items || payload?.recommendations || payload?.data || []
+  return Array.isArray(items) ? items : []
 }
 
 const statusText = videoStatusText
@@ -135,6 +181,13 @@ const mergeVideosById = (items) => {
     return tb - ta
   })
 }
+
+const fallbackRecommendations = (videos) =>
+  videos.slice(0, 4).map((video, index) => ({
+    ...video,
+    reason_label: index === 0 ? '继续学习' : '最近内容',
+    reason_text: index === 0 ? '当前最适合从这个任务继续进入。' : '最近进入视频库，适合继续学习。'
+  }))
 
 const fetchAllVideos = async () => {
   const first = await getVideoList(1, 100)
@@ -168,6 +221,21 @@ const reload = async () => {
   }
 }
 
+const reloadRecommendations = async () => {
+  recommendationLoading.value = true
+  recommendationError.value = ''
+  try {
+    const res = await getVideoRecommendations({ scene: 'home', limit: 4 })
+    const items = normalizeRecommendationItems(res?.data || {})
+    recommendations.value = items.length > 0 ? items : fallbackRecommendations(allVideos.value)
+  } catch (e) {
+    recommendationError.value = e?.message || '推荐加载失败'
+    recommendations.value = fallbackRecommendations(allVideos.value)
+  } finally {
+    recommendationLoading.value = false
+  }
+}
+
 const go = (path) => router.push(path)
 const goStat = (scope) => {
   console.info(`[INFO][Home] stat-card-click scope=${scope}`)
@@ -184,7 +252,58 @@ const openVideo = (video) => {
   router.push(`/videos/${current.id}`)
 }
 
-onMounted(reload)
+const recommendationEmptyText = computed(() => {
+  if (recommendationError.value) return recommendationError.value
+  return '上传更多视频后，这里会按处理状态和内容相关度给你推荐下一步。'
+})
+
+const recommendationKey = (item) =>
+  String(item?.id || item?.external_url || item?.target_url || item?.source_url || item?.link || item?.title || 'recommendation')
+
+const resolveRecommendationUrl = (item) =>
+  String(item?.external_url || item?.target_url || item?.source_url || item?.link || '').trim()
+
+const isExternalRecommendation = (item) => {
+  const itemType = String(item?.item_type || item?.content_type || item?.origin_type || '').trim().toLowerCase()
+  if (item?.is_external === true) return true
+  if (['external', 'external_candidate', 'candidate'].includes(itemType)) return true
+  return !item?.id && Boolean(resolveRecommendationUrl(item))
+}
+
+const recommendationStatusLabel = (item) => {
+  if (isExternalRecommendation(item)) {
+    return String(item?.source_label || item?.external_source_label || item?.source_platform_label || '站外候选')
+  }
+  return item?.status ? statusText(item.status) : '站内推荐'
+}
+
+const recommendationStatusClass = (item) => {
+  if (isExternalRecommendation(item)) return 'status--warn'
+  return statusClass(item?.status)
+}
+
+const openRecommendation = (item) => {
+  if (isExternalRecommendation(item)) {
+    const url = resolveRecommendationUrl(item)
+    if (!url) return
+    router.push({
+      path: '/upload',
+      query: {
+        mode: 'url',
+        url,
+        source: String(item?.source_label || item?.external_source_label || item?.source_platform_label || '站外推荐')
+      }
+    })
+    return
+  }
+  openVideo(item)
+}
+
+const reloadDashboard = async () => {
+  await Promise.all([reload(), reloadRecommendations()])
+}
+
+onMounted(reloadDashboard)
 </script>
 
 <style scoped>
@@ -351,6 +470,11 @@ onMounted(reload)
   color: #905214;
 }
 
+.tag--cobalt {
+  background: rgba(68, 109, 214, 0.14);
+  color: #244a98;
+}
+
 .quick-card__title {
   margin: 10px 0 0;
   font-size: 16px;
@@ -458,6 +582,13 @@ onMounted(reload)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.video-item__desc {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .video-item__status {

@@ -633,3 +633,10 @@
 
 - 新增 [`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md)：补充面向 Codex / Claude / Blitz 的专用提示词，明确视频推荐要基于现有 `videos` 标签先做站内聚类，再扩展 B 站 / YouTube / 中国大学慕课外部候选元数据、标签处理和导入链路，并把“按可独立提交切片推进、每组改动超过 800 行必须继续拆分、CHANGELOG 只能追加”等硬约束写进主提示词。
 - 更新 [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：在总控实现文档和仓库文档索引中补充视频推荐实现边界与专用提示词入口，保持 iOS-only 架构说明与推荐建设方向一致。
+
+## 2026-03-25
+
+### 首页推荐预览
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：在保留当前首页基础结构的前提下新增“推荐学习”入口和首页推荐预览区，接入现有推荐接口，并兼容站外候选跳转到上传页预填 URL。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页推荐预览切片对应的 iOS `WKWebView` 静态资源。
