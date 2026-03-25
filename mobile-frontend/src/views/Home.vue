@@ -124,40 +124,53 @@
       </div>
     </section>
 
-    <section class="recent ios-card">
-      <div class="recent__head">
-        <h3>推荐视频</h3>
-        <button class="refresh-btn" @click="reloadRecommendations" :disabled="recommendationLoading">
-          {{ recommendationLoading ? '加载中…' : '刷新' }}
+    <section class="recommend-panel ios-card">
+      <div class="section-head">
+        <div>
+          <h2>推荐视频</h2>
+          <p>预留真实后端推荐链路，优先返回值得继续处理、复盘或与你方向相关的内容。</p>
+        </div>
+        <button class="overview-link" @click="reloadRecommendations" :disabled="recommendationLoading">
+          {{ recommendationLoading ? '刷新中…' : '刷新推荐' }}
         </button>
       </div>
 
       <div v-if="recommendationLoading && recommendations.length === 0" class="skeleton-list">
-        <div v-for="i in 3" :key="`recommend-${i}`" class="skeleton-item"></div>
+        <div v-for="i in 2" :key="`recommend-${i}`" class="skeleton-item skeleton-item--tall"></div>
       </div>
 
       <div v-else-if="recommendations.length === 0" class="message">
         {{ recommendationEmptyText }}
-        <button class="message__link" @click="go('/recommendations')">打开推荐页</button>
+        <button class="overview-link" @click="go('/videos')">查看视频库</button>
       </div>
 
-      <div v-else class="video-list">
+      <div v-else class="recommend-list">
         <button
           v-for="item in recommendations"
           :key="recommendationKey(item)"
-          class="video-item"
+          class="recommend-card"
           @click="openRecommendation(item)"
         >
-          <div class="video-item__info">
-            <p class="video-item__title">{{ item.title || '未命名视频' }}</p>
-            <p class="video-item__desc">{{ item.reason_text || item.summary || '从这里继续进入学习。' }}</p>
-            <span class="video-item__status" :class="recommendationStatusClass(item)">
+          <div class="recommend-card__top">
+            <span class="recommend-card__reason">{{ item.reason_label || '推荐' }}</span>
+            <span
+              v-if="recommendationStatusLabel(item)"
+              class="video-item__status"
+              :class="recommendationStatusClass(item)"
+            >
               {{ recommendationStatusLabel(item) }}
             </span>
           </div>
-          <span class="video-item__arrow">›</span>
+          <div class="recommend-card__title">{{ item.title || '未命名视频' }}</div>
+          <p class="recommend-card__desc">{{ item.reason_text || item.summary || '从这里继续进入学习。' }}</p>
+          <div class="recommend-card__meta">
+            <span v-if="Array.isArray(item.tags) && item.tags.length > 0">{{ item.tags.slice(0, 2).join(' · ') }}</span>
+            <span v-if="formatTimeText(item.upload_time)">{{ formatTimeText(item.upload_time) }}</span>
+          </div>
         </button>
       </div>
+
+      <button class="hero-btn hero-btn--secondary" @click="go('/recommendations')">打开推荐页</button>
     </section>
   </div>
 </template>
@@ -187,6 +200,7 @@ const recommendationError = ref('')
 const allVideos = ref([])
 const localTranscriptCount = ref(0)
 const recommendations = ref([])
+
 const supportActions = computed(() => quickActions)
 
 const normalizeList = (payload) => {
@@ -197,6 +211,17 @@ const normalizeList = (payload) => {
 const normalizeRecommendationItems = (payload) => {
   const items = payload?.items || payload?.recommendations || payload?.data || []
   return Array.isArray(items) ? items : []
+}
+
+const formatTimeText = (rawValue) => {
+  if (!rawValue) return ''
+  try {
+    const date = new Date(rawValue)
+    if (Number.isNaN(date.getTime())) return ''
+    return date.toLocaleString()
+  } catch {
+    return ''
+  }
 }
 
 const statusText = videoStatusText
@@ -393,6 +418,7 @@ onMounted(reloadDashboard)
   right: -70px;
   top: -90px;
   border-radius: 999px;
+  transform: none;
   background: radial-gradient(circle, rgba(31, 122, 140, 0.14) 0%, rgba(31, 122, 140, 0.03) 62%, transparent 74%);
   pointer-events: none;
 }
@@ -404,7 +430,12 @@ onMounted(reloadDashboard)
   z-index: 1;
 }
 
-.welcome__top {
+.welcome__top,
+.section-head,
+.recent-inline__head,
+.recommend-card__top,
+.recommend-card__meta,
+.focus-card__meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -415,19 +446,23 @@ onMounted(reloadDashboard)
 .welcome__brand {
   display: inline-flex;
   align-items: center;
-  flex: 0 0 auto;
   min-width: 132px;
+}
+
+.guide-btn,
+.overview-link {
+  border: 0;
+  background: transparent;
+  color: var(--primary-deep);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .guide-btn {
   border: 1px solid rgba(24, 45, 73, 0.08);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.82);
-  color: var(--primary-deep);
-  font-size: 12px;
-  font-weight: 700;
   padding: 6px 12px;
-  flex: 0 0 auto;
 }
 
 .welcome__hero {
@@ -436,7 +471,9 @@ onMounted(reloadDashboard)
   margin-top: 16px;
 }
 
-.welcome__eyebrow {
+.welcome__eyebrow,
+.focus-card__eyebrow,
+.recommend-card__reason {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
@@ -453,27 +490,52 @@ onMounted(reloadDashboard)
   line-height: 1.08;
 }
 
+.welcome__subtitle,
+.section-head p,
+.quick-card__desc,
+.summary-card__note,
+.focus-card__note,
+.recommend-card__desc,
+.recommend-card__meta {
+  color: var(--muted);
+}
+
 .welcome__subtitle {
   margin-top: 8px;
-  color: var(--muted);
   font-size: 14px;
   line-height: 1.6;
   max-width: 32rem;
 }
 
-.hero-actions {
+.hero-actions,
+.summary-grid,
+.video-list,
+.recommend-list,
+.skeleton-list {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
-.hero-btn {
+.hero-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hero-btn,
+.stat-pill,
+.summary-card,
+.focus-card,
+.recommend-card,
+.video-item,
+.support-link {
   border: 1px solid rgba(24, 45, 73, 0.08);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.hero-btn {
   border-radius: 14px;
   padding: 13px 14px;
   font-size: 14px;
   font-weight: 900;
-  background: rgba(255, 255, 255, 0.88);
 }
 
 .hero-btn--primary {
@@ -487,141 +549,58 @@ onMounted(reloadDashboard)
   color: var(--primary-deep);
 }
 
-@media (max-width: 390px) {
-  .welcome__top {
-    align-items: flex-start;
-  }
-
-  .welcome__brand {
-    min-width: 120px;
-  }
-
-  .guide-btn {
-    margin-left: auto;
-  }
-
-  .welcome__title {
-    font-size: 24px;
-  }
-
-  .hero-actions {
-    grid-template-columns: 1fr;
-  }
+.stats,
+.summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .stats {
-  margin-top: 14px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 16px;
   gap: 8px;
-  position: relative;
-  z-index: 3;
 }
 
 .stat-pill {
-  width: 100%;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  appearance: none;
   text-align: left;
-  cursor: pointer;
-  border-radius: 12px;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.88);
-  position: relative;
-  z-index: 4;
-  pointer-events: auto;
-  touch-action: manipulation;
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: none;
 }
 
 .stat-pill--ok {
-  background: rgba(55, 174, 115, 0.14);
+  background: rgba(31, 157, 116, 0.1);
 }
 
 .stat-pill--warn {
   background: rgba(242, 154, 74, 0.14);
 }
 
-.stat-pill__label {
+.stat-pill__label,
+.summary-card__label {
   display: block;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
 }
 
-.stat-pill__value {
-  margin-top: 2px;
+.stat-pill__value,
+.summary-card__value {
   display: block;
-  font-size: 18px;
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 900;
   color: var(--text);
 }
 
-.quick-grid {
-  margin-top: 14px;
+.overview,
+.recommend-panel,
+.support-strip {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.quick-card {
-  text-align: left;
-  border: 1px solid var(--border);
-  padding: 14px;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.quick-card__tag {
-  display: inline-block;
-  padding: 4px 9px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.tag--mint {
-  background: rgba(31, 157, 116, 0.14);
-  color: #0f6c4f;
-}
-
-.tag--teal {
-  background: rgba(76, 173, 195, 0.16);
-  color: #166376;
-}
-
-.tag--leaf {
-  background: rgba(114, 196, 106, 0.14);
-  color: #326f2e;
-}
-
-.tag--amber {
-  background: rgba(242, 154, 74, 0.16);
-  color: #905214;
-}
-
-.tag--cobalt {
-  background: rgba(68, 109, 214, 0.14);
-  color: #244a98;
-}
-
-.quick-card__title {
-  margin: 10px 0 0;
-  font-size: 16px;
-}
-
-.quick-card__desc {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.section-head,
-.recent-inline__head,
-.focus-card__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(24, 45, 73, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 10px 24px rgba(24, 45, 73, 0.06);
 }
 
 .section-head h2,
@@ -630,47 +609,10 @@ onMounted(reloadDashboard)
   font-size: 17px;
 }
 
-.section-head p,
-.summary-card__note,
-.focus-card__note {
-  color: var(--muted);
-}
-
 .section-head p {
   margin-top: 4px;
   font-size: 13px;
   line-height: 1.55;
-}
-
-.overview-link {
-  border: 0;
-  background: transparent;
-  color: var(--primary-deep);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.overview,
-.support-strip {
-  display: grid;
-  gap: 14px;
-  padding: 18px;
-  border-radius: 24px;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 10px 24px rgba(24, 45, 73, 0.06);
-}
-
-.overview__body,
-.summary-grid,
-.recent-inline,
-.support-strip__list {
-  display: grid;
-  gap: 10px;
-}
-
-.summary-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .focus-card {
@@ -680,24 +622,13 @@ onMounted(reloadDashboard)
   padding: 18px 16px;
   text-align: left;
   border-radius: 18px;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  border-left: 4px solid rgba(31, 122, 140, 0.5);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 252, 0.94));
+  border-left: 4px solid rgba(31, 122, 140, 0.5);
 }
 
-.focus-card__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 800;
-  background: rgba(31, 122, 140, 0.12);
-  color: var(--primary-deep);
-}
-
-.focus-card__title {
+.focus-card__title,
+.recommend-card__title,
+.quick-card__title {
   margin: 0;
   font-size: 17px;
   color: #1f2a37;
@@ -717,26 +648,11 @@ onMounted(reloadDashboard)
   text-align: left;
   border-radius: 16px;
   border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .summary-card--soft {
   background: rgba(244, 250, 252, 0.92);
-}
-
-.summary-card__label {
-  display: block;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-}
-
-.summary-card__value {
-  display: block;
-  margin-top: 4px;
-  font-size: 22px;
-  font-weight: 900;
-  color: var(--text);
 }
 
 .summary-card__note {
@@ -744,15 +660,122 @@ onMounted(reloadDashboard)
   line-height: 1.5;
 }
 
+.recent-inline {
+  display: grid;
+  gap: 10px;
+}
+
+.video-item,
+.recommend-card,
+.quick-card {
+  width: 100%;
+  padding: 14px;
+  text-align: left;
+  border-radius: 18px;
+}
+
+.video-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.video-item__info {
+  min-width: 0;
+}
+
+.video-item__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.video-item__status {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 6px;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.status--ok {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.status--warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.status--bad {
+  background: var(--bad-bg);
+  color: var(--bad-text);
+}
+
+.status--info {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
+.video-item__arrow,
+.support-card__arrow {
+  color: #8ba4ae;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.quick-card__tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tag--mint {
+  background: rgba(31, 157, 116, 0.14);
+  color: #0f6c4f;
+}
+
+.tag--leaf {
+  background: rgba(114, 196, 106, 0.14);
+  color: #326f2e;
+}
+
+.tag--amber {
+  background: rgba(242, 154, 74, 0.16);
+  color: #905214;
+}
+
+.tag--teal {
+  background: rgba(76, 173, 195, 0.16);
+  color: #166376;
+}
+
+.tag--cobalt {
+  background: rgba(60, 104, 221, 0.14);
+  color: #274ba4;
+}
+
 .section-head--compact {
   align-items: flex-start;
 }
 
+.support-strip__list {
+  display: grid;
+  gap: 10px;
+}
+
 .support-link {
   width: 100%;
-  border: 1px solid rgba(24, 45, 73, 0.08);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.88);
   padding: 12px 14px;
   display: flex;
   align-items: center;
@@ -772,147 +795,60 @@ onMounted(reloadDashboard)
   font-size: 18px;
 }
 
-.recent {
-  margin-top: 14px;
-  padding: 14px;
-  animation: rise-in 480ms ease-out;
+.recommend-list {
+  grid-template-columns: 1fr;
 }
 
-.recent__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.recommend-card {
+  display: grid;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  border-radius: 18px;
+  padding: 14px 15px;
 }
 
-.recent__head h3 {
+.recommend-card__reason {
+  padding-inline: 9px;
+}
+
+.recommend-card__desc,
+.recommend-card__meta {
   margin: 0;
-  font-size: 15px;
-}
-
-.refresh-btn {
-  border: 0;
-  background: transparent;
-  color: var(--primary-deep);
-  font-weight: 700;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .message {
-  margin-top: 12px;
-  border-radius: 12px;
-  padding: 12px;
-  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-radius: 16px;
+  padding: 14px;
   font-size: 13px;
   background: var(--card-soft);
 }
 
 .message--error {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  color: #aa3232;
   background: rgba(223, 82, 82, 0.1);
+  color: #aa3232;
 }
 
 .message--empty {
   justify-content: flex-start;
 }
 
-.message__link {
-  border: 0;
-  background: transparent;
-  color: #9a2d2d;
-  font-weight: 700;
-}
-
-.skeleton-list {
-  margin-top: 12px;
-  display: grid;
-  gap: 10px;
-}
-
 .skeleton-item {
-  height: 54px;
-  border-radius: 12px;
+  height: 64px;
+  border-radius: 16px;
   background: linear-gradient(90deg, #edf3f0, #e3efe9, #edf3f0);
   background-size: 220% 100%;
   animation: shimmer 1.2s linear infinite;
 }
 
-.video-list {
-  margin-top: 12px;
-  display: grid;
-  gap: 8px;
-}
-
-.video-item {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: #fff;
-  padding: 10px 12px;
-  text-align: left;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.video-item__info {
-  min-width: 0;
-}
-
-.video-item__title {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.video-item__desc {
-  margin: 5px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.video-item__status {
-  margin-top: 5px;
-  display: inline-block;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.status--ok {
-  color: #157b4f;
-  background: rgba(55, 174, 115, 0.14);
-}
-
-.status--warn {
-  color: #8f5419;
-  background: rgba(242, 154, 74, 0.14);
-}
-
-.status--bad {
-  color: #9f3535;
-  background: rgba(223, 82, 82, 0.14);
-}
-
-.status--info {
-  color: #1f6a62;
-  background: rgba(76, 173, 195, 0.14);
-}
-
-.video-item__arrow {
-  color: #9bb0ae;
-  font-size: 22px;
-  line-height: 1;
+.skeleton-item--tall {
+  height: 132px;
 }
 
 @keyframes shimmer {
@@ -925,111 +861,12 @@ onMounted(reloadDashboard)
   }
 }
 
-@keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (max-width: 390px) {
-  .stats {
+@media (max-width: 640px) {
+  .hero-actions,
+  .stats,
+  .summary-grid,
+  .recommend-list {
     grid-template-columns: 1fr;
   }
-
-  .summary-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
-<style scoped>
-.home-page {
-  display: grid;
-  gap: 14px;
-}
-
-.welcome {
-  position: relative;
-  overflow: hidden;
-  padding: 20px;
-  border-radius: 26px;
-  border: 1px solid rgba(31, 122, 140, 0.16);
-  background: linear-gradient(160deg, #ffffff 8%, #f2fbfc 92%);
-  box-shadow: 0 20px 38px rgba(31, 122, 140, 0.14);
-}
-
-.welcome::after {
-  content: '';
-  position: absolute;
-  width: 180px;
-  height: 180px;
-  right: -70px;
-  top: -90px;
-  border-radius: 54px;
-  transform: rotate(18deg);
-  background: linear-gradient(140deg, rgba(31, 122, 140, 0.18), rgba(31, 122, 140, 0.04));
-  pointer-events: none;
-}
-
-.welcome__top,
-.welcome__title,
-.welcome__subtitle,
-.stats {
-  position: relative;
-  z-index: 1;
-}
-
-.welcome__title {
-  font-size: 30px;
-}
-
-.guide-btn {
-  border-color: rgba(31, 122, 140, 0.3);
-  background: rgba(31, 122, 140, 0.12);
-  color: var(--primary-deep);
-}
-
-.stat-pill {
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.84);
-}
-
-.quick-grid {
-  gap: 12px;
-}
-
-.quick-card {
-  border-radius: 18px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.08);
-  background: linear-gradient(180deg, #ffffff, #f8fbff);
-}
-
-.quick-card__title {
-  color: #1f2a37;
-}
-
-.recent {
-  padding: 16px;
-  border-radius: 24px;
-}
-
-.recent__head h3 {
-  font-size: 17px;
-}
-
-.refresh-btn {
-  color: var(--primary-deep);
-}
-
-.video-item {
-  border-radius: 16px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: linear-gradient(180deg, #ffffff, #f9fbfd);
 }
 </style>
