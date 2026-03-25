@@ -640,3 +640,10 @@
 
 - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：在保留当前首页基础结构的前提下新增“推荐学习”入口和首页推荐预览区，接入现有推荐接口，并兼容站外候选跳转到上传页预填 URL。
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页推荐预览切片对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 首页 Hero 刷新
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页顶部欢迎区调整为更聚焦的 hero 结构，补充上传新内容和查看视频库的主按钮，并同步刷新统计卡片的视觉层级。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页 hero 切片对应的 iOS `WKWebView` 静态资源。

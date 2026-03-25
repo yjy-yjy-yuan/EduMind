@@ -7,19 +7,29 @@
         </div>
         <button class="guide-btn" @click="go('/guide')" aria-label="打开使用指南">使用指南</button>
       </div>
-      <h1 class="welcome__title gradient-text">智能伴学中心</h1>
-      <p class="welcome__subtitle">围绕你的学习流程，快速进入视频、笔记、问答与知识梳理。</p>
+
+      <div class="welcome__hero">
+        <div class="welcome__copy">
+          <p class="welcome__eyebrow">首页更聚焦</p>
+          <h1 class="welcome__title gradient-text">智能伴学中心</h1>
+          <p class="welcome__subtitle">先上传，再跟进处理，最后复盘沉淀，不用在多个页面之间反复找入口。</p>
+        </div>
+        <div class="hero-actions">
+          <button class="hero-btn hero-btn--primary" @click="go('/upload')">上传新内容</button>
+          <button class="hero-btn hero-btn--secondary" @click="go('/videos')">查看视频库</button>
+        </div>
+      </div>
 
       <div class="stats">
-        <button type="button" class="stat-pill stat-pill--link" @click="goStat('recent')">
+        <button type="button" class="stat-pill" @click="goStat('recent')">
           <span class="stat-pill__label">最近视频</span>
           <strong class="stat-pill__value">{{ recentCount }}</strong>
         </button>
-        <button type="button" class="stat-pill stat-pill--link stat-pill--ok" @click="goStat('completed')">
+        <button type="button" class="stat-pill stat-pill--ok" @click="goStat('completed')">
           <span class="stat-pill__label">已完成</span>
           <strong class="stat-pill__value">{{ completedCount }}</strong>
         </button>
-        <button type="button" class="stat-pill stat-pill--link stat-pill--warn" @click="goStat('active')">
+        <button type="button" class="stat-pill stat-pill--warn" @click="goStat('active')">
           <span class="stat-pill__label">进行中</span>
           <strong class="stat-pill__value">{{ inProgressCount }}</strong>
         </button>
@@ -312,9 +322,32 @@ onMounted(reloadDashboard)
 }
 
 .welcome {
-  padding: 18px;
-  background: linear-gradient(135deg, #f9fffc, #f1fbf6);
-  animation: rise-in 360ms ease-out;
+  position: relative;
+  overflow: hidden;
+  padding: 22px;
+  border-radius: 28px;
+  border: 1px solid rgba(24, 45, 73, 0.08);
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 251, 252, 0.9) 58%, rgba(232, 247, 250, 0.84) 100%);
+  box-shadow: 0 10px 28px rgba(24, 45, 73, 0.08);
+}
+
+.welcome::after {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  right: -70px;
+  top: -90px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(31, 122, 140, 0.14) 0%, rgba(31, 122, 140, 0.03) 62%, transparent 74%);
+  pointer-events: none;
+}
+
+.welcome__top,
+.welcome__hero,
+.stats {
+  position: relative;
+  z-index: 1;
 }
 
 .welcome__top {
@@ -333,9 +366,9 @@ onMounted(reloadDashboard)
 }
 
 .guide-btn {
-  border: 1px solid rgba(31, 157, 116, 0.25);
+  border: 1px solid rgba(24, 45, 73, 0.08);
   border-radius: 999px;
-  background: rgba(31, 157, 116, 0.08);
+  background: rgba(255, 255, 255, 0.82);
   color: var(--primary-deep);
   font-size: 12px;
   font-weight: 700;
@@ -343,19 +376,61 @@ onMounted(reloadDashboard)
   flex: 0 0 auto;
 }
 
+.welcome__hero {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.welcome__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(31, 122, 140, 0.12);
+  color: var(--primary-deep);
+}
+
 .welcome__title {
-  margin: 12px 0 0;
-  font-size: 27px;
-  line-height: 1.2;
-  letter-spacing: 0.01em;
-  text-shadow: 0 8px 22px rgba(22, 117, 190, 0.12);
+  margin: 8px 0 0;
+  font-size: 31px;
+  line-height: 1.08;
 }
 
 .welcome__subtitle {
-  margin: 8px 0 0;
+  margin-top: 8px;
   color: var(--muted);
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 32rem;
+}
+
+.hero-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hero-btn {
+  border: 1px solid rgba(24, 45, 73, 0.08);
+  border-radius: 14px;
+  padding: 13px 14px;
+  font-size: 14px;
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.hero-btn--primary {
+  border: 0;
+  color: #f4feff;
+  background: linear-gradient(135deg, #145b66, #1f7a8c);
+  box-shadow: 0 10px 18px rgba(31, 122, 140, 0.18);
+}
+
+.hero-btn--secondary {
+  color: var(--primary-deep);
 }
 
 @media (max-width: 390px) {
@@ -374,6 +449,10 @@ onMounted(reloadDashboard)
   .welcome__title {
     font-size: 24px;
   }
+
+  .hero-actions {
+    grid-template-columns: 1fr;
+  }
 }
 
 .stats {
@@ -387,23 +466,17 @@ onMounted(reloadDashboard)
 
 .stat-pill {
   width: 100%;
-  border: 0;
+  border: 1px solid rgba(24, 45, 73, 0.08);
   appearance: none;
   text-align: left;
   cursor: pointer;
   border-radius: 12px;
   padding: 10px;
-  background: rgba(31, 157, 116, 0.08);
+  background: rgba(255, 255, 255, 0.88);
   position: relative;
   z-index: 4;
   pointer-events: auto;
   touch-action: manipulation;
-}
-
-.stat-pill--link {
-  display: block;
-  text-decoration: none;
-  color: inherit;
 }
 
 .stat-pill--ok {
