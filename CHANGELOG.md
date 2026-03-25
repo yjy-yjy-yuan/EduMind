@@ -594,3 +594,10 @@
 
 - 新增 [`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)、[`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)，并更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)：新增 `/api/recommendations/scenes` 与 `/api/recommendations/videos`，复用现有 `videos` 与 `users` 数据，先提供首页推荐、继续学习、复盘推荐和相关推荐四类接口契约。
 - 新增 [`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)：覆盖推荐场景枚举、首页推荐排序，以及 `related` 场景的 `seed_video_id` 约束，固定接口行为。
+
+## 2026-03-25
+
+### 首页推荐位接入
+
+- 新增 [`mobile-frontend/src/api/recommendation.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/recommendation.js)，并更新 [`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：前端增加推荐接口封装与 UI-only mock 数据源，为首页推荐位和后续推荐页提供稳定调用入口。
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：在保留原有首页骨架的前提下新增“推荐视频”区，并接入首页推荐接口，优先展示值得继续处理或复盘的视频。

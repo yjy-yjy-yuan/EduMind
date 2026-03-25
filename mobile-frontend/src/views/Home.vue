@@ -42,7 +42,9 @@
     <section class="recent ios-card">
       <div class="recent__head">
         <h3>本地离线转录</h3>
-        <button class="refresh-btn" @click="reload" :disabled="loading">{{ loading ? '加载中…' : '刷新' }}</button>
+        <button class="refresh-btn" @click="reload" :disabled="loading || recommendationLoading">
+          {{ loading ? '加载中…' : '刷新' }}
+        </button>
       </div>
       <div class="message">
         当前已保存 {{ localTranscriptCount }} 条本地离线转录结果。
@@ -53,7 +55,9 @@
     <section class="recent ios-card">
       <div class="recent__head">
         <h3>最近学习内容</h3>
-        <button class="refresh-btn" @click="reload" :disabled="loading">{{ loading ? '加载中…' : '刷新' }}</button>
+        <button class="refresh-btn" @click="reload" :disabled="loading || recommendationLoading">
+          {{ loading ? '加载中…' : '刷新' }}
+        </button>
       </div>
 
       <div v-if="error" class="message message--error">
@@ -77,6 +81,44 @@
         </button>
       </div>
     </section>
+
+    <section class="recent ios-card">
+      <div class="recent__head">
+        <h3>推荐视频</h3>
+        <button class="refresh-btn" @click="reloadRecommendations" :disabled="recommendationLoading">
+          {{ recommendationLoading ? '加载中…' : '刷新推荐' }}
+        </button>
+      </div>
+
+      <div v-if="recommendationLoading && recommendations.length === 0" class="skeleton-list">
+        <div v-for="i in 2" :key="`recommend-${i}`" class="skeleton-item skeleton-item--tall"></div>
+      </div>
+
+      <div v-else-if="recommendations.length === 0" class="message">
+        <span>{{ recommendationEmptyText }}</span>
+        <button class="message__link" @click="go('/videos')">查看视频库</button>
+      </div>
+
+      <div v-else class="recommend-list">
+        <button
+          v-for="item in recommendations"
+          :key="item.id"
+          class="recommend-item"
+          @click="openRecommendation(item)"
+        >
+          <div class="recommend-item__top">
+            <span class="recommend-item__reason">{{ item.reason_label || '推荐' }}</span>
+            <span class="video-item__status" :class="statusClass(item.status)">{{ statusText(item.status) }}</span>
+          </div>
+          <p class="recommend-item__title">{{ item.title || '未命名视频' }}</p>
+          <p class="recommend-item__desc">{{ item.reason_text || item.summary || '从这里继续进入学习。' }}</p>
+          <div class="recommend-item__meta">
+            <span v-if="Array.isArray(item.tags) && item.tags.length > 0">{{ item.tags.slice(0, 2).join(' · ') }}</span>
+            <span v-if="formatTimeText(item.upload_time)">{{ formatTimeText(item.upload_time) }}</span>
+          </div>
+        </button>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -84,6 +126,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BrandLogo from '@/components/BrandLogo.vue'
+import { getVideoRecommendations } from '@/api/recommendation'
 import { getVideoList } from '@/api/video'
 import { listNativeOfflineTranscripts } from '@/services/nativeOfflineTranscripts'
 import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
@@ -99,14 +142,54 @@ const quickActions = [
 
 const router = useRouter()
 const loading = ref(false)
+const recommendationLoading = ref(false)
 const error = ref('')
+const recommendationError = ref('')
 const allVideos = ref([])
 const localTranscriptCount = ref(0)
+const recommendations = ref([])
 
 const normalizeList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
   return Array.isArray(list) ? list : []
 }
+
+const normalizeRecommendationItems = (payload) => {
+  const items = payload?.items || payload?.recommendations || payload?.data || []
+  return Array.isArray(items) ? items : []
+}
+
+const resolveVideoTime = (video) => {
+  const current = video || {}
+  return current.upload_time || current.updated_at || current.created_at || ''
+}
+
+const mergeVideosById = (items) => {
+  const map = new Map()
+  for (const item of items) {
+    if (!item?.id) continue
+    map.set(Number(item.id), item)
+  }
+  return Array.from(map.values()).sort((a, b) => new Date(resolveVideoTime(b)).getTime() - new Date(resolveVideoTime(a)).getTime())
+}
+
+const formatTimeText = (rawValue) => {
+  if (!rawValue) return ''
+  try {
+    const date = new Date(rawValue)
+    if (Number.isNaN(date.getTime())) return ''
+    return date.toLocaleString()
+  } catch {
+    return ''
+  }
+}
+
+const fallbackRecommendations = (videos) =>
+  videos.slice(0, 4).map((video, index) => ({
+    ...video,
+    reason_label: index === 0 ? '继续学习' : '最近内容',
+    reason_text: index === 0 ? '当前最适合从这个任务继续进入。' : '最近进入视频库，适合继续学习。'
+  }))
 
 const statusText = videoStatusText
 
@@ -122,19 +205,10 @@ const recentVideos = computed(() => allVideos.value.slice(0, 5))
 const recentCount = computed(() => allVideos.value.length)
 const completedCount = computed(() => allVideos.value.filter((item) => isCompletedVideoStatus(item?.status)).length)
 const inProgressCount = computed(() => allVideos.value.filter((item) => isActiveVideoStatus(item?.status)).length)
-
-const mergeVideosById = (items) => {
-  const map = new Map()
-  for (const item of items) {
-    if (!item?.id) continue
-    map.set(Number(item.id), item)
-  }
-  return Array.from(map.values()).sort((a, b) => {
-    const ta = new Date(a?.upload_time || 0).getTime()
-    const tb = new Date(b?.upload_time || 0).getTime()
-    return tb - ta
-  })
-}
+const recommendationEmptyText = computed(() => {
+  if (recommendationError.value) return recommendationError.value
+  return '上传更多视频后，这里会按处理状态和内容相关度给你推荐下一步。'
+})
 
 const fetchAllVideos = async () => {
   const first = await getVideoList(1, 100)
@@ -144,35 +218,69 @@ const fetchAllVideos = async () => {
   if (totalPages <= 1) return firstList
 
   const all = [...firstList]
-  for (let p = 2; p <= totalPages; p += 1) {
-    const res = await getVideoList(p, 100)
+  for (let page = 2; page <= totalPages; page += 1) {
+    const res = await getVideoList(page, 100)
     all.push(...normalizeList(res?.data || {}))
   }
   return all
 }
 
-const reload = async () => {
-  loading.value = true
-  error.value = ''
+const reloadRecommendations = async () => {
+  recommendationLoading.value = true
+  recommendationError.value = ''
   try {
-    const [videos, transcripts] = await Promise.all([
-      fetchAllVideos(),
-      listNativeOfflineTranscripts().catch(() => [])
-    ])
-    allVideos.value = mergeVideosById(videos)
-    localTranscriptCount.value = transcripts.length
+    const res = await getVideoRecommendations({ scene: 'home', limit: 4 })
+    const items = normalizeRecommendationItems(res?.data || {})
+    recommendations.value = items.length > 0 ? items : fallbackRecommendations(allVideos.value)
   } catch (e) {
-    error.value = e?.message || '加载失败'
+    recommendationError.value = e?.message || '推荐加载失败'
+    recommendations.value = fallbackRecommendations(allVideos.value)
   } finally {
-    loading.value = false
+    recommendationLoading.value = false
   }
 }
 
-const go = (path) => router.push(path)
-const goStat = (scope) => {
-  console.info(`[INFO][Home] stat-card-click scope=${scope}`)
-  router.push({ path: '/videos', query: { scope } })
+const reload = async () => {
+  loading.value = true
+  recommendationLoading.value = true
+  error.value = ''
+  recommendationError.value = ''
+
+  const [videosResult, transcriptsResult, recommendationsResult] = await Promise.allSettled([
+    fetchAllVideos(),
+    listNativeOfflineTranscripts().catch(() => []),
+    getVideoRecommendations({ scene: 'home', limit: 4 })
+  ])
+
+  let mergedVideos = allVideos.value
+
+  if (videosResult.status === 'fulfilled') {
+    mergedVideos = mergeVideosById(videosResult.value)
+    allVideos.value = mergedVideos
+  } else {
+    error.value = videosResult.reason?.message || '加载失败'
+  }
+
+  if (transcriptsResult.status === 'fulfilled') {
+    localTranscriptCount.value = Array.isArray(transcriptsResult.value) ? transcriptsResult.value.length : 0
+  } else {
+    localTranscriptCount.value = 0
+  }
+
+  if (recommendationsResult.status === 'fulfilled') {
+    const items = normalizeRecommendationItems(recommendationsResult.value?.data || {})
+    recommendations.value = items.length > 0 ? items : fallbackRecommendations(mergedVideos)
+  } else {
+    recommendationError.value = recommendationsResult.reason?.message || '推荐加载失败'
+    recommendations.value = fallbackRecommendations(mergedVideos)
+  }
+
+  loading.value = false
+  recommendationLoading.value = false
 }
+
+const go = (path) => router.push(path)
+const goStat = (scope) => router.push({ path: '/videos', query: { scope } })
 
 const openVideo = (video) => {
   const current = video || {}
@@ -184,18 +292,47 @@ const openVideo = (video) => {
   router.push(`/videos/${current.id}`)
 }
 
+const openRecommendation = (item) => openVideo(item)
+
 onMounted(reload)
 </script>
 
 <style scoped>
 .home-page {
+  display: grid;
+  gap: 14px;
   padding-top: calc(16px + env(safe-area-inset-top));
 }
 
 .welcome {
-  padding: 18px;
-  background: linear-gradient(135deg, #f9fffc, #f1fbf6);
-  animation: rise-in 360ms ease-out;
+  position: relative;
+  overflow: hidden;
+  padding: 20px;
+  border-radius: 26px;
+  border: 1px solid rgba(31, 122, 140, 0.16);
+  background: linear-gradient(160deg, #ffffff 8%, #f2fbfc 92%);
+  box-shadow: 0 20px 38px rgba(31, 122, 140, 0.14);
+}
+
+.welcome::after {
+  content: '';
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  right: -70px;
+  top: -90px;
+  border-radius: 54px;
+  transform: rotate(18deg);
+  background: linear-gradient(140deg, rgba(31, 122, 140, 0.18), rgba(31, 122, 140, 0.04));
+  pointer-events: none;
+}
+
+.welcome__top,
+.welcome__title,
+.welcome__subtitle,
+.stats {
+  position: relative;
+  z-index: 1;
 }
 
 .welcome__top {
@@ -239,46 +376,22 @@ onMounted(reload)
   line-height: 1.5;
 }
 
-@media (max-width: 390px) {
-  .welcome__top {
-    align-items: flex-start;
-  }
-
-  .welcome__brand {
-    min-width: 120px;
-  }
-
-  .guide-btn {
-    margin-left: auto;
-  }
-
-  .welcome__title {
-    font-size: 24px;
-  }
-}
-
 .stats {
   margin-top: 14px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-  position: relative;
-  z-index: 3;
 }
 
 .stat-pill {
   width: 100%;
-  border: 0;
+  border: 1px solid rgba(32, 42, 55, 0.08);
   appearance: none;
   text-align: left;
   cursor: pointer;
   border-radius: 12px;
   padding: 10px;
-  background: rgba(31, 157, 116, 0.08);
-  position: relative;
-  z-index: 4;
-  pointer-events: auto;
-  touch-action: manipulation;
+  background: rgba(255, 255, 255, 0.84);
 }
 
 .stat-pill--link {
@@ -313,17 +426,20 @@ onMounted(reload)
   margin-top: 14px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
 }
 
 .quick-card {
   text-align: left;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(32, 42, 55, 0.08);
   padding: 14px;
-  background: rgba(255, 255, 255, 0.92);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.08);
 }
 
-.quick-card__tag {
+.quick-card__tag,
+.recommend-item__reason {
   display: inline-block;
   padding: 4px 9px;
   border-radius: 999px;
@@ -354,9 +470,12 @@ onMounted(reload)
 .quick-card__title {
   margin: 10px 0 0;
   font-size: 16px;
+  color: #1f2a37;
 }
 
-.quick-card__desc {
+.quick-card__desc,
+.recommend-item__desc,
+.recommend-item__meta {
   margin: 6px 0 0;
   font-size: 12px;
   color: var(--muted);
@@ -365,20 +484,23 @@ onMounted(reload)
 
 .recent {
   margin-top: 14px;
-  padding: 14px;
+  padding: 16px;
+  border-radius: 24px;
   animation: rise-in 480ms ease-out;
 }
 
-.recent__head {
+.recent__head,
+.recommend-item__top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .recent__head h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 17px;
 }
 
 .refresh-btn {
@@ -396,13 +518,14 @@ onMounted(reload)
   color: var(--muted);
   font-size: 13px;
   background: var(--card-soft);
-}
-
-.message--error {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
+}
+
+.message--error {
   color: #aa3232;
   background: rgba(223, 82, 82, 0.1);
 }
@@ -414,7 +537,9 @@ onMounted(reload)
   font-weight: 700;
 }
 
-.skeleton-list {
+.skeleton-list,
+.video-list,
+.recommend-list {
   margin-top: 12px;
   display: grid;
   gap: 10px;
@@ -428,17 +553,15 @@ onMounted(reload)
   animation: shimmer 1.2s linear infinite;
 }
 
-.video-list {
-  margin-top: 12px;
-  display: grid;
-  gap: 8px;
+.skeleton-item--tall {
+  height: 132px;
 }
 
 .video-item {
   width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: #fff;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
   padding: 10px 12px;
   text-align: left;
   display: flex;
@@ -451,13 +574,13 @@ onMounted(reload)
   min-width: 0;
 }
 
-.video-item__title {
+.video-item__title,
+.recommend-item__title {
   margin: 0;
   font-size: 13px;
   font-weight: 700;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: #1f2a37;
+  overflow-wrap: anywhere;
 }
 
 .video-item__status {
@@ -495,6 +618,28 @@ onMounted(reload)
   line-height: 1;
 }
 
+.recommend-item {
+  width: 100%;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+  padding: 14px;
+  text-align: left;
+  display: grid;
+  gap: 8px;
+}
+
+.recommend-item__reason {
+  background: rgba(31, 122, 140, 0.12);
+  color: var(--primary-deep);
+}
+
+.recommend-item__meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 @keyframes shimmer {
   from {
     background-position: 0% 0;
@@ -518,98 +663,25 @@ onMounted(reload)
 }
 
 @media (max-width: 390px) {
-  .quick-grid {
-    grid-template-columns: 1fr;
-  }
-
+  .quick-grid,
   .stats {
     grid-template-columns: 1fr;
   }
-}
-</style>
-<style scoped>
-.home-page {
-  display: grid;
-  gap: 14px;
-}
 
-.welcome {
-  position: relative;
-  overflow: hidden;
-  padding: 20px;
-  border-radius: 26px;
-  border: 1px solid rgba(31, 122, 140, 0.16);
-  background: linear-gradient(160deg, #ffffff 8%, #f2fbfc 92%);
-  box-shadow: 0 20px 38px rgba(31, 122, 140, 0.14);
-}
+  .welcome__top {
+    align-items: flex-start;
+  }
 
-.welcome::after {
-  content: '';
-  position: absolute;
-  width: 180px;
-  height: 180px;
-  right: -70px;
-  top: -90px;
-  border-radius: 54px;
-  transform: rotate(18deg);
-  background: linear-gradient(140deg, rgba(31, 122, 140, 0.18), rgba(31, 122, 140, 0.04));
-  pointer-events: none;
-}
+  .welcome__brand {
+    min-width: 120px;
+  }
 
-.welcome__top,
-.welcome__title,
-.welcome__subtitle,
-.stats {
-  position: relative;
-  z-index: 1;
-}
+  .guide-btn {
+    margin-left: auto;
+  }
 
-.welcome__title {
-  font-size: 30px;
-}
-
-.guide-btn {
-  border-color: rgba(31, 122, 140, 0.3);
-  background: rgba(31, 122, 140, 0.12);
-  color: var(--primary-deep);
-}
-
-.stat-pill {
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.84);
-}
-
-.quick-grid {
-  gap: 12px;
-}
-
-.quick-card {
-  border-radius: 18px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.08);
-  background: linear-gradient(180deg, #ffffff, #f8fbff);
-}
-
-.quick-card__title {
-  color: #1f2a37;
-}
-
-.recent {
-  padding: 16px;
-  border-radius: 24px;
-}
-
-.recent__head h3 {
-  font-size: 17px;
-}
-
-.refresh-btn {
-  color: var(--primary-deep);
-}
-
-.video-item {
-  border-radius: 16px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+  .welcome__title {
+    font-size: 24px;
+  }
 }
 </style>

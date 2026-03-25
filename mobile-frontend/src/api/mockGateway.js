@@ -289,6 +289,119 @@ const tickVideoProgress = (video) => {
 const sortByUpdatedDesc = (list) =>
   [...list].sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0))
 
+const recommendationScenes = [
+  {
+    value: 'home',
+    label: '首页推荐',
+    description: '适合首页首屏，优先给出当前最值得继续跟进的视频。',
+    requires_seed: false
+  },
+  {
+    value: 'continue',
+    label: '继续学习',
+    description: '优先返回处理中、失败待补跑和最近进入的视频。',
+    requires_seed: false
+  },
+  {
+    value: 'review',
+    label: '复盘推荐',
+    description: '优先返回已完成且适合整理笔记的视频。',
+    requires_seed: false
+  },
+  {
+    value: 'related',
+    label: '相似内容',
+    description: '根据 seed 视频推荐主题相关的视频。',
+    requires_seed: true
+  }
+]
+
+const recommendationTime = (video) => video.upload_time || video.updated_at || video.created_at || nowISO()
+
+const buildMockRecommendationItem = (video, reasonCode, reasonLabel, reasonText, score) => ({
+  id: Number(video.id),
+  title: String(video.title || '未命名视频'),
+  status: String(video.status || 'uploaded'),
+  upload_time: recommendationTime(video),
+  summary: String(video.summary || ''),
+  tags: Array.isArray(video.tags) ? clone(video.tags) : [],
+  process_progress: Number(video.process_progress || 0),
+  current_step: String(video.current_step || ''),
+  processing_origin: String(video.processing_origin || 'online_backend'),
+  processing_origin_label: String(video.processing_origin_label || '在线处理'),
+  upload_source: String(video.upload_source || 'local_file'),
+  upload_source_label: String(video.upload_source_label || '本地上传'),
+  recommendation_score: Number(score || 0),
+  reason_code: reasonCode,
+  reason_label: reasonLabel,
+  reason_text: reasonText
+})
+
+export const mockGetRecommendationScenes = () =>
+  mockResponse({ message: '获取推荐场景成功', scenes: clone(recommendationScenes) })
+
+export const mockGetVideoRecommendations = (params = {}) => {
+  const scene = String(params?.scene || 'home').trim().toLowerCase() || 'home'
+  const limit = Math.max(1, Math.min(12, Number(params?.limit || 4) || 4))
+  const seedVideoId = Number(params?.seed_video_id || 0) || null
+  const seedVideo = seedVideoId ? findVideo(seedVideoId) : null
+
+  if (scene === 'related' && !seedVideo) {
+    return Promise.reject({
+      response: {
+        status: 422,
+        data: { detail: 'scene=related 时必须传入 seed_video_id' }
+      }
+    })
+  }
+
+  const ranked = sortByUpdatedDesc(videos)
+    .filter((video) => !seedVideo || Number(video.id) !== Number(seedVideo.id))
+    .map((video) => {
+      if (scene === 'continue' || scene === 'home') {
+        if (['processing', 'pending', 'downloading'].includes(String(video.status || ''))) {
+          return buildMockRecommendationItem(video, 'continue', '继续跟进', '当前任务仍在处理中，建议优先回到详情页。', 95)
+        }
+        if (String(video.status || '') === 'failed') {
+          return buildMockRecommendationItem(video, 'retry', '建议补跑', '该视频上次处理失败，适合重新提交处理。', 82)
+        }
+      }
+
+      if (scene === 'review' && String(video.status || '') === 'completed') {
+        return buildMockRecommendationItem(video, 'review', '适合复盘', '摘要和标签已生成，适合继续整理笔记。', 76)
+      }
+
+      if (scene === 'related' && seedVideo) {
+        const seedTags = new Set(Array.isArray(seedVideo.tags) ? seedVideo.tags : [])
+        const overlap = (Array.isArray(video.tags) ? video.tags : []).filter((tag) => seedTags.has(tag))
+        return buildMockRecommendationItem(
+          video,
+          overlap.length > 0 ? 'related' : 'recent',
+          overlap.length > 0 ? '主题相关' : '最近内容',
+          overlap.length > 0
+            ? `与《${seedVideo.title || '当前视频'}》共享 ${overlap.slice(0, 2).join('、')} 等主题。`
+            : '当前暂无更强主题信号，先从最近内容继续。',
+          overlap.length > 0 ? 88 + overlap.length : 40
+        )
+      }
+
+      return buildMockRecommendationItem(video, 'recent', '最近内容', '最近进入视频库，适合从这里继续学习。', 56)
+    })
+    .sort((a, b) => b.recommendation_score - a.recommendation_score)
+    .slice(0, limit)
+
+  return mockResponse({
+    message: '获取推荐视频成功',
+    scene,
+    strategy: 'ui_mock_recommendation_v1',
+    personalized: true,
+    fallback_used: false,
+    seed_video_id: seedVideo?.id || null,
+    seed_video_title: seedVideo?.title || null,
+    items: ranked
+  })
+}
+
 const normalizePhone = (value) => {
   const digits = String(value || '').replace(/\D/g, '')
   if (digits.startsWith('86') && digits.length === 13) return digits.slice(2)
