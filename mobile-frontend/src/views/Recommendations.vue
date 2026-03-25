@@ -71,6 +71,52 @@
       </div>
     </section>
 
+    <section class="panel panel--compact ios-card">
+      <div class="section-head">
+        <div>
+          <h2>当前推荐上下文</h2>
+          <p>切场景、筛主题和扩展相关推荐前，先确认你现在正在看的推荐范围。</p>
+        </div>
+        <span class="pill">{{ filteredSceneCountLabel }}</span>
+      </div>
+      <div class="context-grid">
+        <article class="context-card">
+          <span class="context-card__label">当前场景</span>
+          <strong class="context-card__value">{{ activeSceneOption.label }}</strong>
+          <span class="context-card__desc">{{ selectedTagSummary }}</span>
+        </article>
+        <article class="context-card">
+          <span class="context-card__label">相关推荐种子</span>
+          <strong class="context-card__value">{{ relatedSeed ? '已选种子' : '等待选择' }}</strong>
+          <span class="context-card__desc">{{ relatedSeedSummary }}</span>
+        </article>
+        <article class="context-card">
+          <span class="context-card__label">结果构成</span>
+          <strong class="context-card__value">{{ filteredSceneCountLabel }}</strong>
+          <span class="context-card__desc">{{ sceneMixSummary }}</span>
+        </article>
+      </div>
+      <div class="context-actions">
+        <button
+          v-if="selectedTag"
+          type="button"
+          class="context-action"
+          @click="selectedTag = ''"
+        >
+          清除主题
+        </button>
+        <button
+          v-if="relatedSeed"
+          type="button"
+          class="context-action"
+          @click="clearRelated"
+        >
+          清除相关推荐
+        </button>
+        <button type="button" class="context-action context-action--primary" @click="go('/upload')">导入新链接</button>
+      </div>
+    </section>
+
     <section class="panel ios-card">
       <div class="section-head">
         <div>
@@ -324,9 +370,23 @@ const filteredRelatedItems = computed(() => {
   return !selectedTag.value ? items : items.filter((item) => item.tags.includes(selectedTag.value))
 })
 const externalItems = computed(() => allLoadedItems.value.filter((item) => isExternalItem(item)))
+const filteredSceneExternalCount = computed(() => filteredSceneItems.value.filter((item) => isExternalItem(item)).length)
+const filteredSceneInternalCount = computed(() => filteredSceneItems.value.length - filteredSceneExternalCount.value)
 const activeSceneLoading = computed(() => Boolean(sceneLoadingMap.value[activeScene.value]))
 const activeSceneError = computed(() => String(sceneErrorMap.value[activeScene.value] || '').trim())
 const sceneDescriptionText = computed(() => selectedTag.value ? `当前已按“${selectedTag.value}”筛选 ${activeSceneOption.value.label}。` : activeSceneOption.value.description)
+const filteredSceneCountLabel = computed(() => `${filteredSceneItems.value.length} 条结果`)
+const selectedTagSummary = computed(() => selectedTag.value ? `已按“${selectedTag.value}”收窄当前推荐。` : '当前未加主题筛选。')
+const relatedSeedSummary = computed(() => {
+  if (!relatedSeed.value?.title) return '点一次“看同主题”后，这里会固定当前种子。'
+  return String(relatedSeed.value.title)
+})
+const sceneMixSummary = computed(() => {
+  if (filteredSceneItems.value.length === 0) return '等待当前场景返回推荐结果。'
+  if (filteredSceneExternalCount.value === 0) return `当前结果以 ${filteredSceneInternalCount.value} 条站内内容为主。`
+  if (filteredSceneInternalCount.value === 0) return `当前结果以 ${filteredSceneExternalCount.value} 条站外候选为主。`
+  return `站内 ${filteredSceneInternalCount.value} 条，站外 ${filteredSceneExternalCount.value} 条。`
+})
 
 const setSceneLoading = (scene, value) => { sceneLoadingMap.value = { ...sceneLoadingMap.value, [scene]: value } }
 const setSceneError = (scene, value) => { sceneErrorMap.value = { ...sceneErrorMap.value, [scene]: value } }
@@ -425,6 +485,7 @@ onMounted(reloadAll)
 <style scoped>
 .recommendations-page { display: grid; gap: 14px; padding-top: calc(16px + env(safe-area-inset-top)); }
 .hero,.panel { display: grid; gap: 14px; padding: 18px; border-radius: 24px; border: 1px solid rgba(24, 45, 73, 0.08); background: rgba(255, 255, 255, 0.76); box-shadow: 0 12px 28px rgba(24, 45, 73, 0.08); }
+.panel--compact { gap: 12px; }
 .hero { background: linear-gradient(155deg, rgba(255, 255, 255, 0.97) 0%, rgba(243, 251, 253, 0.92) 62%, rgba(231, 245, 249, 0.86) 100%); }
 .hero__eyebrow,.badge,.pill,.mini-tag { display: inline-flex; align-items: center; border-radius: 999px; font-size: 11px; font-weight: 800; }
 .hero__eyebrow,.badge--soft,.pill,.mini-tag { padding: 4px 10px; background: rgba(31, 122, 140, 0.12); color: var(--primary-deep); }
@@ -432,18 +493,22 @@ onMounted(reloadAll)
 .badge--external { padding: 4px 10px; background: rgba(235, 140, 52, 0.16); color: #8f4f12; }
 .badge--mint { padding: 4px 10px; background: rgba(31, 176, 135, 0.14); color: #0d7253; }
 .hero__title { margin-top: 8px; font-size: 30px; line-height: 1.08; }
-.hero__desc,.section-head p,.recommend-card__desc,.recommend-card__meta,.message,.tag-card__sample,.provider-card__desc,.related-card__desc,.seed-card__meta { color: var(--muted); }
+.hero__desc,.section-head p,.recommend-card__desc,.recommend-card__meta,.message,.tag-card__sample,.provider-card__desc,.related-card__desc,.seed-card__meta,.context-card__desc { color: var(--muted); }
 .hero__desc { margin-top: 8px; font-size: 14px; line-height: 1.6; }
-.hero__actions,.hero__stats,.scene-tabs,.tag-grid,.card-list,.provider-grid,.skeleton-list { display: grid; gap: 10px; }
-.hero__actions,.hero__stats,.provider-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.hero__actions,.hero__stats,.scene-tabs,.tag-grid,.card-list,.provider-grid,.skeleton-list,.context-grid { display: grid; gap: 10px; }
+.hero__actions,.hero__stats,.provider-grid,.context-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .hero__actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.hero-btn,.scene-tab,.tag-card,.recommend-card,.related-card,.external-card,.provider-card,.action-btn { border: 1px solid rgba(24, 45, 73, 0.08); background: rgba(255, 255, 255, 0.92); }
-.hero-btn,.action-btn { border-radius: 14px; padding: 12px; font-size: 13px; font-weight: 900; }
-.hero-btn--primary,.action-btn--primary { border: 0; color: #f6feff; background: linear-gradient(135deg, #145b66, #1f7a8c); box-shadow: 0 8px 16px rgba(31, 122, 140, 0.2); }
-.hero-btn--ghost,.panel-link,.provider-card__cta { color: var(--primary-deep); }
-.hero-stat,.seed-card { display: grid; gap: 4px; border-radius: 16px; padding: 12px 14px; background: rgba(255, 255, 255, 0.74); border: 1px solid rgba(24, 45, 73, 0.08); }
-.hero-stat span,.seed-card__label { font-size: 12px; font-weight: 700; color: var(--muted); }
-.hero-stat strong,.seed-card__title { font-size: 22px; font-weight: 900; color: var(--text); }
+.hero-btn,.scene-tab,.tag-card,.recommend-card,.related-card,.external-card,.provider-card,.action-btn,.context-action { border: 1px solid rgba(24, 45, 73, 0.08); background: rgba(255, 255, 255, 0.92); }
+.hero-btn,.action-btn,.context-action { border-radius: 14px; padding: 12px; font-size: 13px; font-weight: 900; }
+.hero-btn--primary,.action-btn--primary,.context-action--primary { border: 0; color: #f6feff; background: linear-gradient(135deg, #145b66, #1f7a8c); box-shadow: 0 8px 16px rgba(31, 122, 140, 0.2); }
+.hero-btn--ghost,.panel-link,.provider-card__cta,.context-action { color: var(--primary-deep); }
+.hero-stat,.seed-card,.context-card { display: grid; gap: 4px; border-radius: 16px; padding: 12px 14px; background: rgba(255, 255, 255, 0.74); border: 1px solid rgba(24, 45, 73, 0.08); }
+.hero-stat span,.seed-card__label,.context-card__label { font-size: 12px; font-weight: 700; color: var(--muted); }
+.hero-stat strong,.seed-card__title,.context-card__value { font-size: 22px; font-weight: 900; color: var(--text); }
+.context-card__value { font-size: 18px; line-height: 1.3; }
+.context-card__desc { font-size: 12px; line-height: 1.55; }
+.context-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.context-action { padding-inline: 14px; }
 .section-head,.recommend-card__top,.recommend-card__meta,.recommend-card__actions,.related-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .section-head h2 { margin: 0; font-size: 18px; }
 .section-head p { margin-top: 4px; font-size: 13px; line-height: 1.55; }
@@ -467,5 +532,5 @@ onMounted(reloadAll)
 .skeleton-card { height: 132px; border-radius: 18px; background: linear-gradient(90deg, rgba(240, 248, 250, 0.95), rgba(255, 255, 255, 0.95), rgba(240, 248, 250, 0.95)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
 .skeleton-card--short { height: 100px; }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-@media (max-width: 720px) { .hero__actions,.hero__stats,.tag-grid,.provider-grid { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .hero__actions,.hero__stats,.tag-grid,.provider-grid,.context-grid { grid-template-columns: 1fr; } }
 </style>

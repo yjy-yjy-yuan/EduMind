@@ -661,3 +661,45 @@
 
 - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页推荐区改为更清晰的推荐面板，补充推荐理由、标签与时间信息展示，并增加直达推荐页的入口按钮。
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页推荐区精修切片对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 推荐页上下文总览
+
+- 更新 [`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)：新增“当前推荐上下文”面板，把当前场景、主题筛选、相关推荐种子和结果构成集中展示，并补充清除主题、清除相关推荐、导入新链接的快捷动作。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步推荐页上下文总览切片对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 首页推荐系统卡片
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：在首页顶部统计区补充“推荐系统”卡片，复用当前首页推荐数据展示入口状态，并直接接到推荐页。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页推荐系统卡片切片对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 首页统计卡统一尺寸
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：为首页顶部 4 张统计卡统一补齐底部提示文案，并调整卡片为一致的最小高度和内部布局，避免“推荐系统”卡片与其他卡片尺寸不一致。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页统计卡尺寸修正对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 对 2026-03-25 首页统计卡记录的更正说明
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页顶部 4 张统计卡改为单行横排展示，移除底部提示文案，统一为与原统计卡一致的紧凑卡片结构，避免“推荐系统”入口破坏横向排布。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页统计卡横排修正对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 对 2026-03-25 首页统计卡横排记录的补充更正
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：补上首页统计区容器的 `grid` 布局声明，并让 4 张统计卡在 iOS 首页顶部按单行四列真正横向铺开，修复卡片被块级堆叠成竖列的问题。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页统计区横排布局补充修正对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 对 2026-03-25 首页统计卡移动端尺寸的补充更正
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：修正移动端断点下 `.stats` 被错误降为单列的问题，并将首页顶部 4 张统计卡压回更接近原始尺寸的紧凑规格，确保一横排放下且卡片大小一致。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页统计卡移动端横排与尺寸修正对应的 iOS `WKWebView` 静态资源。

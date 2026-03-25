@@ -33,6 +33,10 @@
           <span class="stat-pill__label">进行中</span>
           <strong class="stat-pill__value">{{ inProgressCount }}</strong>
         </button>
+        <button type="button" class="stat-pill stat-pill--feature" @click="go('/recommendations')">
+          <span class="stat-pill__label">推荐系统</span>
+          <strong class="stat-pill__value">{{ recommendationEntryValue }}</strong>
+        </button>
       </div>
     </header>
 
@@ -237,6 +241,10 @@ const statusClass = (status) => {
 const recentCount = computed(() => allVideos.value.length)
 const completedCount = computed(() => allVideos.value.filter((item) => isCompletedVideoStatus(item?.status)).length)
 const inProgressCount = computed(() => allVideos.value.filter((item) => isActiveVideoStatus(item?.status)).length)
+const recommendationEntryValue = computed(() => {
+  if (recommendationLoading.value && recommendations.value.length === 0) return '...'
+  return String(recommendations.value.length)
+})
 const featuredVideo = computed(() => allVideos.value.find((item) => isActiveVideoStatus(item?.status)) || allVideos.value[0] || null)
 const recentListVideos = computed(() => {
   const featuredId = Number(featuredVideo.value?.id || 0)
@@ -555,15 +563,26 @@ onMounted(reloadDashboard)
 }
 
 .stats {
+  display: grid;
   margin-top: 16px;
-  gap: 8px;
+  gap: 6px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
 }
 
 .stat-pill {
-  text-align: left;
-  border-radius: 14px;
-  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  min-height: 74px;
+  text-align: center;
+  border-radius: 12px;
+  padding: 8px 4px;
   box-shadow: none;
+  width: 100%;
+  min-width: 0;
 }
 
 .stat-pill--ok {
@@ -574,10 +593,15 @@ onMounted(reloadDashboard)
   background: rgba(242, 154, 74, 0.14);
 }
 
+.stat-pill--feature {
+  background: linear-gradient(135deg, rgba(20, 91, 102, 0.16), rgba(31, 122, 140, 0.08));
+}
+
 .stat-pill__label,
 .summary-card__label {
   display: block;
-  font-size: 12px;
+  font-size: 10px;
+  line-height: 1.3;
   font-weight: 700;
   color: var(--muted);
 }
@@ -585,8 +609,9 @@ onMounted(reloadDashboard)
 .stat-pill__value,
 .summary-card__value {
   display: block;
-  margin-top: 4px;
-  font-size: 22px;
+  margin-top: 0;
+  font-size: 18px;
+  line-height: 1;
   font-weight: 900;
   color: var(--text);
 }
@@ -863,10 +888,19 @@ onMounted(reloadDashboard)
 
 @media (max-width: 640px) {
   .hero-actions,
-  .stats,
   .summary-grid,
   .recommend-list {
     grid-template-columns: 1fr;
+  }
+
+  .stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .stat-pill {
+    min-height: 70px;
+    padding: 8px 2px;
   }
 }
 </style>
