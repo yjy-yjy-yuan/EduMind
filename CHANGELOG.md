@@ -587,3 +587,10 @@
 ### 对 2026-03-24 笔记编辑页摘要展示的恢复说明
 
 - 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：恢复笔记编辑页中的摘要正文展示和摘要片段卡片列表，撤销上一笔误删；时间点、自动补字幕和片段内容联动能力保持不变。
+
+## 2026-03-25
+
+### 视频推荐接口
+
+- 新增 [`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)、[`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)，并更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)：新增 `/api/recommendations/scenes` 与 `/api/recommendations/videos`，复用现有 `videos` 与 `users` 数据，先提供首页推荐、继续学习、复盘推荐和相关推荐四类接口契约。
+- 新增 [`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)：覆盖推荐场景枚举、首页推荐排序，以及 `related` 场景的 `seed_video_id` 约束，固定接口行为。
