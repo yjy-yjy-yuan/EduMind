@@ -619,3 +619,10 @@
 ### Videos 页层级优化
 
 - 更新 [`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：列表页增加更清晰的概览、筛选计数、空状态和快捷动作，并把自动刷新与离线补跑提示集中展示，降低“后台控制台”感。
+
+## 2026-03-25
+
+### 对 2026-03-25 首页、上传页与视频库布局收束的更正说明
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：撤回 2026-03-25 的首页、上传页和视频库层级重排，恢复为上一版页面布局，保留推荐、上传、视频状态与本地转录能力本身，不再继续使用收束后的新版界面结构。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：重新同步恢复后前端产物，确保 iOS `WKWebView` 容器加载到的是旧版页面布局而不是先前打包进 App 的新版资源。
