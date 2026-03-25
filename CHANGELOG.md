@@ -607,3 +607,9 @@
 ### 首页层级与视觉收束
 
 - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：首页改为“首要动作 / 继续学习 / 辅助入口 / 推荐视频”四段结构，收掉过重的面板堆叠，保留推荐链路的同时把主任务入口、继续学习和辅助入口分层展示。
+
+## 2026-03-25
+
+### Upload 页动线收束
+
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：将上传页重排为“处理设置 -> 选择提交方式 -> 对应表单 -> 任务结果”四段，并把方式切换收成更轻的分段控件，减少表单堆叠和说明噪音。

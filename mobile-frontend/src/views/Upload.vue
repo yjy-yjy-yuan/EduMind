@@ -1,75 +1,182 @@
 <template>
-  <div class="page">
-    <header class="topbar">
-      <h2>上传</h2>
-      <button class="link" @click="resetAll" :disabled="busy">重置</button>
+  <div class="page upload-page">
+    <header class="topbar topbar--hero">
+      <div class="topbar__copy">
+        <span class="topbar__eyebrow">上传与转录</span>
+        <h2>把素材送进学习链路</h2>
+        <p class="topbar__desc">先选方式，再提交素材，状态会自动回到视频库或本地转录列表。</p>
+      </div>
+      <div class="topbar__actions">
+        <button class="link" @click="go('/videos')">视频库</button>
+        <button class="link" @click="resetAll" :disabled="busy">重置</button>
+      </div>
     </header>
 
-    <div class="card">
+    <div class="card card--hero">
+      <div class="card-head card-head--stack">
+        <div>
+          <div class="card-title">处理设置</div>
+          <div class="muted">设置一次，后续上传、重试和推荐链路都会沿用。</div>
+        </div>
+        <div class="flow-stats">
+          <div class="flow-stat">
+            <span>最近任务</span>
+            <strong>{{ recentUploads.length }}</strong>
+          </div>
+          <div class="flow-stat">
+            <span>进行中</span>
+            <strong>{{ activeRecentCount }}</strong>
+          </div>
+          <div class="flow-stat">
+            <span>本地转录</span>
+            <strong>{{ nativeHistory.length }}</strong>
+          </div>
+        </div>
+      </div>
       <WhisperModelPicker
         title="Whisper 模型"
         :model="processingSettings.model"
         :options="whisperModelOptions"
         :disabled="busy"
+        hint="在线处理会使用当前 Whisper 模型；iOS 本地离线转录会优先走原生识别。"
         @select="selectProcessingModel"
       />
+      <div class="settings-summary">
+        <span class="hero-pill">{{ processingSettingsSummary }}</span>
+        <button class="hero-link" @click="go('/profile')">去“我的”页调整默认设置</button>
+      </div>
     </div>
 
     <div class="card">
-      <div class="card-title">本地视频</div>
-      <input
-        ref="fileInputRef"
-        class="file"
-        type="file"
-        accept=".mp4,.avi,.mov,.mkv,.webm,.flv"
-        @change="onFileChange"
-        :disabled="busy"
-      />
-      <div v-if="file" class="muted">已选择：{{ file.name }}（{{ readableSize(file.size) }}）</div>
-      <div v-else-if="savedFileMeta" class="muted">
-        上次选择：{{ savedFileMeta.name }}（{{ readableSize(savedFileMeta.size) }}，返回后需重新选择文件才能再次上传）
+      <div class="card-head card-head--stack">
+        <div>
+          <div class="card-title">1. 选择提交方式</div>
+          <div class="muted">三条入口只保留一种激活态，避免表单同时抢视线。</div>
+        </div>
       </div>
-      <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
-        {{ busy ? '上传中…' : '开始上传' }}
-      </button>
-      <button class="btn btn--native" @click="startNativeOfflineTranscriptionFlow" :disabled="busy || nativeBusy">
-        {{ nativeBusy ? '准备本地离线转录…' : 'iOS 本地离线转录' }}
-      </button>
-      <label class="field field--native">
-        <span class="field-label">本地识别语言/方言</span>
-        <select
-          class="input"
-          :value="processingSettings.nativeLocale"
-          :disabled="busy || nativeBusy"
-          @change="selectNativeLocale($event.target.value)"
+      <div class="mode-switch">
+        <button
+          v-for="mode in SUBMISSION_MODES"
+          :key="mode.value"
+          class="mode-tab"
+          :class="{ 'mode-tab--active': submissionMode === mode.value }"
+          @click="submissionMode = mode.value"
         >
-          <option v-for="option in NATIVE_LOCALE_OPTIONS" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </option>
-        </select>
-      </label>
-      <div class="muted">当前处理：{{ processingSettingsSummary }}</div>
-      <div class="muted">本地离线转录优先使用 iOS 原生识别能力，只处理当前设备上的本地视频，不依赖 FastAPI。</div>
-      <div class="muted">如果视频是粤语、吴语、繁体中文或明显口音内容，请先切换到更接近的本地识别语言/方言。</div>
-
-      <div v-if="busy" class="progress">
-        <div class="bar" :style="{ width: `${progress}%` }"></div>
+          {{ mode.label }}
+        </button>
       </div>
-      <div v-if="busy" class="muted">进度：{{ progress }}%</div>
-      <div class="muted">离线补跑仅适用于已配置真实后端地址但暂时不可达；纯 UI ONLY 演示模式不会进入真实离线补跑。</div>
+      <div class="mode-caption">{{ currentSubmissionMode.description }}</div>
     </div>
 
-    <div class="card">
-      <div class="card-title">视频链接</div>
-      <input class="input" v-model.trim="videoUrl" placeholder="请输入视频链接（B站/YouTube等）" :disabled="busy" />
-      <button class="btn" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交链接' }}</button>
-      <div class="muted">支持：B站、YouTube、中国大学慕课（icourse163）</div>
-      <div class="muted">将沿用当前处理设置：{{ processingSettingsSummary }}</div>
+    <div class="card submit-card">
+      <div class="card-head card-head--stack">
+        <div>
+          <div class="card-title">2. {{ currentSubmissionMode.title }}</div>
+          <div class="muted">{{ currentSubmissionMode.description }}</div>
+        </div>
+      </div>
+
+      <template v-if="submissionMode === 'file'">
+        <label class="field">
+          <span class="field-label">本地视频文件</span>
+          <input
+            ref="fileInputRef"
+            class="file file--panel"
+            type="file"
+            accept=".mp4,.avi,.mov,.mkv,.webm,.flv"
+            @change="onFileChange"
+            :disabled="busy"
+          />
+        </label>
+        <div v-if="file" class="selection-note">已选择：{{ file.name }}（{{ readableSize(file.size) }}）</div>
+        <div v-else-if="savedFileMeta" class="selection-note">
+          上次选择：{{ savedFileMeta.name }}（{{ readableSize(savedFileMeta.size) }}，返回后需重新选择文件才能再次上传）
+        </div>
+        <div v-if="busy" class="progress-shell">
+          <div class="progress">
+            <div class="bar" :style="{ width: `${progress}%` }"></div>
+          </div>
+          <div class="muted">上传进度：{{ progress }}%</div>
+        </div>
+        <div class="action-row">
+          <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
+            {{ busy ? '上传中…' : '上传并开始处理' }}
+          </button>
+          <button class="btn btn--ghost" @click="go('/videos')" :disabled="busy">查看视频状态</button>
+        </div>
+        <div class="supporting-list">
+          <span class="supporting-chip">支持 mp4 / avi / mov / mkv / webm / flv</span>
+          <span class="supporting-chip">单文件上限 500 MB</span>
+          <span class="supporting-chip">后端短时不可达会尝试离线补跑</span>
+        </div>
+      </template>
+
+      <template v-else-if="submissionMode === 'url'">
+        <label class="field">
+          <span class="field-label">视频链接</span>
+          <input
+            class="input input--prominent"
+            v-model.trim="videoUrl"
+            placeholder="请输入视频链接（B站/YouTube等）"
+            :disabled="busy"
+          />
+        </label>
+        <div class="supporting-list">
+          <span class="supporting-chip">支持 B站 / YouTube / 中国大学慕课</span>
+          <span class="supporting-chip">将沿用当前处理设置</span>
+        </div>
+        <div class="action-row">
+          <button class="btn btn--primary" @click="uploadUrl" :disabled="!videoUrl || busy">
+            {{ busy ? '提交中…' : '提交链接并开始下载' }}
+          </button>
+          <button class="btn btn--ghost" @click="go('/videos')" :disabled="busy">查看视频状态</button>
+        </div>
+      </template>
+
+      <template v-else>
+        <div class="native-panel">
+          <div class="supporting-list">
+            <span class="supporting-chip supporting-chip--native">{{ nativeAvailabilityText }}</span>
+            <span class="supporting-chip">结果进入本地转录列表</span>
+          </div>
+          <label class="field field--native">
+            <span class="field-label">本地识别语言/方言</span>
+            <select
+              class="input"
+              :value="processingSettings.nativeLocale"
+              :disabled="busy || nativeBusy"
+              @change="selectNativeLocale($event.target.value)"
+            >
+              <option v-for="option in NATIVE_LOCALE_OPTIONS" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <div class="action-row">
+            <button class="btn btn--native" @click="startNativeOfflineTranscriptionFlow" :disabled="busy || nativeBusy">
+              {{ nativeBusy ? '准备本地离线转录…' : '启动 iOS 本地离线转录' }}
+            </button>
+            <button class="btn btn--ghost" @click="go('/local-transcripts')" :disabled="busy || nativeBusy">
+              查看本地转录列表
+            </button>
+          </div>
+          <div class="muted">本地离线转录优先使用 iOS 原生识别能力，只处理当前设备上的本地视频，不依赖 FastAPI。</div>
+          <div class="muted">如果视频是粤语、吴语、繁体中文或明显口音内容，请先切换到更接近的本地识别语言/方言。</div>
+        </div>
+      </template>
+    </div>
+
+    <div v-if="message" class="alert alert--ok">{{ message }}</div>
+    <div v-if="error" class="alert alert--bad">{{ error }}</div>
+
+    <div v-if="!nativeTask && nativeHistory.length === 0 && recentUploads.length === 0" class="card card--empty">
+      <div class="card-title">提交后的任务会出现在这里</div>
+      <div class="muted">在线任务会回到视频库，本地离线任务会回到本地转录列表，避免状态散落在多个入口。</div>
     </div>
 
     <div v-if="nativeTask" class="card">
       <div class="card-head">
-        <div class="card-title">iOS 本地离线转录</div>
+        <div class="card-title">当前本地离线任务</div>
         <div class="card-head-actions">
           <button class="link link--small" @click="openNativeTaskDetail(nativeTask.taskId)" :disabled="!nativeTask.taskId">查看详情</button>
           <button class="link link--small" @click="clearNativeTask" :disabled="nativeBusy">清除结果</button>
@@ -97,7 +204,7 @@
 
     <div v-if="nativeHistory.length > 0" class="card">
       <div class="card-head">
-        <div class="card-title">本地转录历史</div>
+        <div class="card-title">本地离线记录</div>
         <button class="link link--small" @click="reloadNativeHistory" :disabled="nativeBusy">刷新</button>
       </div>
       <div class="recent-list">
@@ -120,7 +227,7 @@
 
     <div v-if="recentUploads.length > 0" class="card">
       <div class="card-head">
-        <div class="card-title">最近上传</div>
+        <div class="card-title">最近在线任务</div>
         <div class="card-head-actions">
           <button class="link link--small" @click="syncRecentStatuses" :disabled="busy || syncingRecent">
             {{ syncingRecent ? '刷新中…' : '刷新状态' }}
@@ -173,9 +280,6 @@
         <div v-if="filteredRecentUploads.length === 0" class="empty">当前筛选下没有记录。</div>
       </div>
     </div>
-
-    <div v-if="message" class="alert alert--ok">{{ message }}</div>
-    <div v-if="error" class="alert alert--bad">{{ error }}</div>
   </div>
 </template>
 
@@ -239,6 +343,7 @@ import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
 const router = useRouter()
 const fileInputRef = ref(null)
+const go = (path) => router.push(path)
 
 const file = ref(null)
 const savedFileMeta = ref(null)
@@ -253,12 +358,33 @@ const nativeTask = ref(null)
 const nativeHistory = ref([])
 const syncingRecent = ref(false)
 const statusFilter = ref('all')
+const submissionMode = ref('file')
 let recentStatusTimer = null
 const processingSettings = ref(getProcessingSettings())
 const whisperModelOptions = ref(getWhisperModelOptions())
 
 const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
 const ALLOWED_EXTENSIONS = new Set(['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'])
+const SUBMISSION_MODES = [
+  {
+    value: 'file',
+    label: '本地文件',
+    title: '上传本地视频',
+    description: '适合把当前设备里的视频直接上传到后端，自动进入转录、摘要和标签链路。'
+  },
+  {
+    value: 'url',
+    label: '视频链接',
+    title: '提交视频链接',
+    description: '适合导入 B站、YouTube 和中国大学慕课链接，后端会先下载再处理。'
+  },
+  {
+    value: 'native',
+    label: 'iOS 本地离线',
+    title: '启动 iOS 本地离线转录',
+    description: '适合在原生容器里直接调用设备能力处理本地视频，不依赖 FastAPI。'
+  }
+]
 const RECENT_UPLOADS_KEY = 'm_recent_uploads'
 const MAX_RECENT_UPLOADS = 8
 const STATUS_FILTERS = [
@@ -286,6 +412,14 @@ const processingSettingsSummary = computed(() => {
   if (current.autoGenerateTags) parts.push('自动标签')
   return parts.join(' · ')
 })
+
+const currentSubmissionMode = computed(
+  () => SUBMISSION_MODES.find((item) => item.value === submissionMode.value) || SUBMISSION_MODES[0]
+)
+const activeRecentCount = computed(() => recentUploads.value.filter((item) => isActiveStatus(item.status)).length)
+const nativeAvailabilityText = computed(() =>
+  hasNativeBridge() ? '当前环境支持 iOS 本地离线转录' : '当前环境不是 iOS 原生容器，仅可使用在线入口'
+)
 
 const selectProcessingModel = (model) => {
   if (busy.value) return
@@ -935,6 +1069,7 @@ const validateVideoUrl = (url) => {
 }
 
 const onFileChange = (e) => {
+  submissionMode.value = 'file'
   const selected = e?.target?.files?.[0] || null
   error.value = ''
   message.value = ''
@@ -974,6 +1109,7 @@ const resetAll = () => {
 
 const startNativeOfflineTranscriptionFlow = async () => {
   if (busy.value || nativeBusy.value) return
+  submissionMode.value = 'native'
   processingSettings.value = getProcessingSettings()
   message.value = ''
   error.value = ''
@@ -1609,5 +1745,195 @@ onUnmounted(() => {
 .status--info {
   background: var(--info-bg);
   color: var(--info-text);
+}
+</style>
+<style scoped>
+.upload-page {
+  display: grid;
+  gap: 12px;
+}
+
+.topbar--hero {
+  display: grid;
+  gap: 12px;
+}
+
+.topbar__copy {
+  display: grid;
+  gap: 6px;
+}
+
+.topbar__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--primary-deep);
+  background: rgba(31, 122, 140, 0.12);
+}
+
+.topbar__desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.topbar__actions,
+.settings-summary,
+.action-row,
+.supporting-list,
+.flow-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.card-head--stack {
+  align-items: flex-start;
+}
+
+.flow-stats {
+  width: 100%;
+}
+
+.flow-stat {
+  flex: 1 1 100px;
+  min-width: 0;
+  border-radius: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(24, 45, 73, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.flow-stat span {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.flow-stat strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 22px;
+  color: var(--text);
+}
+
+.hero-pill,
+.supporting-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.hero-pill {
+  color: var(--primary-deep);
+  background: rgba(31, 122, 140, 0.1);
+}
+
+.hero-link {
+  border: 0;
+  background: transparent;
+  color: var(--primary-deep);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.mode-switch {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(21, 43, 59, 0.06);
+}
+
+.mode-tab {
+  flex: 1;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.mode-tab--active {
+  color: var(--primary-deep);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 6px 14px rgba(24, 45, 73, 0.08);
+}
+
+.mode-caption {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.file--panel {
+  padding: 12px;
+  border: 1px dashed rgba(31, 122, 140, 0.32);
+  border-radius: 16px;
+  background: rgba(244, 251, 253, 0.88);
+}
+
+.selection-note {
+  border-radius: 14px;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+  background: rgba(245, 249, 250, 0.94);
+}
+
+.progress-shell,
+.native-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.btn--ghost {
+  color: var(--primary-deep);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.supporting-chip {
+  color: var(--muted);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.supporting-chip--native {
+  color: #0f6c4f;
+  background: rgba(31, 157, 116, 0.12);
+}
+
+@media (max-width: 640px) {
+  .mode-switch {
+    flex-direction: column;
+    border-radius: 18px;
+  }
+
+  .action-row > * {
+    flex: 1 1 100%;
+  }
 }
 </style>
