@@ -103,6 +103,7 @@ from app.routers import auth
 from app.routers import chat
 from app.routers import note
 from app.routers import qa
+from app.routers import recommendation
 from app.routers import subtitle
 from app.routers import video
 
@@ -112,6 +113,7 @@ app.include_router(note.router, prefix="/api/notes", tags=["笔记管理"])
 app.include_router(qa.router, prefix="/api/qa", tags=["问答系统"])
 app.include_router(chat.router, prefix="/api/chat", tags=["聊天系统"])
 app.include_router(auth.router, prefix="/api/auth", tags=["用户认证"])
+app.include_router(recommendation.router, prefix="/api/recommendations", tags=["视频推荐"])
 
 
 # 根路由

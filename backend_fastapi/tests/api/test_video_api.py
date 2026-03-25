@@ -91,6 +91,49 @@ class TestVideoAPI:
         assert response.headers["content-range"] == f"bytes 2-7/{len(content)}"
         assert response.headers["content-length"] == "6"
 
+    def test_get_video_subtitles_returns_rows_sorted_by_start_time(self, client, db, sample_video):
+        """测试字幕接口返回的数据库字幕按时间顺序排序"""
+        from app.models.subtitle import Subtitle
+
+        db.add_all(
+            [
+                Subtitle(
+                    video_id=sample_video.id, start_time=12.0, end_time=14.0, text="第二句", source="asr", language="zh"
+                ),
+                Subtitle(
+                    video_id=sample_video.id, start_time=2.0, end_time=4.0, text="第一句", source="asr", language="zh"
+                ),
+            ]
+        )
+        db.commit()
+
+        response = client.get(f"/api/subtitles/videos/{sample_video.id}/subtitles")
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert [item["text"] for item in payload["subtitles"]] == ["第一句", "第二句"]
+        assert payload["subtitles"][0]["start_time"] == 2.0
+
+    def test_get_video_subtitles_falls_back_to_srt_file_when_db_rows_missing(self, client, db, sample_video, tmp_path):
+        """测试旧视频缺少 subtitles 表数据时仍可从 SRT 文件回退读取字幕"""
+        subtitle_path = tmp_path / "fallback.srt"
+        subtitle_path.write_text(
+            "1\n00:00:02,000 --> 00:00:05,000\n第一句字幕\n\n2\n00:00:08,500 --> 00:00:11,000\n第二句字幕\n",
+            encoding="utf-8",
+        )
+
+        sample_video.subtitle_filepath = str(subtitle_path)
+        db.commit()
+
+        response = client.get(f"/api/subtitles/videos/{sample_video.id}/subtitles")
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert len(payload["subtitles"]) == 2
+        assert payload["subtitles"][0]["text"] == "第一句字幕"
+        assert payload["subtitles"][0]["start_time"] == 2.0
+        assert payload["subtitles"][1]["end_time"] == 11.0
+
     def test_upload_video_file(self, client, db, tmp_path, monkeypatch):
         """测试本地视频上传"""
         from app.core.config import settings

@@ -14,9 +14,10 @@
     </div>
 
     <template v-else>
-      <section v-if="selectedVideoLabel || hasPrefilledTimestamp" class="context-card">
+      <section v-if="selectedVideoLabel || hasPrefilledTimestamp || videoSummary" class="context-card">
         <div class="section-title">当前上下文</div>
         <div v-if="selectedVideoLabel" class="context-line">关联视频：{{ selectedVideoLabel }}</div>
+        <div v-if="videoSummary" class="context-line">摘要已接入，可直接从摘要片段里挑选内容进入笔记。</div>
         <div v-if="hasPrefilledTimestamp" class="context-line">已带入 {{ timestamps.length }} 个重点时间点，可直接保存或继续编辑。</div>
       </section>
 
@@ -59,11 +60,63 @@
         </label>
       </section>
 
+      <section v-if="hasVideoContext" class="card">
+        <div class="section-head">
+          <div>
+            <div class="section-title">摘要关联片段</div>
+            <div class="section-tip">按摘要主题整理字幕片段，可直接加入笔记正文和重点时间点。</div>
+          </div>
+          <div class="section-tip">{{ filteredSummarySegments.length }} 段</div>
+        </div>
+
+        <div v-if="videoContextLoading" class="empty-inline">正在加载摘要和字幕片段…</div>
+        <div v-else-if="videoContextError" class="inline-note inline-note--bad">{{ videoContextError }}</div>
+        <template v-else>
+          <div v-if="videoSummary" class="summary-panel">
+            <div class="summary-panel__title">当前摘要</div>
+            <div class="summary-panel__body">{{ videoSummary }}</div>
+          </div>
+
+          <div v-if="summaryThemeOptions.length > 0" class="tag-row">
+            <button class="tag-chip" :class="{ 'tag-chip--active': activeSummaryTheme === 'all' }" @click="activeSummaryTheme = 'all'">
+              全部
+            </button>
+            <button
+              v-for="theme in summaryThemeOptions"
+              :key="theme"
+              class="tag-chip"
+              :class="{ 'tag-chip--active': activeSummaryTheme === theme }"
+              @click="activeSummaryTheme = theme"
+            >
+              {{ theme }}
+            </button>
+          </div>
+
+          <div v-if="filteredSummarySegments.length === 0" class="empty-inline">当前摘要下还没有可选片段。</div>
+          <div v-else class="segment-list">
+            <button
+              v-for="segment in filteredSummarySegments"
+              :key="segment.localKey"
+              class="segment-card"
+              @click="applySummarySegment(segment)"
+            >
+              <div class="segment-card__head">
+                <span class="segment-card__theme">{{ segment.summaryTheme || segment.title || '字幕片段' }}</span>
+                <span class="segment-card__time">{{ formatTimeRange(segment.start_time, segment.end_time) }}</span>
+              </div>
+              <div v-if="segment.title && segment.title !== segment.summaryTheme" class="segment-card__title">{{ segment.title }}</div>
+              <div class="segment-card__text">{{ segment.text }}</div>
+              <div class="segment-card__action">{{ isSummarySegmentApplied(segment) ? '已加入笔记' : '加入笔记' }}</div>
+            </button>
+          </div>
+        </template>
+      </section>
+
       <section class="card">
         <div class="section-head">
           <div>
             <div class="section-title">重点时间点</div>
-            <div class="section-tip">可挂接多个时间点，便于后续从视频内容回看笔记。</div>
+            <div class="section-tip">新增秒数后会自动补最近字幕，并把对应片段追加到笔记正文。</div>
           </div>
           <div class="section-tip">{{ timestamps.length }} 个</div>
         </div>
@@ -75,7 +128,15 @@
             <div class="timestamp-grid">
               <label class="field">
                 <span class="label">秒数</span>
-                <input v-model="item.timeSeconds" class="input" type="number" min="0" step="0.1" placeholder="例如 92.5" />
+                <input
+                  v-model="item.timeSeconds"
+                  class="input"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  placeholder="例如 92.5"
+                  @blur="autofillTimestampSubtitle(item)"
+                />
               </label>
 
               <label class="field field--wide">
@@ -95,16 +156,25 @@
           <div class="adder-grid">
             <label class="field">
               <span class="label">新增秒数</span>
-              <input v-model="draftTimestamp.timeSeconds" class="input" type="number" min="0" step="0.1" placeholder="例如 120" />
+              <input
+                v-model="draftTimestamp.timeSeconds"
+                class="input"
+                type="number"
+                min="0"
+                step="0.1"
+                placeholder="例如 120"
+                @blur="autofillDraftTimestamp"
+              />
             </label>
 
             <label class="field field--wide">
               <span class="label">新增字幕/提示</span>
-              <input v-model.trim="draftTimestamp.subtitleText" class="input" placeholder="例如：这里解释了导数几何意义" />
+              <input v-model.trim="draftTimestamp.subtitleText" class="input" placeholder="会按秒数自动补最近字幕，也可手动修改" />
             </label>
           </div>
 
           <button class="mini" @click="addDraftTimestamp">添加时间点</button>
+          <div v-if="hasVideoContext" class="section-tip">如果已选择视频，系统会优先用该秒数附近的字幕和摘要片段补齐内容。</div>
         </div>
       </section>
 
@@ -114,10 +184,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { addNoteTimestamp, createNote, deleteNote, deleteNoteTimestamp, getNote, getNoteTags, updateNote } from '@/api/note'
-import { getVideoList } from '@/api/video'
+import { getMergedVideoSubtitles, getVideoSubtitles } from '@/api/subtitle'
+import { getVideo, getVideoList } from '@/api/video'
 
 const route = useRoute()
 const router = useRouter()
@@ -131,6 +202,12 @@ const videoOptions = ref([])
 const popularTags = ref([])
 const timestamps = ref([])
 const originalTimestamps = ref([])
+const videoContextLoading = ref(false)
+const videoContextError = ref('')
+const videoSummary = ref('')
+const videoSubtitles = ref([])
+const summarySegments = ref([])
+const activeSummaryTheme = ref('all')
 
 const form = reactive({
   title: '',
@@ -144,12 +221,25 @@ const draftTimestamp = reactive({
   subtitleText: ''
 })
 
+const SUMMARY_STOPWORDS = new Set(['本节', '当前', '视频', '课程', '重点', '学习', '内容', '讲解', '相关', '这里', '这个'])
+
 const hasPrefilledTimestamp = computed(
   () =>
     isNew.value &&
     (Boolean(route.query.time) || Boolean(route.query.subtitle)) &&
     timestamps.value.length > 0
 )
+const hasVideoContext = computed(() => Number(form.videoId || 0) > 0)
+const selectedVideoId = computed(() => Number(form.videoId || 0))
+const summaryOutline = computed(() => parseSummaryOutline(videoSummary.value))
+const summaryThemeOptions = computed(() => {
+  const values = [...summaryOutline.value, ...summarySegments.value.map((item) => normalizeText(item.summaryTheme))]
+  return [...new Set(values.filter(Boolean))].slice(0, 8)
+})
+const filteredSummarySegments = computed(() => {
+  if (activeSummaryTheme.value === 'all') return summarySegments.value
+  return summarySegments.value.filter((item) => normalizeText(item.summaryTheme) === activeSummaryTheme.value)
+})
 
 const selectedVideoLabel = computed(() => {
   const currentVideoId = String(form.videoId || '')
@@ -161,14 +251,28 @@ const selectedVideoLabel = computed(() => {
 })
 
 const normalizeText = (value) => String(value || '').trim()
+const compactText = (value, maxLength = 56) => {
+  const text = normalizeText(value).replace(/\s+/g, ' ')
+  if (!text) return ''
+  return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text
+}
 
 const normalizeNote = (payload) => payload?.note || payload?.data || payload || null
+const normalizeVideo = (payload) => payload?.video || payload?.data || payload || null
 const normalizeVideoList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
   return Array.isArray(list) ? list : []
 }
 const normalizeTagBuckets = (payload) => {
   const list = payload?.data || payload?.tags || payload || []
+  return Array.isArray(list) ? list : []
+}
+const normalizeSubtitleList = (payload) => {
+  const list = payload?.subtitles || payload?.data?.subtitles || payload?.data || payload || []
+  return Array.isArray(list) ? list : []
+}
+const normalizeSubtitleSegments = (payload) => {
+  const list = payload?.data || payload || []
   return Array.isArray(list) ? list : []
 }
 
@@ -211,6 +315,9 @@ const toTimestampPayload = (item) => ({
 const sortTimestamps = (list) =>
   [...list].sort((a, b) => Number(a?.timeSeconds || 0) - Number(b?.timeSeconds || 0))
 
+const sortByStartTime = (list) =>
+  [...list].sort((a, b) => Number(a?.start_time || 0) - Number(b?.start_time || 0))
+
 const ensureVideoOption = (videoId, title = '') => {
   const normalizedVideoId = Number(videoId || 0)
   if (!normalizedVideoId) return
@@ -220,6 +327,95 @@ const ensureVideoOption = (videoId, title = '') => {
     id: normalizedVideoId,
     title: normalizeText(title) || `视频 ${normalizedVideoId}`
   })
+}
+
+const cleanSummaryLine = (value) =>
+  normalizeText(value)
+    .replace(/^[-•●▪]+\s*/, '')
+    .replace(/^\d+[\.\)、]\s*/, '')
+    .replace(/^(主题|学习重点|重点|总结|核心内容)[:：]\s*/, '')
+
+const parseSummaryOutline = (summary) => {
+  const text = normalizeText(summary)
+  if (!text) return []
+
+  const lines = text
+    .split(/\n+/)
+    .flatMap((line) => {
+      const normalized = cleanSummaryLine(line)
+      if (!normalized) return []
+      if (/[。；;]/.test(normalized) && normalized.length > 18) {
+        return normalized.split(/[。；;]/).map(cleanSummaryLine).filter(Boolean)
+      }
+      return [normalized]
+    })
+    .filter((item) => item && item !== '学习重点')
+
+  return [...new Set(lines)].slice(0, 8)
+}
+
+const buildSearchTokens = (text) => {
+  const normalized = normalizeText(text).replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '')
+  const tokens = new Set()
+  const latinMatches = normalized.match(/[A-Za-z0-9]{2,}/g) || []
+  latinMatches.forEach((item) => tokens.add(item.toLowerCase()))
+
+  const chineseMatches = normalized.match(/[\u4e00-\u9fa5]{2,}/g) || []
+  chineseMatches.forEach((item) => {
+    if (item.length <= 6 && !SUMMARY_STOPWORDS.has(item)) tokens.add(item)
+    for (let size = 2; size <= Math.min(4, item.length); size += 1) {
+      for (let index = 0; index <= item.length - size; index += 1) {
+        const token = item.slice(index, index + size)
+        if (!SUMMARY_STOPWORDS.has(token)) tokens.add(token)
+      }
+    }
+  })
+
+  return [...tokens].filter((item) => item.length >= 2)
+}
+
+const scoreSummaryThemeMatch = (segment, theme) => {
+  const haystack = normalizeText(`${segment?.title || ''} ${segment?.text || ''}`).toLowerCase()
+  return buildSearchTokens(theme).reduce((score, token) => {
+    return haystack.includes(token.toLowerCase()) ? score + token.length : score
+  }, 0)
+}
+
+const resolveSummaryTheme = (segment, themes) => {
+  const fallbackTitle = normalizeText(segment?.title)
+  if (themes.length === 0) return fallbackTitle
+
+  let bestTheme = ''
+  let bestScore = 0
+  themes.forEach((theme) => {
+    const currentScore = scoreSummaryThemeMatch(segment, theme)
+    if (currentScore > bestScore) {
+      bestScore = currentScore
+      bestTheme = theme
+    }
+  })
+
+  return bestScore > 0 ? bestTheme : fallbackTitle
+}
+
+const buildDecoratedSegments = (segments, themes, videoId) =>
+  sortByStartTime(segments)
+    .map((item, index) => ({
+      localKey: `segment-${videoId}-${index}-${Number(item?.start_time || 0)}`,
+      start_time: Number(item?.start_time || 0),
+      end_time: Number(item?.end_time || item?.start_time || 0),
+      text: normalizeText(item?.text),
+      title: normalizeText(item?.title),
+      summaryTheme: resolveSummaryTheme(item, themes)
+    }))
+    .filter((item) => item.text)
+
+const resetVideoContext = () => {
+  videoContextError.value = ''
+  videoSummary.value = ''
+  videoSubtitles.value = []
+  summarySegments.value = []
+  activeSummaryTheme.value = 'all'
 }
 
 const bootstrapFromRouteQuery = () => {
@@ -238,7 +434,6 @@ const bootstrapFromRouteQuery = () => {
   if (!form.title && queryVideoTitle) {
     form.title = queryVideoTitle
   }
-
   const validTime = queryTime !== undefined && queryTime !== null && String(queryTime).trim() !== ''
   if (!validTime && !querySubtitle) return
 
@@ -255,6 +450,46 @@ const loadAuxiliaryData = async () => {
   const [videoResult, tagResult] = await Promise.allSettled([getVideoList(1, 100), getNoteTags()])
   videoOptions.value = videoResult.status === 'fulfilled' ? sortByUpdated(normalizeVideoList(videoResult.value?.data)) : []
   popularTags.value = tagResult.status === 'fulfilled' ? normalizeTagBuckets(tagResult.value?.data) : []
+}
+
+const loadSelectedVideoContext = async (videoId) => {
+  if (!videoId) {
+    resetVideoContext()
+    return
+  }
+
+  videoContextLoading.value = true
+  videoContextError.value = ''
+  activeSummaryTheme.value = 'all'
+
+  const [videoResult, subtitleResult, segmentResult] = await Promise.allSettled([
+    getVideo(videoId),
+    getVideoSubtitles(videoId),
+    getMergedVideoSubtitles(videoId)
+  ])
+
+  try {
+    const videoDetail = videoResult.status === 'fulfilled' ? normalizeVideo(videoResult.value?.data) : null
+    const currentSummary = normalizeText(videoDetail?.summary)
+    const rawSubtitles =
+      subtitleResult.status === 'fulfilled' ? sortByStartTime(normalizeSubtitleList(subtitleResult.value?.data)) : []
+    const mergedSegments =
+      segmentResult.status === 'fulfilled' ? sortByStartTime(normalizeSubtitleSegments(segmentResult.value?.data)) : []
+    const themes = parseSummaryOutline(currentSummary)
+    const segmentSource = mergedSegments.length > 0 ? mergedSegments : rawSubtitles
+
+    videoSummary.value = currentSummary
+    videoSubtitles.value = rawSubtitles
+    summarySegments.value = buildDecoratedSegments(segmentSource, themes, videoId)
+
+    if (!summarySegments.value.length && !videoSubtitles.value.length) {
+      videoContextError.value = '当前视频还没有可用字幕，暂时无法自动回填重点时间点。'
+    }
+  } catch (e) {
+    videoContextError.value = e?.message || '视频摘要与字幕上下文加载失败'
+  } finally {
+    videoContextLoading.value = false
+  }
 }
 
 const load = async () => {
@@ -292,6 +527,143 @@ const load = async () => {
   }
 }
 
+const parsePositiveSeconds = (value) => {
+  const numericValue = Number(normalizeText(value))
+  if (!Number.isFinite(numericValue) || numericValue < 0) return null
+  return numericValue
+}
+
+const findClosestTimedItem = (list, seconds, maxGapSeconds = 18) => {
+  if (!Array.isArray(list) || list.length === 0) return null
+
+  let bestMatch = null
+  let bestDistance = Number.POSITIVE_INFINITY
+
+  list.forEach((item) => {
+    const startTime = Number(item?.start_time || 0)
+    const endTime = Number(item?.end_time ?? item?.start_time ?? 0)
+    const distance = seconds < startTime ? startTime - seconds : seconds > endTime ? seconds - endTime : 0
+    if (distance < bestDistance) {
+      bestDistance = distance
+      bestMatch = item
+    }
+  })
+
+  return bestDistance <= maxGapSeconds ? bestMatch : null
+}
+
+const findMatchingSubtitle = (seconds) => findClosestTimedItem(videoSubtitles.value, seconds, 18)
+const findMatchingSegment = (seconds) => findClosestTimedItem(summarySegments.value, seconds, 36)
+
+const suggestSubtitleText = (seconds) => {
+  const subtitle = findMatchingSubtitle(seconds)
+  if (subtitle?.text) return compactText(subtitle.text)
+  const segment = findMatchingSegment(seconds)
+  return compactText(segment?.text)
+}
+
+const buildContextSegmentForSeconds = (seconds, explicitText = '') => {
+  const matchedSegment = findMatchingSegment(seconds)
+  if (matchedSegment) return matchedSegment
+
+  const matchedSubtitle = findMatchingSubtitle(seconds)
+  if (matchedSubtitle) {
+    return {
+      start_time: Number(matchedSubtitle.start_time || 0),
+      end_time: Number(matchedSubtitle.end_time || matchedSubtitle.start_time || 0),
+      text: normalizeText(matchedSubtitle.text),
+      title: '',
+      summaryTheme: ''
+    }
+  }
+
+  const fallbackText = normalizeText(explicitText)
+  if (!fallbackText) return null
+  return {
+    start_time: seconds,
+    end_time: seconds,
+    text: fallbackText,
+    title: '重点时间点',
+    summaryTheme: ''
+  }
+}
+
+const formatTimeRange = (startTime, endTime) => {
+  const startLabel = formatSeconds(startTime)
+  const endLabel = formatSeconds(endTime)
+  return startLabel === endLabel ? startLabel : `${startLabel}-${endLabel}`
+}
+
+const buildSegmentContentBlock = (segment) => {
+  const contentText = normalizeText(segment?.text || segment?.subtitle_text)
+  if (!contentText) return ''
+
+  const startTime = Number(segment?.start_time ?? segment?.time_seconds ?? 0)
+  const endTime = Number(segment?.end_time ?? segment?.time_seconds ?? startTime)
+  const title = normalizeText(segment?.summaryTheme || segment?.title)
+  const lines = [`[${formatTimeRange(startTime, endTime)}]${title ? ` ${title}` : ''}`]
+
+  if (segment?.title && segment?.summaryTheme && normalizeText(segment.title) !== normalizeText(segment.summaryTheme)) {
+    lines.push(`片段：${normalizeText(segment.title)}`)
+  }
+
+  lines.push(contentText)
+  return lines.join('\n')
+}
+
+const appendSegmentToNoteContent = (segment) => {
+  const block = buildSegmentContentBlock(segment)
+  if (!block) return
+
+  const current = normalizeText(form.content)
+  if (current.includes(block)) return
+  form.content = current ? `${current}\n\n${block}` : block
+}
+
+const hasTimestampAt = (seconds) =>
+  timestamps.value.some((item) => Math.abs(Number(item?.timeSeconds || 0) - Number(seconds || 0)) < 0.001)
+
+const addTimestampEntry = (seconds, subtitleText) => {
+  if (hasTimestampAt(seconds)) return false
+
+  timestamps.value = sortTimestamps([
+    ...timestamps.value,
+    toEditableTimestamp({
+      time_seconds: seconds,
+      subtitle_text: subtitleText
+    })
+  ])
+  return true
+}
+
+const autofillDraftTimestamp = () => {
+  if (normalizeText(draftTimestamp.subtitleText)) return
+  const seconds = parsePositiveSeconds(draftTimestamp.timeSeconds)
+  if (seconds == null) return
+  draftTimestamp.subtitleText = suggestSubtitleText(seconds)
+}
+
+const autofillTimestampSubtitle = (item) => {
+  if (!item || normalizeText(item.subtitleText)) return
+  const seconds = parsePositiveSeconds(item.timeSeconds)
+  if (seconds == null) return
+  item.subtitleText = suggestSubtitleText(seconds)
+}
+
+const isSummarySegmentApplied = (segment) => {
+  const seconds = Number(segment?.start_time || 0)
+  const block = buildSegmentContentBlock(segment)
+  return hasTimestampAt(seconds) && normalizeText(form.content).includes(block)
+}
+
+const applySummarySegment = (segment) => {
+  const seconds = Number(segment?.start_time || 0)
+  const subtitleText = compactText(segment?.text)
+  addTimestampEntry(seconds, subtitleText)
+  appendSegmentToNoteContent(segment)
+  error.value = ''
+}
+
 const tagSelected = (name) => normalizeTags(form.tagsText).includes(name)
 
 const toggleSuggestedTag = (name) => {
@@ -305,19 +677,22 @@ const addDraftTimestamp = () => {
   const subtitle = normalizeText(draftTimestamp.subtitleText)
   if (!rawTime && !subtitle) return
 
-  const timeNumber = Number(rawTime || 0)
-  if (!Number.isFinite(timeNumber) || timeNumber < 0) {
+  const timeNumber = parsePositiveSeconds(rawTime)
+  if (timeNumber == null) {
     error.value = '时间点必须是大于等于 0 的数字'
     return
   }
 
-  timestamps.value = sortTimestamps([
-    ...timestamps.value,
-    toEditableTimestamp({
-      time_seconds: timeNumber,
-      subtitle_text: subtitle
-    })
-  ])
+  const resolvedSubtitle = subtitle || suggestSubtitleText(timeNumber)
+  const added = addTimestampEntry(timeNumber, resolvedSubtitle)
+  if (!added) {
+    error.value = '该重点时间点已经存在'
+    return
+  }
+
+  const contextSegment = buildContextSegmentForSeconds(timeNumber, resolvedSubtitle)
+  if (contextSegment) appendSegmentToNoteContent(contextSegment)
+
   draftTimestamp.timeSeconds = ''
   draftTimestamp.subtitleText = ''
   error.value = ''
@@ -398,7 +773,6 @@ const buildNoteContent = () => {
 
   return `${memoryLines.join('\n')}\n\n待补充要点：\n- `
 }
-
 const save = async () => {
   if (saving.value) return
   saving.value = true
@@ -461,6 +835,20 @@ const remove = async () => {
     saving.value = false
   }
 }
+
+watch(
+  selectedVideoId,
+  async (videoId) => {
+    await loadSelectedVideoContext(videoId)
+  },
+  { immediate: true }
+)
+
+watch(selectedVideoLabel, (label) => {
+  if (!isNew.value || form.title) return
+  const normalizedLabel = normalizeText(label)
+  if (normalizedLabel) form.title = normalizedLabel
+})
 
 onMounted(load)
 </script>
@@ -569,6 +957,20 @@ onMounted(load)
   color: #475569;
 }
 
+.inline-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 700;
+}
+
+.inline-note--bad {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+}
+
 .context-line + .context-line {
   margin-top: 6px;
 }
@@ -624,6 +1026,82 @@ onMounted(load)
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
+}
+
+.summary-panel {
+  margin-top: 12px;
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(15, 118, 110, 0.08);
+  display: grid;
+  gap: 8px;
+}
+
+.summary-panel__title {
+  font-size: 12px;
+  font-weight: 900;
+  color: #0f766e;
+}
+
+.summary-panel__body {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #0f172a;
+  white-space: pre-wrap;
+}
+
+.segment-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.segment-card {
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  border-radius: 18px;
+  padding: 14px;
+  background: #fff;
+  text-align: left;
+  display: grid;
+  gap: 8px;
+}
+
+.segment-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.segment-card__theme {
+  font-size: 12px;
+  font-weight: 900;
+  color: #0f766e;
+}
+
+.segment-card__time {
+  font-size: 11px;
+  font-weight: 800;
+  color: #0c4a6e;
+}
+
+.segment-card__title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.segment-card__text {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #334155;
+}
+
+.segment-card__action {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--primary);
 }
 
 .tag-chip {

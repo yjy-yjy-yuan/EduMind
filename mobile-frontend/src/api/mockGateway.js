@@ -81,6 +81,79 @@ const videos = [
   }
 ]
 
+const subtitleLibrary = {
+  1: [
+    { id: 101, video_id: 1, start_time: 8, end_time: 18, text: '导数本质上描述函数变化率，可以理解为切线斜率的极限。', source: 'asr', language: 'zh' },
+    { id: 102, video_id: 1, start_time: 22, end_time: 34, text: '当自变量增量趋近于零时，平均变化率就逼近瞬时变化率。', source: 'asr', language: 'zh' },
+    { id: 103, video_id: 1, start_time: 40, end_time: 52, text: '几何意义上，导数对应曲线在某一点的切线斜率。', source: 'asr', language: 'zh' },
+    { id: 104, video_id: 1, start_time: 60, end_time: 74, text: '常见求导法则包括常数法则、幂函数法则和和差法则。', source: 'asr', language: 'zh' },
+    { id: 105, video_id: 1, start_time: 76, end_time: 92, text: '复合函数求导要用链式法则，先求外层再乘内层导数。', source: 'asr', language: 'zh' },
+    { id: 106, video_id: 1, start_time: 96, end_time: 110, text: '遇到隐函数求导时，要对两边同时求导并整理 dy/dx。', source: 'asr', language: 'zh' }
+  ],
+  2: [
+    { id: 201, video_id: 2, start_time: 10, end_time: 24, text: '一般现在时强调习惯、事实和经常发生的动作。', source: 'asr', language: 'zh' },
+    { id: 202, video_id: 2, start_time: 28, end_time: 42, text: '一般过去时用于描述已经完成并结束的动作。', source: 'asr', language: 'zh' },
+    { id: 203, video_id: 2, start_time: 45, end_time: 60, text: '现在完成时更强调结果以及对现在的影响。', source: 'asr', language: 'zh' },
+    { id: 204, video_id: 2, start_time: 64, end_time: 80, text: '判断时态时要看时间状语和语境，而不是只背固定词。', source: 'asr', language: 'zh' }
+  ],
+  3: [
+    { id: 301, video_id: 3, start_time: 12, end_time: 26, text: '列表适合按顺序存储和遍历，支持通过索引访问元素。', source: 'asr', language: 'zh' },
+    { id: 302, video_id: 3, start_time: 30, end_time: 46, text: '字典适合键值映射场景，查找和更新通常更高效。', source: 'asr', language: 'zh' },
+    { id: 303, video_id: 3, start_time: 50, end_time: 68, text: '选择列表还是字典，要根据访问方式和数据组织方式来定。', source: 'asr', language: 'zh' }
+  ]
+}
+
+const semanticSubtitleLibrary = {
+  1: [
+    {
+      start_time: 8,
+      end_time: 34,
+      title: '导数定义',
+      text: '导数本质上描述函数变化率，可以理解为切线斜率的极限。当自变量增量趋近于零时，平均变化率就逼近瞬时变化率。'
+    },
+    {
+      start_time: 40,
+      end_time: 52,
+      title: '几何意义',
+      text: '几何意义上，导数对应曲线在某一点的切线斜率。'
+    },
+    {
+      start_time: 60,
+      end_time: 110,
+      title: '求导法则',
+      text: '常见求导法则包括常数法则、幂函数法则和和差法则。复合函数求导要用链式法则，先求外层再乘内层导数。遇到隐函数求导时，要对两边同时求导并整理 dy/dx。'
+    }
+  ],
+  2: [
+    {
+      start_time: 10,
+      end_time: 42,
+      title: '基础时态',
+      text: '一般现在时强调习惯、事实和经常发生的动作。一般过去时用于描述已经完成并结束的动作。'
+    },
+    {
+      start_time: 45,
+      end_time: 80,
+      title: '完成时辨析',
+      text: '现在完成时更强调结果以及对现在的影响。判断时态时要看时间状语和语境，而不是只背固定词。'
+    }
+  ],
+  3: [
+    {
+      start_time: 12,
+      end_time: 46,
+      title: '列表与字典',
+      text: '列表适合按顺序存储和遍历，支持通过索引访问元素。字典适合键值映射场景，查找和更新通常更高效。'
+    },
+    {
+      start_time: 50,
+      end_time: 68,
+      title: '结构选择',
+      text: '选择列表还是字典，要根据访问方式和数据组织方式来定。'
+    }
+  ]
+}
+
 const notes = [
   {
     id: 1,
@@ -184,6 +257,8 @@ const mockResponse = (data) =>
   })
 
 const findVideo = (videoId) => videos.find((item) => Number(item.id) === Number(videoId))
+const findVideoSubtitles = (videoId) => clone(subtitleLibrary[Number(videoId)] || [])
+const findMergedVideoSubtitles = (videoId) => clone(semanticSubtitleLibrary[Number(videoId)] || [])
 
 const tickVideoProgress = (video) => {
   if (!video) return
@@ -213,6 +288,119 @@ const tickVideoProgress = (video) => {
 
 const sortByUpdatedDesc = (list) =>
   [...list].sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0))
+
+const recommendationScenes = [
+  {
+    value: 'home',
+    label: '首页推荐',
+    description: '适合首页首屏，优先给出当前最值得继续跟进的视频。',
+    requires_seed: false
+  },
+  {
+    value: 'continue',
+    label: '继续学习',
+    description: '优先返回处理中、失败待补跑和最近进入的视频。',
+    requires_seed: false
+  },
+  {
+    value: 'review',
+    label: '复盘推荐',
+    description: '优先返回已完成且适合整理笔记的视频。',
+    requires_seed: false
+  },
+  {
+    value: 'related',
+    label: '相似内容',
+    description: '根据 seed 视频推荐主题相关的视频。',
+    requires_seed: true
+  }
+]
+
+const recommendationTime = (video) => video.upload_time || video.updated_at || video.created_at || nowISO()
+
+const buildMockRecommendationItem = (video, reasonCode, reasonLabel, reasonText, score) => ({
+  id: Number(video.id),
+  title: String(video.title || '未命名视频'),
+  status: String(video.status || 'uploaded'),
+  upload_time: recommendationTime(video),
+  summary: String(video.summary || ''),
+  tags: Array.isArray(video.tags) ? clone(video.tags) : [],
+  process_progress: Number(video.process_progress || 0),
+  current_step: String(video.current_step || ''),
+  processing_origin: String(video.processing_origin || 'online_backend'),
+  processing_origin_label: String(video.processing_origin_label || '在线处理'),
+  upload_source: String(video.upload_source || 'local_file'),
+  upload_source_label: String(video.upload_source_label || '本地上传'),
+  recommendation_score: Number(score || 0),
+  reason_code: reasonCode,
+  reason_label: reasonLabel,
+  reason_text: reasonText
+})
+
+export const mockGetRecommendationScenes = () =>
+  mockResponse({ message: '获取推荐场景成功', scenes: clone(recommendationScenes) })
+
+export const mockGetVideoRecommendations = (params = {}) => {
+  const scene = String(params?.scene || 'home').trim().toLowerCase() || 'home'
+  const limit = Math.max(1, Math.min(12, Number(params?.limit || 4) || 4))
+  const seedVideoId = Number(params?.seed_video_id || 0) || null
+  const seedVideo = seedVideoId ? findVideo(seedVideoId) : null
+
+  if (scene === 'related' && !seedVideo) {
+    return Promise.reject({
+      response: {
+        status: 422,
+        data: { detail: 'scene=related 时必须传入 seed_video_id' }
+      }
+    })
+  }
+
+  const ranked = sortByUpdatedDesc(videos)
+    .filter((video) => !seedVideo || Number(video.id) !== Number(seedVideo.id))
+    .map((video) => {
+      if (scene === 'continue' || scene === 'home') {
+        if (['processing', 'pending', 'downloading'].includes(String(video.status || ''))) {
+          return buildMockRecommendationItem(video, 'continue', '继续跟进', '当前任务仍在处理中，建议优先回到详情页。', 95)
+        }
+        if (String(video.status || '') === 'failed') {
+          return buildMockRecommendationItem(video, 'retry', '建议补跑', '该视频上次处理失败，适合重新提交处理。', 82)
+        }
+      }
+
+      if (scene === 'review' && String(video.status || '') === 'completed') {
+        return buildMockRecommendationItem(video, 'review', '适合复盘', '摘要和标签已生成，适合继续整理笔记。', 76)
+      }
+
+      if (scene === 'related' && seedVideo) {
+        const seedTags = new Set(Array.isArray(seedVideo.tags) ? seedVideo.tags : [])
+        const overlap = (Array.isArray(video.tags) ? video.tags : []).filter((tag) => seedTags.has(tag))
+        return buildMockRecommendationItem(
+          video,
+          overlap.length > 0 ? 'related' : 'recent',
+          overlap.length > 0 ? '主题相关' : '最近内容',
+          overlap.length > 0
+            ? `与《${seedVideo.title || '当前视频'}》共享 ${overlap.slice(0, 2).join('、')} 等主题。`
+            : '当前暂无更强主题信号，先从最近内容继续。',
+          overlap.length > 0 ? 88 + overlap.length : 40
+        )
+      }
+
+      return buildMockRecommendationItem(video, 'recent', '最近内容', '最近进入视频库，适合从这里继续学习。', 56)
+    })
+    .sort((a, b) => b.recommendation_score - a.recommendation_score)
+    .slice(0, limit)
+
+  return mockResponse({
+    message: '获取推荐视频成功',
+    scene,
+    strategy: 'ui_mock_recommendation_v1',
+    personalized: true,
+    fallback_used: false,
+    seed_video_id: seedVideo?.id || null,
+    seed_video_title: seedVideo?.title || null,
+    items: ranked
+  })
+}
 
 const normalizePhone = (value) => {
   const digits = String(value || '').replace(/\D/g, '')
@@ -403,6 +591,23 @@ export const mockGenerateVideoTags = (videoId) => {
   video.tags = Array.isArray(video.tags) && video.tags.length > 0 ? video.tags : ['重点知识', '视频复盘', '学习标签']
   video.updated_at = nowISO()
   return mockResponse({ success: true, tags: clone(video.tags) })
+}
+
+export const mockGetVideoSubtitles = (videoId) => {
+  const video = findVideo(videoId)
+  if (!video) return Promise.reject(new Error('视频不存在（UI 模式）'))
+  return mockResponse({
+    status: 'success',
+    video_id: Number(videoId),
+    video_status: String(video.status || ''),
+    subtitles: findVideoSubtitles(videoId)
+  })
+}
+
+export const mockGetMergedVideoSubtitles = (videoId) => {
+  const video = findVideo(videoId)
+  if (!video) return Promise.reject(new Error('视频不存在（UI 模式）'))
+  return mockResponse(findMergedVideoSubtitles(videoId))
 }
 
 export const mockGetNotes = (params = {}) => {

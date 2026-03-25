@@ -381,7 +381,6 @@ const normalizeNoteList = (payload) => {
 }
 
 const normalizeNote = (payload) => payload?.note || payload?.data || payload || null
-
 const loadVideoNotes = async () => {
   notesLoading.value = true
   try {
@@ -548,7 +547,6 @@ const qa = () => router.push({ path: '/qa', query: { videoId: String(id.value) }
 const openVideoNotes = () => router.push({ path: '/notes', query: { videoId: String(id.value) } })
 
 const openNote = (noteId) => router.push(`/notes/${noteId}`)
-
 const takeNote = () => {
   router.push({
     path: '/notes/new',
@@ -580,7 +578,6 @@ const formatMetaTime = (value) => {
   if (Number.isNaN(date.getTime())) return String(value)
   return date.toLocaleDateString()
 }
-
 const remove = async () => {
   const ok = window.confirm('确认删除该视频？')
   if (!ok) return

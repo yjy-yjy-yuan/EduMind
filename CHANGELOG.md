@@ -547,3 +547,75 @@
 - 更新 [`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：移除工程中硬编码的 `Apple Development`、`DEVELOPMENT_TEAM = 669BK65A7K` 和自动签名设置，Debug / Release 默认改为无签名构建，避免仓库继续继承历史工程里的账号配置导致本机 `xcodebuild` 失败。
 - 更新 [`ios-app/validate_ios_build.sh`](/Users/yuan/final-work/EduMind/ios-app/validate_ios_build.sh)、[`scripts/blitz_build_ios.sh`](/Users/yuan/final-work/EduMind/scripts/blitz_build_ios.sh)：本地 iOS 校验与 Agent 构建脚本统一改为无签名模式，默认走 `generic/platform=iOS`，用于验证当前容器工程与 `WebAssets` 是否可成功编译；真机安装仍需在 Xcode 中单独配置 Team / 描述文件。
 - 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`ios-app/README.md`](/Users/yuan/final-work/EduMind/ios-app/README.md)、[`docs/BLITZ_EDUMIND_WORKFLOW.md`](/Users/yuan/final-work/EduMind/docs/BLITZ_EDUMIND_WORKFLOW.md)：同步说明 `validate_ios_build.sh` 现在是“无签名本地校验”入口，避免继续把它误解为必须依赖 Apple ID 的签名构建。
+
+## 2026-03-24
+
+### 笔记重点时间点接入字幕自动回填与摘要片段选择
+
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：笔记编辑页新增“摘要关联片段”区，会基于当前视频摘要和语义合并字幕展示可选片段；点击片段后会同时把对应秒数写入重点时间点，并把片段正文追加到笔记内容。新增重点时间点时，输入秒数后也会自动补最近字幕，并把匹配到的主要内容写进笔记正文。
+- 新增 [`mobile-frontend/src/api/subtitle.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/subtitle.js)，更新 [`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：前端新增视频字幕与语义分段接口封装，UI-only mock 同步补齐原始字幕和语义片段数据，保证笔记编辑页在 mock / live 两种模式下都能走通。
+- 更新 [`backend_fastapi/app/routers/subtitle.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/subtitle.py)、[`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：字幕接口改为按开始时间排序返回；当数据库里缺少 `subtitles` 行但视频仍保留 `.srt` 文件时，会自动从字幕文件回退解析，确保旧视频也能支持按秒自动补字幕与片段选择。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步最新前端构建产物，确保 iOS `WKWebView` 加载的是当前笔记编辑页实现。
+
+## 2026-03-24
+
+### 对 2026-03-24 “iOS 本地校验改为无签名构建” 的更正说明
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：工程默认配置恢复为可签名状态，继续使用 `Automatic` 与现有 `Apple Development` Team，解决真机安装时报 `No code signature found` 的问题。
+- 保持 [`ios-app/validate_ios_build.sh`](/Users/yuan/final-work/EduMind/ios-app/validate_ios_build.sh) 与 [`scripts/blitz_build_ios.sh`](/Users/yuan/final-work/EduMind/scripts/blitz_build_ios.sh) 的无签名覆盖参数不变；无签名仅用于本地编译校验，不再等同于 Xcode 工程默认产物。
+
+## 2026-03-24
+
+### 对 2026-03-24 “笔记重点时间点接入字幕自动回填与摘要片段选择” 的更正说明
+
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：移除编辑页里重复展示的“当前摘要”正文和按时间节点展开的摘要片段卡片，避免与视频处理页已有摘要重复；重点时间点的秒数输入、自动补字幕、以及片段内容自动写入笔记正文的能力保留不变。
+
+## 2026-03-24
+
+### 对 2026-03-24 “笔记重点时间点接入字幕自动回填与摘要片段选择” 的再次更正说明
+
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：恢复编辑页中的“当前摘要”面板和摘要片段卡片列表，回到上一步版本；重点时间点、自动补字幕和片段内容联动能力继续保留。
+
+## 2026-03-24
+
+### 对 2026-03-24 笔记编辑页摘要展示的最新更正说明
+
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：删除笔记编辑页中的摘要正文展示和下方按时间节点展开的摘要卡片，避免与视频处理页已有摘要重复；重点时间点、自动补字幕和片段内容自动写入笔记正文继续保留。
+
+## 2026-03-24
+
+### 对 2026-03-24 笔记编辑页摘要展示的恢复说明
+
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：恢复笔记编辑页中的摘要正文展示和摘要片段卡片列表，撤销上一笔误删；时间点、自动补字幕和片段内容联动能力保持不变。
+
+## 2026-03-25
+
+### 视频推荐接口
+
+- 新增 [`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)、[`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)，并更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)：新增 `/api/recommendations/scenes` 与 `/api/recommendations/videos`，复用现有 `videos` 与 `users` 数据，先提供首页推荐、继续学习、复盘推荐和相关推荐四类接口契约。
+- 新增 [`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)：覆盖推荐场景枚举、首页推荐排序，以及 `related` 场景的 `seed_video_id` 约束，固定接口行为。
+
+## 2026-03-25
+
+### 首页推荐位接入
+
+- 新增 [`mobile-frontend/src/api/recommendation.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/recommendation.js)，并更新 [`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：前端增加推荐接口封装与 UI-only mock 数据源，为首页推荐位和后续推荐页提供稳定调用入口。
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：在保留原有首页骨架的前提下新增“推荐视频”区，并接入首页推荐接口，优先展示值得继续处理或复盘的视频。
+
+## 2026-03-25
+
+### 首页层级与视觉收束
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：首页改为“首要动作 / 继续学习 / 辅助入口 / 推荐视频”四段结构，收掉过重的面板堆叠，保留推荐链路的同时把主任务入口、继续学习和辅助入口分层展示。
+
+## 2026-03-25
+
+### Upload 页动线收束
+
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：将上传页重排为“处理设置 -> 选择提交方式 -> 对应表单 -> 任务结果”四段，并把方式切换收成更轻的分段控件，减少表单堆叠和说明噪音。
+
+## 2026-03-25
+
+### Videos 页层级优化
+
+- 更新 [`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：列表页增加更清晰的概览、筛选计数、空状态和快捷动作，并把自动刷新与离线补跑提示集中展示，降低“后台控制台”感。
