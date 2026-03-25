@@ -36,54 +36,90 @@
       </div>
     </header>
 
-    <section class="quick-grid">
-      <button
-        v-for="item in quickActions"
-        :key="item.route"
-        class="quick-card ios-card"
-        @click="go(item.route)"
-      >
-        <span class="quick-card__tag" :class="item.tagClass">{{ item.tag }}</span>
-        <h2 class="quick-card__title">{{ item.title }}</h2>
-        <p class="quick-card__desc">{{ item.desc }}</p>
-      </button>
-    </section>
-
-    <section class="recent ios-card">
-      <div class="recent__head">
-        <h3>本地离线转录</h3>
-        <button class="refresh-btn" @click="reload" :disabled="loading">{{ loading ? '加载中…' : '刷新' }}</button>
-      </div>
-      <div class="message">
-        当前已保存 {{ localTranscriptCount }} 条本地离线转录结果。
-        <button class="message__link" @click="go('/local-transcripts')">查看列表</button>
-      </div>
-    </section>
-
-    <section class="recent ios-card">
-      <div class="recent__head">
-        <h3>最近学习内容</h3>
-        <button class="refresh-btn" @click="reload" :disabled="loading">{{ loading ? '加载中…' : '刷新' }}</button>
+    <section class="overview ios-card">
+      <div class="section-head">
+        <div>
+          <h2>继续学习</h2>
+          <p>把最近任务和本地离线结果收口到一个区域里，减少来回跳转。</p>
+        </div>
+        <button class="overview-link" @click="reloadDashboard" :disabled="loading || recommendationLoading">
+          {{ loading ? '刷新中…' : '刷新' }}
+        </button>
       </div>
 
       <div v-if="error" class="message message--error">
         <span>{{ error }}</span>
-        <button class="message__link" @click="reload">重试</button>
+        <button class="overview-link" @click="reloadDashboard">重试</button>
       </div>
 
-      <div v-else-if="loading" class="skeleton-list">
+      <div v-else-if="loading && !featuredVideo" class="skeleton-list">
         <div v-for="i in 3" :key="i" class="skeleton-item"></div>
       </div>
 
-      <div v-else-if="allVideos.length === 0" class="message">暂无视频，先上传一个开始学习吧。</div>
-
-      <div v-else class="video-list">
-        <button v-for="video in recentVideos" :key="video.id" class="video-item" @click="openVideo(video)">
-          <div class="video-item__info">
-            <p class="video-item__title">{{ video.title || '未命名视频' }}</p>
-            <span class="video-item__status" :class="statusClass(video.status)">{{ statusText(video.status) }}</span>
+      <div v-else class="overview__body">
+        <button v-if="featuredVideo" class="focus-card" @click="openVideo(featuredVideo)">
+          <span class="focus-card__eyebrow">{{ featuredVideoEyebrow }}</span>
+          <h3 class="focus-card__title">{{ featuredVideo.title || '未命名视频' }}</h3>
+          <div class="focus-card__meta">
+            <span class="video-item__status" :class="statusClass(featuredVideo.status)">{{ statusText(featuredVideo.status) }}</span>
+            <span class="focus-card__note">{{ featuredVideoNote }}</span>
           </div>
-          <span class="video-item__arrow">›</span>
+          <span class="focus-card__cta">{{ featuredVideoActionLabel }}</span>
+        </button>
+
+        <div v-else class="message message--empty">
+          还没有学习内容，先上传一个视频建立你的学习轨迹。
+          <button class="overview-link" @click="go('/upload')">去上传</button>
+        </div>
+
+        <div class="summary-grid">
+          <button class="summary-card" @click="go('/local-transcripts')">
+            <span class="summary-card__label">本地离线转录</span>
+            <strong class="summary-card__value">{{ localTranscriptCount }}</strong>
+            <span class="summary-card__note">查看 iOS 端侧转录结果</span>
+          </button>
+          <button class="summary-card summary-card--soft" @click="goStat(completedCount > 0 ? 'completed' : 'recent')">
+            <span class="summary-card__label">可复盘内容</span>
+            <strong class="summary-card__value">{{ completedCount }}</strong>
+            <span class="summary-card__note">优先进入已完成视频整理笔记</span>
+          </button>
+        </div>
+
+        <div v-if="recentListVideos.length > 0" class="recent-inline">
+          <div class="recent-inline__head">
+            <h3>最近进入</h3>
+            <button class="overview-link" @click="go('/videos')">查看全部</button>
+          </div>
+          <div class="video-list">
+            <button v-for="video in recentListVideos" :key="video.id" class="video-item" @click="openVideo(video)">
+              <div class="video-item__info">
+                <p class="video-item__title">{{ video.title || '未命名视频' }}</p>
+                <span class="video-item__status" :class="statusClass(video.status)">{{ statusText(video.status) }}</span>
+              </div>
+              <span class="video-item__arrow">›</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="support-strip ios-card">
+      <div class="section-head section-head--compact">
+        <div>
+          <h2>辅助入口</h2>
+          <p>高频动作留在前面，低频入口收成轻量跳转。</p>
+        </div>
+      </div>
+      <div class="support-strip__list">
+        <button
+          v-for="item in supportActions"
+          :key="item.route"
+          class="support-link"
+          @click="go(item.route)"
+        >
+          <span class="quick-card__tag" :class="item.tagClass">{{ item.tag }}</span>
+          <span class="support-link__label">{{ item.title }}</span>
+          <span class="support-link__arrow">›</span>
         </button>
       </div>
     </section>
@@ -136,13 +172,11 @@ import { listNativeOfflineTranscripts } from '@/services/nativeOfflineTranscript
 import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
 const quickActions = [
-  { route: '/videos', tag: '视频', tagClass: 'tag--mint', title: '视频库', desc: '查看列表与处理状态' },
-  { route: '/upload', tag: '上传', tagClass: 'tag--teal', title: '上传中心', desc: '支持本地文件和链接' },
   { route: '/local-transcripts', tag: '本地', tagClass: 'tag--mint', title: '本地转录', desc: '查看 iOS 离线转录结果' },
-  { route: '/notes', tag: '笔记', tagClass: 'tag--leaf', title: '学习笔记', desc: '随学随记，整理知识片段' },
-  { route: '/qa', tag: '问答', tagClass: 'tag--amber', title: 'AI 问答', desc: '基于课程内容即时提问' },
+  { route: '/notes', tag: '笔记', tagClass: 'tag--leaf', title: '学习笔记', desc: '把结论沉淀成稳定回看入口' },
+  { route: '/qa', tag: '问答', tagClass: 'tag--amber', title: 'AI 问答', desc: '围绕课程内容继续追问' },
   { route: '/recommendations', tag: '推荐', tagClass: 'tag--cobalt', title: '推荐学习', desc: '集中查看继续学习、复盘与相关推荐' },
-  { route: '/learning-path', tag: '路径', tagClass: 'tag--teal', title: '学习路径', desc: '获取下一步学习建议' }
+  { route: '/learning-path', tag: '路径', tagClass: 'tag--teal', title: '学习路径', desc: '后续承接推荐学习顺序' }
 ]
 
 const router = useRouter()
@@ -153,6 +187,7 @@ const recommendationError = ref('')
 const allVideos = ref([])
 const localTranscriptCount = ref(0)
 const recommendations = ref([])
+const supportActions = computed(() => quickActions)
 
 const normalizeList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
@@ -174,10 +209,27 @@ const statusClass = (status) => {
   return 'status--info'
 }
 
-const recentVideos = computed(() => allVideos.value.slice(0, 5))
 const recentCount = computed(() => allVideos.value.length)
 const completedCount = computed(() => allVideos.value.filter((item) => isCompletedVideoStatus(item?.status)).length)
 const inProgressCount = computed(() => allVideos.value.filter((item) => isActiveVideoStatus(item?.status)).length)
+const featuredVideo = computed(() => allVideos.value.find((item) => isActiveVideoStatus(item?.status)) || allVideos.value[0] || null)
+const recentListVideos = computed(() => {
+  const featuredId = Number(featuredVideo.value?.id || 0)
+  return allVideos.value.filter((item) => Number(item.id || 0) !== featuredId).slice(0, 3)
+})
+const featuredVideoEyebrow = computed(() => {
+  if (!featuredVideo.value) return ''
+  if (isActiveVideoStatus(featuredVideo.value?.status)) return '优先跟进'
+  if (isCompletedVideoStatus(featuredVideo.value?.status)) return '适合复盘'
+  return '最近进入'
+})
+const featuredVideoNote = computed(() => {
+  if (!featuredVideo.value) return ''
+  if (isActiveVideoStatus(featuredVideo.value?.status)) return '当前任务仍在推进'
+  if (isCompletedVideoStatus(featuredVideo.value?.status)) return '已完成处理，可继续复盘'
+  return '从这里继续进入'
+})
+const featuredVideoActionLabel = computed(() => (isActiveVideoStatus(featuredVideo.value?.status) ? '查看进度' : '打开详情'))
 
 const mergeVideosById = (items) => {
   const map = new Map()
@@ -318,6 +370,8 @@ onMounted(reloadDashboard)
 
 <style scoped>
 .home-page {
+  display: grid;
+  gap: 14px;
   padding-top: calc(16px + env(safe-area-inset-top));
 }
 
@@ -560,6 +614,164 @@ onMounted(reloadDashboard)
   line-height: 1.5;
 }
 
+.section-head,
+.recent-inline__head,
+.focus-card__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.section-head h2,
+.recent-inline__head h3 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.section-head p,
+.summary-card__note,
+.focus-card__note {
+  color: var(--muted);
+}
+
+.section-head p {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.overview-link {
+  border: 0;
+  background: transparent;
+  color: var(--primary-deep);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.overview,
+.support-strip {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(24, 45, 73, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 24px rgba(24, 45, 73, 0.06);
+}
+
+.overview__body,
+.summary-grid,
+.recent-inline,
+.support-strip__list {
+  display: grid;
+  gap: 10px;
+}
+
+.summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.focus-card {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  padding: 18px 16px;
+  text-align: left;
+  border-radius: 18px;
+  border: 1px solid rgba(24, 45, 73, 0.08);
+  border-left: 4px solid rgba(31, 122, 140, 0.5);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 252, 0.94));
+}
+
+.focus-card__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(31, 122, 140, 0.12);
+  color: var(--primary-deep);
+}
+
+.focus-card__title {
+  margin: 0;
+  font-size: 17px;
+  color: #1f2a37;
+}
+
+.focus-card__cta {
+  color: var(--primary-deep);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.summary-card {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 14px;
+  text-align: left;
+  border-radius: 16px;
+  border: 1px solid rgba(24, 45, 73, 0.08);
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.summary-card--soft {
+  background: rgba(244, 250, 252, 0.92);
+}
+
+.summary-card__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.summary-card__value {
+  display: block;
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.summary-card__note {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.section-head--compact {
+  align-items: flex-start;
+}
+
+.support-link {
+  width: 100%;
+  border: 1px solid rgba(24, 45, 73, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+.support-link__label {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 800;
+  color: #1f2a37;
+}
+
+.support-link__arrow {
+  color: #8ba4ae;
+  font-size: 18px;
+}
+
 .recent {
   margin-top: 14px;
   padding: 14px;
@@ -602,6 +814,10 @@ onMounted(reloadDashboard)
   gap: 10px;
   color: #aa3232;
   background: rgba(223, 82, 82, 0.1);
+}
+
+.message--empty {
+  justify-content: flex-start;
 }
 
 .message__link {
@@ -722,11 +938,11 @@ onMounted(reloadDashboard)
 }
 
 @media (max-width: 390px) {
-  .quick-grid {
+  .stats {
     grid-template-columns: 1fr;
   }
 
-  .stats {
+  .summary-grid {
     grid-template-columns: 1fr;
   }
 }
