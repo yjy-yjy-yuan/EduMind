@@ -613,3 +613,9 @@
 ### Upload 页动线收束
 
 - 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：将上传页重排为“处理设置 -> 选择提交方式 -> 对应表单 -> 任务结果”四段，并把方式切换收成更轻的分段控件，减少表单堆叠和说明噪音。
+
+## 2026-03-25
+
+### Videos 页层级优化
+
+- 更新 [`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：列表页增加更清晰的概览、筛选计数、空状态和快捷动作，并把自动刷新与离线补跑提示集中展示，降低“后台控制台”感。
