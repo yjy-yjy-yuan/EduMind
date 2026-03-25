@@ -317,6 +317,35 @@ const recommendationScenes = [
 ]
 
 const recommendationTime = (video) => video.upload_time || video.updated_at || video.created_at || nowISO()
+const externalRecommendationCatalog = [
+  {
+    key: 'bilibili-derivative-review',
+    title: 'B站·导数与函数单调性综合串讲',
+    source_label: 'B站',
+    url: 'https://www.bilibili.com/video/BV1xk4y1x7m9',
+    summary: '围绕导数、函数单调性和常见压轴题型做集中复盘。',
+    tags: ['导数定义', '函数', '题型复盘'],
+    published_at: nowISO()
+  },
+  {
+    key: 'youtube-python-structures',
+    title: 'YouTube · Python Data Structures Crash Review',
+    source_label: 'YouTube',
+    url: 'https://www.youtube.com/watch?v=python-structures-demo',
+    summary: '用更短的节奏复盘列表、字典和集合在学习项目里的典型用法。',
+    tags: ['Python', '数据结构', '列表'],
+    published_at: nowISO()
+  },
+  {
+    key: 'mooc-english-tense',
+    title: '中国大学慕课 · 英语时态专项精讲',
+    source_label: '中国大学慕课',
+    url: 'https://www.icourse163.org/learn/FOREIGN-1001',
+    summary: '聚焦一般过去时、现在完成时与写作语境辨析，适合配合已上传语法视频继续学习。',
+    tags: ['英语', '时态', '写作'],
+    published_at: nowISO()
+  }
+]
 
 const buildMockRecommendationItem = (video, reasonCode, reasonLabel, reasonText, score) => ({
   id: Number(video.id),
@@ -337,12 +366,82 @@ const buildMockRecommendationItem = (video, reasonCode, reasonLabel, reasonText,
   reason_text: reasonText
 })
 
+const buildMockExternalRecommendationItem = (candidate, reasonCode, reasonLabel, reasonText, score) => ({
+  title: String(candidate.title || '站外候选'),
+  status: '',
+  upload_time: candidate.published_at || nowISO(),
+  summary: String(candidate.summary || ''),
+  tags: Array.isArray(candidate.tags) ? clone(candidate.tags) : [],
+  process_progress: 0,
+  current_step: '',
+  processing_origin: 'external_candidate',
+  processing_origin_label: '站外候选',
+  upload_source: 'external_candidate',
+  upload_source_label: String(candidate.source_label || '站外候选'),
+  recommendation_score: Number(score || 0),
+  reason_code: reasonCode,
+  reason_label: reasonLabel,
+  reason_text: reasonText,
+  is_external: true,
+  item_type: 'external_candidate',
+  source_label: String(candidate.source_label || '站外候选'),
+  external_url: String(candidate.url || ''),
+  external_source_label: String(candidate.source_label || '站外候选')
+})
+
+const buildMockExternalCandidates = (scene, seedVideo) => {
+  const seedTags = new Set(Array.isArray(seedVideo?.tags) ? seedVideo.tags : [])
+  return externalRecommendationCatalog.map((candidate) => {
+    const overlap = candidate.tags.filter((tag) => seedTags.has(tag))
+    if (scene === 'related' && seedVideo) {
+      return buildMockExternalRecommendationItem(
+        candidate,
+        overlap.length > 0 ? 'external_related' : 'external_recent',
+        overlap.length > 0 ? '站外同主题' : '站外扩展',
+        overlap.length > 0
+          ? `与《${seedVideo.title || '当前视频'}》共享 ${overlap.slice(0, 2).join('、')} 等主题，可直接导入继续学习。`
+          : '当前暂无更强主题重合，但可以作为站外扩展内容导入。',
+        overlap.length > 0 ? 79 + overlap.length : 48
+      )
+    }
+
+    if (scene === 'review') {
+      return buildMockExternalRecommendationItem(
+        candidate,
+        'external_review',
+        '站外复盘',
+        '适合配合当前已完成内容继续做复盘或横向补充。',
+        68
+      )
+    }
+
+    if (scene === 'continue') {
+      return buildMockExternalRecommendationItem(
+        candidate,
+        'external_continue',
+        '站外延伸',
+        '当前场景可继续从站外课程扩展同主题内容，并随时导回学习链路。',
+        64
+      )
+    }
+
+    return buildMockExternalRecommendationItem(
+      candidate,
+      'external_discovery',
+      '站外发现',
+      '把站内学习主题继续扩展到 B站、YouTube 或慕课内容。',
+      62
+    )
+  })
+}
+
 export const mockGetRecommendationScenes = () =>
   mockResponse({ message: '获取推荐场景成功', scenes: clone(recommendationScenes) })
 
 export const mockGetVideoRecommendations = (params = {}) => {
   const scene = String(params?.scene || 'home').trim().toLowerCase() || 'home'
   const limit = Math.max(1, Math.min(12, Number(params?.limit || 4) || 4))
+  const includeExternal = ['1', 'true', 'yes'].includes(String(params?.include_external || '').trim().toLowerCase())
   const seedVideoId = Number(params?.seed_video_id || 0) || null
   const seedVideo = seedVideoId ? findVideo(seedVideoId) : null
 
@@ -387,6 +486,8 @@ export const mockGetVideoRecommendations = (params = {}) => {
 
       return buildMockRecommendationItem(video, 'recent', '最近内容', '最近进入视频库，适合从这里继续学习。', 56)
     })
+  const externalItems = includeExternal ? buildMockExternalCandidates(scene, seedVideo) : []
+  const items = [...ranked, ...externalItems]
     .sort((a, b) => b.recommendation_score - a.recommendation_score)
     .slice(0, limit)
 
@@ -398,7 +499,7 @@ export const mockGetVideoRecommendations = (params = {}) => {
     fallback_used: false,
     seed_video_id: seedVideo?.id || null,
     seed_video_title: seedVideo?.title || null,
-    items: ranked
+    items
   })
 }
 

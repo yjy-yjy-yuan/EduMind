@@ -180,8 +180,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   generateTranscriptSummary,
   getVideoProcessingOptions,
@@ -238,6 +238,7 @@ import {
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
 const router = useRouter()
+const route = useRoute()
 const fileInputRef = ref(null)
 
 const file = ref(null)
@@ -301,6 +302,45 @@ const selectNativeLocale = (nativeLocale) => {
     ...processingSettings.value,
     nativeLocale: String(nativeLocale || '').trim()
   })
+}
+
+const consumeUploadRouteIntent = async () => {
+  const query = route.query || {}
+  const normalizedMode = String(query.mode || '').trim().toLowerCase()
+  const normalizedUrl = String(query.url || '').trim()
+  const normalizedSource = String(query.source || '').trim()
+
+  const restQuery = { ...query }
+  delete restQuery.mode
+  delete restQuery.url
+  delete restQuery.source
+
+  let consumed = false
+  if (normalizedMode === 'url' || normalizedUrl) {
+    submissionMode.value = 'url'
+    consumed = true
+  } else if (normalizedMode === 'native') {
+    submissionMode.value = 'native'
+    consumed = true
+  } else if (normalizedMode === 'file') {
+    submissionMode.value = 'file'
+    consumed = true
+  }
+
+  if (normalizedUrl) {
+    videoUrl.value = normalizedUrl
+    message.value = normalizedSource
+      ? `已从 ${normalizedSource} 推荐带入链接，可直接提交导入。`
+      : '已带入推荐链接，可直接提交导入。'
+    consumed = true
+  } else if (normalizedSource && normalizedMode === 'url') {
+    message.value = `已切换到链接导入，可粘贴 ${normalizedSource} 链接。`
+    consumed = true
+  }
+
+  if (consumed) {
+    await router.replace({ path: route.path, query: restQuery }).catch(() => {})
+  }
 }
 
 const readableSize = (size) => {
@@ -1176,6 +1216,7 @@ const uploadUrl = async () => {
 }
 
 onMounted(async () => {
+  await consumeUploadRouteIntent()
   nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_PROGRESS_EVENT, handleNativeProgressEvent))
   nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_COMPLETED_EVENT, handleNativeCompletedEvent))
   nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_FAILED_EVENT, handleNativeFailedEvent))
@@ -1191,6 +1232,13 @@ onMounted(async () => {
   await syncRecentStatuses()
   scheduleRecentStatusSync()
 })
+
+watch(
+  () => route.fullPath,
+  async () => {
+    await consumeUploadRouteIntent()
+  }
+)
 
 onUnmounted(() => {
   clearRecentStatusSync()

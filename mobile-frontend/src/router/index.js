@@ -4,6 +4,7 @@ import * as authStore from '@/store/auth'
 import Home from '@/views/Home.vue'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
+import Recommendations from '@/views/Recommendations.vue'
 import Videos from '@/views/Videos.vue'
 import VideoDetail from '@/views/VideoDetail.vue'
 import LocalTranscripts from '@/views/LocalTranscripts.vue'
@@ -24,6 +25,7 @@ const router = createRouter({
   history,
   routes: [
     { path: '/', name: 'Home', component: Home, meta: { title: '首页' } },
+    { path: '/recommendations', name: 'Recommendations', component: Recommendations, meta: { title: '推荐学习' } },
     { path: '/videos', name: 'Videos', component: Videos, meta: { title: '视频' } },
     { path: '/local-transcripts', name: 'LocalTranscripts', component: LocalTranscripts, meta: { title: '本地转录' } },
     { path: '/videos/:id', name: 'VideoDetail', component: VideoDetail, meta: { title: '视频详情' } },
