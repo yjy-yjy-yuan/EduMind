@@ -320,6 +320,7 @@ bash scripts/install_git_hooks.sh
 - [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)
 - [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)
 - [`docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md)
+- [`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md)
 - [`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)
 - [`backend_fastapi/README_RUN.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README_RUN.md)
 - [`mobile-frontend/README.md`](/Users/yuan/final-work/EduMind/mobile-frontend/README.md)

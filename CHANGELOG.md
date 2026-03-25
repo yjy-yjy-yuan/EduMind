@@ -626,3 +626,10 @@
 
 - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：撤回 2026-03-25 的首页、上传页和视频库层级重排，恢复为上一版页面布局，保留推荐、上传、视频状态与本地转录能力本身，不再继续使用收束后的新版界面结构。
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：重新同步恢复后前端产物，确保 iOS `WKWebView` 容器加载到的是旧版页面布局而不是先前打包进 App 的新版资源。
+
+## 2026-03-25
+
+### 视频推荐实现提示词
+
+- 新增 [`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md)：补充面向 Codex / Claude / Blitz 的专用提示词，明确视频推荐要基于现有 `videos` 标签先做站内聚类，再扩展 B 站 / YouTube / 中国大学慕课外部候选元数据、标签处理和导入链路，并把“按可独立提交切片推进、每组改动超过 800 行必须继续拆分、CHANGELOG 只能追加”等硬约束写进主提示词。
+- 更新 [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：在总控实现文档和仓库文档索引中补充视频推荐实现边界与专用提示词入口，保持 iOS-only 架构说明与推荐建设方向一致。
