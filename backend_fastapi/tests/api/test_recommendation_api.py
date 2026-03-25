@@ -72,6 +72,7 @@ class TestRecommendationAPI:
         assert len(payload["items"]) == 3
         assert payload["items"][0]["id"] == processing_video.id
         assert payload["items"][0]["reason_code"] == "continue"
+        assert payload["items"][0]["tags"][0] == "数学"
         assert any(item["reason_code"] in {"interest", "continue"} for item in payload["items"])
 
     def test_related_recommendations_require_seed_video(self, client):
@@ -129,4 +130,54 @@ class TestRecommendationAPI:
         assert payload["seed_video_title"] == seed_video.title
         assert payload["items"][0]["id"] == best_match.id
         assert payload["items"][0]["reason_code"] == "related"
+        assert payload["items"][0]["tags"][0] == "数学"
         assert all(item["id"] != seed_video.id for item in payload["items"])
+
+    def test_related_recommendations_infer_subject_from_title_only(self, client, db):
+        """即使原始标签为空，相关推荐也应能根据科目归一返回同科目内容。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        seed_video = Video(
+            title="牛顿第二定律串讲",
+            filename="seed-physics.mp4",
+            filepath="/tmp/seed-physics.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="高中物理受力分析与牛顿第二定律综合应用。",
+            tags=None,
+        )
+        physics_match = Video(
+            title="受力分析复习",
+            filename="physics-match.mp4",
+            filepath="/tmp/physics-match.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="物理力学里常见的受力分析步骤整理。",
+            tags=None,
+        )
+        english_video = Video(
+            title="英语听力技巧",
+            filename="english-listening.mp4",
+            filepath="/tmp/english-listening.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="整理英语听力高频信号词。",
+            tags='["英语听力"]',
+        )
+        db.add_all([seed_video, physics_match, english_video])
+        db.commit()
+
+        response = client.get(
+            "/api/recommendations/videos",
+            params={"scene": "related", "seed_video_id": seed_video.id, "limit": 2},
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["items"][0]["id"] == physics_match.id
+        assert payload["items"][0]["tags"][0] == "物理"
+        assert payload["items"][0]["reason_code"] in {"related", "subject"}

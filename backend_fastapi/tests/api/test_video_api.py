@@ -1,6 +1,7 @@
 """API 测试 - 视频接口"""
 
 import io
+import json
 import os
 
 import pytest
@@ -36,6 +37,40 @@ class TestVideoAPI:
         """测试获取不存在的视频"""
         response = client.get("/api/videos/99999")
         assert response.status_code == 404
+
+    def test_generate_tags_includes_subject_tag(self, client, db, monkeypatch):
+        """重提标签后应写回科目标签，便于视频详情页直接展示。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        monkeypatch.setattr("app.services.video_content_service.call_online_chat", lambda *args, **kwargs: None)
+        monkeypatch.setattr("app.services.video_content_service.call_ollama", lambda *args, **kwargs: None)
+
+        video = Video(
+            title="勾股定理详细讲解",
+            filename="math.mp4",
+            filepath="/tmp/math.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="讲解勾股定理、直角三角形性质和几何证明方法。",
+            tags=None,
+        )
+        db.add(video)
+        db.commit()
+        db.refresh(video)
+
+        response = client.post(f"/api/videos/{video.id}/generate-tags", json={"max_tags": 6})
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["tags"][0] == "数学"
+        assert any("勾股" in tag for tag in payload["tags"])
+
+        db.refresh(video)
+        stored_tags = json.loads(video.tags)
+        assert stored_tags[0] == "数学"
 
     def test_delete_video(self, client, sample_video):
         """测试删除视频"""

@@ -10,7 +10,6 @@ from typing import Optional
 import jieba
 import jieba.analyse
 import requests
-
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -98,6 +97,90 @@ GENERIC_VIDEO_TITLE_VALUES = {
     "本地视频",
     "未命名视频",
     "视频",
+}
+SUBJECT_KEYWORDS = {
+    "数学": (
+        "数学",
+        "小学数学",
+        "初中数学",
+        "高中数学",
+        "高数",
+        "高等数学",
+        "数学分析",
+        "数分",
+        "微积分",
+        "导数",
+        "极限",
+        "函数",
+        "几何",
+        "几何证明",
+        "代数",
+        "线代",
+        "线性代数",
+        "概率",
+        "统计",
+        "计数",
+        "数列",
+        "三角",
+        "三角形",
+        "解析几何",
+        "勾股",
+        "勾股定理",
+        "排列",
+        "组合",
+        "排列组合",
+        "组合数学",
+        "插空法",
+        "空位计数",
+    ),
+    "英语": (
+        "英语",
+        "英文",
+        "英语写作",
+        "英文写作",
+        "英语听力",
+        "英语阅读",
+        "英语口语",
+        "英语语法",
+        "单词",
+        "词汇",
+        "雅思",
+        "托福",
+        "四六级",
+    ),
+    "语文": ("语文", "作文", "文言文", "古诗", "古诗词", "现代文", "阅读理解", "修辞", "汉语"),
+    "物理": ("物理", "力学", "电学", "电磁", "电路", "热学", "光学", "受力", "牛顿", "动量", "加速度"),
+    "化学": ("化学", "有机", "无机", "化学方程式", "化学反应", "酸碱", "氧化还原", "元素周期"),
+    "生物": ("生物", "细胞", "遗传", "基因", "生态", "光合作用", "呼吸作用", "进化"),
+    "历史": ("历史", "中国史", "世界史", "近代史", "古代史", "现代史"),
+    "地理": ("地理", "地图", "气候", "地貌", "经纬度", "区域地理"),
+    "政治": ("政治", "思想政治", "时政", "哲学", "法治", "马克思主义"),
+    "计算机": (
+        "计算机",
+        "编程",
+        "程序设计",
+        "python",
+        "java",
+        "c++",
+        "前端",
+        "后端",
+        "算法",
+        "数据结构",
+        "数据库",
+        "机器学习",
+        "人工智能",
+        "深度学习",
+    ),
+    "经济": ("经济", "金融", "会计", "财务", "投资", "证券", "宏观经济", "微观经济"),
+}
+TAG_ALIAS_MAP = {
+    "高数": "高等数学",
+    "数分": "数学分析",
+    "线代": "线性代数",
+    "概率论": "概率统计",
+    "英文": "英语",
+    "python语言": "Python",
+    "py": "Python",
 }
 
 
@@ -264,11 +347,18 @@ def parse_json_array(text: str) -> list[str]:
     return []
 
 
+def normalize_learning_tag(tag: str) -> str:
+    text = clean_whitespace(tag).strip("#")
+    if not text:
+        return ""
+    return TAG_ALIAS_MAP.get(text.lower(), text).strip()
+
+
 def normalize_tags(tags: Iterable[str], *, max_tags: int = DEFAULT_MAX_TAGS) -> list[str]:
     normalized = []
     seen = set()
     for tag in tags:
-        text = clean_whitespace(tag).strip("#")
+        text = normalize_learning_tag(tag)
         if not text:
             continue
         lowered = text.lower()
@@ -279,6 +369,39 @@ def normalize_tags(tags: Iterable[str], *, max_tags: int = DEFAULT_MAX_TAGS) -> 
         if len(normalized) >= max(1, int(max_tags)):
             break
     return normalized
+
+
+def infer_subject_from_text(*, tags: Iterable[str], title: str = "", summary: str = "") -> str:
+    scores: Counter[str] = Counter()
+    normalized_tags = [normalize_learning_tag(tag).lower() for tag in tags if normalize_learning_tag(tag)]
+    normalized_title = str(title or "").lower()
+    normalized_summary = str(summary or "").lower()
+
+    for subject, keywords in SUBJECT_KEYWORDS.items():
+        for keyword in keywords:
+            normalized_keyword = keyword.lower()
+            if any(
+                tag == normalized_keyword or normalized_keyword in tag or tag in normalized_keyword
+                for tag in normalized_tags
+            ):
+                scores[subject] += 5
+            if normalized_keyword and normalized_keyword in normalized_title:
+                scores[subject] += 3
+            if normalized_keyword and normalized_keyword in normalized_summary:
+                scores[subject] += 1
+
+    if not scores:
+        return ""
+    return scores.most_common(1)[0][0]
+
+
+def build_subject_enriched_tags(
+    tags: Iterable[str], *, title: str = "", summary: str = "", max_tags: int = DEFAULT_MAX_TAGS
+) -> list[str]:
+    normalized_tags = normalize_tags(tags, max_tags=max(1, int(max_tags)))
+    subject = infer_subject_from_text(tags=normalized_tags, title=title, summary=summary)
+    ordered = [subject, *normalized_tags] if subject else normalized_tags
+    return normalize_tags(ordered, max_tags=max_tags)
 
 
 def fallback_tags(summary: str, *, title: str = "", max_tags: int = DEFAULT_MAX_TAGS) -> list[str]:
@@ -355,7 +478,9 @@ def extract_primary_topic_candidates(summary: str, *, title: str = "") -> list[s
 
 
 def build_tag_based_primary_topic(tags: Iterable[str], *, max_length: int = DEFAULT_PRIMARY_TOPIC_NAME_LENGTH) -> str:
-    normalized_tags = [normalize_primary_topic_name(tag, max_length=max_length) for tag in normalize_tags(tags, max_tags=3)]
+    normalized_tags = [
+        normalize_primary_topic_name(tag, max_length=max_length) for tag in normalize_tags(tags, max_tags=3)
+    ]
     normalized_tags = [tag for tag in normalized_tags if tag]
     if not normalized_tags:
         return ""
@@ -549,6 +674,7 @@ def generate_video_tags(video_id: int, summary: str, *, title: str = "", max_tag
     if not tags:
         tags = fallback_tags(clean_summary, title=title, max_tags=max_tags)
         provider = "fallback"
+    tags = build_subject_enriched_tags(tags, title=title, summary=clean_summary, max_tags=max_tags)
 
     if not tags:
         return {"success": False, "error": "标签生成失败"}

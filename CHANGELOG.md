@@ -703,3 +703,25 @@
 
 - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：修正移动端断点下 `.stats` 被错误降为单列的问题，并将首页顶部 4 张统计卡压回更接近原始尺寸的紧凑规格，确保一横排放下且卡片大小一致。
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页统计卡移动端横排与尺寸修正对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 推荐后端科目归一与主题聚类
+
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：在现有推荐服务中新增科目识别、标签别名归一、主题主键提取和聚类桶排序逻辑，让已上传视频可以按“科目 + 主题”信号参与首页推荐、复盘推荐和相关推荐排序。
+- 更新 [`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)、[`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)：补充推荐接口和推荐服务测试，覆盖科目标签回填、标题/摘要推断科目以及相关推荐优先返回同科目内容的主路径。
+
+## 2026-03-25
+
+### 对 2026-03-25 推荐后端科目归一记录的补充更正
+
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：补充“排列组合 / 插空法 / 勾股定理 / 三角形”等数学主题关键词，修正真实已上传视频里部分数学内容未稳定归入“数学”科目的问题。
+- 更新 [`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)：新增排列组合类视频归入数学科目的单测，避免后续回归。
+
+## 2026-03-25
+
+### 对 2026-03-25 重提标签科目未展示问题的修正
+
+- 更新 [`backend_fastapi/app/services/video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_content_service.py)：为真实标签生成链路补上科目识别与科目标签回写，让“提取标签 / 重提标签”在写回 `videos.tags` 时直接带上“数学”等科目标签，而不是只生成知识点标签。
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：改为复用视频内容服务里的共享科目归一规则，保证视频详情页标签与推荐聚类使用同一套科目判断逻辑。
+- 更新 [`backend_fastapi/tests/unit/test_video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_content_service.py)、[`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充“生成标签后返回并写回科目标签”的单测和 API 测试，覆盖 `generate-tags` 主路径。
