@@ -1,11 +1,29 @@
 <template>
   <div class="page">
     <header class="topbar">
-      <h2>上传</h2>
+      <div class="topbar__copy">
+        <h2>导入学习内容</h2>
+        <p>本地上传和推荐导入都走同一条处理链路。</p>
+      </div>
       <button class="link" @click="resetAll" :disabled="busy">重置</button>
     </header>
 
-    <div class="card">
+    <div v-if="hasRecommendationImport" class="card import-banner">
+      <div class="import-banner__top">
+        <div>
+          <div class="card-title">推荐导入</div>
+          <div class="muted">你正在承接来自 {{ importSourceLabel }} 的推荐内容，提交后会进入现有下载与处理链路，不会直接当作已入库视频播放。</div>
+        </div>
+        <span class="import-badge">{{ importSourceLabel }}</span>
+      </div>
+      <div class="import-banner__url">{{ importPreviewUrl }}</div>
+      <div class="import-banner__actions">
+        <button class="btn btn--primary" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交当前推荐链接' }}</button>
+        <button class="btn" @click="router.push('/recommendations')" :disabled="busy">返回推荐页</button>
+      </div>
+    </div>
+
+    <div class="card" :class="{ 'card--active': submissionMode === 'file' }">
       <WhisperModelPicker
         title="Whisper 模型"
         :model="processingSettings.model"
@@ -15,7 +33,7 @@
       />
     </div>
 
-    <div class="card">
+    <div class="card" :class="{ 'card--active': submissionMode === 'file' }">
       <div class="card-title">本地视频</div>
       <input
         ref="fileInputRef"
@@ -59,8 +77,12 @@
       <div class="muted">离线补跑仅适用于已配置真实后端地址但暂时不可达；纯 UI ONLY 演示模式不会进入真实离线补跑。</div>
     </div>
 
-    <div class="card">
+    <div class="card" :class="{ 'card--active': submissionMode === 'url', 'card--spotlight': hasRecommendationImport }">
       <div class="card-title">视频链接</div>
+      <div v-if="hasRecommendationImport" class="import-tip">
+        <span class="import-badge import-badge--inline">{{ importSourceLabel }}</span>
+        <span class="muted">当前链接来自推荐系统，提交后不会直接播放，而是进入导入学习流程。</span>
+      </div>
       <input class="input" v-model.trim="videoUrl" placeholder="请输入视频链接（B站/YouTube等）" :disabled="busy" />
       <button class="btn" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交链接' }}</button>
       <div class="muted">支持：B站、YouTube、中国大学慕课（icourse163）</div>
@@ -244,6 +266,8 @@ const fileInputRef = ref(null)
 const file = ref(null)
 const savedFileMeta = ref(null)
 const videoUrl = ref('')
+const submissionMode = ref('file')
+const recommendationSource = ref('')
 const busy = ref(false)
 const nativeBusy = ref(false)
 const progress = ref(0)
@@ -287,6 +311,9 @@ const processingSettingsSummary = computed(() => {
   if (current.autoGenerateTags) parts.push('自动标签')
   return parts.join(' · ')
 })
+const hasRecommendationImport = computed(() => Boolean(recommendationSource.value || videoUrl.value) && submissionMode.value === 'url')
+const importSourceLabel = computed(() => recommendationSource.value || '推荐系统')
+const importPreviewUrl = computed(() => String(videoUrl.value || '').trim() || '等待带入推荐链接')
 
 const selectProcessingModel = (model) => {
   if (busy.value) return
@@ -309,6 +336,7 @@ const consumeUploadRouteIntent = async () => {
   const normalizedMode = String(query.mode || '').trim().toLowerCase()
   const normalizedUrl = String(query.url || '').trim()
   const normalizedSource = String(query.source || '').trim()
+  recommendationSource.value = normalizedSource
 
   const restQuery = { ...query }
   delete restQuery.mode
@@ -1006,6 +1034,8 @@ const resetAll = () => {
   savedFileMeta.value = null
   if (fileInputRef.value) fileInputRef.value.value = ''
   videoUrl.value = ''
+  submissionMode.value = 'file'
+  recommendationSource.value = ''
   progress.value = 0
   message.value = ''
   error.value = ''
@@ -1186,6 +1216,7 @@ const uploadUrl = async () => {
     const data = res?.data || {}
     const videoId = resolveVideoId(data)
     message.value = data?.message || '已提交链接，下载完成后会自动开始处理'
+    recommendationSource.value = ''
     addRecentUpload({
       videoId,
       title: data?.data?.title || trimmedUrl,
@@ -1252,28 +1283,55 @@ onUnmounted(() => {
 .page {
   max-width: 520px;
   margin: 0 auto;
-  padding: 16px 16px 0;
+  padding: calc(14px + env(safe-area-inset-top)) 16px 0;
+  font-family: 'Avenir Next', 'SF Pro Display', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.topbar,
+.card {
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(251, 245, 239, 0.97);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
 }
 
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 12px 14px;
+  border-radius: 20px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 10px;
-  gap: 8px;
+}
+
+.topbar__copy {
+  display: grid;
+  gap: 4px;
 }
 
 .topbar h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 20px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: #111827;
+}
+
+.topbar__copy p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
 }
 
 .link {
   border: 0;
   background: transparent;
-  color: var(--primary);
-  font-weight: 900;
+  color: var(--primary-deep);
+  font-weight: 700;
 }
 
 .link--small {
@@ -1281,34 +1339,76 @@ onUnmounted(() => {
 }
 
 .card {
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 14px;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
+  padding: 16px;
+  border-radius: 24px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
-.card-title {
-  font-weight: 900;
-  font-size: 13px;
+.card--active {
+  border-color: var(--primary-soft-strong);
+  background: linear-gradient(180deg, rgba(240, 232, 245, 0.96), rgba(251, 245, 239, 0.98));
 }
 
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.card--spotlight {
+  background: linear-gradient(180deg, rgba(240, 232, 245, 0.96), rgba(251, 245, 239, 0.98));
 }
 
+.import-banner {
+  gap: 14px;
+  border-color: var(--primary-soft);
+  background: linear-gradient(180deg, rgba(243, 235, 215, 0.96), rgba(251, 245, 239, 0.98));
+}
+
+.import-banner__top,
+.import-banner__actions,
+.import-tip,
+.card-head,
 .card-head-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 10px;
   flex-wrap: wrap;
+}
+
+.import-banner__url {
+  border-radius: 16px;
+  padding: 13px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #111827;
+  background: rgba(251, 245, 239, 0.92);
+  border: 1px dashed rgba(17, 24, 39, 0.12);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.import-badge,
+.recent-tag,
+.status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.import-badge {
+  padding: 5px 10px;
+  color: var(--primary-deep);
+  background: var(--primary-soft);
+}
+
+.import-badge--inline {
+  flex-shrink: 0;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
 }
 
 .filters {
@@ -1317,93 +1417,105 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.filter {
-  border: 1px solid var(--border);
-  background: #fff;
+.filter,
+.mini {
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(251, 245, 239, 0.98);
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 7px 11px;
   font-size: 12px;
-  font-weight: 800;
-  color: var(--text);
+  font-weight: 700;
+  color: #111827;
+  text-align: center;
 }
 
 .filter--active {
-  border-color: rgba(79, 70, 229, 0.35);
-  background: rgba(79, 70, 229, 0.10);
-  color: #3730a3;
-}
-
-.file {
-  width: 100%;
+  border-color: var(--primary-soft-strong);
+  background: var(--surface-lilac);
+  color: var(--primary-deep);
 }
 
 .input {
   width: 100%;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  padding: 12px;
   outline: none;
+  background: rgba(247, 239, 232, 0.92);
+  color: #111827;
 }
 
 .btn {
-  border-radius: 14px;
-  padding: 12px;
-  font-weight: 900;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: #fff;
+  border-radius: 16px;
+  padding: 13px;
+  font-weight: 800;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(251, 245, 239, 0.98);
   width: 100%;
   text-align: center;
 }
 
 .btn--primary {
   border: 0;
-  color: #fff;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #f9fafb;
+  background: linear-gradient(135deg, #665775, #8b799d);
+  box-shadow: 0 16px 24px rgba(17, 24, 39, 0.16);
 }
 
 .btn--native {
-  border: 1px solid rgba(16, 185, 129, 0.22);
-  color: #065f46;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(45, 212, 191, 0.08));
+  border: 1px solid rgba(41, 98, 66, 0.16);
+  color: var(--primary-deep);
+  background: linear-gradient(180deg, var(--surface-gold), rgba(251, 245, 239, 0.98));
 }
 
-.btn:disabled {
+.btn:disabled,
+.mini:disabled {
   opacity: 0.6;
+}
+
+.bar {
+  height: 100%;
+  background: linear-gradient(90deg, #665775, #8b799d);
+}
+
+.bar--native {
+  background: linear-gradient(90deg, #c8ab6c, #a98d58);
 }
 
 .progress {
   height: 8px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(17, 24, 39, 0.06);
   overflow: hidden;
 }
 
-.bar {
-  height: 100%;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+.progress--compact {
+  height: 6px;
 }
 
-.bar--native {
-  background: linear-gradient(90deg, #10b981, #14b8a6);
-}
-
-.muted {
+.muted,
+.empty {
   font-size: 12px;
-  color: var(--muted);
+  line-height: 1.6;
+  color: #6b7280;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
+.file {
+  width: 100%;
+}
+
 .recent-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .recent-item {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #fff;
-  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(247, 239, 232, 0.9);
+  padding: 12px 14px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1412,18 +1524,21 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.recent-main {
+.recent-main,
+.native-result {
   min-width: 0;
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .recent-title {
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
+  color: #111827;
 }
 
 .recent-meta {
@@ -1438,40 +1553,33 @@ onUnmounted(() => {
 
 .recent-progress__text {
   font-size: 12px;
-  color: var(--muted);
+  color: #6b7280;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-.progress--compact {
-  height: 6px;
-}
-
 .status {
-  border-radius: 999px;
-  padding: 3px 8px;
-  font-size: 12px;
-  font-weight: 800;
+  padding: 4px 9px;
 }
 
 .status--ok {
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+  background: rgba(212, 240, 223, 0.92);
+  color: var(--ok-text);
 }
 
 .status--bad {
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  background: var(--bad-bg);
+  color: #b45309;
 }
 
 .status--warn {
-  background: rgba(245, 158, 11, 0.14);
-  color: #92400e;
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 
 .status--info {
-  background: rgba(99, 102, 241, 0.12);
-  color: #3730a3;
+  background: var(--info-bg);
+  color: var(--info-text);
 }
 
 .recent-actions {
@@ -1483,17 +1591,12 @@ onUnmounted(() => {
   margin-left: auto;
 }
 
-.native-result {
-  display: grid;
-  gap: 8px;
-}
-
 .native-result__text {
   margin: 0;
   padding: 12px;
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.04);
-  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(17, 24, 39, 0.04);
+  border: 1px solid rgba(17, 24, 39, 0.08);
   white-space: pre-wrap;
   word-break: break-word;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -1504,108 +1607,59 @@ onUnmounted(() => {
 }
 
 .recent-tag {
-  border-radius: 999px;
-  padding: 3px 9px;
-  font-size: 12px;
-  font-weight: 800;
-  background: rgba(99, 102, 241, 0.12);
-  color: #3730a3;
+  padding: 4px 10px;
+  background: var(--info-bg);
+  color: var(--info-text);
   white-space: normal;
   text-align: center;
 }
 
 .recent-tag--dup {
-  background: rgba(245, 158, 11, 0.14);
-  color: #92400e;
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 
 .recent-tag--offline {
-  background: rgba(31, 122, 140, 0.12);
-  color: #155e75;
-}
-
-.mini {
-  border: 1px solid var(--border);
-  background: #fff;
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--text);
-  text-align: center;
+  background: var(--surface-lilac);
+  color: var(--primary-deep);
 }
 
 .mini--warn {
-  border-color: rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.10);
-  color: #92400e;
-}
-
-.mini:disabled {
-  opacity: 0.6;
-}
-
-.empty {
-  font-size: 12px;
-  color: var(--muted);
+  border-color: rgba(217, 119, 6, 0.16);
+  background: var(--bad-bg);
+  color: #b45309;
 }
 
 .alert {
-  padding: 10px 12px;
-  border-radius: 12px;
-  font-weight: 800;
+  padding: 11px 13px;
+  border-radius: 16px;
+  font-weight: 700;
   margin-bottom: 12px;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-.alert--ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
-.alert--bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
-</style>
-<style scoped>
-.page {
-  padding-top: calc(14px + env(safe-area-inset-top));
+.alert--ok {
+  background: var(--surface-lilac);
+  color: var(--primary-deep);
 }
 
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  padding: 12px 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
-}
-
-.topbar h2 {
-  font-size: 18px;
-}
-
-.card {
-  border-radius: 22px;
-  padding: 16px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: linear-gradient(180deg, #ffffff, #f9fbfd);
-  box-shadow: 0 14px 26px rgba(24, 45, 73, 0.08);
-}
-
-.card-title {
-  font-size: 15px;
-  color: #1f2a37;
-}
-
-.input {
-  border-radius: 14px;
-  border-color: rgba(32, 42, 55, 0.14);
-  padding: 12px;
-}
-
-.btn {
-  border-radius: 16px;
+.alert--bad {
+  background: var(--bad-bg);
+  color: #b45309;
 }
 
 @media (max-width: 480px) {
+  .topbar,
+  .card {
+    padding: 14px;
+  }
+
+  .import-banner__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
   .recent-actions {
     width: 100%;
     margin-left: 0;
@@ -1617,45 +1671,5 @@ onUnmounted(() => {
   .link--small {
     max-width: 100%;
   }
-}
-
-.btn--primary {
-  background: linear-gradient(135deg, #1f7a8c, #3d8da0);
-}
-
-.bar {
-  background: linear-gradient(90deg, #1f7a8c, #3d8da0);
-}
-
-.recent-item {
-  border-radius: 15px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: #fff;
-}
-
-.filter--active {
-  border-color: rgba(31, 122, 140, 0.36);
-  background: rgba(31, 122, 140, 0.1);
-  color: var(--primary-deep);
-}
-
-.status--ok {
-  background: var(--ok-bg);
-  color: var(--ok-text);
-}
-
-.status--bad {
-  background: var(--bad-bg);
-  color: var(--bad-text);
-}
-
-.status--warn {
-  background: var(--warn-bg);
-  color: var(--warn-text);
-}
-
-.status--info {
-  background: var(--info-bg);
-  color: var(--info-text);
 }
 </style>
