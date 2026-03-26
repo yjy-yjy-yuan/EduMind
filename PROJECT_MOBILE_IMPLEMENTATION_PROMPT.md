@@ -197,6 +197,7 @@
 5. 前端只负责展示站内视频与外部候选，并明确区分来源；外部候选应接回现有链接导入链路，而不是伪装成已入库视频。
 6. 在第一版推荐增强里，优先不新增外部推荐平行表；如果确实需要缓存或扩展 schema，必须同步更新 SQL、测试和文档。
 7. 如需直接给 AI 编码助手下达任务，优先使用 `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 作为专用提示词。
+8. 如果当前轮次优先做推荐相关的前端页面、推荐入口、推荐页层级、站外候选卡片和导入承接体验，而不优先改推荐算法，请优先使用 `docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md`。
 
 ---
 

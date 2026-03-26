@@ -734,3 +734,10 @@
 - 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：为推荐链路新增 `include_external` 混合推荐能力，根据当前场景与站内主题推导站外检索词，并把站内视频与站外候选按统一的“科目 + 主题”信号合并排序。
 - 更新 [`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)、[`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)：扩展推荐接口参数与返回结构，支持 `include_external`、`is_external`、`item_type`、`external_url`、`source_label`、`subject`、`cluster_key` 等字段，让移动端可以直接区分站内视频和站外候选。
 - 更新 [`backend_fastapi/tests/unit/test_external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_external_candidate_service.py)、[`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)、[`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)：补充 provider 解析、失败隔离和推荐接口混合返回测试，覆盖站外候选主路径。
+
+## 2026-03-26
+
+### 新增推荐系统 UI 优先实现提示词
+
+- 新增 [`docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md)：补充“推荐系统 UI 优先”的专用提示词，明确本轮以首页推荐入口、独立推荐页、站外候选卡片、上传页导入承接和 iOS `WKWebView` 可用性为主，不优先扩展推荐后端算法。
+- 更新 [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：补充 UI 优先推荐提示词入口，便于后续直接给 AI 编码助手下达“先改推荐界面”的任务。
