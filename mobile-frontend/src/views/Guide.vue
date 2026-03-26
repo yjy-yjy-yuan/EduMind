@@ -231,7 +231,7 @@ const go = (path) => router.push(path)
   padding: 14px;
   border-radius: var(--radius);
   color: #fff;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #a792bc, #7f698f);
   box-shadow: var(--shadow-sm);
   border: 1px solid rgba(255, 255, 255, 0.18);
 }
@@ -272,7 +272,7 @@ const go = (path) => router.push(path)
   position: relative;
   padding: 10px 14px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(31, 122, 140, 0.12), rgba(61, 141, 160, 0.2));
+  background: linear-gradient(135deg, rgba(139, 121, 157, 0.12), rgba(200, 171, 108, 0.18));
   color: #0f4c5c;
   font-size: 12px;
   font-weight: 900;
@@ -392,11 +392,11 @@ const go = (path) => router.push(path)
 .hero {
   background:
     radial-gradient(circle at right top, rgba(255, 255, 255, 0.24), transparent 44%),
-    linear-gradient(145deg, #1f7a8c, #0f5f70);
+    linear-gradient(145deg, #8b799d, #665775);
 }
 
 .btn--primary {
-  background: linear-gradient(145deg, #1f7a8c, #3d8da0);
+  background: linear-gradient(145deg, #8b799d, #a48eb5);
 }
 
 .workflow {
@@ -407,16 +407,16 @@ const go = (path) => router.push(path)
 
 .acc {
   border-color: rgba(32, 42, 55, 0.1);
-  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+  background: linear-gradient(180deg, #ffffff, #f7f0ea);
 }
 
 .acc-badge {
-  background: rgba(31, 122, 140, 0.14);
+  background: rgba(139, 121, 157, 0.14);
   color: var(--primary-deep);
 }
 
 .acc-note {
-  background: rgba(31, 122, 140, 0.08);
+  background: rgba(139, 121, 157, 0.08);
   color: var(--primary-deep);
 }
 </style>

@@ -395,8 +395,8 @@ onBeforeUnmount(() => {
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+  background: rgba(251, 245, 239, 0.92);
+  box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
 }
 
 .topbar h2 {
@@ -499,7 +499,7 @@ onBeforeUnmount(() => {
   width: 72px;
   border-radius: 22px;
   overflow: hidden;
-  background: rgba(31, 122, 140, 0.08);
+  background: rgba(139, 121, 157, 0.08);
   flex: 0 0 auto;
   padding: 0;
   border: 0;
@@ -520,7 +520,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   border-radius: 22px;
-  background: linear-gradient(145deg, #1f7a8c, #3d8da0);
+  background: linear-gradient(145deg, #8b799d, #a48eb5);
   color: #fff;
   font-size: 26px;
   font-weight: 900;
@@ -607,12 +607,12 @@ onBeforeUnmount(() => {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  border: 1px solid rgba(31, 122, 140, 0.18);
-  background: rgba(31, 122, 140, 0.08);
+  border: 1px solid rgba(139, 121, 157, 0.18);
+  background: rgba(139, 121, 157, 0.08);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #1f7a8c;
+  color: #8b799d;
   flex: 0 0 auto;
 }
 
@@ -666,7 +666,7 @@ onBeforeUnmount(() => {
 }
 
 .alert--good {
-  background: rgba(34, 197, 94, 0.12);
+  background: rgba(200, 171, 108, 0.16);
   color: #166534;
 }
 

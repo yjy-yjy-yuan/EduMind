@@ -256,7 +256,7 @@ onMounted(loadVideoMeta)
   min-height: 28px;
   padding: 0 10px;
   border-radius: 999px;
-  background: rgba(31, 122, 140, 0.12);
+  background: rgba(139, 121, 157, 0.12);
   color: var(--primary-deep);
   font-size: 12px;
   font-weight: 900;
@@ -264,8 +264,8 @@ onMounted(loadVideoMeta)
 }
 
 .badge--status {
-  background: rgba(15, 118, 110, 0.12);
-  color: #0f766e;
+  background: rgba(200, 171, 108, 0.14);
+  color: #8f7040;
 }
 
 .muted {
@@ -284,12 +284,12 @@ onMounted(loadVideoMeta)
 .player-shell {
   background:
     radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 35%),
-    linear-gradient(180deg, #08121a, #000);
+    linear-gradient(180deg, #261f2d, #000);
 }
 
 .mock-player {
   padding: 16px;
-  background: linear-gradient(180deg, #08121a, #0f2430);
+  background: linear-gradient(180deg, #261f2d, #3a3042);
   color: #fff;
 }
 
@@ -303,8 +303,8 @@ onMounted(loadVideoMeta)
   text-align: center;
   gap: 10px;
   background:
-    radial-gradient(circle at top right, rgba(61, 141, 160, 0.34), transparent 34%),
-    linear-gradient(145deg, rgba(31, 122, 140, 0.94), rgba(11, 56, 67, 0.98));
+    radial-gradient(circle at top right, rgba(200, 171, 108, 0.22), transparent 34%),
+    linear-gradient(145deg, rgba(139, 121, 157, 0.94), rgba(73, 60, 82, 0.98));
 }
 
 .mock-player__chip {
@@ -359,7 +359,7 @@ onMounted(loadVideoMeta)
 .mock-player__bar {
   width: 34%;
   height: 100%;
-  background: linear-gradient(90deg, #67e8f9, #fbbf24);
+  background: linear-gradient(90deg, #d8bd83, #fbbf24);
 }
 
 .video {
@@ -381,8 +381,8 @@ onMounted(loadVideoMeta)
   padding: 10px 12px;
   border-radius: 16px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 20px rgba(24, 45, 73, 0.08);
+  background: rgba(251, 245, 239, 0.92);
+  box-shadow: 0 10px 20px rgba(101, 87, 117, 0.08);
 }
 
 .wrap {
@@ -395,7 +395,7 @@ onMounted(loadVideoMeta)
   margin-top: 14px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(31, 122, 140, 0.08);
+  background: rgba(139, 121, 157, 0.08);
   color: var(--primary-deep);
 }
 
@@ -417,7 +417,7 @@ onMounted(loadVideoMeta)
 }
 
 .btn--primary {
-  background: linear-gradient(135deg, #1f7a8c, #164e63);
+  background: linear-gradient(135deg, #8b799d, #6f5d7d);
   color: #fff;
 }
 

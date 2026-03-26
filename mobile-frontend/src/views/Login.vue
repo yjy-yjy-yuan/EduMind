@@ -85,8 +85,8 @@ const submit = async () => {
   padding: 14px;
   border-radius: var(--radius);
   color: #fff;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.25);
+  background: linear-gradient(135deg, #a792bc, #7f698f);
+  box-shadow: 0 10px 30px rgba(139, 121, 157, 0.22);
 }
 
 .hero__logo {
@@ -143,7 +143,7 @@ const submit = async () => {
 .btn--primary {
   border: 0;
   color: #fff;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #a792bc, #7f698f);
 }
 
 .btn:disabled {
@@ -176,7 +176,7 @@ const submit = async () => {
   padding: 18px;
   background:
     radial-gradient(circle at right top, rgba(255, 255, 255, 0.24), transparent 44%),
-    linear-gradient(145deg, #1f7a8c, #0f5f70);
+    linear-gradient(145deg, #8b799d, #665775);
 }
 
 .title {
@@ -198,6 +198,6 @@ const submit = async () => {
 }
 
 .btn--primary {
-  background: linear-gradient(145deg, #1f7a8c, #3d8da0);
+  background: linear-gradient(145deg, #8b799d, #a48eb5);
 }
 </style>

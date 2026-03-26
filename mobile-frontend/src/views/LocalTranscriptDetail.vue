@@ -620,7 +620,7 @@ onUnmounted(() => {
 }
 
 .hero-shell--idle {
-  background: linear-gradient(145deg, #1f7a8c, #0f5f70);
+  background: linear-gradient(145deg, #8b799d, #665775);
 }
 
 .hero-shell--warn {
@@ -628,7 +628,7 @@ onUnmounted(() => {
 }
 
 .hero-shell--ok {
-  background: linear-gradient(145deg, #159a72, #0f766e);
+  background: linear-gradient(145deg, #c29a59, #8f7040);
 }
 
 .hero-shell--bad {
@@ -698,10 +698,10 @@ onUnmounted(() => {
   text-align: center;
 }
 
-.badge.ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
+.badge.ok { background: rgba(200, 171, 108, 0.16); color: #8f7040; }
 .badge.warn { background: rgba(245, 158, 11, 0.14); color: #92400e; }
 .badge.bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
-.badge.info { background: rgba(99, 102, 241, 0.12); color: #3730a3; }
+.badge.info { background: rgba(139, 121, 157, 0.14); color: #665775; }
 
 .setting-hint {
   margin-top: 8px;
@@ -719,7 +719,7 @@ onUnmounted(() => {
 
 .bar {
   height: 100%;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+  background: linear-gradient(90deg, #a792bc, #7f698f);
 }
 
 .inline-tip {
@@ -745,12 +745,12 @@ onUnmounted(() => {
   border-radius: 14px;
   padding: 12px 10px;
   font-weight: 900;
-  background: rgba(15, 118, 110, 0.12);
-  color: #0f766e;
+  background: rgba(200, 171, 108, 0.14);
+  color: #8f7040;
 }
 
 .btn--primary {
-  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  background: linear-gradient(135deg, #8f7040, #c8ab6c);
   color: #fff;
 }
 
@@ -801,8 +801,8 @@ onUnmounted(() => {
 .block-placeholder {
   border-radius: 14px;
   padding: 12px;
-  background: rgba(15, 118, 110, 0.08);
-  color: #0f766e;
+  background: rgba(200, 171, 108, 0.12);
+  color: #8f7040;
   font-size: 13px;
   font-weight: 700;
   line-height: 1.6;

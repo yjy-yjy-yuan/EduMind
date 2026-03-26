@@ -337,8 +337,8 @@ onUnmounted(() => {
 }
 
 .badge.ok {
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+  background: rgba(200, 171, 108, 0.16);
+  color: #8f7040;
 }
 
 .badge.bad {
@@ -352,8 +352,8 @@ onUnmounted(() => {
 }
 
 .badge.info {
-  background: rgba(99, 102, 241, 0.12);
-  color: #3730a3;
+  background: rgba(139, 121, 157, 0.14);
+  color: #665775;
 }
 
 .muted {
@@ -372,7 +372,7 @@ onUnmounted(() => {
 
 .bar {
   height: 100%;
-  background: linear-gradient(90deg, #10b981, #14b8a6);
+  background: linear-gradient(90deg, #10b981, #c8ab6c);
 }
 
 .mini {

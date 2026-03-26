@@ -457,9 +457,9 @@ onUnmounted(() => {
   margin: -2px 0 10px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(31, 122, 140, 0.08);
-  border: 1px solid rgba(31, 122, 140, 0.16);
-  color: #155e75;
+  background: var(--surface-lilac);
+  border: 1px solid var(--primary-soft-strong);
+  color: var(--primary-deep);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -479,7 +479,7 @@ onUnmounted(() => {
 
 .scope-pill {
   border: 1px solid var(--border);
-  background: #fff;
+  background: rgba(251, 245, 239, 0.98);
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 12px;
@@ -488,8 +488,8 @@ onUnmounted(() => {
 }
 
 .scope-pill--active {
-  border-color: rgba(31, 122, 140, 0.36);
-  background: rgba(31, 122, 140, 0.1);
+  border-color: var(--primary-soft-strong);
+  background: var(--surface-lilac);
   color: var(--primary-deep);
 }
 
@@ -522,8 +522,8 @@ onUnmounted(() => {
 
 .alert--ok {
   margin-top: 10px;
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+  background: rgba(200, 171, 108, 0.16);
+  color: #8f7040;
 }
 
 .skeleton {
@@ -534,7 +534,7 @@ onUnmounted(() => {
 .sk-card {
   height: 92px;
   border-radius: var(--radius);
-  background: linear-gradient(90deg, #f3f4f6, #e5e7eb, #f3f4f6);
+  background: linear-gradient(90deg, #f7efe8, #efe6dc, #f7efe8);
   background-size: 200% 100%;
   animation: shimmer 1.2s infinite;
 }
@@ -624,10 +624,10 @@ onUnmounted(() => {
   text-align: center;
 }
 
-.badge.ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
+.badge.ok { background: rgba(200, 171, 108, 0.16); color: #8f7040; }
 .badge.warn { background: rgba(245, 158, 11, 0.14); color: #92400e; }
 .badge.bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
-.badge.info { background: rgba(99, 102, 241, 0.12); color: #3730a3; }
+.badge.info { background: rgba(139, 121, 157, 0.14); color: #665775; }
 
 .progress {
   height: 8px;
@@ -638,12 +638,12 @@ onUnmounted(() => {
 
 .bar {
   height: 100%;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+  background: linear-gradient(90deg, #665775, #8b799d);
 }
 
 .mini {
   border: 1px solid var(--border);
-  background: #fff;
+  background: rgba(251, 245, 239, 0.98);
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 12px;
@@ -670,7 +670,7 @@ onUnmounted(() => {
 
 .load-more {
   border: 1px solid rgba(0, 0, 0, 0.08);
-  background: #fff;
+  background: rgba(251, 245, 239, 0.98);
   border-radius: 999px;
   padding: 10px 14px;
   font-weight: 900;
@@ -704,9 +704,9 @@ onUnmounted(() => {
   z-index: 5;
   padding: 12px 14px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(251, 245, 239, 0.94);
   border: 1px solid rgba(32, 42, 55, 0.08);
-  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+  box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
 }
 
 .topbar h2 {
@@ -717,8 +717,8 @@ onUnmounted(() => {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 14px;
-  border: 1px dashed rgba(31, 122, 140, 0.28);
-  background: rgba(31, 122, 140, 0.08);
+  border: 1px dashed var(--primary-soft-strong);
+  background: var(--surface-lilac);
 }
 
 .list {
@@ -729,8 +729,8 @@ onUnmounted(() => {
 .card {
   border-radius: 20px;
   border: 1px solid rgba(32, 42, 55, 0.09);
-  background: linear-gradient(180deg, #ffffff, #f9fbfd);
-  box-shadow: 0 12px 24px rgba(24, 45, 73, 0.08);
+  background: linear-gradient(180deg, rgba(251, 245, 239, 0.98), rgba(246, 238, 230, 0.96));
+  box-shadow: 0 12px 24px rgba(101, 87, 117, 0.08);
 }
 
 .card-main {
@@ -763,11 +763,11 @@ onUnmounted(() => {
 }
 
 .bar {
-  background: linear-gradient(90deg, #1f7a8c, #3d8da0);
+  background: linear-gradient(90deg, #665775, #8b799d);
 }
 
 .load-more {
-  border-color: rgba(31, 122, 140, 0.22);
+  border-color: var(--primary-soft-strong);
   color: var(--primary-deep);
 }
 </style>

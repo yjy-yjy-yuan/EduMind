@@ -510,7 +510,7 @@ watch(
 .provider-chip--active {
   color: #fff;
   border-color: transparent;
-  background: linear-gradient(135deg, #1f7a8c, #3d8da0);
+  background: linear-gradient(135deg, #8b799d, #a48eb5);
 }
 
 .mode-panel {
@@ -550,7 +550,7 @@ watch(
 .mode-chip--active {
   color: #fff;
   border-color: transparent;
-  background: linear-gradient(135deg, #0f766e, #155e75);
+  background: linear-gradient(135deg, #8f7040, #7a667f);
 }
 
 .mode-panel__hint {
@@ -572,7 +572,7 @@ watch(
 .progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(135deg, #1f7a8c, #3d8da0);
+  background: linear-gradient(135deg, #8b799d, #a48eb5);
 }
 
 .chat {
@@ -691,7 +691,7 @@ watch(
   padding: 12px 14px;
   font-weight: 900;
   color: #fff;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  background: linear-gradient(135deg, #a792bc, #7f698f);
 }
 
 .send:disabled {
@@ -708,12 +708,12 @@ watch(
   padding: 10px 12px;
   border-radius: 16px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 20px rgba(24, 45, 73, 0.08);
+  background: rgba(251, 245, 239, 0.92);
+  box-shadow: 0 10px 20px rgba(101, 87, 117, 0.08);
 }
 
 .msg.user .bubble {
-  background: linear-gradient(135deg, rgba(31, 122, 140, 0.14), rgba(31, 122, 140, 0.08));
+  background: linear-gradient(135deg, rgba(139, 121, 157, 0.14), rgba(139, 121, 157, 0.08));
 }
 
 .msg.ai .bubble {
@@ -727,7 +727,7 @@ watch(
 
 .send {
   border-radius: 16px;
-  background: linear-gradient(135deg, #1f7a8c, #3d8da0);
+  background: linear-gradient(135deg, #8b799d, #a48eb5);
 }
 
 @media (max-width: 390px) {
