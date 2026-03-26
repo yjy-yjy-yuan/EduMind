@@ -15,31 +15,37 @@
     'Noto Sans SC',
     'Microsoft YaHei',
     sans-serif;
-  --bg: #d6edf4;
-  --bg-decor-a: rgba(111, 231, 255, 0.5);
-  --bg-decor-b: rgba(14, 132, 171, 0.38);
-  --card: rgba(247, 253, 255, 0.5);
-  --card-soft: rgba(238, 250, 255, 0.42);
-  --text: #173949;
-  --muted: #55798a;
-  --primary: #158db2;
-  --primary-deep: #0f617a;
-  --accent: #3fb7d8;
-  --danger: #d64545;
-  --border: rgba(255, 255, 255, 0.28);
-  --shadow: 0 24px 48px rgba(28, 112, 143, 0.12);
-  --shadow-sm: 0 12px 26px rgba(28, 112, 143, 0.08);
+  --bg: #f3eee8;
+  --bg-decor-a: rgba(139, 121, 157, 0.09);
+  --bg-decor-b: rgba(201, 172, 106, 0.08);
+  --card: rgba(250, 244, 238, 0.92);
+  --card-soft: rgba(244, 236, 229, 0.94);
+  --text: #171b22;
+  --muted: #6a6f7a;
+  --primary: #8b799d;
+  --primary-deep: #665775;
+  --accent: #c8ab6c;
+  --danger: #b45309;
+  --border: rgba(17, 24, 39, 0.08);
+  --shadow: 0 24px 48px rgba(15, 23, 42, 0.08);
+  --shadow-sm: 0 16px 34px rgba(15, 23, 42, 0.06);
   --radius: 22px;
   --radius-sm: 14px;
-  --tap: rgba(31, 122, 140, 0.14);
-  --ok-bg: rgba(36, 176, 114, 0.14);
-  --ok-text: #14835a;
-  --warn-bg: rgba(235, 140, 52, 0.18);
-  --warn-text: #8f4f12;
-  --info-bg: rgba(31, 122, 140, 0.16);
-  --info-text: #1b6170;
-  --bad-bg: rgba(214, 69, 69, 0.16);
-  --bad-text: #a22c2c;
+  --tap: rgba(139, 121, 157, 0.12);
+  --primary-soft: rgba(139, 121, 157, 0.12);
+  --primary-soft-strong: rgba(139, 121, 157, 0.2);
+  --accent-soft: rgba(200, 171, 108, 0.18);
+  --surface-lilac: rgba(238, 232, 242, 0.96);
+  --surface-gold: rgba(243, 235, 215, 0.96);
+  --surface-rose: rgba(248, 238, 235, 0.96);
+  --ok-bg: rgba(221, 240, 227, 0.95);
+  --ok-text: #2b6847;
+  --warn-bg: rgba(243, 235, 215, 0.96);
+  --warn-text: #8f7040;
+  --info-bg: rgba(238, 232, 242, 0.96);
+  --info-text: #6e5d7f;
+  --bad-bg: rgba(248, 238, 235, 0.96);
+  --bad-text: #b45309;
 }
 
 html,
@@ -58,21 +64,27 @@ html {
 
 body {
   margin: 0;
+  position: relative;
   min-width: 320px;
   overflow-x: hidden;
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.55;
   letter-spacing: 0.01em;
-  background:
-    linear-gradient(180deg, rgba(246, 253, 255, 0.94), rgba(214, 238, 246, 0.74)),
-    radial-gradient(circle at 12% 60%, rgba(105, 231, 255, 0.48), transparent 28%),
-    radial-gradient(circle at 70% 38%, rgba(4, 125, 166, 0.92), transparent 34%),
-    radial-gradient(circle at 56% 76%, rgba(64, 196, 229, 0.44), transparent 34%),
-    radial-gradient(circle at 90% 8%, rgba(245, 252, 255, 0.94), transparent 18%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.86) 0%, rgba(255, 255, 255, 0.24) 20%, rgba(255, 255, 255, 0) 40%),
-    var(--bg);
+  background: linear-gradient(180deg, rgba(255, 249, 241, 0.76), rgba(241, 233, 223, 0.82)), var(--bg);
   color: var(--text);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 249, 241, 0.1), rgba(241, 233, 223, 0.16)),
+    url('./assets/morandi-surface.svg') center top / cover no-repeat;
+  opacity: 0.98;
+  pointer-events: none;
+  z-index: -1;
 }
 
 * {
@@ -123,6 +135,8 @@ button {
 .app-surface,
 #app {
   min-height: 100%;
+  position: relative;
+  isolation: isolate;
 }
 
 .tabbar,
@@ -195,7 +209,7 @@ p {
 
 .gradient-text {
   color: transparent;
-  background-image: linear-gradient(135deg, #7ee7fb 0%, #38b9e1 36%, #2278dc 68%, #1849c9 100%);
+  background-image: linear-gradient(135deg, #665775 0%, #8b799d 52%, #c8ab6c 100%);
   -webkit-background-clip: text;
   background-clip: text;
 }
@@ -256,7 +270,7 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid rgba(31, 157, 116, 0.45);
+  outline: 2px solid rgba(139, 121, 157, 0.4);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }

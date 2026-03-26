@@ -741,3 +741,29 @@
 
 - 新增 [`docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md)：补充“推荐系统 UI 优先”的专用提示词，明确本轮以首页推荐入口、独立推荐页、站外候选卡片、上传页导入承接和 iOS `WKWebView` 可用性为主，不优先扩展推荐后端算法。
 - 更新 [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：补充 UI 优先推荐提示词入口，便于后续直接给 AI 编码助手下达“先改推荐界面”的任务。
+
+## 2026-03-26
+
+### 推荐系统 UI 第一轮页面修改
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页推荐区收成“推荐中枢预览”，补充站内/站外构成概览、下一步学习动作提示，并让首页预览直接混入真实推荐接口返回的站外候选。
+- 更新 [`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)：强化推荐页的中枢感，新增推荐路线、来源总览、站外候选导入说明和当前场景的站外提示，让用户更容易区分站内视频与站外导入项。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：补充“从推荐导入”承接横幅，明确推荐链接会进入导入学习链路，并高亮链接导入卡片，减少从推荐页跳转到上传页后的理解成本。
+
+## 2026-03-26
+
+### 推荐系统 UI 视觉重构首轮
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页欢迎区替换为更克制的浅底白卡布局，新增“当前重心”聚焦卡，并把学习概览、辅助入口和推荐预览统一到更简洁的移动端卡片体系中。
+- 更新 [`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)：将推荐页整体改为 clean minimal 风格，压低渐变和发光感，统一 hero、场景卡、标签卡、相关推荐卡和站外导入卡的版式与层级。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：将上传页的推荐导入承接区域改为同一套轻量视觉语言，统一顶部信息、导入横幅、按钮和最近任务列表的表现。
+- 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)：将全局背景、卡片、阴影、主强调色和状态色从原来的高饱和青蓝玻璃感收回到中性浅底和深色按钮体系，避免局部页面重构后仍被全局视觉变量拖回旧风格。
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：重做底部导航栏的外壳、激活态和上传入口表现，改为更贴近原生移动端的浮动导航条，减少旧版导航栏的生硬感和廉价发光感。
+- 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)、[`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：移除底部导航激活态上方的短横杠，并将整套推荐 UI 主色改为更柔和的莫兰迪黄紫系，让底部导航、首页、推荐页和导入页使用统一的柔和色板。
+- 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：清理笔记页和视频列表页中残留的蓝绿色筛选态、主按钮、标签与卡片高亮，补齐到同一套莫兰迪黄紫色板，避免这两页继续暴露旧主题。
+- 更新 [`mobile-frontend/src/assets/morandi-surface.svg`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/morandi-surface.svg)、[`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)：删除旧的冷调渐变背景，改用参考 Figma/Pencil 简约移动端模板氛围自制的莫兰迪黄紫背景图，并让全局页面统一使用该背景图作为底层氛围。
+- 更新 [`mobile-frontend/src/views/Login.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Register.vue)、[`mobile-frontend/src/views/Guide.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)、[`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)、[`mobile-frontend/src/views/LocalTranscripts.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscripts.vue)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)、[`mobile-frontend/src/views/LearningPath.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LearningPath.vue)、[`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)：继续清扫其余页面残留的蓝色、青色和冷调阴影，把登录、详情、播放器、问答、笔记编辑、离线转录和学习路径等页面统一到黄紫莫兰迪色板。
+- 对 2026-03-26 同日背景图记录的更正说明：将背景图承载方式改为独立全屏背景层，并增强背景图内黄紫图形的对比度与面积，避免在 iOS `WKWebView` 中被浅色底覆盖后看起来像“背景没有变化”。
+- 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)、[`mobile-frontend/src/assets/edumind-logo.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo.png)、[`ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png)：将前端品牌 logo 与 iOS App 图标统一替换为新的紫色 EduMind 品牌图，并移除前端 logo 的旧正方形约束，避免横版品牌图被压缩变形。
+- 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)：将品牌图展示方式改为带留白和圆角承载框的品牌卡片，补充暖紫阴影与边框高光，让首页和登录/注册页里的 logo 不再像生硬贴图。
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：继续优化首页左上角品牌区，将 logo 收成更完整的品牌牌匾样式，补充独立承载面、品牌标识和更稳定的留白比例，让首页 logo 看起来更像主品牌入口而不是普通小图片。

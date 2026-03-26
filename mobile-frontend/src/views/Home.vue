@@ -3,21 +3,39 @@
     <header class="welcome ios-card">
       <div class="welcome__top">
         <div class="welcome__brand">
-          <BrandLogo :width="138" compact />
+          <div class="welcome__brand-surface">
+            <span class="welcome__brand-mark">EduMind</span>
+            <BrandLogo :width="172" />
+          </div>
         </div>
         <button class="guide-btn" @click="go('/guide')" aria-label="打开使用指南">使用指南</button>
       </div>
 
       <div class="welcome__hero">
         <div class="welcome__copy">
-          <p class="welcome__eyebrow">首页更聚焦</p>
-          <h1 class="welcome__title gradient-text">智能伴学中心</h1>
-          <p class="welcome__subtitle">先上传，再跟进处理，最后复盘沉淀，不用在多个页面之间反复找入口。</p>
+          <p class="welcome__eyebrow">Learning Dashboard</p>
+          <h1 class="welcome__title">智能伴学中心</h1>
+          <p class="welcome__subtitle">把上传、跟进、复盘和推荐收进同一条学习动线里，页面保持简洁，下一步一眼就能决定。</p>
         </div>
-        <div class="hero-actions">
-          <button class="hero-btn hero-btn--primary" @click="go('/upload')">上传新内容</button>
-          <button class="hero-btn hero-btn--secondary" @click="go('/videos')">查看视频库</button>
-        </div>
+        <aside class="welcome__spotlight">
+          <span class="welcome__spotlight-label">当前重心</span>
+          <strong class="welcome__spotlight-value">{{ featuredVideo ? featuredVideoEyebrow : '从上传开始' }}</strong>
+          <p class="welcome__spotlight-note">
+            {{ featuredVideo ? (featuredVideo.title || '未命名视频') : '先上传一个视频，系统就会开始整理学习轨迹。' }}
+          </p>
+          <button class="welcome__spotlight-link" @click="featuredVideo ? openVideo(featuredVideo) : go('/upload')">
+            {{ featuredVideo ? featuredVideoActionLabel : '开始上传' }}
+          </button>
+        </aside>
+      </div>
+
+      <div class="hero-actions">
+        <button class="hero-btn hero-btn--primary" @click="go('/upload')">立即上传</button>
+        <button class="hero-btn hero-btn--secondary" @click="go('/videos')">浏览视频库</button>
+      </div>
+
+      <div class="welcome__subnote">
+        <span>推荐页会继续承接站内学习与站外导入，首页只保留最重要的下一步。</span>
       </div>
 
       <div class="stats">
@@ -43,8 +61,8 @@
     <section class="overview ios-card">
       <div class="section-head">
         <div>
-          <h2>继续学习</h2>
-          <p>把最近任务和本地离线结果收口到一个区域里，减少来回跳转。</p>
+          <h2>学习概览</h2>
+          <p>把最近任务、本地离线结果和回看入口压缩成一屏里的稳定节奏。</p>
         </div>
         <button class="overview-link" @click="reloadDashboard" :disabled="loading || recommendationLoading">
           {{ loading ? '刷新中…' : '刷新' }}
@@ -111,7 +129,7 @@
       <div class="section-head section-head--compact">
         <div>
           <h2>辅助入口</h2>
-          <p>高频动作留在前面，低频入口收成轻量跳转。</p>
+          <p>保留高频学习动作，其余入口用轻量方式承接，不打断主页面节奏。</p>
         </div>
       </div>
       <div class="support-strip__list">
@@ -131,12 +149,30 @@
     <section class="recommend-panel ios-card">
       <div class="section-head">
         <div>
-          <h2>推荐视频</h2>
-          <p>预留真实后端推荐链路，优先返回值得继续处理、复盘或与你方向相关的内容。</p>
+          <h2>推荐中枢预览</h2>
+          <p>首页只预览最值得继续的方向，真正的相关推荐和站外导入放进推荐页里完成。</p>
         </div>
         <button class="overview-link" @click="reloadRecommendations" :disabled="recommendationLoading">
           {{ recommendationLoading ? '刷新中…' : '刷新推荐' }}
         </button>
+      </div>
+
+      <div v-if="recommendations.length > 0" class="recommend-summary">
+        <article class="recommend-summary__card">
+          <span class="recommend-summary__label">当前预览</span>
+          <strong class="recommend-summary__value">{{ recommendations.length }}</strong>
+          <span class="recommend-summary__note">首页先看最值得继续的 {{ recommendations.length }} 条内容</span>
+        </article>
+        <article class="recommend-summary__card recommend-summary__card--soft">
+          <span class="recommend-summary__label">结果构成</span>
+          <strong class="recommend-summary__value">{{ recommendationMixValue }}</strong>
+          <span class="recommend-summary__note">{{ recommendationMixNote }}</span>
+        </article>
+        <article class="recommend-summary__card recommend-summary__card--action">
+          <span class="recommend-summary__label">下一步</span>
+          <strong class="recommend-summary__value">进推荐页</strong>
+          <span class="recommend-summary__note">继续筛场景、看相关推荐或导入站外候选</span>
+        </article>
       </div>
 
       <div v-if="recommendationLoading && recommendations.length === 0" class="skeleton-list">
@@ -171,10 +207,11 @@
             <span v-if="Array.isArray(item.tags) && item.tags.length > 0">{{ item.tags.slice(0, 2).join(' · ') }}</span>
             <span v-if="formatTimeText(item.upload_time)">{{ formatTimeText(item.upload_time) }}</span>
           </div>
+          <span class="recommend-card__next">{{ recommendationNextStepText(item) }}</span>
         </button>
       </div>
 
-      <button class="hero-btn hero-btn--secondary" @click="go('/recommendations')">打开推荐页</button>
+      <button class="hero-btn hero-btn--secondary" @click="go('/recommendations')">进入推荐中枢</button>
     </section>
   </div>
 </template>
@@ -320,7 +357,7 @@ const reloadRecommendations = async () => {
   recommendationLoading.value = true
   recommendationError.value = ''
   try {
-    const res = await getVideoRecommendations({ scene: 'home', limit: 4 })
+    const res = await getVideoRecommendations({ scene: 'home', limit: 4, include_external: true })
     const items = normalizeRecommendationItems(res?.data || {})
     recommendations.value = items.length > 0 ? items : fallbackRecommendations(allVideos.value)
   } catch (e) {
@@ -351,6 +388,18 @@ const recommendationEmptyText = computed(() => {
   if (recommendationError.value) return recommendationError.value
   return '上传更多视频后，这里会按处理状态和内容相关度给你推荐下一步。'
 })
+const externalRecommendationCount = computed(() => recommendations.value.filter((item) => isExternalRecommendation(item)).length)
+const internalRecommendationCount = computed(() => Math.max(recommendations.value.length - externalRecommendationCount.value, 0))
+const recommendationMixValue = computed(() => {
+  if (externalRecommendationCount.value === 0) return `站内 ${internalRecommendationCount.value}`
+  return `${internalRecommendationCount.value} / ${externalRecommendationCount.value}`
+})
+const recommendationMixNote = computed(() => {
+  if (recommendations.value.length === 0) return '当前还没有推荐结果。'
+  if (externalRecommendationCount.value === 0) return '当前首页预览以站内学习内容为主。'
+  if (internalRecommendationCount.value === 0) return '当前首页预览以站外候选为主。'
+  return `站内 ${internalRecommendationCount.value} 条，站外 ${externalRecommendationCount.value} 条。`
+})
 
 const recommendationKey = (item) =>
   String(item?.id || item?.external_url || item?.target_url || item?.source_url || item?.link || item?.title || 'recommendation')
@@ -376,6 +425,9 @@ const recommendationStatusClass = (item) => {
   if (isExternalRecommendation(item)) return 'status--warn'
   return statusClass(item?.status)
 }
+
+const recommendationNextStepText = (item) =>
+  isExternalRecommendation(item) ? '下一步：带着链接进入导入学习链路' : '下一步：打开详情继续学习'
 
 const openRecommendation = (item) => {
   if (isExternalRecommendation(item)) {
@@ -404,30 +456,48 @@ onMounted(reloadDashboard)
 <style scoped>
 .home-page {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding-top: calc(16px + env(safe-area-inset-top));
+  font-family: 'Avenir Next', 'SF Pro Display', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.welcome,
+.overview,
+.recommend-panel,
+.support-strip {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(251, 245, 239, 0.96);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
 }
 
 .welcome {
-  position: relative;
-  overflow: hidden;
-  padding: 22px;
-  border-radius: 28px;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: linear-gradient(155deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 251, 252, 0.9) 58%, rgba(232, 247, 250, 0.84) 100%);
-  box-shadow: 0 10px 28px rgba(24, 45, 73, 0.08);
+  padding: 24px;
+  border-radius: 30px;
+  background:
+    linear-gradient(180deg, rgba(251, 245, 239, 0.98), rgba(246, 238, 230, 0.96)),
+    radial-gradient(circle at top right, rgba(139, 121, 157, 0.12), transparent 34%),
+    radial-gradient(circle at 18% 100%, rgba(200, 171, 108, 0.12), transparent 28%);
+}
+
+.welcome::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0), rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0));
 }
 
 .welcome::after {
   content: '';
   position: absolute;
-  width: 180px;
-  height: 180px;
-  right: -70px;
-  top: -90px;
+  width: 240px;
+  height: 240px;
+  right: -90px;
+  top: -120px;
   border-radius: 999px;
-  transform: none;
-  background: radial-gradient(circle, rgba(31, 122, 140, 0.14) 0%, rgba(31, 122, 140, 0.03) 62%, transparent 74%);
+  background: radial-gradient(circle, rgba(15, 23, 42, 0.06) 0%, rgba(15, 23, 42, 0.01) 64%, transparent 72%);
   pointer-events: none;
 }
 
@@ -454,7 +524,35 @@ onMounted(reloadDashboard)
 .welcome__brand {
   display: inline-flex;
   align-items: center;
-  min-width: 132px;
+  min-width: 180px;
+}
+
+.welcome__brand-surface {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(251, 245, 239, 0.98), rgba(243, 235, 227, 0.94)),
+    rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  box-shadow:
+    0 18px 28px rgba(102, 87, 117, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.welcome__brand-mark {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(139, 121, 157, 0.12);
+  color: var(--primary-deep);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .guide-btn,
@@ -463,20 +561,22 @@ onMounted(reloadDashboard)
   background: transparent;
   color: var(--primary-deep);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .guide-btn {
-  border: 1px solid rgba(24, 45, 73, 0.08);
+  border: 1px solid rgba(17, 24, 39, 0.09);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  padding: 6px 12px;
+  background: rgba(245, 236, 229, 0.92);
+  padding: 8px 13px;
 }
 
 .welcome__hero {
   display: grid;
-  gap: 16px;
-  margin-top: 16px;
+  gap: 14px;
+  margin-top: 18px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(180px, 0.9fr);
 }
 
 .welcome__eyebrow,
@@ -485,17 +585,22 @@ onMounted(reloadDashboard)
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 800;
-  background: rgba(31, 122, 140, 0.12);
+  width: fit-content;
+  padding: 5px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--primary-soft);
   color: var(--primary-deep);
 }
 
 .welcome__title {
-  margin: 8px 0 0;
-  font-size: 31px;
-  line-height: 1.08;
+  margin: 10px 0 0;
+  font-size: 34px;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  color: #111827;
 }
 
 .welcome__subtitle,
@@ -509,14 +614,66 @@ onMounted(reloadDashboard)
 }
 
 .welcome__subtitle {
-  margin-top: 8px;
+  margin-top: 12px;
   font-size: 14px;
   line-height: 1.6;
-  max-width: 32rem;
+  max-width: 28rem;
+}
+
+.welcome__spotlight {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: linear-gradient(180deg, rgba(240, 232, 245, 0.96), rgba(251, 245, 239, 0.96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.welcome__spotlight-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.welcome__spotlight-value {
+  font-size: 20px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #111827;
+}
+
+.welcome__spotlight-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #6b7280;
+}
+
+.welcome__spotlight-link {
+  width: fit-content;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--primary-deep);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.welcome__subnote {
+  margin-top: 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b7280;
 }
 
 .hero-actions,
 .summary-grid,
+.recommend-summary,
 .video-list,
 .recommend-list,
 .skeleton-list {
@@ -526,6 +683,7 @@ onMounted(reloadDashboard)
 
 .hero-actions {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 14px;
 }
 
 .hero-btn,
@@ -535,26 +693,27 @@ onMounted(reloadDashboard)
 .recommend-card,
 .video-item,
 .support-link {
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(251, 245, 239, 0.98);
 }
 
 .hero-btn {
-  border-radius: 14px;
-  padding: 13px 14px;
+  border-radius: 16px;
+  padding: 14px 15px;
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .hero-btn--primary {
   border: 0;
-  color: #f4feff;
-  background: linear-gradient(135deg, #145b66, #1f7a8c);
-  box-shadow: 0 10px 18px rgba(31, 122, 140, 0.18);
+  color: #f9fafb;
+  background: linear-gradient(135deg, #665775, #8b799d);
+  box-shadow: 0 16px 24px rgba(17, 24, 39, 0.16);
 }
 
 .hero-btn--secondary {
   color: var(--primary-deep);
+  background: rgba(245, 236, 229, 0.96);
 }
 
 .stats,
@@ -564,8 +723,8 @@ onMounted(reloadDashboard)
 
 .stats {
   display: grid;
-  margin-top: 16px;
-  gap: 6px;
+  margin-top: 18px;
+  gap: 8px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch;
 }
@@ -576,25 +735,25 @@ onMounted(reloadDashboard)
   justify-content: center;
   align-items: center;
   gap: 3px;
-  min-height: 74px;
+  min-height: 78px;
   text-align: center;
-  border-radius: 12px;
-  padding: 8px 4px;
-  box-shadow: none;
+  border-radius: 18px;
+  padding: 10px 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68);
   width: 100%;
   min-width: 0;
 }
 
 .stat-pill--ok {
-  background: rgba(31, 157, 116, 0.1);
+  background: rgba(212, 240, 223, 0.78);
 }
 
 .stat-pill--warn {
-  background: rgba(242, 154, 74, 0.14);
+  background: var(--surface-gold);
 }
 
 .stat-pill--feature {
-  background: linear-gradient(135deg, rgba(20, 91, 102, 0.16), rgba(31, 122, 140, 0.08));
+  background: linear-gradient(180deg, rgba(240, 232, 245, 0.96), rgba(247, 239, 228, 0.96));
 }
 
 .stat-pill__label,
@@ -603,81 +762,120 @@ onMounted(reloadDashboard)
   font-size: 10px;
   line-height: 1.3;
   font-weight: 700;
-  color: var(--muted);
+  color: #6b7280;
 }
 
 .stat-pill__value,
 .summary-card__value {
   display: block;
   margin-top: 0;
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
-  font-weight: 900;
-  color: var(--text);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #111827;
 }
 
 .overview,
 .recommend-panel,
 .support-strip {
   display: grid;
-  gap: 14px;
-  padding: 18px;
-  border-radius: 24px;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 10px 24px rgba(24, 45, 73, 0.06);
+  gap: 16px;
+  padding: 20px;
+  border-radius: 28px;
+}
+
+.recommend-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.recommend-summary__card {
+  display: grid;
+  gap: 5px;
+  border-radius: 20px;
+  padding: 15px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(247, 239, 232, 0.92);
+}
+
+.recommend-summary__card--soft {
+  background: rgba(240, 232, 245, 0.94);
+}
+
+.recommend-summary__card--action {
+  background: linear-gradient(180deg, rgba(243, 235, 215, 0.96), rgba(251, 245, 239, 0.96));
+}
+
+.recommend-summary__label,
+.recommend-summary__note,
+.recommend-card__next {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b7280;
+}
+
+.recommend-summary__value {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #111827;
 }
 
 .section-head h2,
 .recent-inline__head h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  color: #111827;
 }
 
 .section-head p {
   margin-top: 4px;
   font-size: 13px;
   line-height: 1.55;
+  max-width: 28rem;
 }
 
 .focus-card {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 18px 16px;
+  padding: 18px;
   text-align: left;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 252, 0.94));
-  border-left: 4px solid rgba(31, 122, 140, 0.5);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(251, 245, 239, 0.98), rgba(243, 235, 215, 0.9));
+  border: 1px solid rgba(17, 24, 39, 0.08);
 }
 
 .focus-card__title,
 .recommend-card__title,
 .quick-card__title {
   margin: 0;
-  font-size: 17px;
-  color: #1f2a37;
+  font-size: 18px;
+  line-height: 1.35;
+  color: #111827;
 }
 
 .focus-card__cta {
   color: var(--primary-deep);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .summary-card {
   display: grid;
   gap: 6px;
   width: 100%;
-  padding: 14px;
+  padding: 16px;
   text-align: left;
-  border-radius: 16px;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.82);
+  border-radius: 20px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(247, 239, 232, 0.92);
 }
 
 .summary-card--soft {
-  background: rgba(244, 250, 252, 0.92);
+  background: var(--surface-lilac);
 }
 
 .summary-card__note {
@@ -694,9 +892,9 @@ onMounted(reloadDashboard)
 .recommend-card,
 .quick-card {
   width: 100%;
-  padding: 14px;
+  padding: 16px;
   text-align: left;
-  border-radius: 18px;
+  border-radius: 20px;
 }
 
 .video-item {
@@ -713,9 +911,10 @@ onMounted(reloadDashboard)
 .video-item__title {
   margin: 0;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   overflow-wrap: anywhere;
   word-break: break-word;
+  color: #111827;
 }
 
 .video-item__status {
@@ -725,7 +924,7 @@ onMounted(reloadDashboard)
   border-radius: 999px;
   padding: 3px 9px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .status--ok {
@@ -750,7 +949,7 @@ onMounted(reloadDashboard)
 
 .video-item__arrow,
 .support-card__arrow {
-  color: #8ba4ae;
+  color: #94a3b8;
   font-size: 20px;
   line-height: 1;
 }
@@ -761,32 +960,32 @@ onMounted(reloadDashboard)
   border-radius: 999px;
   padding: 4px 9px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .tag--mint {
-  background: rgba(31, 157, 116, 0.14);
-  color: #0f6c4f;
+  background: rgba(212, 240, 223, 0.92);
+  color: var(--ok-text);
 }
 
 .tag--leaf {
-  background: rgba(114, 196, 106, 0.14);
-  color: #326f2e;
+  background: rgba(245, 236, 229, 0.92);
+  color: #7f6755;
 }
 
 .tag--amber {
-  background: rgba(242, 154, 74, 0.16);
-  color: #905214;
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 
 .tag--teal {
-  background: rgba(76, 173, 195, 0.16);
-  color: #166376;
+  background: rgba(240, 232, 245, 0.94);
+  color: #6e5d7f;
 }
 
 .tag--cobalt {
-  background: rgba(60, 104, 221, 0.14);
-  color: #274ba4;
+  background: var(--info-bg);
+  color: var(--info-text);
 }
 
 .section-head--compact {
@@ -796,12 +995,13 @@ onMounted(reloadDashboard)
 .support-strip__list {
   display: grid;
   gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .support-link {
   width: 100%;
-  border-radius: 16px;
-  padding: 12px 14px;
+  border-radius: 18px;
+  padding: 14px 15px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -811,12 +1011,12 @@ onMounted(reloadDashboard)
 .support-link__label {
   flex: 1;
   font-size: 14px;
-  font-weight: 800;
-  color: #1f2a37;
+  font-weight: 700;
+  color: #111827;
 }
 
 .support-link__arrow {
-  color: #8ba4ae;
+  color: #94a3b8;
   font-size: 18px;
 }
 
@@ -826,10 +1026,10 @@ onMounted(reloadDashboard)
 
 .recommend-card {
   display: grid;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.86);
-  border-radius: 18px;
-  padding: 14px 15px;
+  gap: 10px;
+  background: rgba(251, 245, 239, 0.98);
+  border-radius: 20px;
+  padding: 16px;
 }
 
 .recommend-card__reason {
@@ -843,21 +1043,29 @@ onMounted(reloadDashboard)
   line-height: 1.55;
 }
 
+.recommend-card__next {
+  color: var(--primary-deep);
+  font-weight: 700;
+}
+
 .message {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 14px;
   font-size: 13px;
-  background: var(--card-soft);
+  background: rgba(247, 239, 232, 0.92);
+  border: 1px dashed rgba(17, 24, 39, 0.12);
 }
 
 .message--error {
-  background: rgba(223, 82, 82, 0.1);
-  color: #aa3232;
+  background: var(--bad-bg);
+  color: #b45309;
+  border-style: solid;
+  border-color: rgba(217, 119, 6, 0.14);
 }
 
 .message--empty {
@@ -866,8 +1074,8 @@ onMounted(reloadDashboard)
 
 .skeleton-item {
   height: 64px;
-  border-radius: 16px;
-  background: linear-gradient(90deg, #edf3f0, #e3efe9, #edf3f0);
+  border-radius: 18px;
+  background: linear-gradient(90deg, #f5f5f1, #eceee7, #f5f5f1);
   background-size: 220% 100%;
   animation: shimmer 1.2s linear infinite;
 }
@@ -887,10 +1095,30 @@ onMounted(reloadDashboard)
 }
 
 @media (max-width: 640px) {
+  .welcome {
+    padding: 20px;
+  }
+
+  .welcome__hero,
   .hero-actions,
   .summary-grid,
-  .recommend-list {
+  .recommend-summary,
+  .recommend-list,
+  .support-strip__list {
     grid-template-columns: 1fr;
+  }
+
+  .welcome__top {
+    align-items: flex-start;
+  }
+
+  .welcome__brand {
+    min-width: 0;
+  }
+
+  .welcome__brand-surface {
+    padding: 10px 12px;
+    border-radius: 24px;
   }
 
   .stats {
@@ -901,6 +1129,10 @@ onMounted(reloadDashboard)
   .stat-pill {
     min-height: 70px;
     padding: 8px 2px;
+  }
+
+  .welcome__title {
+    font-size: 30px;
   }
 }
 </style>
