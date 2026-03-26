@@ -1,6 +1,8 @@
 """API 测试 - 推荐接口。"""
 
 import pytest
+from app.services import video_recommendation_service as recommendation_service
+from app.services.external_candidate_service import ExternalCandidate
 
 
 @pytest.mark.api
@@ -181,3 +183,53 @@ class TestRecommendationAPI:
         assert payload["items"][0]["id"] == physics_match.id
         assert payload["items"][0]["tags"][0] == "物理"
         assert payload["items"][0]["reason_code"] in {"related", "subject"}
+
+    def test_home_recommendations_include_external_candidates(self, client, db, monkeypatch):
+        """推荐接口应支持在返回中混入站外候选元数据。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        internal_video = Video(
+            title="高数导数专题",
+            filename="math.mp4",
+            filepath="/tmp/math.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="围绕导数定义与函数单调性做复盘。",
+            tags='["导数","函数"]',
+        )
+        db.add(internal_video)
+        db.commit()
+
+        def fake_fetch_external_candidates(*args, **kwargs):
+            return [
+                ExternalCandidate(
+                    id="youtube:abc123",
+                    provider="youtube",
+                    source_label="YouTube",
+                    title="YouTube · Calculus Review",
+                    external_url="https://www.youtube.com/watch?v=abc123",
+                    summary="适合配合当前数学主题继续学习。",
+                    tags=["数学", "导数"],
+                    subject="数学",
+                    primary_topic="导数",
+                    cluster_key="数学::导数",
+                )
+            ]
+
+        monkeypatch.setattr(recommendation_service, "fetch_external_candidates", fake_fetch_external_candidates)
+
+        response = client.get(
+            "/api/recommendations/videos",
+            params={"scene": "home", "limit": 4, "include_external": True},
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["strategy"] == "video_status_interest_external_v2"
+        assert any(item["id"] == internal_video.id for item in payload["items"])
+        external_item = next(item for item in payload["items"] if item.get("is_external") is True)
+        assert external_item["source_label"] == "YouTube"
+        assert external_item["external_url"] == "https://www.youtube.com/watch?v=abc123"
+        assert external_item["item_type"] == "external_candidate"

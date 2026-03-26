@@ -725,3 +725,12 @@
 - 更新 [`backend_fastapi/app/services/video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_content_service.py)：为真实标签生成链路补上科目识别与科目标签回写，让“提取标签 / 重提标签”在写回 `videos.tags` 时直接带上“数学”等科目标签，而不是只生成知识点标签。
 - 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：改为复用视频内容服务里的共享科目归一规则，保证视频详情页标签与推荐聚类使用同一套科目判断逻辑。
 - 更新 [`backend_fastapi/tests/unit/test_video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_content_service.py)、[`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充“生成标签后返回并写回科目标签”的单测和 API 测试，覆盖 `generate-tags` 主路径。
+
+## 2026-03-26
+
+### 推荐后端接入站外候选元数据
+
+- 新增 [`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)：抽象 B 站、YouTube、中国大学慕课 3 个站外候选 provider，统一抓取轻量元数据并补上科目、主题、标签归一，且单个 provider 失败不会阻断整体推荐接口。
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：为推荐链路新增 `include_external` 混合推荐能力，根据当前场景与站内主题推导站外检索词，并把站内视频与站外候选按统一的“科目 + 主题”信号合并排序。
+- 更新 [`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)、[`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)：扩展推荐接口参数与返回结构，支持 `include_external`、`is_external`、`item_type`、`external_url`、`source_label`、`subject`、`cluster_key` 等字段，让移动端可以直接区分站内视频和站外候选。
+- 更新 [`backend_fastapi/tests/unit/test_external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_external_candidate_service.py)、[`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)、[`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)：补充 provider 解析、失败隔离和推荐接口混合返回测试，覆盖站外候选主路径。

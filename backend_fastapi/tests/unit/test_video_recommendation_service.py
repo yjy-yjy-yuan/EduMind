@@ -2,6 +2,8 @@
 
 from app.models.video import Video
 from app.models.video import VideoStatus
+from app.services import video_recommendation_service as recommendation_service
+from app.services.external_candidate_service import ExternalCandidate
 from app.services.video_recommendation_service import build_normalized_video_tags
 from app.services.video_recommendation_service import build_recommendation_profile
 from app.services.video_recommendation_service import recommend_videos
@@ -104,3 +106,49 @@ def test_recommend_videos_related_prefers_same_subject_match():
     assert payload["items"][0]["id"] == same_subject_video.id
     assert payload["items"][0]["tags"][0] == "物理"
     assert payload["items"][0]["reason_code"] in {"related", "subject"}
+
+
+def test_recommend_videos_include_external_candidates(monkeypatch):
+    """开启 include_external 后应同时返回站内视频与站外候选。"""
+    internal_video = Video(
+        id=20,
+        title="高数导数专题",
+        filename="math.mp4",
+        filepath="/tmp/math.mp4",
+        status=VideoStatus.COMPLETED,
+        process_progress=100,
+        summary="围绕导数与函数单调性做系统讲解。",
+        tags='["导数","函数"]',
+    )
+
+    def fake_fetch_external_candidates(*args, **kwargs):
+        return [
+            ExternalCandidate(
+                id="bilibili:BV1demo",
+                provider="bilibili",
+                source_label="B站",
+                title="B站·导数与函数单调性综合串讲",
+                external_url="https://www.bilibili.com/video/BV1demo",
+                summary="适合配合站内数学视频继续复盘。",
+                tags=["数学", "导数", "函数"],
+                subject="数学",
+                primary_topic="导数",
+                cluster_key="数学::导数",
+            )
+        ]
+
+    monkeypatch.setattr(recommendation_service, "fetch_external_candidates", fake_fetch_external_candidates)
+
+    payload = recommend_videos(
+        videos=[internal_video],
+        scene="home",
+        limit=4,
+        include_external=True,
+    )
+
+    assert any(item["id"] == internal_video.id for item in payload["items"])
+    assert any(item.get("is_external") is True for item in payload["items"])
+    external_item = next(item for item in payload["items"] if item.get("is_external") is True)
+    assert external_item["source_label"] == "B站"
+    assert external_item["external_url"] == "https://www.bilibili.com/video/BV1demo"
+    assert payload["strategy"] == "video_status_interest_external_v2"

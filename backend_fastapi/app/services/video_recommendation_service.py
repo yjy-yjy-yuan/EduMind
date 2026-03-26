@@ -13,6 +13,8 @@ from typing import Optional
 from app.models.user import User
 from app.models.video import Video
 from app.models.video import VideoStatus
+from app.services.external_candidate_service import ExternalCandidate
+from app.services.external_candidate_service import fetch_external_candidates
 from app.services.video_content_service import build_subject_enriched_tags
 from app.services.video_content_service import fallback_primary_topic_name
 from app.services.video_content_service import infer_subject_from_text
@@ -75,6 +77,16 @@ class RecommendationProfile:
     primary_topic: str
     tokens: list[str]
     cluster_key: str
+
+
+@dataclass
+class ExternalQueryContext:
+    """站外候选检索上下文。"""
+
+    query_text: str
+    subject: str
+    primary_topic: str
+    preferred_tags: list[str]
 
 
 def list_recommendation_scenes() -> list[dict]:
@@ -233,6 +245,44 @@ def build_reason(
     return ("recent", "最近内容", "最近进入视频库，适合从这里继续学习。")
 
 
+def build_external_reason(
+    *,
+    scene: str,
+    candidate: ExternalCandidate,
+    seed_video: Optional[Video],
+    same_subject: bool,
+    seed_overlap: list[str],
+    interest_overlap: list[str],
+) -> tuple[str, str, str]:
+    """构建站外候选推荐理由。"""
+    if scene == "related" and seed_video is not None and seed_overlap:
+        topic_text = "、".join(seed_overlap[:2])
+        return (
+            "external_related",
+            "站外同主题",
+            f"与《{seed_video.title or '当前视频'}》共享 {topic_text} 等主题，可直接导入继续学习。",
+        )
+
+    if scene == "related" and seed_video is not None and same_subject and candidate.subject:
+        return (
+            "external_subject",
+            "站外同科",
+            f"与《{seed_video.title or '当前视频'}》同属 {candidate.subject}，适合站内外串联学习。",
+        )
+
+    if scene == "review":
+        return ("external_review", "站外复盘", "适合配合当前已完成内容继续做复盘或横向补充。")
+
+    if scene == "continue":
+        return ("external_continue", "站外延伸", "当前场景可继续从站外课程扩展同主题内容，并随时导回学习链路。")
+
+    if interest_overlap:
+        topic_text = "、".join(interest_overlap[:2])
+        return ("external_interest", "站外匹配", f"这条站外候选与你当前学习方向里的 {topic_text} 更相关。")
+
+    return ("external_discovery", "站外发现", "把站内学习主题继续扩展到 B站、YouTube 或慕课内容。")
+
+
 def score_video(
     *,
     video: Video,
@@ -320,6 +370,63 @@ def score_video(
     return score, reason_code, reason_label, reason_text
 
 
+def score_external_candidate(
+    *,
+    candidate: ExternalCandidate,
+    scene: str,
+    seed_video: Optional[Video],
+    seed_profile: Optional[RecommendationProfile],
+    user_tokens: list[str],
+    user_subject: str,
+    focus_subject: str,
+    focus_tags: list[str],
+) -> tuple[float, str, str, str]:
+    """对站外候选打分。"""
+    candidate_tokens = unique_tokens([candidate.title, candidate.summary, candidate.author, *candidate.tags])
+    interest_overlap = [token for token in user_tokens if token in candidate_tokens]
+    seed_overlap = []
+    same_subject = False
+    if seed_profile is not None:
+        seed_tokens = set(seed_profile.tokens)
+        seed_overlap = [token for token in candidate_tokens if token in seed_tokens]
+        same_subject = bool(candidate.subject and candidate.subject == seed_profile.subject)
+    elif focus_subject and candidate.subject:
+        same_subject = candidate.subject == focus_subject
+
+    tag_overlap = [tag for tag in candidate.tags if tag in set(focus_tags)]
+    score = 52
+    if scene == "related":
+        score = 68
+        score += len(seed_overlap) * 18
+        if same_subject:
+            score += 20
+    elif scene == "review":
+        score = 62
+    elif scene == "continue":
+        score = 58
+
+    score += len(tag_overlap) * 10
+    score += len(interest_overlap) * 12
+    if candidate.subject and candidate.subject == user_subject:
+        score += 16
+    elif candidate.subject and candidate.subject == focus_subject:
+        score += 10
+    if candidate.primary_topic and seed_profile is not None and candidate.primary_topic == seed_profile.primary_topic:
+        score += 14
+    if candidate.upload_time is not None:
+        score += 4
+
+    reason_code, reason_label, reason_text = build_external_reason(
+        scene=scene,
+        candidate=candidate,
+        seed_video=seed_video,
+        same_subject=same_subject,
+        seed_overlap=seed_overlap,
+        interest_overlap=interest_overlap,
+    )
+    return score, reason_code, reason_label, reason_text
+
+
 def serialize_recommendation_item(
     video: Video,
     *,
@@ -351,26 +458,110 @@ def serialize_recommendation_item(
         "reason_code": reason_code,
         "reason_label": reason_label,
         "reason_text": reason_text,
+        "subject": profile.subject,
+        "cluster_key": profile.cluster_key,
     }
 
 
-def recommend_videos(
+def serialize_external_candidate_item(
+    candidate: ExternalCandidate,
+    *,
+    score: float,
+    reason_code: str,
+    reason_label: str,
+    reason_text: str,
+) -> dict:
+    """序列化站外候选条目。"""
+    return {
+        "id": candidate.id,
+        "title": candidate.title,
+        "status": "",
+        "upload_time": candidate.upload_time,
+        "summary": candidate.summary,
+        "tags": candidate.tags,
+        "process_progress": 0,
+        "current_step": "",
+        "processing_origin": "external_candidate",
+        "processing_origin_label": "站外候选",
+        "upload_source": "external_candidate",
+        "upload_source_label": candidate.source_label,
+        "recommendation_score": round(score, 2),
+        "reason_code": reason_code,
+        "reason_label": reason_label,
+        "reason_text": reason_text,
+        "is_external": True,
+        "item_type": "external_candidate",
+        "source_label": candidate.source_label,
+        "external_source_label": candidate.source_label,
+        "external_url": candidate.external_url,
+        "subject": candidate.subject,
+        "cluster_key": candidate.cluster_key,
+        "author": candidate.author,
+    }
+
+
+def build_external_query_context(
+    *,
+    videos: list[Video],
+    profiles: dict[int, RecommendationProfile],
+    scene: str,
+    seed_video: Optional[Video],
+    seed_profile: Optional[RecommendationProfile],
+    user_subject: str,
+) -> ExternalQueryContext:
+    """为站外候选推导搜索上下文。"""
+    if seed_video is not None and seed_profile is not None:
+        query_text = " ".join(part for part in [seed_profile.subject, seed_profile.primary_topic] if part).strip()
+        return ExternalQueryContext(
+            query_text=query_text or (seed_video.title or "学习课程"),
+            subject=seed_profile.subject,
+            primary_topic=seed_profile.primary_topic,
+            preferred_tags=seed_profile.tags[:4],
+        )
+
+    ordered_profiles = [profiles[video.id] for video in videos if video.id in profiles]
+    subject_counter = Counter(profile.subject for profile in ordered_profiles if profile.subject)
+    focus_subject = user_subject or (subject_counter.most_common(1)[0][0] if subject_counter else "")
+    subject_profiles = [
+        profile for profile in ordered_profiles if not focus_subject or profile.subject == focus_subject
+    ]
+    if not subject_profiles:
+        subject_profiles = ordered_profiles
+
+    topic_counter = Counter(profile.primary_topic for profile in subject_profiles if profile.primary_topic)
+    primary_topic = topic_counter.most_common(1)[0][0] if topic_counter else ""
+    tag_counter = Counter(tag for profile in subject_profiles for tag in profile.tags[1:5])
+    preferred_tags = [tag for tag, _ in tag_counter.most_common(4)]
+    query_text = " ".join(part for part in [focus_subject, primary_topic] if part).strip()
+    if not query_text and preferred_tags:
+        query_text = " ".join(preferred_tags[:2])
+    if not query_text:
+        fallback_title = next((video.title for video in videos if str(video.title or "").strip()), "")
+        query_text = fallback_title or "学习课程"
+    if scene == "review" and focus_subject and focus_subject not in preferred_tags:
+        preferred_tags = [focus_subject, *preferred_tags]
+
+    return ExternalQueryContext(
+        query_text=query_text,
+        subject=focus_subject,
+        primary_topic=primary_topic,
+        preferred_tags=preferred_tags,
+    )
+
+
+def build_ranked_internal_items(
     *,
     videos: list[Video],
     scene: str,
-    limit: int,
-    seed_video: Optional[Video] = None,
-    user: Optional[User] = None,
-    exclude_ids: Optional[set[int]] = None,
-) -> dict:
-    """生成推荐视频列表。"""
-    normalized_scene = normalize_scene(scene)
-    exclude_ids = set(exclude_ids or set())
-    user_tokens = extract_user_interest_tokens(user)
-    user_subject = extract_user_subject(user)
-    now = datetime.utcnow()
+    now: datetime,
+    seed_video: Optional[Video],
+    user_tokens: list[str],
+    user_subject: str,
+    profiles: dict[int, RecommendationProfile],
+    exclude_ids: set[int],
+) -> list[tuple[float, datetime, dict]]:
+    """生成站内推荐条目。"""
     scored_items = []
-    profiles = {video.id: build_recommendation_profile(video) for video in videos}
     cluster_counter = Counter(profile.cluster_key for profile in profiles.values() if profile.cluster_key)
     subject_counter = Counter(profile.subject for profile in profiles.values() if profile.subject)
     seed_profile = profiles.get(seed_video.id) if seed_video is not None else None
@@ -386,7 +577,7 @@ def recommend_videos(
 
         score, reason_code, reason_label, reason_text = score_video(
             video=video,
-            scene=normalized_scene,
+            scene=scene,
             now=now,
             seed_video=seed_video,
             user_tokens=user_tokens,
@@ -412,7 +603,148 @@ def recommend_videos(
         )
 
     scored_items.sort(key=lambda item: (item[0], item[1]), reverse=True)
-    items = [item[2] for item in scored_items[:limit]]
+    return scored_items
+
+
+def build_ranked_external_items(
+    *,
+    query_context: ExternalQueryContext,
+    scene: str,
+    seed_video: Optional[Video],
+    seed_profile: Optional[RecommendationProfile],
+    user_tokens: list[str],
+    user_subject: str,
+    limit: int,
+) -> list[tuple[float, datetime, dict]]:
+    """生成站外候选条目。"""
+    candidates = fetch_external_candidates(
+        query_context.query_text,
+        subject_hint=query_context.subject,
+        preferred_tags=query_context.preferred_tags,
+        limit=max(1, limit),
+    )
+    ranked_items = []
+    for candidate in candidates:
+        score, reason_code, reason_label, reason_text = score_external_candidate(
+            candidate=candidate,
+            scene=scene,
+            seed_video=seed_video,
+            seed_profile=seed_profile,
+            user_tokens=user_tokens,
+            user_subject=user_subject,
+            focus_subject=query_context.subject,
+            focus_tags=query_context.preferred_tags,
+        )
+        ranked_items.append(
+            (
+                score,
+                candidate.upload_time or datetime.min,
+                serialize_external_candidate_item(
+                    candidate,
+                    score=score,
+                    reason_code=reason_code,
+                    reason_label=reason_label,
+                    reason_text=reason_text,
+                ),
+            )
+        )
+    ranked_items.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return ranked_items
+
+
+def select_combined_items(
+    *,
+    internal_items: list[tuple[float, datetime, dict]],
+    external_items: list[tuple[float, datetime, dict]],
+    limit: int,
+) -> list[dict]:
+    """按总条数挑选站内/站外混合结果，尽量保留双边入口。"""
+    if limit <= 1:
+        combined = sorted(internal_items + external_items, key=lambda item: (item[0], item[1]), reverse=True)
+        return [item[2] for item in combined[:limit]]
+    if not external_items:
+        return [item[2] for item in internal_items[:limit]]
+    if not internal_items:
+        return [item[2] for item in external_items[:limit]]
+
+    external_target = min(2 if limit >= 6 else 1, len(external_items))
+    internal_target = min(max(limit - external_target, 1), len(internal_items))
+
+    selected = internal_items[:internal_target] + external_items[:external_target]
+    internal_cursor = internal_target
+    external_cursor = external_target
+    while len(selected) < limit:
+        next_internal = internal_items[internal_cursor] if internal_cursor < len(internal_items) else None
+        next_external = external_items[external_cursor] if external_cursor < len(external_items) else None
+        if next_internal is None and next_external is None:
+            break
+        if next_external is not None and (
+            next_internal is None or (next_external[0], next_external[1]) > (next_internal[0], next_internal[1])
+        ):
+            selected.append(next_external)
+            external_cursor += 1
+        else:
+            selected.append(next_internal)
+            internal_cursor += 1
+
+    selected.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [item[2] for item in selected[:limit]]
+
+
+def recommend_videos(
+    *,
+    videos: list[Video],
+    scene: str,
+    limit: int,
+    seed_video: Optional[Video] = None,
+    user: Optional[User] = None,
+    exclude_ids: Optional[set[int]] = None,
+    include_external: bool = False,
+) -> dict:
+    """生成推荐视频列表。"""
+    normalized_scene = normalize_scene(scene)
+    exclude_ids = set(exclude_ids or set())
+    user_tokens = extract_user_interest_tokens(user)
+    user_subject = extract_user_subject(user)
+    now = datetime.utcnow()
+    profiles = {video.id: build_recommendation_profile(video) for video in videos}
+    seed_profile = profiles.get(seed_video.id) if seed_video is not None else None
+
+    internal_ranked_items = build_ranked_internal_items(
+        videos=videos,
+        scene=normalized_scene,
+        now=now,
+        seed_video=seed_video,
+        user_tokens=user_tokens,
+        user_subject=user_subject,
+        profiles=profiles,
+        exclude_ids=exclude_ids,
+    )
+    items = [item[2] for item in internal_ranked_items[:limit]]
+
+    if include_external:
+        query_context = build_external_query_context(
+            videos=videos,
+            profiles=profiles,
+            scene=normalized_scene,
+            seed_video=seed_video,
+            seed_profile=seed_profile,
+            user_subject=user_subject,
+        )
+        external_ranked_items = build_ranked_external_items(
+            query_context=query_context,
+            scene=normalized_scene,
+            seed_video=seed_video,
+            seed_profile=seed_profile,
+            user_tokens=user_tokens,
+            user_subject=user_subject,
+            limit=min(limit, 4),
+        )
+        items = select_combined_items(
+            internal_items=internal_ranked_items,
+            external_items=external_ranked_items,
+            limit=limit,
+        )
 
     fallback_used = False
     if not items and videos:
@@ -440,7 +772,7 @@ def recommend_videos(
 
     return {
         "scene": normalized_scene,
-        "strategy": "video_status_interest_v1",
+        "strategy": "video_status_interest_external_v2" if include_external else "video_status_interest_v1",
         "personalized": bool(user_tokens),
         "fallback_used": fallback_used,
         "seed_video_id": seed_video.id if seed_video is not None else None,

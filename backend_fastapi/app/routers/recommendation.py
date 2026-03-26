@@ -52,6 +52,7 @@ async def get_recommendation_scenes():
 async def get_video_recommendations(
     scene: str = Query(default="home", description="推荐场景：home/continue/review/related"),
     limit: int = Query(default=4, ge=1, le=12, description="返回条数"),
+    include_external: bool = Query(default=False, description="是否附带站外候选元数据"),
     seed_video_id: Optional[int] = Query(default=None, description="相关推荐的种子视频 ID"),
     exclude_video_ids: Optional[str] = Query(default=None, description="排除的视频 ID，逗号分隔"),
     user_id: Optional[int] = Query(default=None, description="兼容旧链路的用户 ID"),
@@ -80,6 +81,7 @@ async def get_video_recommendations(
         seed_video=seed_video,
         user=user,
         exclude_ids=parse_exclude_ids(exclude_video_ids),
+        include_external=include_external,
     )
     payload["message"] = "获取推荐视频成功"
     return payload
