@@ -1,0 +1,374 @@
+"""站外候选轻量元数据服务。"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+from dataclasses import dataclass
+from datetime import datetime
+from html import unescape
+from typing import Optional
+from urllib.parse import quote_plus
+
+import requests
+from app.services.video_content_service import build_subject_enriched_tags
+from app.services.video_content_service import fallback_primary_topic_name
+from app.services.video_content_service import infer_subject_from_text
+
+logger = logging.getLogger(__name__)
+
+REQUEST_TIMEOUT_SECONDS = 8
+COMMON_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
+    )
+}
+VIDEO_LINK_RE = re.compile(r"href=\"//www\.bilibili\.com/video/([^\"]+)\"")
+VIDEO_TITLE_RE = re.compile(r"bili-video-card__info--tit[^>]*title=\"([^\"]+)\"")
+VIDEO_AUTHOR_RE = re.compile(r"<span class=\"bili-video-card__info--author\"[^>]*>(.*?)</span>", re.S)
+VIDEO_DATE_RE = re.compile(r"<span class=\"bili-video-card__info--date\"[^>]*>(.*?)</span>", re.S)
+YOUTUBE_INITIAL_DATA_RE = re.compile(r"var ytInitialData = (\{.*?\});", re.S)
+
+
+@dataclass
+class ExternalCandidate:
+    """站外候选元数据。"""
+
+    id: str
+    provider: str
+    source_label: str
+    title: str
+    external_url: str
+    summary: str = ""
+    tags: list[str] | None = None
+    author: str = ""
+    upload_time: Optional[datetime] = None
+    subject: str = ""
+    primary_topic: str = ""
+    cluster_key: str = ""
+
+    def __post_init__(self):
+        self.tags = list(self.tags or [])
+
+
+def clean_text(value: str) -> str:
+    """清理 HTML/文本中的空白。"""
+    text = re.sub(r"<[^>]+>", " ", unescape(str(value or "")))
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def parse_date_text(value: str) -> Optional[datetime]:
+    """尝试解析页面里出现的日期文本。"""
+    text = clean_text(value).strip("· ").strip()
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def dedupe_keep_order(values: list[str]) -> list[str]:
+    """按原顺序去重。"""
+    seen = set()
+    ordered = []
+    for value in values:
+        normalized = clean_text(value)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        ordered.append(normalized)
+    return ordered
+
+
+def enrich_candidate_tags(
+    *,
+    title: str,
+    summary: str,
+    tags: list[str],
+    subject_hint: str = "",
+) -> tuple[list[str], str, str, str]:
+    """统一站外候选的科目与主题画像。"""
+    seed_tags = [subject_hint, *tags] if subject_hint else tags
+    normalized_tags = build_subject_enriched_tags(seed_tags, title=title, summary=summary, max_tags=8)
+    subject = infer_subject_from_text(tags=normalized_tags, title=title, summary=summary) or subject_hint
+    primary_topic = fallback_primary_topic_name(summary, tags=normalized_tags, title=title, max_length=24)
+    cluster_basis = primary_topic or (normalized_tags[1] if len(normalized_tags) > 1 else subject)
+    cluster_key = "::".join([part for part in [subject, cluster_basis] if part])
+    return normalized_tags, subject, primary_topic, cluster_key
+
+
+class ExternalCandidateAdapter:
+    """站外候选适配器基类。"""
+
+    provider = "external"
+    source_label = "站外候选"
+
+    def search(
+        self,
+        query_text: str,
+        *,
+        subject_hint: str = "",
+        preferred_tags: Optional[list[str]] = None,
+        limit: int = 2,
+    ) -> list[ExternalCandidate]:
+        raise NotImplementedError
+
+    def build_candidate(
+        self,
+        *,
+        raw_id: str,
+        title: str,
+        external_url: str,
+        summary: str = "",
+        author: str = "",
+        upload_time: Optional[datetime] = None,
+        tags: Optional[list[str]] = None,
+        subject_hint: str = "",
+    ) -> ExternalCandidate:
+        normalized_tags, subject, primary_topic, cluster_key = enrich_candidate_tags(
+            title=title,
+            summary=summary,
+            tags=list(tags or []),
+            subject_hint=subject_hint,
+        )
+        return ExternalCandidate(
+            id=f"{self.provider}:{raw_id}",
+            provider=self.provider,
+            source_label=self.source_label,
+            title=clean_text(title),
+            external_url=external_url,
+            summary=clean_text(summary),
+            tags=normalized_tags,
+            author=clean_text(author),
+            upload_time=upload_time,
+            subject=subject,
+            primary_topic=primary_topic,
+            cluster_key=cluster_key,
+        )
+
+
+class BilibiliExternalCandidateAdapter(ExternalCandidateAdapter):
+    """B 站搜索结果适配器。"""
+
+    provider = "bilibili"
+    source_label = "B站"
+    search_url = "https://search.bilibili.com/all"
+
+    def search(
+        self,
+        query_text: str,
+        *,
+        subject_hint: str = "",
+        preferred_tags: Optional[list[str]] = None,
+        limit: int = 2,
+    ) -> list[ExternalCandidate]:
+        response = requests.get(
+            self.search_url,
+            params={"keyword": query_text},
+            headers=COMMON_HEADERS,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        html = response.text
+        titles = [clean_text(item) for item in VIDEO_TITLE_RE.findall(html)]
+        links = dedupe_keep_order(VIDEO_LINK_RE.findall(html))
+        authors = [clean_text(item) for item in VIDEO_AUTHOR_RE.findall(html)]
+        dates = [parse_date_text(item) for item in VIDEO_DATE_RE.findall(html)]
+
+        candidates = []
+        for index, title in enumerate(titles[: max(1, limit)]):
+            video_path = links[index] if index < len(links) else ""
+            if not video_path:
+                continue
+            author = authors[index] if index < len(authors) else ""
+            upload_time = dates[index] if index < len(dates) else None
+            summary = f"来自 B站 的 {query_text} 相关视频。"
+            if author:
+                summary = f"{summary} 作者：{author}。"
+            candidate = self.build_candidate(
+                raw_id=video_path.strip("/"),
+                title=title,
+                external_url=f"https://www.bilibili.com/video/{video_path.strip('/')}",
+                summary=summary,
+                author=author,
+                upload_time=upload_time,
+                tags=list(preferred_tags or []),
+                subject_hint=subject_hint,
+            )
+            candidates.append(candidate)
+        return candidates
+
+
+class YouTubeExternalCandidateAdapter(ExternalCandidateAdapter):
+    """YouTube 搜索结果适配器。"""
+
+    provider = "youtube"
+    source_label = "YouTube"
+    search_url = "https://www.youtube.com/results"
+
+    def search(
+        self,
+        query_text: str,
+        *,
+        subject_hint: str = "",
+        preferred_tags: Optional[list[str]] = None,
+        limit: int = 2,
+    ) -> list[ExternalCandidate]:
+        response = requests.get(
+            self.search_url,
+            params={"search_query": query_text},
+            headers=COMMON_HEADERS,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        matched = YOUTUBE_INITIAL_DATA_RE.search(response.text)
+        if not matched:
+            return []
+
+        try:
+            payload = json.loads(matched.group(1))
+        except json.JSONDecodeError:
+            logger.warning("YouTube 搜索结果解析失败 | query=%s", query_text)
+            return []
+
+        renderers = []
+        self._walk_video_renderers(payload, renderers)
+        candidates = []
+        for renderer in renderers[: max(1, limit)]:
+            video_id = str(renderer.get("videoId") or "").strip()
+            title = clean_text("".join(run.get("text", "") for run in renderer.get("title", {}).get("runs", [])))
+            if not video_id or not title:
+                continue
+            author = clean_text("".join(run.get("text", "") for run in renderer.get("ownerText", {}).get("runs", [])))
+            description = clean_text(
+                "".join(run.get("text", "") for run in (renderer.get("descriptionSnippet") or {}).get("runs", []))
+            )
+            if not description:
+                description = clean_text(
+                    "".join(
+                        run.get("text", "")
+                        for run in (renderer.get("detailedMetadataSnippets") or [{}])[0]
+                        .get("snippetText", {})
+                        .get("runs", [])
+                    )
+                )
+            published_text = clean_text((renderer.get("publishedTimeText") or {}).get("simpleText", ""))
+            summary = description or f"来自 YouTube 的 {query_text} 相关视频。"
+            if published_text:
+                summary = f"{summary} 发布时间：{published_text}。"
+            candidate = self.build_candidate(
+                raw_id=video_id,
+                title=title,
+                external_url=f"https://www.youtube.com/watch?v={video_id}",
+                summary=summary,
+                author=author,
+                tags=list(preferred_tags or []),
+                subject_hint=subject_hint,
+            )
+            candidates.append(candidate)
+        return candidates
+
+    def _walk_video_renderers(self, node, renderers: list[dict]):
+        if isinstance(node, dict):
+            if "videoRenderer" in node:
+                renderers.append(node["videoRenderer"])
+            for value in node.values():
+                self._walk_video_renderers(value, renderers)
+        elif isinstance(node, list):
+            for item in node:
+                self._walk_video_renderers(item, renderers)
+
+
+class MoocExternalCandidateAdapter(ExternalCandidateAdapter):
+    """中国大学慕课搜索页适配器。"""
+
+    provider = "icourse163"
+    source_label = "中国大学慕课"
+    search_url = "https://www.icourse163.org/search.htm"
+
+    def search(
+        self,
+        query_text: str,
+        *,
+        subject_hint: str = "",
+        preferred_tags: Optional[list[str]] = None,
+        limit: int = 1,
+    ) -> list[ExternalCandidate]:
+        response = requests.get(
+            self.search_url,
+            params={"search": query_text},
+            headers=COMMON_HEADERS,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        title_match = re.search(r"<title>\s*([^<]+)\s*</title>", response.text)
+        page_title = clean_text(title_match.group(1) if title_match else "搜索课程_中国大学MOOC(慕课)")
+        if not page_title:
+            return []
+
+        candidate = self.build_candidate(
+            raw_id=quote_plus(query_text),
+            title=f"中国大学慕课 · {query_text} 相关课程",
+            external_url=f"{self.search_url}?search={quote_plus(query_text)}",
+            summary=f"打开中国大学慕课搜索页，继续查看 {query_text} 相关课程。页面标题：{page_title}。",
+            tags=list(preferred_tags or []),
+            subject_hint=subject_hint,
+        )
+        return [candidate][: max(1, limit)]
+
+
+EXTERNAL_CANDIDATE_ADAPTERS: tuple[ExternalCandidateAdapter, ...] = (
+    BilibiliExternalCandidateAdapter(),
+    YouTubeExternalCandidateAdapter(),
+    MoocExternalCandidateAdapter(),
+)
+
+
+def fetch_external_candidates(
+    query_text: str,
+    *,
+    subject_hint: str = "",
+    preferred_tags: Optional[list[str]] = None,
+    limit: int = 3,
+) -> list[ExternalCandidate]:
+    """按统一接口抓取站外候选元数据。"""
+    normalized_query = clean_text(query_text)
+    if not normalized_query:
+        return []
+
+    candidates = []
+    seen_urls = set()
+    per_provider_limit = 1 if limit <= 3 else 2
+    for adapter in EXTERNAL_CANDIDATE_ADAPTERS:
+        try:
+            provider_items = adapter.search(
+                normalized_query,
+                subject_hint=subject_hint,
+                preferred_tags=list(preferred_tags or []),
+                limit=per_provider_limit,
+            )
+        except requests.RequestException as exc:
+            logger.warning(
+                "站外候选抓取失败 | provider=%s | query=%s | error=%s", adapter.provider, normalized_query, exc
+            )
+            continue
+        except Exception as exc:
+            logger.warning(
+                "站外候选解析失败 | provider=%s | query=%s | error=%s", adapter.provider, normalized_query, exc
+            )
+            continue
+
+        for item in provider_items:
+            if not item.external_url or item.external_url in seen_urls:
+                continue
+            seen_urls.add(item.external_url)
+            candidates.append(item)
+            if len(candidates) >= limit:
+                return candidates[:limit]
+
+    return candidates[:limit]
