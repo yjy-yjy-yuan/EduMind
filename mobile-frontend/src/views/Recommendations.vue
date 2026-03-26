@@ -2,9 +2,9 @@
   <div class="ios-page recommendations-page">
     <header class="hero ios-card">
       <div class="hero__copy">
-        <p class="hero__eyebrow">推荐学习</p>
-        <h1 class="hero__title gradient-text">先看站内主题，再接回站外导入</h1>
-        <p class="hero__desc">继续学习、复盘推荐、相关推荐和站外导入入口都收在这里，避免推荐链路散在多个页面。</p>
+        <p class="hero__eyebrow">Recommendation Hub</p>
+        <h1 class="hero__title">推荐学习中枢</h1>
+        <p class="hero__desc">先看站内主题，再扩到相近内容，最后把站外候选送回导入链路，让推荐动作本身也保持清晰和克制。</p>
       </div>
       <div class="hero__actions">
         <button type="button" class="hero-btn hero-btn--ghost" @click="go('/upload')">去上传</button>
@@ -17,7 +17,37 @@
         <div class="hero-stat"><span>主题</span><strong>{{ tagClusters.length }}</strong></div>
         <div class="hero-stat"><span>入口</span><strong>{{ providerShortcuts.length }}</strong></div>
       </div>
+      <div class="hero__notice">
+        <strong>这一页先帮你决定下一步学什么。</strong>
+        <span>站内内容会直接打开详情，站外候选只做元数据推荐，点击后会带着链接进入导入学习链路。</span>
+      </div>
     </header>
+
+    <section class="panel panel--compact ios-card">
+      <div class="section-head">
+        <div>
+          <h2>推荐路线</h2>
+          <p>先看当前场景，再按标签收窄，最后把站外候选导回学习系统，避免推荐和学习流程脱节。</p>
+        </div>
+      </div>
+      <div class="journey-grid">
+        <article class="journey-card">
+          <span class="journey-card__step">01</span>
+          <strong class="journey-card__title">选当前场景</strong>
+          <span class="journey-card__desc">先决定是继续学习、复盘，还是围绕某条内容扩相关推荐。</span>
+        </article>
+        <article class="journey-card">
+          <span class="journey-card__step">02</span>
+          <strong class="journey-card__title">收窄主题</strong>
+          <span class="journey-card__desc">用标签把当前推荐范围收紧，避免在多个主题之间反复跳。</span>
+        </article>
+        <article class="journey-card">
+          <span class="journey-card__step">03</span>
+          <strong class="journey-card__title">导入站外候选</strong>
+          <span class="journey-card__desc">看准站外内容后直接导入，不把它误当成已入库视频。</span>
+        </article>
+      </div>
+    </section>
 
     <section class="panel ios-card">
       <div class="section-head">
@@ -117,6 +147,32 @@
       </div>
     </section>
 
+    <section class="panel panel--compact ios-card">
+      <div class="section-head">
+        <div>
+          <h2>来源总览</h2>
+          <p>先确认这一屏推荐主要来自哪里，再决定是继续看站内内容还是导入站外候选。</p>
+        </div>
+      </div>
+      <div class="source-grid">
+        <article class="source-card">
+          <span class="source-card__label">站内内容</span>
+          <strong class="source-card__value">{{ internalItemCount }}</strong>
+          <span class="source-card__desc">已进入视频库，可直接打开详情继续学习。</span>
+        </article>
+        <article class="source-card source-card--soft">
+          <span class="source-card__label">站外候选</span>
+          <strong class="source-card__value">{{ externalItems.length }}</strong>
+          <span class="source-card__desc">点击后会带着链接进入导入学习链路。</span>
+        </article>
+        <article class="source-card">
+          <span class="source-card__label">来源平台</span>
+          <strong class="source-card__value">{{ externalSourceCount }}</strong>
+          <span class="source-card__desc">{{ externalSourceSummary }}</span>
+        </article>
+      </div>
+    </section>
+
     <section class="panel ios-card">
       <div class="section-head">
         <div>
@@ -126,6 +182,9 @@
         <button type="button" class="panel-link" @click="refreshActiveScene" :disabled="activeSceneLoading">
           {{ activeSceneLoading ? '刷新中…' : '刷新本场景' }}
         </button>
+      </div>
+      <div v-if="filteredSceneExternalCount > 0" class="message message--hint">
+        当前场景里已混入 {{ filteredSceneExternalCount }} 条站外候选，点击后会先进入导入学习，不会直接当作站内视频播放。
       </div>
       <div v-if="activeSceneError" class="message message--error">
         <span>{{ activeSceneError }}</span>
@@ -216,14 +275,27 @@
       <div class="section-head">
         <div>
           <h2>站外候选入口</h2>
-          <p>当前先把 UI 和导入动线搭好。等后端接入 RSS / 抓取后，这里会直接展示真实外部推荐卡片。</p>
+          <p>这里不是直接播放区，而是把外部内容清晰地带回现有导入学习链路。</p>
         </div>
+      </div>
+      <div class="message message--hint">
+        站外候选只展示推荐元数据。点“导入学习”后，会把链接带到上传页，再走现有下载、处理和复盘流程。
       </div>
       <div v-if="externalItems.length > 0" class="card-list">
         <article v-for="item in externalItems" :key="item.key" class="external-card">
-          <span class="badge badge--external">{{ item.sourceLabel }}</span>
+          <div class="recommend-card__top">
+            <span class="badge badge--external">{{ item.sourceLabel }}</span>
+            <span class="badge badge--reason">{{ item.reasonLabel }}</span>
+          </div>
           <strong class="related-card__title">{{ item.title }}</strong>
           <p class="related-card__desc">{{ item.summaryText }}</p>
+          <div v-if="item.tags.length > 0" class="mini-tags">
+            <span v-for="tag in item.tags.slice(0, 3)" :key="`${item.key}-external-${tag}`" class="mini-tag">{{ tag }}</span>
+          </div>
+          <div class="recommend-card__meta">
+            <span>{{ item.sourceLabel }}</span>
+            <span v-if="item.timeText">{{ item.timeText }}</span>
+          </div>
           <button type="button" class="action-btn action-btn--primary" @click="openRecommendation(item)">导入学习</button>
         </article>
       </div>
@@ -372,6 +444,13 @@ const filteredRelatedItems = computed(() => {
 const externalItems = computed(() => allLoadedItems.value.filter((item) => isExternalItem(item)))
 const filteredSceneExternalCount = computed(() => filteredSceneItems.value.filter((item) => isExternalItem(item)).length)
 const filteredSceneInternalCount = computed(() => filteredSceneItems.value.length - filteredSceneExternalCount.value)
+const internalItemCount = computed(() => Math.max(allLoadedItems.value.length - externalItems.value.length, 0))
+const externalSourceLabels = computed(() => Array.from(new Set(externalItems.value.map((item) => item.sourceLabel).filter(Boolean))))
+const externalSourceCount = computed(() => externalSourceLabels.value.length)
+const externalSourceSummary = computed(() => {
+  if (externalSourceLabels.value.length === 0) return '当前还没有外部候选来源。'
+  return externalSourceLabels.value.join(' / ')
+})
 const activeSceneLoading = computed(() => Boolean(sceneLoadingMap.value[activeScene.value]))
 const activeSceneError = computed(() => String(sceneErrorMap.value[activeScene.value] || '').trim())
 const sceneDescriptionText = computed(() => selectedTag.value ? `当前已按“${selectedTag.value}”筛选 ${activeSceneOption.value.label}。` : activeSceneOption.value.description)
@@ -483,54 +562,496 @@ onMounted(reloadAll)
 </script>
 
 <style scoped>
-.recommendations-page { display: grid; gap: 14px; padding-top: calc(16px + env(safe-area-inset-top)); }
-.hero,.panel { display: grid; gap: 14px; padding: 18px; border-radius: 24px; border: 1px solid rgba(24, 45, 73, 0.08); background: rgba(255, 255, 255, 0.76); box-shadow: 0 12px 28px rgba(24, 45, 73, 0.08); }
-.panel--compact { gap: 12px; }
-.hero { background: linear-gradient(155deg, rgba(255, 255, 255, 0.97) 0%, rgba(243, 251, 253, 0.92) 62%, rgba(231, 245, 249, 0.86) 100%); }
-.hero__eyebrow,.badge,.pill,.mini-tag { display: inline-flex; align-items: center; border-radius: 999px; font-size: 11px; font-weight: 800; }
-.hero__eyebrow,.badge--soft,.pill,.mini-tag { padding: 4px 10px; background: rgba(31, 122, 140, 0.12); color: var(--primary-deep); }
-.badge--reason { padding: 4px 10px; background: rgba(14, 99, 122, 0.12); color: #11556a; }
-.badge--external { padding: 4px 10px; background: rgba(235, 140, 52, 0.16); color: #8f4f12; }
-.badge--mint { padding: 4px 10px; background: rgba(31, 176, 135, 0.14); color: #0d7253; }
-.hero__title { margin-top: 8px; font-size: 30px; line-height: 1.08; }
-.hero__desc,.section-head p,.recommend-card__desc,.recommend-card__meta,.message,.tag-card__sample,.provider-card__desc,.related-card__desc,.seed-card__meta,.context-card__desc { color: var(--muted); }
-.hero__desc { margin-top: 8px; font-size: 14px; line-height: 1.6; }
-.hero__actions,.hero__stats,.scene-tabs,.tag-grid,.card-list,.provider-grid,.skeleton-list,.context-grid { display: grid; gap: 10px; }
-.hero__actions,.hero__stats,.provider-grid,.context-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.hero__actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.hero-btn,.scene-tab,.tag-card,.recommend-card,.related-card,.external-card,.provider-card,.action-btn,.context-action { border: 1px solid rgba(24, 45, 73, 0.08); background: rgba(255, 255, 255, 0.92); }
-.hero-btn,.action-btn,.context-action { border-radius: 14px; padding: 12px; font-size: 13px; font-weight: 900; }
-.hero-btn--primary,.action-btn--primary,.context-action--primary { border: 0; color: #f6feff; background: linear-gradient(135deg, #145b66, #1f7a8c); box-shadow: 0 8px 16px rgba(31, 122, 140, 0.2); }
-.hero-btn--ghost,.panel-link,.provider-card__cta,.context-action { color: var(--primary-deep); }
-.hero-stat,.seed-card,.context-card { display: grid; gap: 4px; border-radius: 16px; padding: 12px 14px; background: rgba(255, 255, 255, 0.74); border: 1px solid rgba(24, 45, 73, 0.08); }
-.hero-stat span,.seed-card__label,.context-card__label { font-size: 12px; font-weight: 700; color: var(--muted); }
-.hero-stat strong,.seed-card__title,.context-card__value { font-size: 22px; font-weight: 900; color: var(--text); }
-.context-card__value { font-size: 18px; line-height: 1.3; }
-.context-card__desc { font-size: 12px; line-height: 1.55; }
-.context-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-.context-action { padding-inline: 14px; }
-.section-head,.recommend-card__top,.recommend-card__meta,.recommend-card__actions,.related-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.section-head h2 { margin: 0; font-size: 18px; }
-.section-head p { margin-top: 4px; font-size: 13px; line-height: 1.55; }
-.panel-link { border: 0; background: transparent; font-size: 13px; font-weight: 800; }
-.scene-tab,.tag-card,.provider-card,.recommend-card,.external-card { width: 100%; text-align: left; }
-.scene-tab,.tag-card,.provider-card,.recommend-card,.related-card,.external-card { border-radius: 18px; padding: 14px; }
-.scene-tab { display: grid; gap: 6px; }
-.scene-tab--active,.tag-card--active { border-color: rgba(31, 122, 140, 0.24); background: linear-gradient(180deg, rgba(231, 247, 250, 0.92), rgba(255, 255, 255, 0.92)); }
-.scene-tab__label,.provider-card__name,.recommend-card__title,.related-card__title { font-size: 16px; font-weight: 900; color: #1f2a37; }
-.scene-tab__desc,.provider-card__desc,.related-card__desc,.recommend-card__desc,.tag-card__sample { font-size: 12px; line-height: 1.55; }
-.tag-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.tag-card { display: grid; gap: 4px; }
-.tag-card__name { font-size: 14px; font-weight: 900; color: #1f2a37; }
-.tag-card__count { font-size: 20px; font-weight: 900; color: var(--primary-deep); }
-.recommend-card,.external-card { display: grid; gap: 10px; }
-.mini-tags { display: flex; gap: 8px; flex-wrap: wrap; }
-.recommend-card__meta { font-size: 12px; }
-.related-card__copy { display: grid; gap: 6px; }
-.message { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 15px; border-radius: 16px; background: rgba(255, 255, 255, 0.8); border: 1px dashed rgba(24, 45, 73, 0.12); font-size: 13px; line-height: 1.55; }
-.message--error { color: var(--bad-text); background: rgba(255, 244, 244, 0.92); border-style: solid; border-color: rgba(214, 69, 69, 0.16); }
-.skeleton-card { height: 132px; border-radius: 18px; background: linear-gradient(90deg, rgba(240, 248, 250, 0.95), rgba(255, 255, 255, 0.95), rgba(240, 248, 250, 0.95)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
-.skeleton-card--short { height: 100px; }
-@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-@media (max-width: 720px) { .hero__actions,.hero__stats,.tag-grid,.provider-grid,.context-grid { grid-template-columns: 1fr; } }
+.recommendations-page {
+  display: grid;
+  gap: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top));
+  font-family: 'Avenir Next', 'SF Pro Display', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.hero,
+.panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 28px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(251, 245, 239, 0.97);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+}
+
+.panel--compact {
+  gap: 14px;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(251, 245, 239, 0.98), rgba(246, 238, 230, 0.96)),
+    radial-gradient(circle at top right, rgba(139, 121, 157, 0.12), transparent 34%),
+    radial-gradient(circle at 16% 100%, rgba(200, 171, 108, 0.12), transparent 28%);
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  width: 240px;
+  height: 240px;
+  top: -130px;
+  right: -100px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(15, 23, 42, 0.06) 0%, rgba(15, 23, 42, 0.01) 64%, transparent 72%);
+  pointer-events: none;
+}
+
+.hero__copy,
+.hero__actions,
+.hero__stats,
+.hero__notice {
+  position: relative;
+  z-index: 1;
+}
+
+.hero__eyebrow,
+.badge,
+.pill,
+.mini-tag {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero__eyebrow,
+.badge--soft,
+.pill,
+.mini-tag {
+  padding: 5px 10px;
+  background: var(--primary-soft);
+  color: var(--primary-deep);
+}
+
+.badge--reason {
+  padding: 5px 10px;
+  background: rgba(17, 24, 39, 0.06);
+  color: #1f2937;
+}
+
+.badge--external {
+  padding: 5px 10px;
+  background: var(--surface-gold);
+  color: var(--warn-text);
+}
+
+.badge--mint {
+  padding: 5px 10px;
+  background: rgba(243, 235, 215, 0.94);
+  color: var(--ok-text);
+}
+
+.hero__title {
+  margin-top: 10px;
+  font-size: 34px;
+  line-height: 1.03;
+  letter-spacing: -0.04em;
+  color: #111827;
+}
+
+.hero__desc,
+.section-head p,
+.recommend-card__desc,
+.recommend-card__meta,
+.message,
+.tag-card__sample,
+.provider-card__desc,
+.related-card__desc,
+.seed-card__meta,
+.context-card__desc,
+.journey-card__desc,
+.source-card__desc {
+  color: #6b7280;
+}
+
+.hero__desc {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.65;
+  max-width: 32rem;
+}
+
+.hero__actions,
+.hero__stats,
+.scene-tabs,
+.tag-grid,
+.card-list,
+.provider-grid,
+.skeleton-list,
+.context-grid,
+.journey-grid,
+.source-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.hero__actions,
+.hero__stats,
+.provider-grid,
+.context-grid,
+.journey-grid,
+.source-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.hero__actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scene-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hero-btn,
+.scene-tab,
+.tag-card,
+.recommend-card,
+.related-card,
+.external-card,
+.provider-card,
+.action-btn,
+.context-action {
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(251, 245, 239, 0.98);
+}
+
+.hero-btn,
+.action-btn,
+.context-action {
+  border-radius: 16px;
+  padding: 13px 14px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.hero-btn--primary,
+.action-btn--primary,
+.context-action--primary {
+  border: 0;
+  color: #f9fafb;
+  background: linear-gradient(135deg, #665775, #8b799d);
+  box-shadow: 0 16px 24px rgba(17, 24, 39, 0.16);
+}
+
+.hero-btn--ghost,
+.panel-link,
+.provider-card__cta,
+.context-action {
+  color: var(--primary-deep);
+}
+
+.hero-btn--ghost {
+  background: rgba(245, 236, 229, 0.96);
+}
+
+.hero-stat,
+.seed-card,
+.context-card,
+.journey-card,
+.source-card {
+  display: grid;
+  gap: 6px;
+  border-radius: 20px;
+  padding: 15px;
+  background: rgba(247, 239, 232, 0.94);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.hero-stat span,
+.seed-card__label,
+.context-card__label,
+.source-card__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.hero-stat strong,
+.seed-card__title,
+.context-card__value,
+.source-card__value {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #111827;
+}
+
+.context-card__value {
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.context-card__desc {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.hero__notice {
+  display: grid;
+  gap: 4px;
+  padding: 14px 15px;
+  border-radius: 20px;
+  background: rgba(245, 236, 229, 0.92);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
+}
+
+.hero__notice strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.journey-card__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary-deep);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.journey-card__title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.journey-card__desc,
+.source-card__desc {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.source-card--soft {
+  background: var(--surface-lilac);
+}
+
+.context-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.context-action {
+  padding-inline: 15px;
+}
+
+.section-head,
+.recommend-card__top,
+.recommend-card__meta,
+.recommend-card__actions,
+.related-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.section-head h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
+
+.section-head p {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  max-width: 31rem;
+}
+
+.panel-link {
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.scene-tab,
+.tag-card,
+.provider-card,
+.recommend-card,
+.external-card {
+  width: 100%;
+  text-align: left;
+}
+
+.scene-tab,
+.tag-card,
+.provider-card,
+.recommend-card,
+.related-card,
+.external-card {
+  border-radius: 20px;
+  padding: 16px;
+}
+
+.scene-tab {
+  display: grid;
+  gap: 8px;
+}
+
+.scene-tab--active,
+.tag-card--active {
+  border-color: var(--primary-soft-strong);
+  background: linear-gradient(180deg, rgba(240, 232, 245, 0.96), rgba(251, 245, 239, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.scene-tab__label,
+.provider-card__name,
+.recommend-card__title,
+.related-card__title {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.35;
+  color: #111827;
+}
+
+.scene-tab__desc,
+.provider-card__desc,
+.related-card__desc,
+.recommend-card__desc,
+.tag-card__sample {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.tag-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tag-card {
+  display: grid;
+  gap: 4px;
+}
+
+.tag-card__name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.tag-card__count {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--primary-deep);
+}
+
+.recommend-card,
+.external-card {
+  display: grid;
+  gap: 10px;
+}
+
+.mini-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recommend-card__meta {
+  font-size: 12px;
+}
+
+.related-card__copy {
+  display: grid;
+  gap: 6px;
+}
+
+.message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 15px;
+  border-radius: 18px;
+  background: rgba(247, 239, 232, 0.92);
+  border: 1px dashed rgba(17, 24, 39, 0.12);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.message--error {
+  color: #b45309;
+  background: var(--bad-bg);
+  border-style: solid;
+  border-color: rgba(217, 119, 6, 0.14);
+}
+
+.message--hint {
+  justify-content: flex-start;
+  color: var(--primary-deep);
+  background: var(--surface-lilac);
+  border-style: solid;
+  border-color: var(--primary-soft);
+}
+
+.skeleton-card {
+  height: 132px;
+  border-radius: 20px;
+  background: linear-gradient(90deg, #f5f5f1, #eceee7, #f5f5f1);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.skeleton-card--short {
+  height: 100px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero,
+  .panel {
+    padding: 18px;
+  }
+
+  .hero__actions,
+  .hero__stats,
+  .scene-tabs,
+  .tag-grid,
+  .provider-grid,
+  .context-grid,
+  .journey-grid,
+  .source-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero__title {
+    font-size: 30px;
+  }
+}
 </style>
