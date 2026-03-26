@@ -213,6 +213,50 @@ QA_MAX_HISTORY_CHARS=2200
 3. 若希望默认问答走 DeepSeek，可将 `QA_DEFAULT_PROVIDER` 改为 `deepseek`。
 4. 当前版本不要求修改现有 MySQL `questions` 表；数据库继续只保存基础问答记录，视频问答空间隔离以前端本地缓存与请求参数为准。
 
+## 设计助手（接入 agent-skills / Sleek）
+
+你提供的 `agent-skills` 仓库本质上是 Sleek API 的技能说明，而不是可直接放进 `mobile-frontend/` 的组件包。当前仓库已经按 EduMind 的 iOS-only 架构，将它收敛为一条新的后端代理链路：
+
+1. `backend_fastapi/` 负责保存 `SLEEK_API_KEY`，统一代理 `projects`、`components`、`chat runs`、`screenshots`
+2. `mobile-frontend/` 新增“设计助手”页面，只调用 EduMind 自己的 `/api/design/*`
+3. `ios-app/` 无需直连 Sleek，也不会暴露第三方 API Key
+
+启用步骤：
+
+```bash
+cp backend_fastapi/.env.example backend_fastapi/.env
+# 在 backend_fastapi/.env 中补齐：
+# SLEEK_API_KEY=...
+python backend_fastapi/run.py
+```
+
+需要的 Sleek scope 至少包括：
+
+1. `projects:read`
+2. `projects:write`
+3. `components:read`
+4. `chats:read`
+5. `chats:write`
+6. `screenshots`
+
+当前新增的 EduMind 后端接口：
+
+1. `GET /api/design/status`
+2. `GET /api/design/projects`
+3. `POST /api/design/projects`
+4. `GET /api/design/projects/{project_id}/components`
+5. `GET /api/design/projects/{project_id}/components/{component_id}`
+6. `POST /api/design/projects/{project_id}/messages`
+7. `GET /api/design/projects/{project_id}/runs/{run_id}`
+8. `POST /api/design/projects/{project_id}/screenshots`
+
+移动端入口位于“我的”页中的“设计助手”。当前流程支持：
+
+1. 创建或选择 Sleek 项目
+2. 直接输入自然语言描述生成页面
+3. 自动回显生成结果截图
+4. 查看生成组件的 HTML 原型
+
 ## MySQL 表管理
 
 当前后端显式管理的业务表只有 6 张：

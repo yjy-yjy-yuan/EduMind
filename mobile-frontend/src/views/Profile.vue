@@ -70,6 +70,7 @@
 
       <button class="btn" @click="go('/videos')">我的视频</button>
       <button class="btn" @click="go('/notes')">我的笔记</button>
+      <button class="btn" @click="go('/design-assistant')">设计助手</button>
       <button class="danger" @click="doLogout" :disabled="loading">退出登录</button>
     </div>
 

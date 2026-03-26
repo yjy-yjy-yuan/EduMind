@@ -64,6 +64,25 @@ python run.py
 - 头像上传接口会把文件保存到 `backend_fastapi/uploads/avatars/`，并将访问路径写入现有 `users.avatar` 字段，不新增附件表。
 - 执行 `python scripts/init_db.py --create` 时，会自动为已有 `users` 表补齐手机号、密码重复检测指纹和登录次数字段。
 
+## 设计助手代理
+
+当前已把 `agent-skills` 对应的 Sleek 能力接入为 EduMind 后端代理，而不是让移动端直接请求第三方：
+
+- 配置项：`SLEEK_API_KEY`、`SLEEK_API_BASE`
+- 路由前缀：`/api/design/*`
+- 设计结果：支持项目列表、项目创建、聊天生成、运行状态查询、组件 HTML 拉取、截图预览
+
+建议在 Sleek 控制台创建最小权限 key，并至少授予：
+
+- `projects:read`
+- `projects:write`
+- `components:read`
+- `chats:read`
+- `chats:write`
+- `screenshots`
+
+这些接口当前要求 EduMind 用户已登录，前端会自动带上现有 Bearer token。
+
 ## 测试
 
 ```bash
