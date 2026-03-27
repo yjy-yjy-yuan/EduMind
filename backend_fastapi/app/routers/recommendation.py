@@ -5,12 +5,12 @@ from typing import Optional
 from app.core.database import get_db
 from app.models.user import User
 from app.models.video import Video
-from app.routers.video import build_processing_options
-from app.routers.video import serialize_video
 from app.schemas.recommendation import RecommendationSceneListResponse
 from app.schemas.recommendation import VideoRecommendationResponse
 from app.schemas.video import VideoUploadResponse
 from app.schemas.video import VideoUploadURL
+from app.services.video_api_service import build_processing_options
+from app.services.video_api_service import serialize_video
 from app.services.video_recommendation_service import SCENE_MAP
 from app.services.video_recommendation_service import list_recommendation_scenes
 from app.services.video_recommendation_service import normalize_scene
