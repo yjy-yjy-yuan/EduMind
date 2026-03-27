@@ -10,7 +10,10 @@ from datetime import datetime
 from html import unescape
 from time import perf_counter
 from typing import Optional
+from urllib.parse import parse_qs
 from urllib.parse import quote_plus
+from urllib.parse import unquote
+from urllib.parse import urlparse
 
 import requests
 from app.services.video_content_service import build_subject_enriched_tags
@@ -31,6 +34,10 @@ VIDEO_TITLE_RE = re.compile(r"bili-video-card__info--tit[^>]*title=\"([^\"]+)\""
 VIDEO_AUTHOR_RE = re.compile(r"<span class=\"bili-video-card__info--author\"[^>]*>(.*?)</span>", re.S)
 VIDEO_DATE_RE = re.compile(r"<span class=\"bili-video-card__info--date\"[^>]*>(.*?)</span>", re.S)
 YOUTUBE_INITIAL_DATA_RE = re.compile(r"var ytInitialData = (\{.*?\});", re.S)
+DUCKDUCKGO_RESULT_RE = re.compile(
+    r'<a[^>]*class="result__a"[^>]*href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>',
+    re.S,
+)
 
 
 @dataclass
@@ -185,6 +192,48 @@ def dedupe_keep_order(values: list[str]) -> list[str]:
         seen.add(normalized)
         ordered.append(normalized)
     return ordered
+
+
+def decode_duckduckgo_result_url(raw_url: str) -> str:
+    """解析 DuckDuckGo 跳转 URL 中的真实目标。"""
+    parsed = urlparse(str(raw_url or "").strip())
+    if parsed.netloc.endswith("duckduckgo.com") and parsed.path.startswith("/l/"):
+        target = parse_qs(parsed.query).get("uddg", [""])[0]
+        return unquote(target).strip()
+    if raw_url.startswith("//duckduckgo.com/l/?"):
+        parsed = urlparse(f"https:{raw_url}")
+        target = parse_qs(parsed.query).get("uddg", [""])[0]
+        return unquote(target).strip()
+    return str(raw_url or "").strip()
+
+
+def parse_duckduckgo_result_entries(html: str, *, limit: int) -> list[tuple[str, str]]:
+    """提取 DuckDuckGo HTML 搜索结果中的标题和真实链接。"""
+    entries = []
+    seen_urls = set()
+    for matched in DUCKDUCKGO_RESULT_RE.finditer(str(html or "")):
+        external_url = decode_duckduckgo_result_url(matched.group("href"))
+        title = clean_text(matched.group("title"))
+        if not external_url or not title or external_url in seen_urls:
+            continue
+        seen_urls.add(external_url)
+        entries.append((title, external_url))
+        if len(entries) >= max(1, limit):
+            break
+    return entries
+
+
+def build_mooc_search_query(
+    query_text: str, *, subject_hint: str = "", preferred_tags: Optional[list[str]] = None
+) -> str:
+    """构建中国大学慕课课程页检索词。"""
+    parts = ["site:icourse163.org/learn"]
+    if subject_hint:
+        parts.append(subject_hint)
+    if preferred_tags:
+        parts.extend(preferred_tags[:2])
+    parts.append(query_text)
+    return " ".join(part for part in parts if clean_text(part))
 
 
 def enrich_candidate_tags(
@@ -396,6 +445,46 @@ class MoocExternalCandidateAdapter(ExternalCandidateAdapter):
     provider = "icourse163"
     source_label = "中国大学慕课"
     search_url = "https://www.icourse163.org/search.htm"
+    course_search_url = "https://html.duckduckgo.com/html/"
+
+    def search_course_pages(
+        self,
+        query_text: str,
+        *,
+        subject_hint: str = "",
+        preferred_tags: Optional[list[str]] = None,
+        limit: int = 1,
+    ) -> list[ExternalCandidate]:
+        search_query = build_mooc_search_query(
+            query_text,
+            subject_hint=subject_hint,
+            preferred_tags=preferred_tags,
+        )
+        response = requests.get(
+            self.course_search_url,
+            params={"q": search_query},
+            headers=COMMON_HEADERS,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        response.raise_for_status()
+        entries = parse_duckduckgo_result_entries(response.text, limit=max(1, limit * 3))
+        candidates = []
+        for title, external_url in entries:
+            if "icourse163.org/learn/" not in external_url:
+                continue
+            candidate = self.build_candidate(
+                raw_id=external_url.rstrip("/").split("/")[-1].split("?")[0] or quote_plus(query_text),
+                title=title,
+                external_url=external_url,
+                summary=f"来自中国大学慕课的 {query_text} 相关课程，可直接进入课程页后导入学习。",
+                tags=list(preferred_tags or []),
+                subject_hint=subject_hint,
+                can_import=True,
+            )
+            candidates.append(candidate)
+            if len(candidates) >= max(1, limit):
+                break
+        return candidates
 
     def search(
         self,
@@ -405,6 +494,15 @@ class MoocExternalCandidateAdapter(ExternalCandidateAdapter):
         preferred_tags: Optional[list[str]] = None,
         limit: int = 1,
     ) -> list[ExternalCandidate]:
+        course_candidates = self.search_course_pages(
+            query_text,
+            subject_hint=subject_hint,
+            preferred_tags=preferred_tags,
+            limit=limit,
+        )
+        if course_candidates:
+            return course_candidates
+
         response = requests.get(
             self.search_url,
             params={"search": query_text},

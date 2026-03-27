@@ -780,6 +780,40 @@
 
 ## 2026-03-27
 
+### 强化推荐接口编排信息
+
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：为站内视频和站外候选统一补充 `provider`、`action_type`、`action_label`、`action_target` 等动作字段，并在推荐结果中新增站内/站外数量统计、来源分布汇总和站外检索上下文摘要，方便前端按“打开详情 / 导入学习”两类动作直接消费。
+- 更新 [`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)：扩展推荐返回 schema，增加来源统计和站外检索摘要结构，保持现有推荐接口向后兼容。
+- 更新 [`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)、[`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)：补充推荐动作目标、来源统计和站外检索摘要测试，确保新字段在 service 与 API 两层都稳定返回。
+
+## 2026-03-27
+
+### 增强站外 provider 可观测性与失败摘要
+
+- 更新 [`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)：为 B 站、YouTube、中国大学慕课等站外 provider 增加抓取报告结构，记录每个 provider 的状态、候选数量、失败摘要和耗时，并在抓取失败时输出 DEBUG 级别日志到后端运行终端。
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)：将 provider 级抓取摘要接入推荐接口返回，新增 `external_providers`、`external_failed_provider_count`、`external_fetch_failed`，让前端或调试面板可以直接看到本次站外抓取成功/失败情况。
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)：根据 `settings.DEBUG` 自动设置日志级别，确保本地开发运行时可以直接看到站外 provider 抓取失败的 DEBUG 输出。
+- 更新 [`backend_fastapi/tests/unit/test_external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_external_candidate_service.py)、[`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)、[`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)：补充 provider 报告、失败摘要和推荐接口可观测性字段测试，覆盖抓取失败不阻断主路径的场景。
+
+## 2026-03-27
+
+### 补全推荐候选直连下载入库链路
+
+- 新增 [`backend_fastapi/app/services/video_url_import_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_url_import_service.py)：抽出远程视频链接导入共享服务，统一处理外部 URL 来源识别、重复提交去重、下载中记录创建、预填摘要/标签写回以及后台下载任务提交，避免推荐导入和普通 URL 上传各自维护一套逻辑。
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)：让原有 `/api/videos/upload-url` 支持接收推荐候选的 `title`、`summary`、`tags` 预填元数据，下载前先写入 `videos` 记录，保证入库后立刻保留推荐侧的上下文信息。
+- 更新 [`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)、[`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)、[`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)：新增 `/api/recommendations/import-external` 直连入库接口，并在推荐条目中显式返回 `can_import`、`import_hint`、`action_api`、`action_method`，同时把中国大学慕课搜索页候选标记为“暂不可直接导入”，避免前端继续把不可下载的搜索页当成可入库视频。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)、[`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)、[`backend_fastapi/tests/unit/test_external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_external_candidate_service.py)、[`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)：补充推荐候选直连入库、推荐元数据预填持久化和慕课候选不可导入标记测试，覆盖推荐到视频入库的主路径。
+
+## 2026-03-27
+
+### 强化慕课课程页解析与上传后自动推荐触发
+
+- 更新 [`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)：为中国大学慕课 provider 增加“搜索词 -> 具体课程页”解析链路，优先通过公开搜索结果定位 `icourse163.org/learn/...` 课程页，再把课程详情页作为可导入候选返回；仅在无法解析课程页时才回退为不可直接导入的搜索页候选。
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)：在本地上传和 URL 上传成功响应里自动附带一份实时推荐结果，上传后立即触发推荐获取，不再要求用户额外点击按钮才能拿到下一步推荐内容。
+- 更新 [`backend_fastapi/tests/unit/test_external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_external_candidate_service.py)、[`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充慕课课程页解析与上传后自动返回推荐结果的回归测试，覆盖“上传即得推荐”和“慕课候选真正可导入”两条主路径。
+
+## 2026-03-27
+
 ### 明确后端测试目录结构
 
 - 新增 [`backend_fastapi/tests/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)：明确 `unit/`、`api/`、`smoke/`、`integration/` 的职责边界和测试文件命名规则，统一后端测试入口，避免测试继续散落到业务目录。
