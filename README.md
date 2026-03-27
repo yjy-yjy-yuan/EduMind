@@ -82,6 +82,24 @@ bash ios-app/sync_ios_web_assets.sh
 2. 读取 `backend_fastapi/.env` 中的 `PORT`，自动刷新 iOS 真机默认后端地址
 3. 将最新 `dist/` 同步到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
 
+## 后端测试目录
+
+后端测试已经统一放在 [backend_fastapi/tests](/Users/yuan/final-work/EduMind/backend_fastapi/tests)：
+
+- `backend_fastapi/tests/unit/`：单元测试
+- `backend_fastapi/tests/api/`：接口测试
+- `backend_fastapi/tests/smoke/`：冒烟测试
+- `backend_fastapi/tests/integration/`：集成测试
+
+执行方式：
+
+```bash
+. .venv/bin/activate
+pytest backend_fastapi/tests/ -v
+```
+
+更具体的测试放置规则见 [backend_fastapi/tests/README.md](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)。
+
 ## Blitz / Codex CLI 开发工作流
 
 面向 Blitz、Codex CLI、Claude Code 等本地代码代理，当前仓库新增了 4 个统一脚本：

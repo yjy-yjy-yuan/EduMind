@@ -777,3 +777,10 @@
 - 新增 [`backend_fastapi/tests/api/test_design_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_design_api.py)：补充设计助手接口测试，覆盖鉴权、项目列表、项目创建、设计生成截图回显与组件 HTML 拉取主路径。
 - 新增 [`mobile-frontend/src/api/design.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/design.js)、[`mobile-frontend/src/views/DesignAssistant.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/DesignAssistant.vue)：为移动端新增“设计助手”页面，支持选择或创建 Sleek 项目、提交自然语言设计描述、查看生成截图和读取组件 HTML 原型。
 - 更新 [`mobile-frontend/src/router/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/router/index.js)、[`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)、[`mobile-frontend/README.md`](/Users/yuan/final-work/EduMind/mobile-frontend/README.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：新增移动端路由与“我的”页入口，并把 `agent-skills` 的接入方式、后端代理原则和使用步骤写入文档。
+
+## 2026-03-27
+
+### 明确后端测试目录结构
+
+- 新增 [`backend_fastapi/tests/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)：明确 `unit/`、`api/`、`smoke/`、`integration/` 的职责边界和测试文件命名规则，统一后端测试入口，避免测试继续散落到业务目录。
+- 更新 [`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：补充后端测试目录说明和常用运行命令，强调新增后端测试应统一放在 `backend_fastapi/tests/` 下。

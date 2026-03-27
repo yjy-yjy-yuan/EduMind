@@ -42,7 +42,7 @@ python run.py
 | `app/tasks/` | 耗时任务 |
 | `app/utils/` | 通用工具 |
 | `scripts/` | 辅助脚本 |
-| `tests/` | FastAPI 专属测试 |
+| `tests/` | FastAPI 专属测试根目录 |
 
 ## 依赖服务
 
@@ -92,6 +92,15 @@ pytest -m smoke
 pytest -m api
 pytest --cov=app
 ```
+
+测试目录约定：
+
+- `tests/unit/`：service、task、runtime、工具函数等单元测试
+- `tests/api/`：FastAPI 路由与响应行为测试
+- `tests/smoke/`：启动与最小链路验证
+- `tests/integration/`：跨模块集成测试
+
+新增后端测试请统一放进 `backend_fastapi/tests/`，不要散落到 `app/` 或仓库根目录。更详细的放置规则见 [backend_fastapi/tests/README.md](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)。
 
 ## 端口约定
 
