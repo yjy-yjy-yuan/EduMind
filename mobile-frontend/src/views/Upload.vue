@@ -89,6 +89,46 @@
       <div class="muted">将沿用当前处理设置：{{ processingSettingsSummary }}</div>
     </div>
 
+    <div v-if="uploadRecommendationItems.length > 0" class="card upload-followup">
+      <div class="card-head">
+        <div class="card-title">上传后推荐</div>
+        <div class="card-head-actions">
+          <button class="link link--small" @click="openLatestUploadedVideo" :disabled="!latestUploadedVideoId">查看刚上传内容</button>
+          <button class="link link--small" @click="clearUploadRecommendations" :disabled="busy">收起</button>
+        </div>
+      </div>
+      <div class="muted">{{ uploadRecommendationIntro }}</div>
+      <div v-if="uploadRecommendationQuerySummary" class="upload-followup__context">
+        当前推荐围绕：{{ uploadRecommendationQuerySummary }}
+      </div>
+      <div class="upload-followup__list">
+        <article v-for="item in uploadRecommendationItems" :key="item.key" class="upload-followup__item">
+          <div class="upload-followup__top">
+            <span class="recent-tag">{{ item.reasonLabel }}</span>
+            <span class="recent-tag recent-tag--soft">{{ item.sourceLabel }}</span>
+          </div>
+          <strong class="upload-followup__title">{{ item.title }}</strong>
+          <p class="upload-followup__desc">{{ item.summaryText }}</p>
+          <div v-if="item.tags.length > 0" class="upload-followup__tags">
+            <span v-for="tag in item.tags.slice(0, 4)" :key="`${item.key}-${tag}`" class="upload-followup__tag">{{ tag }}</span>
+          </div>
+          <div class="upload-followup__meta">
+            <span v-if="item.statusText">{{ item.statusText }}</span>
+            <span v-if="item.subjectText">{{ item.subjectText }}</span>
+            <span v-if="item.timeText">{{ item.timeText }}</span>
+          </div>
+          <div v-if="item.importHint" class="upload-followup__hint">{{ item.importHint }}</div>
+          <button
+            class="btn btn--primary"
+            @click="openUploadRecommendation(item)"
+            :disabled="item.primaryActionDisabled || busy"
+          >
+            {{ item.primaryActionLabel }}
+          </button>
+        </article>
+      </div>
+    </div>
+
     <div v-if="nativeTask" class="card">
       <div class="card-head">
         <div class="card-title">iOS 本地离线转录</div>
@@ -294,6 +334,12 @@ const STATUS_FILTERS = [
 ]
 let syncingOfflineRecent = false
 const nativeEventDisposers = []
+const UPLOAD_RECOMMENDATION_SCENE_LABELS = {
+  home: '首页推荐',
+  continue: '继续学习',
+  review: '复盘推荐',
+  related: '相关推荐'
+}
 
 const processingSettingsSummary = computed(() => {
   const current = processingSettings.value || getProcessingSettings()
@@ -314,6 +360,116 @@ const processingSettingsSummary = computed(() => {
 const hasRecommendationImport = computed(() => Boolean(recommendationSource.value || videoUrl.value) && submissionMode.value === 'url')
 const importSourceLabel = computed(() => recommendationSource.value || '推荐系统')
 const importPreviewUrl = computed(() => String(videoUrl.value || '').trim() || '等待带入推荐链接')
+const uploadRecommendationPayload = ref(null)
+const latestUploadedVideoId = ref(0)
+const latestUploadedTitle = ref('')
+const normalizeRecommendationItems = (payload) => Array.isArray(payload?.items) ? payload.items : []
+const normalizeRecommendationQuery = (payload) => payload?.external_query || null
+const resolveRecommendationItemKey = (item, index = 0) =>
+  String(item?.id || item?.video_id || item?.external_url || item?.url || `upload-recommendation-${index}`)
+const resolveRecommendationUrl = (item) =>
+  String(item?.external_url || item?.target_url || item?.source_url || item?.url || item?.link || '').trim()
+const isExternalRecommendationItem = (item) => {
+  const itemType = String(item?.item_type || item?.content_type || '').trim().toLowerCase()
+  if (item?.is_external === true) return true
+  return ['external', 'external_candidate', 'candidate'].includes(itemType) || (!item?.id && Boolean(resolveRecommendationUrl(item)))
+}
+const parseRecommendationActionTarget = (target) => {
+  const text = String(target || '').trim()
+  if (!text || !text.startsWith('/')) return null
+  const [path, search = ''] = text.split('?')
+  if (!search) return { path }
+  const params = new URLSearchParams(search)
+  const query = {}
+  params.forEach((value, key) => {
+    query[key] = value
+  })
+  return { path, query }
+}
+const formatRecommendationTime = (rawValue) => {
+  if (!rawValue) return ''
+  const date = new Date(rawValue)
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString()
+}
+const decorateUploadRecommendationItem = (item, index = 0) => {
+  const tags = Array.isArray(item?.tags) ? item.tags.filter(Boolean).map((tag) => String(tag).trim()) : []
+  const isExternal = isExternalRecommendationItem(item)
+  const sourceLabel = String(item?.source_label || item?.upload_source_label || (isExternal ? '站外候选' : '站内视频')).trim() || '站内视频'
+  return {
+    ...item,
+    key: resolveRecommendationItemKey(item, index),
+    title: String(item?.title || '未命名内容'),
+    tags,
+    sourceLabel,
+    reasonLabel: String(item?.reason_label || '推荐'),
+    summaryText: String(item?.reason_text || item?.summary || '可继续从这里进入学习链路。'),
+    statusText: item?.status ? videoStatusText(item.status) : '',
+    timeText: formatRecommendationTime(item?.upload_time || item?.updated_at || item?.created_at),
+    subjectText: String(item?.subject || '').trim() ? `科目 · ${String(item.subject).trim()}` : '',
+    importHint: String(item?.import_hint || '').trim(),
+    primaryActionLabel: String(item?.action_label || '').trim() || (isExternal ? '导入学习' : '打开详情'),
+    primaryActionDisabled: isExternal ? !Boolean(item?.can_import ?? resolveRecommendationUrl(item)) : false,
+    actionTarget: String(item?.action_target || '').trim()
+  }
+}
+const uploadRecommendationItems = computed(() =>
+  normalizeRecommendationItems(uploadRecommendationPayload.value).map((item, index) => decorateUploadRecommendationItem(item, index))
+)
+const uploadRecommendationIntro = computed(() => {
+  const scene = String(uploadRecommendationPayload.value?.scene || '').trim().toLowerCase()
+  const label = UPLOAD_RECOMMENDATION_SCENE_LABELS[scene] || '下一步推荐'
+  const title = latestUploadedTitle.value ? `《${latestUploadedTitle.value}》` : '当前上传内容'
+  return `${title} 上传后，后端已自动返回 ${label}，你可以直接从这里决定下一步学什么。`
+})
+const uploadRecommendationQuerySummary = computed(() => {
+  const query = normalizeRecommendationQuery(uploadRecommendationPayload.value)
+  if (!query) return ''
+  const parts = [query.subject, query.primary_topic].filter(Boolean)
+  if (Array.isArray(query.preferred_tags) && query.preferred_tags.length > 0) {
+    parts.push(`优先标签：${query.preferred_tags.join('、')}`)
+  }
+  return parts.join(' · ')
+})
+
+const clearUploadRecommendations = () => {
+  uploadRecommendationPayload.value = null
+}
+
+const storeUploadRecommendations = (payload, videoId, title) => {
+  uploadRecommendationPayload.value = payload && normalizeRecommendationItems(payload).length > 0 ? payload : null
+  latestUploadedVideoId.value = Number(videoId || 0) || 0
+  latestUploadedTitle.value = String(title || '').trim()
+}
+
+const openLatestUploadedVideo = () => {
+  if (!latestUploadedVideoId.value) return
+  router.push(`/videos/${latestUploadedVideoId.value}`)
+}
+
+const openUploadRecommendation = (item) => {
+  if (isExternalRecommendationItem(item) && item.primaryActionDisabled) {
+    error.value = item.importHint || '当前站外候选暂不可直接导入。'
+    return
+  }
+  const actionLocation = parseRecommendationActionTarget(item.actionTarget || item?.action_target)
+  if (actionLocation) {
+    router.push(actionLocation)
+    return
+  }
+  if (isExternalRecommendationItem(item)) {
+    const url = resolveRecommendationUrl(item)
+    if (!url) return
+    router.push({ path: '/upload', query: { mode: 'url', url, source: item.sourceLabel || '站外推荐' } })
+    return
+  }
+  if (item?.task_id) {
+    router.push(`/local-transcripts/${item.task_id}`)
+    return
+  }
+  if (item?.id) {
+    router.push(`/videos/${item.id}`)
+  }
+}
 
 const selectProcessingModel = (model) => {
   if (busy.value) return
@@ -1039,6 +1195,9 @@ const resetAll = () => {
   progress.value = 0
   message.value = ''
   error.value = ''
+  clearUploadRecommendations()
+  latestUploadedVideoId.value = 0
+  latestUploadedTitle.value = ''
   if (!nativeBusy.value) nativeTask.value = null
 }
 
@@ -1152,6 +1311,7 @@ const uploadFile = async () => {
   progress.value = 0
   message.value = ''
   error.value = ''
+  clearUploadRecommendations()
   try {
     const form = new FormData()
     form.append('file', file.value)
@@ -1165,24 +1325,29 @@ const uploadFile = async () => {
     })
     const data = res?.data || {}
     const videoId = resolveVideoId(data)
+    const uploadedTitle = data?.data?.title || file.value?.name || '本地视频'
     progress.value = 100
     message.value = data?.duplicate
       ? (data?.message || '视频已存在，已为你跳转到详情页')
       : (data?.message || '上传成功，已为你自动开始处理')
+    storeUploadRecommendations(data?.recommendations, videoId, uploadedTitle)
     addRecentUpload({
       videoId,
-      title: data?.data?.title || file.value?.name || '本地视频',
+      title: uploadedTitle,
       typeText: `本地文件 · ${readableSize(file.value?.size)}`,
       duplicate: Boolean(data?.duplicate),
       status: data?.status || 'uploaded',
       requestedModel: data?.data?.requested_model || processingSettings.value.model,
       effectiveModel: data?.data?.effective_model || data?.data?.requested_model || processingSettings.value.model
     })
-    router.push(
-      videoId
-        ? { path: `/videos/${videoId}`, query: data?.duplicate ? undefined : { autostart: '1' } }
-        : '/videos'
-    )
+    savedFileMeta.value = file.value ? { name: file.value.name, size: Number(file.value.size || 0) } : savedFileMeta.value
+    file.value = null
+    if (fileInputRef.value) fileInputRef.value.value = ''
+    if (uploadRecommendationItems.value.length > 0) {
+      message.value = `${message.value} 下方已自动给出下一步推荐。`
+      return
+    }
+    router.push(videoId ? { path: `/videos/${videoId}`, query: data?.duplicate ? undefined : { autostart: '1' } } : '/videos')
   } catch (e) {
     if (isVideoUploadQueueableError(e)) {
       try {
@@ -1209,28 +1374,32 @@ const uploadUrl = async () => {
   progress.value = 0
   message.value = ''
   error.value = ''
+  clearUploadRecommendations()
   try {
     const trimmedUrl = String(videoUrl.value).trim()
     processingSettings.value = getProcessingSettings()
     const res = await uploadVideoUrl({ url: trimmedUrl, ...buildProcessPayload(processingSettings.value) })
     const data = res?.data || {}
     const videoId = resolveVideoId(data)
+    const uploadedTitle = data?.data?.title || trimmedUrl
     message.value = data?.message || '已提交链接，下载完成后会自动开始处理'
+    storeUploadRecommendations(data?.recommendations, videoId, uploadedTitle)
     recommendationSource.value = ''
     addRecentUpload({
       videoId,
-      title: data?.data?.title || trimmedUrl,
+      title: uploadedTitle,
       typeText: '链接导入',
       duplicate: Boolean(data?.duplicate),
       status: data?.status || 'downloading',
       requestedModel: data?.data?.requested_model || processingSettings.value.model,
       effectiveModel: data?.data?.effective_model || data?.data?.requested_model || processingSettings.value.model
     })
-    router.push(
-      videoId
-        ? { path: `/videos/${videoId}`, query: data?.duplicate ? undefined : { autostart: '1' } }
-        : '/videos'
-    )
+    videoUrl.value = ''
+    if (uploadRecommendationItems.value.length > 0) {
+      message.value = `${message.value} 下方已自动给出下一步推荐。`
+      return
+    }
+    router.push(videoId ? { path: `/videos/${videoId}`, query: data?.duplicate ? undefined : { autostart: '1' } } : '/videos')
   } catch (e) {
     if (isVideoUploadQueueableError(e)) {
       try {
@@ -1383,6 +1552,70 @@ onUnmounted(() => {
   border: 1px dashed rgba(17, 24, 39, 0.12);
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.upload-followup__context,
+.upload-followup__hint {
+  border-radius: 16px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--primary-deep);
+  background: var(--surface-lilac);
+  border: 1px solid rgba(139, 121, 157, 0.14);
+}
+
+.upload-followup__list {
+  display: grid;
+  gap: 10px;
+}
+
+.upload-followup__item {
+  display: grid;
+  gap: 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(247, 239, 232, 0.9);
+  padding: 14px;
+}
+
+.upload-followup__top,
+.upload-followup__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.upload-followup__title {
+  font-size: 15px;
+  line-height: 1.45;
+  color: #111827;
+}
+
+.upload-followup__desc,
+.upload-followup__meta {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
+}
+
+.upload-followup__tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.upload-followup__tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: rgba(243, 235, 215, 0.92);
+  color: var(--warn-text);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .import-badge,
@@ -1622,6 +1855,11 @@ onUnmounted(() => {
 .recent-tag--offline {
   background: var(--surface-lilac);
   color: var(--primary-deep);
+}
+
+.recent-tag--soft {
+  background: rgba(243, 235, 215, 0.92);
+  color: var(--warn-text);
 }
 
 .mini--warn {

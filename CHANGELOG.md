@@ -795,6 +795,14 @@
 
 ## 2026-03-27
 
+### 接通推荐增强字段与上传后推荐回流
+
+- 更新 [`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)、[`mobile-frontend/src/api/recommendation.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/recommendation.js)：推荐页开始消费后端返回的 `external_providers`、`external_query`、`action_target`、`can_import`、`import_hint` 等增强字段，直接在页面里展示站外 provider 状态、检索上下文和可导入/不可导入提示，并按后端动作元数据决定跳转目标。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：上传成功后不再默认立刻跳出当前页，而是优先展示后端回流的 `recommendations`，让用户在上传完成后立即看到“下一步学什么”的推荐结果，并保留查看刚上传视频的快捷入口。
+- 更新 [`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：为 UI-only 模式补齐推荐增强字段、站外 provider 摘要和上传后推荐返回，保证 mock 流程与真实后端接口保持一致。
+
+## 2026-03-27
+
 ### 强化推荐接口编排信息
 
 - 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：为站内视频和站外候选统一补充 `provider`、`action_type`、`action_label`、`action_target` 等动作字段，并在推荐结果中新增站内/站外数量统计、来源分布汇总和站外检索上下文摘要，方便前端按“打开详情 / 导入学习”两类动作直接消费。

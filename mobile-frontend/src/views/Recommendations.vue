@@ -171,6 +171,26 @@
           <span class="source-card__desc">{{ externalSourceSummary }}</span>
         </article>
       </div>
+      <div v-if="activeExternalQuerySummary" class="message message--hint">
+        本轮站外检索围绕：{{ activeExternalQuerySummary }}
+      </div>
+      <div v-if="activeProviderReports.length > 0" class="provider-status-list">
+        <article
+          v-for="provider in activeProviderReports"
+          :key="`${activeScene}-${provider.provider}`"
+          class="provider-status-card"
+          :class="{
+            'provider-status-card--failed': provider.status === 'failed',
+            'provider-status-card--empty': provider.status === 'empty'
+          }"
+        >
+          <div class="provider-status-card__top">
+            <strong>{{ provider.source_label }}</strong>
+            <span>{{ providerStatusText(provider) }}</span>
+          </div>
+          <p>{{ providerStatusDetail(provider) }}</p>
+        </article>
+      </div>
     </section>
 
     <section class="panel ios-card">
@@ -218,9 +238,16 @@
           <div class="recommend-card__meta">
             <span v-if="item.timeText">{{ item.timeText }}</span>
             <span v-if="item.statusText">{{ item.statusText }}</span>
+            <span v-if="item.subjectText">{{ item.subjectText }}</span>
           </div>
+          <div v-if="item.importHint" class="recommend-card__hint">{{ item.importHint }}</div>
           <div class="recommend-card__actions">
-            <button type="button" class="action-btn action-btn--primary" @click="openRecommendation(item)">
+            <button
+              type="button"
+              class="action-btn action-btn--primary"
+              :disabled="item.primaryActionDisabled"
+              @click="openRecommendation(item)"
+            >
               {{ item.primaryActionLabel }}
             </button>
             <button type="button" class="action-btn" @click="loadRelatedByItem(item)" :disabled="!item.canLoadRelated">
@@ -295,8 +322,17 @@
           <div class="recommend-card__meta">
             <span>{{ item.sourceLabel }}</span>
             <span v-if="item.timeText">{{ item.timeText }}</span>
+            <span v-if="item.subjectText">{{ item.subjectText }}</span>
           </div>
-          <button type="button" class="action-btn action-btn--primary" @click="openRecommendation(item)">导入学习</button>
+          <div v-if="item.importHint" class="recommend-card__hint">{{ item.importHint }}</div>
+          <button
+            type="button"
+            class="action-btn action-btn--primary"
+            :disabled="item.primaryActionDisabled"
+            @click="openRecommendation(item)"
+          >
+            {{ item.primaryActionLabel }}
+          </button>
         </article>
       </div>
       <div v-else class="provider-grid">
@@ -341,6 +377,7 @@ const scenes = ref([])
 const activeScene = ref('home')
 const selectedTag = ref('')
 const sceneItemsMap = ref({})
+const sceneMetaMap = ref({})
 const sceneErrorMap = ref({})
 const sceneLoadingMap = ref({})
 const relatedSeed = ref(null)
@@ -351,6 +388,32 @@ const relatedError = ref('')
 const go = (path) => router.push(path)
 const normalizeSceneOptions = (payload) => Array.isArray(payload?.scenes) ? payload.scenes : Array.isArray(payload?.data?.scenes) ? payload.data.scenes : []
 const normalizeRecommendationItems = (payload) => Array.isArray(payload?.items) ? payload.items : Array.isArray(payload?.data?.items) ? payload.data.items : []
+const normalizeRecommendationSources = (payload) => Array.isArray(payload?.sources) ? payload.sources : Array.isArray(payload?.data?.sources) ? payload.data.sources : []
+const normalizeExternalProviders = (payload) => Array.isArray(payload?.external_providers) ? payload.external_providers : Array.isArray(payload?.data?.external_providers) ? payload.data.external_providers : []
+const normalizeExternalQuery = (payload) => payload?.external_query || payload?.data?.external_query || null
+const normalizeRecommendationCount = (payload, key) => {
+  const value = payload?.[key] ?? payload?.data?.[key] ?? 0
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+const createRecommendationMeta = () => ({
+  sources: [],
+  externalProviders: [],
+  externalQuery: null,
+  internalItemCount: 0,
+  externalItemCount: 0,
+  externalFailedProviderCount: 0,
+  externalFetchFailed: false
+})
+const buildRecommendationMeta = (payload) => ({
+  sources: normalizeRecommendationSources(payload),
+  externalProviders: normalizeExternalProviders(payload),
+  externalQuery: normalizeExternalQuery(payload),
+  internalItemCount: normalizeRecommendationCount(payload, 'internal_item_count'),
+  externalItemCount: normalizeRecommendationCount(payload, 'external_item_count'),
+  externalFailedProviderCount: normalizeRecommendationCount(payload, 'external_failed_provider_count'),
+  externalFetchFailed: Boolean(payload?.external_fetch_failed ?? payload?.data?.external_fetch_failed ?? false)
+})
 
 const formatTimeText = (rawValue) => {
   if (!rawValue) return ''
@@ -360,6 +423,18 @@ const formatTimeText = (rawValue) => {
 
 const resolvePrimaryUrl = (item) => String(item?.external_url || item?.target_url || item?.source_url || item?.link || item?.url || '').trim()
 const resolveItemKey = (item, index = 0) => String(item?.id || item?.video_id || resolvePrimaryUrl(item) || `item-${index}`)
+const parseActionTarget = (target) => {
+  const text = String(target || '').trim()
+  if (!text || !text.startsWith('/')) return null
+  const [path, search = ''] = text.split('?')
+  if (!search) return { path }
+  const params = new URLSearchParams(search)
+  const query = {}
+  params.forEach((value, key) => {
+    query[key] = value
+  })
+  return { path, query }
+}
 
 const isExternalItem = (item) => {
   const itemType = String(item?.item_type || item?.content_type || item?.origin_type || '').trim().toLowerCase()
@@ -378,6 +453,11 @@ const resolveSourceLabel = (item) => {
 
 const decorateItem = (item, index = 0) => {
   const tags = Array.isArray(item?.tags) ? item.tags.filter(Boolean).map((tag) => String(tag).trim()) : []
+  const sourceLabel = resolveSourceLabel(item)
+  const isExternal = isExternalItem(item)
+  const actionLabel = String(item?.action_label || '').trim()
+  const importHint = String(item?.import_hint || '').trim()
+  const subjectText = String(item?.subject || '').trim()
   return {
     ...item,
     key: resolveItemKey(item, index),
@@ -387,10 +467,18 @@ const decorateItem = (item, index = 0) => {
     summaryText: String(item?.reason_text || item?.summary || '从这里继续进入学习链路。'),
     statusText: item?.status ? videoStatusText(item.status) : '',
     timeText: formatTimeText(item?.upload_time || item?.updated_at || item?.created_at),
-    sourceLabel: resolveSourceLabel(item),
-    sourceBadgeClass: isExternalItem(item) ? 'badge--external' : item?.processing_origin === 'ios_offline' ? 'badge--mint' : 'badge--soft',
-    primaryActionLabel: isExternalItem(item) ? '导入学习' : item?.processing_origin === 'ios_offline' ? '打开本地结果' : '打开详情',
-    canLoadRelated: Boolean(item?.id)
+    sourceLabel,
+    sourceBadgeClass: isExternal ? 'badge--external' : item?.processing_origin === 'ios_offline' ? 'badge--mint' : 'badge--soft',
+    primaryActionLabel: actionLabel || (isExternal ? '导入学习' : item?.processing_origin === 'ios_offline' ? '打开本地结果' : '打开详情'),
+    primaryActionDisabled: isExternal ? !Boolean(item?.can_import ?? resolvePrimaryUrl(item)) : false,
+    canLoadRelated: Boolean(item?.id),
+    canImport: Boolean(item?.can_import ?? false),
+    importHint,
+    actionTarget: String(item?.action_target || '').trim(),
+    actionApi: String(item?.action_api || '').trim(),
+    actionMethod: String(item?.action_method || '').trim().toUpperCase(),
+    subjectText: subjectText ? `科目 · ${subjectText}` : '',
+    clusterKey: String(item?.cluster_key || '').trim()
   }
 }
 
@@ -441,6 +529,7 @@ const filteredRelatedItems = computed(() => {
   const items = relatedItems.value.map((item, index) => decorateItem(item, index))
   return !selectedTag.value ? items : items.filter((item) => item.tags.includes(selectedTag.value))
 })
+const activeSceneMeta = computed(() => sceneMetaMap.value[activeScene.value] || createRecommendationMeta())
 const externalItems = computed(() => allLoadedItems.value.filter((item) => isExternalItem(item)))
 const filteredSceneExternalCount = computed(() => filteredSceneItems.value.filter((item) => isExternalItem(item)).length)
 const filteredSceneInternalCount = computed(() => filteredSceneItems.value.length - filteredSceneExternalCount.value)
@@ -466,24 +555,57 @@ const sceneMixSummary = computed(() => {
   if (filteredSceneInternalCount.value === 0) return `当前结果以 ${filteredSceneExternalCount.value} 条站外候选为主。`
   return `站内 ${filteredSceneInternalCount.value} 条，站外 ${filteredSceneExternalCount.value} 条。`
 })
+const activeProviderReports = computed(() => activeSceneMeta.value.externalProviders || [])
+const activeExternalQuerySummary = computed(() => {
+  const query = activeSceneMeta.value.externalQuery
+  if (!query) return ''
+  const parts = [query.subject, query.primary_topic].filter(Boolean)
+  const tagText = Array.isArray(query.preferred_tags) && query.preferred_tags.length > 0 ? `优先标签：${query.preferred_tags.join('、')}` : ''
+  if (tagText) parts.push(tagText)
+  return parts.join(' · ')
+})
 
 const setSceneLoading = (scene, value) => { sceneLoadingMap.value = { ...sceneLoadingMap.value, [scene]: value } }
 const setSceneError = (scene, value) => { sceneErrorMap.value = { ...sceneErrorMap.value, [scene]: value } }
 const setSceneItems = (scene, items) => { sceneItemsMap.value = { ...sceneItemsMap.value, [scene]: items } }
+const setSceneMeta = (scene, payload) => { sceneMetaMap.value = { ...sceneMetaMap.value, [scene]: buildRecommendationMeta(payload) } }
 const toggleTag = (tag) => { selectedTag.value = selectedTag.value === tag ? '' : tag }
+const providerStatusText = (provider) => {
+  if (provider?.status === 'failed') return '抓取失败'
+  if (provider?.status === 'empty') return '暂无候选'
+  return `${Number(provider?.candidate_count || 0)} 条候选`
+}
+const providerStatusDetail = (provider) => {
+  if (provider?.status === 'failed') return String(provider?.error_message || '当前 provider 抓取失败，请稍后刷新重试。')
+  if (provider?.status === 'empty') return `当前已检索，但没有返回可用候选。耗时 ${Number(provider?.latency_ms || 0)} ms`
+  return `本轮抓取耗时 ${Number(provider?.latency_ms || 0)} ms，可继续导入该来源内容。`
+}
+const resolveRecommendationRoute = (item) => {
+  const actionLocation = parseActionTarget(item?.actionTarget || item?.action_target)
+  if (actionLocation) return actionLocation
+  if (isExternalItem(item)) {
+    const url = resolvePrimaryUrl(item)
+    if (!url) return null
+    return { path: '/upload', query: { mode: 'url', url, source: item.sourceLabel || '站外推荐' } }
+  }
+  if (item.processing_origin === 'ios_offline' && item.task_id) return `/local-transcripts/${item.task_id}`
+  if (item.id) return `/videos/${item.id}`
+  return null
+}
 
 const openRecommendation = (item) => {
   if (isExternalItem(item)) {
-    const url = resolvePrimaryUrl(item)
-    if (!url) return
-    router.push({ path: '/upload', query: { mode: 'url', url, source: item.sourceLabel || '站外推荐' } })
+    if (!item.canImport && !resolvePrimaryUrl(item)) {
+      pageError.value = item.importHint || '当前站外候选暂不可直接导入。'
+      return
+    }
+  }
+  const location = resolveRecommendationRoute(item)
+  if (!location) {
+    pageError.value = '当前推荐项缺少可用的跳转动作。'
     return
   }
-  if (item.processing_origin === 'ios_offline' && item.task_id) {
-    router.push(`/local-transcripts/${item.task_id}`)
-    return
-  }
-  if (item.id) router.push(`/videos/${item.id}`)
+  router.push(location)
 }
 
 const loadScene = async (scene, { force = false } = {}) => {
@@ -492,12 +614,15 @@ const loadScene = async (scene, { force = false } = {}) => {
   setSceneError(scene, '')
   try {
     const res = await getVideoRecommendations({ scene, limit: 6, include_external: true })
-    const items = normalizeRecommendationItems(res?.data || {})
+    const payload = res?.data || {}
+    const items = normalizeRecommendationItems(payload)
     setSceneItems(scene, items)
+    setSceneMeta(scene, payload)
     return items
   } catch (error) {
     setSceneError(scene, error?.message || `${scene} 场景加载失败`)
     setSceneItems(scene, [])
+    setSceneMeta(scene, createRecommendationMeta())
     return []
   } finally {
     setSceneLoading(scene, false)
@@ -516,7 +641,8 @@ const loadRelatedByItem = async (item) => {
   relatedError.value = ''
   try {
     const res = await getVideoRecommendations({ scene: 'related', seed_video_id: item.id, limit: 4, include_external: true })
-    relatedItems.value = normalizeRecommendationItems(res?.data || {})
+    const payload = res?.data || {}
+    relatedItems.value = normalizeRecommendationItems(payload)
   } catch (error) {
     relatedItems.value = []
     relatedError.value = error?.message || '相关推荐加载失败'
@@ -978,9 +1104,58 @@ onMounted(reloadAll)
   font-size: 12px;
 }
 
+.recommend-card__hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--primary-deep);
+  background: rgba(240, 232, 245, 0.72);
+  border: 1px solid rgba(139, 121, 157, 0.14);
+  border-radius: 16px;
+  padding: 10px 12px;
+}
+
 .related-card__copy {
   display: grid;
   gap: 6px;
+}
+
+.provider-status-list {
+  display: grid;
+  gap: 10px;
+}
+
+.provider-status-card {
+  display: grid;
+  gap: 6px;
+  border-radius: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(251, 245, 239, 0.94);
+}
+
+.provider-status-card--failed {
+  border-color: rgba(217, 119, 6, 0.18);
+  background: var(--bad-bg);
+}
+
+.provider-status-card--empty {
+  background: rgba(245, 236, 229, 0.84);
+}
+
+.provider-status-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #111827;
+}
+
+.provider-status-card__top span,
+.provider-status-card p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b7280;
 }
 
 .message {
