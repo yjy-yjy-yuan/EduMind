@@ -175,6 +175,28 @@
         </article>
       </div>
 
+      <div v-if="recommendationQuerySummary" class="message message--hint">
+        <span>本轮站外检索围绕：{{ recommendationQuerySummary }}</span>
+      </div>
+
+      <div v-if="recommendationProviderReports.length > 0" class="recommend-provider-list">
+        <article
+          v-for="provider in recommendationProviderReports"
+          :key="provider.provider"
+          class="recommend-provider-card"
+          :class="{
+            'recommend-provider-card--failed': provider.status === 'failed',
+            'recommend-provider-card--empty': provider.status === 'empty'
+          }"
+        >
+          <div class="recommend-provider-card__top">
+            <strong>{{ provider.source_label }}</strong>
+            <span>{{ providerStatusText(provider) }}</span>
+          </div>
+          <p>{{ providerStatusDetail(provider) }}</p>
+        </article>
+      </div>
+
       <div v-if="recommendationLoading && recommendations.length === 0" class="skeleton-list">
         <div v-for="i in 2" :key="`recommend-${i}`" class="skeleton-item skeleton-item--tall"></div>
       </div>
@@ -186,7 +208,7 @@
 
       <div v-else class="recommend-list">
         <button
-          v-for="item in recommendations"
+          v-for="item in recommendationCards"
           :key="recommendationKey(item)"
           class="recommend-card"
           @click="openRecommendation(item)"
@@ -205,8 +227,10 @@
           <p class="recommend-card__desc">{{ item.reason_text || item.summary || '从这里继续进入学习。' }}</p>
           <div class="recommend-card__meta">
             <span v-if="Array.isArray(item.tags) && item.tags.length > 0">{{ item.tags.slice(0, 2).join(' · ') }}</span>
+            <span v-if="item.subjectText">{{ item.subjectText }}</span>
             <span v-if="formatTimeText(item.upload_time)">{{ formatTimeText(item.upload_time) }}</span>
           </div>
+          <div v-if="item.importHint" class="recommend-card__hint">{{ item.importHint }}</div>
           <span class="recommend-card__next">{{ recommendationNextStepText(item) }}</span>
         </button>
       </div>
@@ -241,6 +265,15 @@ const recommendationError = ref('')
 const allVideos = ref([])
 const localTranscriptCount = ref(0)
 const recommendations = ref([])
+const recommendationMeta = ref({
+  sources: [],
+  externalProviders: [],
+  externalQuery: null,
+  internalItemCount: 0,
+  externalItemCount: 0,
+  externalFailedProviderCount: 0,
+  externalFetchFailed: false
+})
 
 const supportActions = computed(() => quickActions)
 
@@ -253,6 +286,31 @@ const normalizeRecommendationItems = (payload) => {
   const items = payload?.items || payload?.recommendations || payload?.data || []
   return Array.isArray(items) ? items : []
 }
+const normalizeRecommendationSources = (payload) => Array.isArray(payload?.sources) ? payload.sources : []
+const normalizeRecommendationProviders = (payload) => Array.isArray(payload?.external_providers) ? payload.external_providers : []
+const normalizeRecommendationQuery = (payload) => payload?.external_query || null
+const normalizeRecommendationCount = (payload, key) => {
+  const numeric = Number(payload?.[key] || 0)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+const createRecommendationMeta = () => ({
+  sources: [],
+  externalProviders: [],
+  externalQuery: null,
+  internalItemCount: 0,
+  externalItemCount: 0,
+  externalFailedProviderCount: 0,
+  externalFetchFailed: false
+})
+const buildRecommendationMeta = (payload) => ({
+  sources: normalizeRecommendationSources(payload),
+  externalProviders: normalizeRecommendationProviders(payload),
+  externalQuery: normalizeRecommendationQuery(payload),
+  internalItemCount: normalizeRecommendationCount(payload, 'internal_item_count'),
+  externalItemCount: normalizeRecommendationCount(payload, 'external_item_count'),
+  externalFailedProviderCount: normalizeRecommendationCount(payload, 'external_failed_provider_count'),
+  externalFetchFailed: Boolean(payload?.external_fetch_failed || false)
+})
 
 const formatTimeText = (rawValue) => {
   if (!rawValue) return ''
@@ -358,11 +416,14 @@ const reloadRecommendations = async () => {
   recommendationError.value = ''
   try {
     const res = await getVideoRecommendations({ scene: 'home', limit: 4, include_external: true })
-    const items = normalizeRecommendationItems(res?.data || {})
+    const payload = res?.data || {}
+    const items = normalizeRecommendationItems(payload)
     recommendations.value = items.length > 0 ? items : fallbackRecommendations(allVideos.value)
+    recommendationMeta.value = buildRecommendationMeta(payload)
   } catch (e) {
     recommendationError.value = e?.message || '推荐加载失败'
     recommendations.value = fallbackRecommendations(allVideos.value)
+    recommendationMeta.value = createRecommendationMeta()
   } finally {
     recommendationLoading.value = false
   }
@@ -388,8 +449,33 @@ const recommendationEmptyText = computed(() => {
   if (recommendationError.value) return recommendationError.value
   return '上传更多视频后，这里会按处理状态和内容相关度给你推荐下一步。'
 })
-const externalRecommendationCount = computed(() => recommendations.value.filter((item) => isExternalRecommendation(item)).length)
-const internalRecommendationCount = computed(() => Math.max(recommendations.value.length - externalRecommendationCount.value, 0))
+const decorateRecommendationItem = (item) => ({
+  ...item,
+  subjectText: String(item?.subject || '').trim() ? `科目 · ${String(item.subject).trim()}` : '',
+  importHint: String(item?.import_hint || '').trim(),
+  actionTarget: String(item?.action_target || '').trim(),
+  primaryActionDisabled: isExternalRecommendation(item)
+    ? !Boolean(item?.can_import ?? resolveRecommendationUrl(item))
+    : false
+})
+const recommendationCards = computed(() => recommendations.value.map((item) => decorateRecommendationItem(item)))
+const externalRecommendationCount = computed(() => recommendationCards.value.filter((item) => isExternalRecommendation(item)).length)
+const internalRecommendationCount = computed(() => {
+  if (recommendationMeta.value.internalItemCount > 0 || recommendationMeta.value.externalItemCount > 0) {
+    return recommendationMeta.value.internalItemCount
+  }
+  return Math.max(recommendationCards.value.length - externalRecommendationCount.value, 0)
+})
+const recommendationProviderReports = computed(() => recommendationMeta.value.externalProviders || [])
+const recommendationQuerySummary = computed(() => {
+  const query = recommendationMeta.value.externalQuery
+  if (!query) return ''
+  const parts = [query.subject, query.primary_topic].filter(Boolean)
+  if (Array.isArray(query.preferred_tags) && query.preferred_tags.length > 0) {
+    parts.push(`优先标签：${query.preferred_tags.join('、')}`)
+  }
+  return parts.join(' · ')
+})
 const recommendationMixValue = computed(() => {
   if (externalRecommendationCount.value === 0) return `站内 ${internalRecommendationCount.value}`
   return `${internalRecommendationCount.value} / ${externalRecommendationCount.value}`
@@ -400,12 +486,33 @@ const recommendationMixNote = computed(() => {
   if (internalRecommendationCount.value === 0) return '当前首页预览以站外候选为主。'
   return `站内 ${internalRecommendationCount.value} 条，站外 ${externalRecommendationCount.value} 条。`
 })
+const providerStatusText = (provider) => {
+  if (provider?.status === 'failed') return '抓取失败'
+  if (provider?.status === 'empty') return '暂无候选'
+  return `${Number(provider?.candidate_count || 0)} 条候选`
+}
+const providerStatusDetail = (provider) => {
+  if (provider?.status === 'failed') return String(provider?.error_message || '当前 provider 抓取失败，请到推荐页查看详情。')
+  if (provider?.status === 'empty') return `当前已检索但没有返回可用候选，耗时 ${Number(provider?.latency_ms || 0)} ms`
+  return `本轮抓取耗时 ${Number(provider?.latency_ms || 0)} ms，可在推荐页继续导入。`
+}
 
 const recommendationKey = (item) =>
   String(item?.id || item?.external_url || item?.target_url || item?.source_url || item?.link || item?.title || 'recommendation')
 
 const resolveRecommendationUrl = (item) =>
   String(item?.external_url || item?.target_url || item?.source_url || item?.link || '').trim()
+const parseRecommendationActionTarget = (target) => {
+  const text = String(target || '').trim()
+  if (!text || !text.startsWith('/')) return null
+  const [path, search = ''] = text.split('?')
+  if (!search) return { path }
+  const query = {}
+  new URLSearchParams(search).forEach((value, key) => {
+    query[key] = value
+  })
+  return { path, query }
+}
 
 const isExternalRecommendation = (item) => {
   const itemType = String(item?.item_type || item?.content_type || item?.origin_type || '').trim().toLowerCase()
@@ -427,9 +534,18 @@ const recommendationStatusClass = (item) => {
 }
 
 const recommendationNextStepText = (item) =>
-  isExternalRecommendation(item) ? '下一步：带着链接进入导入学习链路' : '下一步：打开详情继续学习'
+  String(item?.action_label || '').trim() || (isExternalRecommendation(item) ? '下一步：带着链接进入导入学习链路' : '下一步：打开详情继续学习')
 
 const openRecommendation = (item) => {
+  if (isExternalRecommendation(item) && item.primaryActionDisabled) {
+    recommendationError.value = item.importHint || '当前站外候选暂不可直接导入。'
+    return
+  }
+  const actionLocation = parseRecommendationActionTarget(item?.actionTarget || item?.action_target)
+  if (actionLocation) {
+    router.push(actionLocation)
+    return
+  }
   if (isExternalRecommendation(item)) {
     const url = resolveRecommendationUrl(item)
     if (!url) return
@@ -822,6 +938,45 @@ onMounted(reloadDashboard)
   color: #111827;
 }
 
+.recommend-provider-list {
+  display: grid;
+  gap: 10px;
+}
+
+.recommend-provider-card {
+  display: grid;
+  gap: 6px;
+  border-radius: 18px;
+  padding: 14px 15px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(247, 239, 232, 0.92);
+}
+
+.recommend-provider-card--failed {
+  border-color: rgba(217, 119, 6, 0.16);
+  background: var(--bad-bg);
+}
+
+.recommend-provider-card--empty {
+  background: rgba(245, 236, 229, 0.88);
+}
+
+.recommend-provider-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: #111827;
+}
+
+.recommend-provider-card__top span,
+.recommend-provider-card p {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #6b7280;
+}
+
 .section-head h2,
 .recent-inline__head h3 {
   margin: 0;
@@ -1043,6 +1198,16 @@ onMounted(reloadDashboard)
   line-height: 1.55;
 }
 
+.recommend-card__hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--primary-deep);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(240, 232, 245, 0.72);
+  border: 1px solid rgba(139, 121, 157, 0.14);
+}
+
 .recommend-card__next {
   color: var(--primary-deep);
   font-weight: 700;
@@ -1070,6 +1235,14 @@ onMounted(reloadDashboard)
 
 .message--empty {
   justify-content: flex-start;
+}
+
+.message--hint {
+  justify-content: flex-start;
+  color: var(--primary-deep);
+  background: var(--surface-lilac);
+  border-style: solid;
+  border-color: var(--primary-soft);
 }
 
 .skeleton-item {

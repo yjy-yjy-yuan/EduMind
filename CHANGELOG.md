@@ -795,6 +795,13 @@
 
 ## 2026-03-27
 
+### 首页接入推荐增强摘要
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：首页推荐预览开始消费后端返回的 `external_query`、`external_providers`、`action_target`、`can_import`、`import_hint` 等增强字段，直接展示站外检索主题、provider 抓取状态和可导入提示，并按后端动作元数据决定首页推荐卡片的跳转目标。
+- 更新 [`CHANGELOG.md`](/Users/yuan/final-work/EduMind/CHANGELOG.md)：追加记录首页推荐摘要接入，不改历史。
+
+## 2026-03-27
+
 ### 接通推荐增强字段与上传后推荐回流
 
 - 更新 [`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)、[`mobile-frontend/src/api/recommendation.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/recommendation.js)：推荐页开始消费后端返回的 `external_providers`、`external_query`、`action_target`、`can_import`、`import_hint` 等增强字段，直接在页面里展示站外 provider 状态、检索上下文和可导入/不可导入提示，并按后端动作元数据决定跳转目标。
