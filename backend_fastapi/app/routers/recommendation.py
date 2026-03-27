@@ -5,12 +5,17 @@ from typing import Optional
 from app.core.database import get_db
 from app.models.user import User
 from app.models.video import Video
+from app.routers.video import build_processing_options
+from app.routers.video import serialize_video
 from app.schemas.recommendation import RecommendationSceneListResponse
 from app.schemas.recommendation import VideoRecommendationResponse
+from app.schemas.video import VideoUploadResponse
+from app.schemas.video import VideoUploadURL
 from app.services.video_recommendation_service import SCENE_MAP
 from app.services.video_recommendation_service import list_recommendation_scenes
 from app.services.video_recommendation_service import normalize_scene
 from app.services.video_recommendation_service import recommend_videos
+from app.services.video_url_import_service import import_remote_video_from_url
 from app.utils.auth_token import parse_auth_token
 from app.utils.auth_token import parse_bearer_token
 from fastapi import APIRouter
@@ -85,3 +90,31 @@ async def get_video_recommendations(
     )
     payload["message"] = "获取推荐视频成功"
     return payload
+
+
+@router.post("/import-external", response_model=VideoUploadResponse)
+async def import_external_recommendation(data: VideoUploadURL, db: Session = Depends(get_db)):
+    """将推荐页中的站外候选直接提交到现有链接下载入库链路。"""
+    process_options = build_processing_options(
+        language=data.language,
+        model=data.model,
+        auto_generate_summary=data.auto_generate_summary,
+        auto_generate_tags=data.auto_generate_tags,
+        summary_style=data.summary_style,
+    )
+    result = import_remote_video_from_url(
+        db,
+        video_url=data.url,
+        process_options=process_options,
+        preferred_title=data.title,
+        preferred_summary=data.summary,
+        preferred_tags=list(data.tags or []),
+        request_source="recommendation_import_external",
+    )
+    return VideoUploadResponse(
+        id=result.video.id,
+        status=result.status,
+        message=result.message,
+        duplicate=result.duplicate,
+        data=serialize_video(result.video),
+    )

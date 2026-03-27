@@ -270,3 +270,49 @@ class TestRecommendationAPI:
         assert external_item["source_label"] == "YouTube"
         assert external_item["external_url"] == "https://www.youtube.com/watch?v=abc123"
         assert external_item["item_type"] == "external_candidate"
+        assert external_item["can_import"] is True
+        assert external_item["action_api"] == "/api/recommendations/import-external"
+        assert external_item["action_method"] == "POST"
+        assert external_item["action_type"] == "import_external_url"
+        assert external_item["action_target"].startswith("/upload?mode=url&url=")
+
+    def test_import_external_recommendation_creates_downloading_record(self, client, db, monkeypatch):
+        """推荐候选应能直接走后端链接下载入库链路。"""
+        from app.models.video import Video
+
+        submitted = {}
+
+        def fake_submit_task(task_func, *args, **kwargs):
+            submitted["name"] = task_func.__name__
+            submitted["args"] = args
+            submitted["kwargs"] = kwargs
+            return None
+
+        monkeypatch.setattr("app.core.executor.submit_task", fake_submit_task)
+
+        response = client.post(
+            "/api/recommendations/import-external",
+            json={
+                "url": "https://www.bilibili.com/video/BV1xx411c7mD",
+                "title": "B站·导数与函数单调性综合串讲",
+                "summary": "适合配合当前数学主题继续学习。",
+                "tags": ["数学", "导数", "函数"],
+                "model": "small",
+            },
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["status"] == "downloading"
+        assert payload["duplicate"] is False
+        assert payload["data"]["title"] == "B站·导数与函数单调性综合串讲"
+        assert payload["data"]["summary"] == "适合配合当前数学主题继续学习。"
+        assert payload["data"]["tags"][0] == "数学"
+
+        video = db.query(Video).filter(Video.id == payload["id"]).first()
+        assert video is not None
+        assert video.url == "https://www.bilibili.com/video/BV1xx411c7mD"
+        assert video.status.value == "downloading"
+        assert submitted["name"] == "download_video_from_url_task"
+        assert submitted["args"][0] == video.id
+        assert submitted["kwargs"]["model"] == "small"

@@ -34,6 +34,8 @@ from app.services.video_content_service import read_subtitle_text
 from app.services.video_processing_registry import forget_video_processing_request
 from app.services.video_processing_registry import get_video_processing_request
 from app.services.video_processing_registry import remember_video_processing_request
+from app.services.video_recommendation_service import recommend_videos
+from app.services.video_url_import_service import import_remote_video_from_url
 from app.services.whisper_runtime import get_supported_whisper_models
 from app.services.whisper_runtime import get_whisper_model_catalog
 from app.services.whisper_runtime import normalize_whisper_model_name
@@ -227,6 +229,35 @@ def serialize_video(video: Video) -> dict:
     payload = video.to_dict()
     payload.update(build_processing_metadata(video))
     return payload
+
+
+def should_use_related_scene_for_upload(video: Video) -> bool:
+    """上传后若已有标题/摘要/标签，则优先返回与该视频相关的推荐。"""
+    if str(video.title or "").strip():
+        return True
+    if str(video.summary or "").strip():
+        return True
+    return bool(video.tags)
+
+
+def build_upload_recommendations(db: Session, *, video: Video, limit: int = 4) -> Optional[dict]:
+    """上传后自动获取推荐结果，减少用户二次点击。"""
+    try:
+        videos = db.query(Video).order_by(Video.updated_at.desc(), Video.upload_time.desc()).all()
+        if not videos:
+            return None
+        scene = "related" if should_use_related_scene_for_upload(video) else "home"
+        seed_video = video if scene == "related" else None
+        return recommend_videos(
+            videos=videos,
+            scene=scene,
+            limit=limit,
+            seed_video=seed_video,
+            include_external=True,
+        )
+    except Exception as exc:
+        logger.debug("上传后自动获取推荐失败 | video_id=%s | error=%s", video.id, exc)
+        return None
 
 
 def normalize_offline_filename(original_name: str, original_ext: str = "") -> str:
@@ -428,6 +459,7 @@ async def upload_video(
                 message="视频已存在",
                 duplicate=True,
                 data=serialize_video(existing_video),
+                recommendations=build_upload_recommendations(db, video=existing_video),
             )
 
         title, filename, file_path = build_local_video_path(file.filename)
@@ -468,6 +500,7 @@ async def upload_video(
             message="视频上传成功，已开始后台处理" if task_submitted else "视频上传成功，请手动开始处理",
             duplicate=False,
             data=serialize_video(video),
+            recommendations=build_upload_recommendations(db, video=video),
         )
 
     except HTTPException:
@@ -486,115 +519,30 @@ async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
     """通过 URL 上传视频"""
     video_url = data.url
     logger.info(f"处理视频URL: {video_url}")
-
-    # 验证 URL 格式
-    is_bilibili = "bilibili.com" in video_url or "b23.tv" in video_url
-    is_youtube = "youtube.com" in video_url or "youtu.be" in video_url
-    is_mooc = "icourse163.org" in video_url
-
-    if not (is_bilibili or is_youtube or is_mooc):
-        raise HTTPException(status_code=400, detail="目前仅支持B站、YouTube和中国大学慕课视频")
-
-    existing_video = (
-        db.query(Video)
-        .filter(Video.url == video_url, Video.status != VideoStatus.FAILED)
-        .order_by(Video.upload_time.desc())
-        .first()
+    process_options = build_processing_options(
+        language=data.language,
+        model=data.model,
+        auto_generate_summary=data.auto_generate_summary,
+        auto_generate_tags=data.auto_generate_tags,
+        summary_style=data.summary_style,
     )
-    if existing_video:
-        return VideoUploadResponse(
-            id=existing_video.id,
-            status=(
-                existing_video.status.value if hasattr(existing_video.status, "value") else str(existing_video.status)
-            ),
-            message="该视频链接已提交过",
-            duplicate=True,
-            data=serialize_video(existing_video),
-        )
-
-    video_id = None
-    title = None
-    source_type = "video"
-
-    if is_bilibili:
-        bv_match = re.search(r"BV[0-9A-Za-z]+", video_url)
-        av_match = re.search(r"av\d+", video_url.lower())
-        if bv_match:
-            video_id = bv_match.group(0)
-            title = f"bilibili-{video_id}"
-        elif av_match:
-            video_id = av_match.group(0)
-            title = f"bilibili-{video_id}"
-        else:
-            raise HTTPException(status_code=400, detail="无效的B站视频链接")
-        source_type = "bilibili"
-    elif is_youtube:
-        if "youtube.com" in video_url:
-            match = re.search(r"v=([^&]+)", video_url)
-            if match:
-                video_id = match.group(1)
-        elif "youtu.be" in video_url:
-            video_id = video_url.split("/")[-1].split("?")[0]
-        if not video_id:
-            raise HTTPException(status_code=400, detail="无效的YouTube视频链接")
-        title = f"youtube-{video_id}"
-        source_type = "youtube"
-    elif is_mooc:
-        course_match = re.search(r"learn/([^-]+)-(\d+)", video_url)
-        if course_match:
-            course_id = course_match.group(2)
-            title = f"mooc-{course_id}"
-            video_id = course_id
-        else:
-            raise HTTPException(status_code=400, detail="无效的慕课视频链接")
-        source_type = "mooc"
-
-    temp_video = Video(
-        title=title,
-        url=video_url,
-        status=VideoStatus.DOWNLOADING,
-        process_progress=0.0,
-        current_step="已提交，等待下载",
+    result = import_remote_video_from_url(
+        db,
+        video_url=video_url,
+        process_options=process_options,
+        preferred_title=data.title,
+        preferred_summary=data.summary,
+        preferred_tags=list(data.tags or []),
+        request_source="upload_video_url",
     )
-    db.add(temp_video)
-    db.commit()
-    db.refresh(temp_video)
-
-    try:
-        from app.core.executor import submit_task
-        from app.tasks.video_download import download_video_from_url_task
-
-        process_options = build_processing_options(
-            language=data.language,
-            model=data.model,
-            auto_generate_summary=data.auto_generate_summary,
-            auto_generate_tags=data.auto_generate_tags,
-            summary_style=data.summary_style,
-        )
-        temp_video.current_step = f"已提交，等待下载（{process_options['model']}）"
-        db.commit()
-        db.refresh(temp_video)
-        submit_task(download_video_from_url_task, temp_video.id, video_url, source_type, **process_options)
-        remember_video_processing_request(
-            temp_video.id,
-            model=process_options["model"],
-            language=process_options["language"],
-            source="upload_video_url",
-        )
-        return VideoUploadResponse(
-            id=temp_video.id,
-            status="downloading",
-            message="链接已提交，正在后台下载，下载完成后可自动开始处理",
-            duplicate=False,
-            data=serialize_video(temp_video),
-        )
-    except Exception as exc:
-        logger.error(f"提交下载任务失败: {str(exc)}")
-        temp_video.status = VideoStatus.FAILED
-        temp_video.current_step = "下载任务提交失败"
-        temp_video.error_message = str(exc)
-        db.commit()
-        raise HTTPException(status_code=500, detail="提交链接下载任务失败，请稍后重试")
+    return VideoUploadResponse(
+        id=result.video.id,
+        status=result.status,
+        message=result.message,
+        duplicate=result.duplicate,
+        data=serialize_video(result.video),
+        recommendations=build_upload_recommendations(db, video=result.video),
+    )
 
 
 @router.get("/list", response_model=VideoListResponse)

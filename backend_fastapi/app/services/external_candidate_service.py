@@ -424,6 +424,8 @@ class MoocExternalCandidateAdapter(ExternalCandidateAdapter):
             summary=f"打开中国大学慕课搜索页，继续查看 {query_text} 相关课程。页面标题：{page_title}。",
             tags=list(preferred_tags or []),
             subject_hint=subject_hint,
+            can_import=False,
+            import_hint="当前候选为中国大学慕课搜索页，需先进入具体课程页后才能导入。",
         )
         return [candidate][: max(1, limit)]
 
