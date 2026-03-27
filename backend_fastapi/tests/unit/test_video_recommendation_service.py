@@ -4,9 +4,48 @@ from app.models.video import Video
 from app.models.video import VideoStatus
 from app.services import video_recommendation_service as recommendation_service
 from app.services.external_candidate_service import ExternalCandidate
+from app.services.external_candidate_service import ExternalCandidateFetchReport
+from app.services.external_candidate_service import ExternalProviderFetchSummary
 from app.services.video_recommendation_service import build_normalized_video_tags
 from app.services.video_recommendation_service import build_recommendation_profile
 from app.services.video_recommendation_service import recommend_videos
+
+
+def fake_fetch_external_candidates_report(*args, **kwargs):
+    """返回带 provider 报告的站外候选假数据。"""
+    return ExternalCandidateFetchReport(
+        candidates=[
+            ExternalCandidate(
+                id="bilibili:BV1demo",
+                provider="bilibili",
+                source_label="B站",
+                title="B站·导数与函数单调性综合串讲",
+                external_url="https://www.bilibili.com/video/BV1demo",
+                summary="适合配合站内数学视频继续复盘。",
+                tags=["数学", "导数", "函数"],
+                subject="数学",
+                primary_topic="导数",
+                cluster_key="数学::导数",
+            )
+        ],
+        providers=[
+            ExternalProviderFetchSummary(
+                provider="bilibili",
+                source_label="B站",
+                status="success",
+                candidate_count=1,
+                latency_ms=123,
+            ),
+            ExternalProviderFetchSummary(
+                provider="youtube",
+                source_label="YouTube",
+                status="failed",
+                candidate_count=0,
+                error_message="timeout",
+                latency_ms=800,
+            ),
+        ],
+    )
 
 
 def test_build_normalized_video_tags_prepends_subject_and_aliases():
@@ -121,23 +160,11 @@ def test_recommend_videos_include_external_candidates(monkeypatch):
         tags='["导数","函数"]',
     )
 
-    def fake_fetch_external_candidates(*args, **kwargs):
-        return [
-            ExternalCandidate(
-                id="bilibili:BV1demo",
-                provider="bilibili",
-                source_label="B站",
-                title="B站·导数与函数单调性综合串讲",
-                external_url="https://www.bilibili.com/video/BV1demo",
-                summary="适合配合站内数学视频继续复盘。",
-                tags=["数学", "导数", "函数"],
-                subject="数学",
-                primary_topic="导数",
-                cluster_key="数学::导数",
-            )
-        ]
-
-    monkeypatch.setattr(recommendation_service, "fetch_external_candidates", fake_fetch_external_candidates)
+    monkeypatch.setattr(
+        recommendation_service,
+        "fetch_external_candidates_report",
+        fake_fetch_external_candidates_report,
+    )
 
     payload = recommend_videos(
         videos=[internal_video],
@@ -151,4 +178,48 @@ def test_recommend_videos_include_external_candidates(monkeypatch):
     external_item = next(item for item in payload["items"] if item.get("is_external") is True)
     assert external_item["source_label"] == "B站"
     assert external_item["external_url"] == "https://www.bilibili.com/video/BV1demo"
+    assert external_item["can_import"] is True
+    assert external_item["action_api"] == "/api/recommendations/import-external"
+    assert external_item["action_method"] == "POST"
+    assert external_item["action_type"] == "import_external_url"
+    assert external_item["action_target"].startswith("/upload?mode=url&url=")
+    assert payload["internal_item_count"] == 1
+    assert payload["external_item_count"] == 1
+    assert payload["external_failed_provider_count"] == 1
+    assert payload["external_fetch_failed"] is True
+    assert payload["external_query"]["subject"] == "数学"
+    assert any(item["provider"] == "internal" for item in payload["sources"])
+    assert any(item["provider"] == "bilibili" for item in payload["sources"])
+    assert any(item["provider"] == "youtube" and item["status"] == "failed" for item in payload["external_providers"])
     assert payload["strategy"] == "video_status_interest_external_v2"
+
+
+def test_recommend_videos_internal_items_include_open_detail_action():
+    """站内推荐条目应带详情页跳转动作，便于前端统一处理。"""
+    internal_video = Video(
+        id=31,
+        title="函数极限与导数复盘",
+        filename="math-review.mp4",
+        filepath="/tmp/math-review.mp4",
+        status=VideoStatus.COMPLETED,
+        process_progress=100,
+        summary="围绕极限、导数定义与常见求导法则做复盘。",
+        tags='["导数","极限","函数"]',
+    )
+
+    payload = recommend_videos(
+        videos=[internal_video],
+        scene="home",
+        limit=2,
+        include_external=False,
+    )
+
+    item = payload["items"][0]
+    assert item["item_type"] == "video"
+    assert item["provider"] == "internal"
+    assert item["can_import"] is False
+    assert item["action_type"] == "open_video_detail"
+    assert item["action_target"] == f"/videos/{internal_video.id}"
+    assert payload["internal_item_count"] == 1
+    assert payload["external_item_count"] == 0
+    assert payload["sources"][0]["source_label"] == "站内视频"

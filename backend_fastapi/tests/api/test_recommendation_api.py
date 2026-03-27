@@ -3,6 +3,45 @@
 import pytest
 from app.services import video_recommendation_service as recommendation_service
 from app.services.external_candidate_service import ExternalCandidate
+from app.services.external_candidate_service import ExternalCandidateFetchReport
+from app.services.external_candidate_service import ExternalProviderFetchSummary
+
+
+def fake_fetch_external_candidates_report(*args, **kwargs):
+    """返回推荐接口测试用的站外候选假数据。"""
+    return ExternalCandidateFetchReport(
+        candidates=[
+            ExternalCandidate(
+                id="youtube:abc123",
+                provider="youtube",
+                source_label="YouTube",
+                title="YouTube · Calculus Review",
+                external_url="https://www.youtube.com/watch?v=abc123",
+                summary="适合配合当前数学主题继续学习。",
+                tags=["数学", "导数"],
+                subject="数学",
+                primary_topic="导数",
+                cluster_key="数学::导数",
+            )
+        ],
+        providers=[
+            ExternalProviderFetchSummary(
+                provider="youtube",
+                source_label="YouTube",
+                status="success",
+                candidate_count=1,
+                latency_ms=145,
+            ),
+            ExternalProviderFetchSummary(
+                provider="icourse163",
+                source_label="中国大学慕课",
+                status="failed",
+                candidate_count=0,
+                error_message="search failed",
+                latency_ms=620,
+            ),
+        ],
+    )
 
 
 @pytest.mark.api
@@ -202,23 +241,11 @@ class TestRecommendationAPI:
         db.add(internal_video)
         db.commit()
 
-        def fake_fetch_external_candidates(*args, **kwargs):
-            return [
-                ExternalCandidate(
-                    id="youtube:abc123",
-                    provider="youtube",
-                    source_label="YouTube",
-                    title="YouTube · Calculus Review",
-                    external_url="https://www.youtube.com/watch?v=abc123",
-                    summary="适合配合当前数学主题继续学习。",
-                    tags=["数学", "导数"],
-                    subject="数学",
-                    primary_topic="导数",
-                    cluster_key="数学::导数",
-                )
-            ]
-
-        monkeypatch.setattr(recommendation_service, "fetch_external_candidates", fake_fetch_external_candidates)
+        monkeypatch.setattr(
+            recommendation_service,
+            "fetch_external_candidates_report",
+            fake_fetch_external_candidates_report,
+        )
 
         response = client.get(
             "/api/recommendations/videos",
@@ -229,6 +256,16 @@ class TestRecommendationAPI:
         payload = response.json()
         assert payload["strategy"] == "video_status_interest_external_v2"
         assert any(item["id"] == internal_video.id for item in payload["items"])
+        assert payload["internal_item_count"] == 1
+        assert payload["external_item_count"] == 1
+        assert payload["external_failed_provider_count"] == 1
+        assert payload["external_fetch_failed"] is True
+        assert payload["external_query"]["subject"] == "数学"
+        assert any(item["provider"] == "internal" for item in payload["sources"])
+        assert any(item["provider"] == "youtube" for item in payload["sources"])
+        assert any(
+            item["provider"] == "icourse163" and item["status"] == "failed" for item in payload["external_providers"]
+        )
         external_item = next(item for item in payload["items"] if item.get("is_external") is True)
         assert external_item["source_label"] == "YouTube"
         assert external_item["external_url"] == "https://www.youtube.com/watch?v=abc123"

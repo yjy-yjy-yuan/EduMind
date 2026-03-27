@@ -9,12 +9,15 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable
 from typing import Optional
+from urllib.parse import urlencode
 
 from app.models.user import User
 from app.models.video import Video
 from app.models.video import VideoStatus
 from app.services.external_candidate_service import ExternalCandidate
-from app.services.external_candidate_service import fetch_external_candidates
+from app.services.external_candidate_service import ExternalProviderFetchSummary
+from app.services.external_candidate_service import fetch_external_candidates_report
+from app.services.external_candidate_service import serialize_provider_summary
 from app.services.video_content_service import build_subject_enriched_tags
 from app.services.video_content_service import fallback_primary_topic_name
 from app.services.video_content_service import infer_subject_from_text
@@ -89,6 +92,34 @@ class ExternalQueryContext:
     preferred_tags: list[str]
 
 
+@dataclass
+class RecommendationQuerySummary:
+    """推荐接口返回给前端的站外检索摘要。"""
+
+    query_text: str
+    subject: str
+    primary_topic: str
+    preferred_tags: list[str]
+
+
+@dataclass
+class RecommendationSourceSummary:
+    """推荐结果来源统计。"""
+
+    source_type: str
+    provider: str
+    source_label: str
+    count: int
+
+
+@dataclass
+class RankedExternalRecommendationBundle:
+    """站外推荐排序结果与 provider 报告。"""
+
+    items: list[tuple[float, datetime, dict]]
+    providers: list[ExternalProviderFetchSummary]
+
+
 def list_recommendation_scenes() -> list[dict]:
     """返回支持的推荐场景。"""
     return [dict(item) for item in SCENE_OPTIONS]
@@ -121,6 +152,25 @@ def build_normalized_video_tags(video: Video) -> list[str]:
         summary=video.summary or "",
         max_tags=8,
     )
+
+
+def build_internal_action_target(video: Video) -> str:
+    """生成站内视频详情页目标。"""
+    return f"/videos/{video.id}"
+
+
+def build_external_action_target(candidate: ExternalCandidate) -> str:
+    """生成站外候选导入目标。"""
+    if not candidate.can_import:
+        return candidate.external_url
+    query = urlencode(
+        {
+            "mode": "url",
+            "url": candidate.external_url,
+            "source": candidate.source_label,
+        }
+    )
+    return f"/upload?{query}"
 
 
 def unique_tokens(values: Iterable[str]) -> list[str]:
@@ -458,8 +508,22 @@ def serialize_recommendation_item(
         "reason_code": reason_code,
         "reason_label": reason_label,
         "reason_text": reason_text,
+        "is_external": False,
+        "item_type": "video",
+        "source_label": "站内视频",
+        "external_source_label": None,
+        "external_url": None,
         "subject": profile.subject,
         "cluster_key": profile.cluster_key,
+        "author": None,
+        "provider": "internal",
+        "can_import": False,
+        "import_hint": "",
+        "action_type": "open_video_detail",
+        "action_label": "打开详情",
+        "action_target": build_internal_action_target(video),
+        "action_api": None,
+        "action_method": None,
     }
 
 
@@ -472,6 +536,8 @@ def serialize_external_candidate_item(
     reason_text: str,
 ) -> dict:
     """序列化站外候选条目。"""
+    action_type = "import_external_url" if candidate.can_import else "open_external_source"
+    action_label = "导入学习" if candidate.can_import else "打开来源"
     return {
         "id": candidate.id,
         "title": candidate.title,
@@ -497,6 +563,14 @@ def serialize_external_candidate_item(
         "subject": candidate.subject,
         "cluster_key": candidate.cluster_key,
         "author": candidate.author,
+        "provider": candidate.provider,
+        "can_import": candidate.can_import,
+        "import_hint": candidate.import_hint,
+        "action_type": action_type,
+        "action_label": action_label,
+        "action_target": build_external_action_target(candidate),
+        "action_api": "/api/recommendations/import-external" if candidate.can_import else None,
+        "action_method": "POST" if candidate.can_import else None,
     }
 
 
@@ -547,6 +621,85 @@ def build_external_query_context(
         primary_topic=primary_topic,
         preferred_tags=preferred_tags,
     )
+
+
+def serialize_query_summary(query_context: ExternalQueryContext) -> dict:
+    """序列化站外检索摘要。"""
+    summary = RecommendationQuerySummary(
+        query_text=query_context.query_text,
+        subject=query_context.subject,
+        primary_topic=query_context.primary_topic,
+        preferred_tags=list(query_context.preferred_tags),
+    )
+    return {
+        "query_text": summary.query_text,
+        "subject": summary.subject,
+        "primary_topic": summary.primary_topic,
+        "preferred_tags": summary.preferred_tags,
+    }
+
+
+def summarize_recommendation_sources(items: list[dict]) -> list[dict]:
+    """汇总推荐结果来源分布。"""
+    counter = Counter()
+    labels = {}
+    source_types = {}
+
+    for item in items:
+        is_external = bool(item.get("is_external"))
+        provider = str(item.get("provider") or ("external" if is_external else "internal")).strip()
+        source_label = str(item.get("source_label") or ("站外候选" if is_external else "站内视频")).strip()
+        source_type = "external" if is_external else "internal"
+        key = (source_type, provider, source_label)
+        counter[key] += 1
+        labels[key] = source_label
+        source_types[key] = source_type
+
+    ordered_keys = sorted(
+        counter.keys(),
+        key=lambda item: (
+            0 if source_types[item] == "internal" else 1,
+            -counter[item],
+            labels[item],
+        ),
+    )
+    summaries = []
+    for source_type, provider, source_label in ordered_keys:
+        summary = RecommendationSourceSummary(
+            source_type=source_type,
+            provider=provider,
+            source_label=source_label,
+            count=counter[(source_type, provider, source_label)],
+        )
+        summaries.append(
+            {
+                "source_type": summary.source_type,
+                "provider": summary.provider,
+                "source_label": summary.source_label,
+                "count": summary.count,
+            }
+        )
+    return summaries
+
+
+def count_external_items(items: list[dict]) -> int:
+    """统计返回结果中的站外候选数量。"""
+    return sum(1 for item in items if item.get("is_external"))
+
+
+def count_internal_items(items: list[dict]) -> int:
+    """统计返回结果中的站内条目数量。"""
+    return sum(1 for item in items if not item.get("is_external"))
+
+
+def summarize_external_providers(provider_summaries: list[ExternalProviderFetchSummary]) -> list[dict]:
+    """序列化站外 provider 抓取摘要。"""
+    return [serialize_provider_summary(summary) for summary in provider_summaries]
+
+
+def count_failed_external_providers(provider_summaries: list[ExternalProviderFetchSummary]) -> int:
+    """统计失败的站外 provider 数量。"""
+    return sum(1 for summary in provider_summaries if summary.status == "failed")
 
 
 def build_ranked_internal_items(
@@ -615,16 +768,16 @@ def build_ranked_external_items(
     user_tokens: list[str],
     user_subject: str,
     limit: int,
-) -> list[tuple[float, datetime, dict]]:
-    """生成站外候选条目。"""
-    candidates = fetch_external_candidates(
+) -> RankedExternalRecommendationBundle:
+    """生成站外候选条目，并附带 provider 报告。"""
+    report = fetch_external_candidates_report(
         query_context.query_text,
         subject_hint=query_context.subject,
         preferred_tags=query_context.preferred_tags,
         limit=max(1, limit),
     )
     ranked_items = []
-    for candidate in candidates:
+    for candidate in report.candidates:
         score, reason_code, reason_label, reason_text = score_external_candidate(
             candidate=candidate,
             scene=scene,
@@ -649,7 +802,7 @@ def build_ranked_external_items(
             )
         )
     ranked_items.sort(key=lambda item: (item[0], item[1]), reverse=True)
-    return ranked_items
+    return RankedExternalRecommendationBundle(items=ranked_items, providers=report.providers)
 
 
 def select_combined_items(
@@ -709,6 +862,8 @@ def recommend_videos(
     now = datetime.utcnow()
     profiles = {video.id: build_recommendation_profile(video) for video in videos}
     seed_profile = profiles.get(seed_video.id) if seed_video is not None else None
+    external_query_summary = None
+    external_provider_summaries: list[ExternalProviderFetchSummary] = []
 
     internal_ranked_items = build_ranked_internal_items(
         videos=videos,
@@ -731,7 +886,8 @@ def recommend_videos(
             seed_profile=seed_profile,
             user_subject=user_subject,
         )
-        external_ranked_items = build_ranked_external_items(
+        external_query_summary = serialize_query_summary(query_context)
+        external_bundle = build_ranked_external_items(
             query_context=query_context,
             scene=normalized_scene,
             seed_video=seed_video,
@@ -740,9 +896,10 @@ def recommend_videos(
             user_subject=user_subject,
             limit=min(limit, 4),
         )
+        external_provider_summaries = external_bundle.providers
         items = select_combined_items(
             internal_items=internal_ranked_items,
-            external_items=external_ranked_items,
+            external_items=external_bundle.items,
             limit=limit,
         )
 
@@ -770,6 +927,9 @@ def recommend_videos(
             for video in recent_videos
         ]
 
+    internal_item_count = count_internal_items(items)
+    external_item_count = count_external_items(items)
+    external_failed_provider_count = count_failed_external_providers(external_provider_summaries)
     return {
         "scene": normalized_scene,
         "strategy": "video_status_interest_external_v2" if include_external else "video_status_interest_v1",
@@ -777,5 +937,12 @@ def recommend_videos(
         "fallback_used": fallback_used,
         "seed_video_id": seed_video.id if seed_video is not None else None,
         "seed_video_title": seed_video.title if seed_video is not None else None,
+        "internal_item_count": internal_item_count,
+        "external_item_count": external_item_count,
+        "external_failed_provider_count": external_failed_provider_count,
+        "external_fetch_failed": external_failed_provider_count > 0,
+        "sources": summarize_recommendation_sources(items),
+        "external_query": external_query_summary,
+        "external_providers": summarize_external_providers(external_provider_summaries),
         "items": items,
     }

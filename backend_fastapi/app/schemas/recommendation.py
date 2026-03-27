@@ -52,6 +52,43 @@ class RecommendationVideoItem(BaseModel):
     subject: Optional[str] = None
     cluster_key: Optional[str] = None
     author: Optional[str] = None
+    provider: Optional[str] = None
+    can_import: bool = False
+    import_hint: Optional[str] = None
+    action_type: Optional[str] = None
+    action_label: Optional[str] = None
+    action_target: Optional[str] = None
+    action_api: Optional[str] = None
+    action_method: Optional[str] = None
+
+
+class RecommendationSourceItem(BaseModel):
+    """推荐来源统计。"""
+
+    source_type: str = Field(..., description="internal/external")
+    provider: str = Field(..., description="来源 provider 标识")
+    source_label: str = Field(..., description="来源展示名称")
+    count: int = Field(default=0, description="当前返回结果中该来源条目数")
+
+
+class RecommendationExternalQuery(BaseModel):
+    """站外候选检索摘要。"""
+
+    query_text: str = Field(default="", description="站外检索关键词")
+    subject: str = Field(default="", description="本次检索聚焦科目")
+    primary_topic: str = Field(default="", description="本次检索主主题")
+    preferred_tags: List[str] = Field(default_factory=list, description="优先标签")
+
+
+class RecommendationExternalProviderItem(BaseModel):
+    """站外 provider 抓取摘要。"""
+
+    provider: str = Field(..., description="provider 标识")
+    source_label: str = Field(..., description="provider 展示名称")
+    status: str = Field(default="success", description="success/empty/failed")
+    candidate_count: int = Field(default=0, description="本次抓取产出的候选条数")
+    error_message: str = Field(default="", description="失败摘要")
+    latency_ms: int = Field(default=0, description="抓取耗时（毫秒）")
 
 
 class VideoRecommendationResponse(BaseModel):
@@ -64,4 +101,11 @@ class VideoRecommendationResponse(BaseModel):
     fallback_used: bool = False
     seed_video_id: Optional[int] = None
     seed_video_title: Optional[str] = None
+    internal_item_count: int = 0
+    external_item_count: int = 0
+    external_failed_provider_count: int = 0
+    external_fetch_failed: bool = False
+    sources: List[RecommendationSourceItem] = Field(default_factory=list)
+    external_query: Optional[RecommendationExternalQuery] = None
+    external_providers: List[RecommendationExternalProviderItem] = Field(default_factory=list)
     items: List[RecommendationVideoItem] = Field(default_factory=list)

@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from html import unescape
+from time import perf_counter
 from typing import Optional
 from urllib.parse import quote_plus
 
@@ -48,9 +49,110 @@ class ExternalCandidate:
     subject: str = ""
     primary_topic: str = ""
     cluster_key: str = ""
+    can_import: bool = True
+    import_hint: str = ""
 
     def __post_init__(self):
         self.tags = list(self.tags or [])
+
+
+@dataclass
+class ExternalProviderFetchSummary:
+    """单个 provider 的抓取摘要。"""
+
+    provider: str
+    source_label: str
+    status: str
+    candidate_count: int = 0
+    error_message: str = ""
+    latency_ms: int = 0
+
+
+@dataclass
+class ExternalCandidateFetchReport:
+    """站外候选抓取总报告。"""
+
+    candidates: list[ExternalCandidate]
+    providers: list[ExternalProviderFetchSummary]
+
+
+def build_provider_success_summary(
+    adapter: "ExternalCandidateAdapter",
+    *,
+    candidate_count: int,
+    latency_ms: int,
+) -> ExternalProviderFetchSummary:
+    """构建 provider 成功摘要。"""
+    status = "success" if candidate_count > 0 else "empty"
+    return ExternalProviderFetchSummary(
+        provider=adapter.provider,
+        source_label=adapter.source_label,
+        status=status,
+        candidate_count=candidate_count,
+        latency_ms=latency_ms,
+    )
+
+
+def build_provider_failure_summary(
+    adapter: "ExternalCandidateAdapter",
+    *,
+    error_message: str,
+    latency_ms: int,
+) -> ExternalProviderFetchSummary:
+    """构建 provider 失败摘要。"""
+    return ExternalProviderFetchSummary(
+        provider=adapter.provider,
+        source_label=adapter.source_label,
+        status="failed",
+        candidate_count=0,
+        error_message=clean_text(error_message),
+        latency_ms=latency_ms,
+    )
+
+
+def log_provider_fetch_start(adapter: "ExternalCandidateAdapter", query_text: str) -> None:
+    """记录 provider 抓取开始日志。"""
+    logger.debug("站外候选抓取开始 | provider=%s | query=%s", adapter.provider, query_text)
+
+
+def log_provider_fetch_success(
+    adapter: "ExternalCandidateAdapter",
+    *,
+    query_text: str,
+    candidate_count: int,
+    latency_ms: int,
+) -> None:
+    """记录 provider 抓取成功日志。"""
+    logger.debug(
+        "站外候选抓取完成 | provider=%s | query=%s | count=%s | latency_ms=%s",
+        adapter.provider,
+        query_text,
+        candidate_count,
+        latency_ms,
+    )
+
+
+def log_provider_fetch_failure(
+    adapter: "ExternalCandidateAdapter",
+    *,
+    query_text: str,
+    error_message: str,
+    latency_ms: int,
+) -> None:
+    """记录 provider 抓取失败日志。"""
+    logger.debug(
+        "站外候选抓取失败 | provider=%s | query=%s | latency_ms=%s | error=%s",
+        adapter.provider,
+        query_text,
+        latency_ms,
+        error_message,
+    )
+    logger.warning(
+        "站外候选抓取失败 | provider=%s | query=%s | error=%s",
+        adapter.provider,
+        query_text,
+        error_message,
+    )
 
 
 def clean_text(value: str) -> str:
@@ -129,6 +231,8 @@ class ExternalCandidateAdapter:
         upload_time: Optional[datetime] = None,
         tags: Optional[list[str]] = None,
         subject_hint: str = "",
+        can_import: bool = True,
+        import_hint: str = "",
     ) -> ExternalCandidate:
         normalized_tags, subject, primary_topic, cluster_key = enrich_candidate_tags(
             title=title,
@@ -149,6 +253,8 @@ class ExternalCandidateAdapter:
             subject=subject,
             primary_topic=primary_topic,
             cluster_key=cluster_key,
+            can_import=can_import,
+            import_hint=clean_text(import_hint),
         )
 
 
@@ -329,22 +435,37 @@ EXTERNAL_CANDIDATE_ADAPTERS: tuple[ExternalCandidateAdapter, ...] = (
 )
 
 
-def fetch_external_candidates(
+def serialize_provider_summary(summary: ExternalProviderFetchSummary) -> dict:
+    """序列化 provider 摘要。"""
+    return {
+        "provider": summary.provider,
+        "source_label": summary.source_label,
+        "status": summary.status,
+        "candidate_count": summary.candidate_count,
+        "error_message": summary.error_message,
+        "latency_ms": summary.latency_ms,
+    }
+
+
+def fetch_external_candidates_report(
     query_text: str,
     *,
     subject_hint: str = "",
     preferred_tags: Optional[list[str]] = None,
     limit: int = 3,
-) -> list[ExternalCandidate]:
-    """按统一接口抓取站外候选元数据。"""
+) -> ExternalCandidateFetchReport:
+    """按统一接口抓取站外候选元数据并返回 provider 摘要。"""
     normalized_query = clean_text(query_text)
     if not normalized_query:
-        return []
+        return ExternalCandidateFetchReport(candidates=[], providers=[])
 
     candidates = []
+    provider_summaries = []
     seen_urls = set()
     per_provider_limit = 1 if limit <= 3 else 2
     for adapter in EXTERNAL_CANDIDATE_ADAPTERS:
+        start = perf_counter()
+        log_provider_fetch_start(adapter, normalized_query)
         try:
             provider_items = adapter.search(
                 normalized_query,
@@ -353,22 +474,74 @@ def fetch_external_candidates(
                 limit=per_provider_limit,
             )
         except requests.RequestException as exc:
-            logger.warning(
-                "站外候选抓取失败 | provider=%s | query=%s | error=%s", adapter.provider, normalized_query, exc
+            latency_ms = int((perf_counter() - start) * 1000)
+            error_message = str(exc)
+            log_provider_fetch_failure(
+                adapter,
+                query_text=normalized_query,
+                error_message=error_message,
+                latency_ms=latency_ms,
+            )
+            provider_summaries.append(
+                build_provider_failure_summary(adapter, error_message=error_message, latency_ms=latency_ms)
             )
             continue
         except Exception as exc:
-            logger.warning(
-                "站外候选解析失败 | provider=%s | query=%s | error=%s", adapter.provider, normalized_query, exc
+            latency_ms = int((perf_counter() - start) * 1000)
+            error_message = str(exc)
+            log_provider_fetch_failure(
+                adapter,
+                query_text=normalized_query,
+                error_message=error_message,
+                latency_ms=latency_ms,
+            )
+            provider_summaries.append(
+                build_provider_failure_summary(adapter, error_message=error_message, latency_ms=latency_ms)
             )
             continue
 
+        provider_added = 0
         for item in provider_items:
             if not item.external_url or item.external_url in seen_urls:
                 continue
             seen_urls.add(item.external_url)
             candidates.append(item)
+            provider_added += 1
             if len(candidates) >= limit:
-                return candidates[:limit]
+                break
 
-    return candidates[:limit]
+        latency_ms = int((perf_counter() - start) * 1000)
+        log_provider_fetch_success(
+            adapter,
+            query_text=normalized_query,
+            candidate_count=provider_added,
+            latency_ms=latency_ms,
+        )
+        provider_summaries.append(
+            build_provider_success_summary(
+                adapter,
+                candidate_count=provider_added,
+                latency_ms=latency_ms,
+            )
+        )
+        if len(candidates) >= limit:
+            break
+
+    return ExternalCandidateFetchReport(candidates=candidates[:limit], providers=provider_summaries)
+
+
+def fetch_external_candidates(
+    query_text: str,
+    *,
+    subject_hint: str = "",
+    preferred_tags: Optional[list[str]] = None,
+    limit: int = 3,
+) -> list[ExternalCandidate]:
+    """兼容旧调用方，只返回站外候选列表。"""
+    report = fetch_external_candidates_report(
+        query_text,
+        subject_hint=subject_hint,
+        preferred_tags=preferred_tags,
+        limit=limit,
+    )
+    return report.candidates
