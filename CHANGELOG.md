@@ -780,6 +780,21 @@
 
 ## 2026-03-27
 
+### 降低推荐路由与视频路由的耦合
+
+- 新增 [`backend_fastapi/app/services/video_api_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_api_service.py)：集中承载视频接口共享的处理参数构建、处理元数据补充和视频序列化逻辑，避免这些 API 辅助函数继续散落在 router 层。
+- 更新 [`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：推荐路由不再直接依赖视频路由中的函数，视频路由也改为复用共享 service，收紧 router 间耦合，为后续继续拆分推荐链路做准备。
+
+## 2026-03-27
+
+### 收紧上传后推荐链路并增加站外抓取缓存
+
+- 更新 [`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)：为站外候选抓取增加短 TTL 内存缓存，避免首页、推荐页和上传回流在短时间内重复打 B 站、YouTube、中国大学慕课等外部源；同时保持返回对象复制，避免缓存对象被调用方改写。
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：将上传成功响应中的自动推荐收紧为“先返回站内推荐”，不再在上传主链路里同步触发站外抓取，降低外部源波动对上传接口延迟的影响。
+- 更新 [`backend_fastapi/tests/unit/test_external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_external_candidate_service.py)、[`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充站外抓取缓存命中测试，并调整上传接口测试，确保上传后自动返回的是轻量站内推荐结果。
+
+## 2026-03-27
+
 ### 强化推荐接口编排信息
 
 - 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：为站内视频和站外候选统一补充 `provider`、`action_type`、`action_label`、`action_target` 等动作字段，并在推荐结果中新增站内/站外数量统计、来源分布汇总和站外检索上下文摘要，方便前端按“打开详情 / 导入学习”两类动作直接消费。

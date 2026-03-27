@@ -11,17 +11,17 @@ def fake_upload_recommendations(*args, **kwargs):
     """上传后自动返回的推荐结果假数据。"""
     return {
         "scene": "related",
-        "strategy": "video_status_interest_external_v2",
+        "strategy": "video_status_interest_v1",
         "items": [
             {
-                "id": "youtube:abc123",
-                "title": "YouTube · Calculus Review",
-                "is_external": True,
-                "source_label": "YouTube",
+                "id": 88,
+                "title": "站内导数复盘",
+                "is_external": False,
+                "source_label": "站内视频",
             }
         ],
-        "external_item_count": 1,
-        "internal_item_count": 0,
+        "external_item_count": 0,
+        "internal_item_count": 1,
     }
 
 
@@ -221,7 +221,8 @@ class TestVideoAPI:
         assert payload["data"]["requested_model"] == "small"
         assert payload["data"]["effective_model"] == "small"
         assert payload["recommendations"]["scene"] == "related"
-        assert payload["recommendations"]["items"][0]["source_label"] == "YouTube"
+        assert payload["recommendations"]["items"][0]["source_label"] == "站内视频"
+        assert payload["recommendations"]["external_item_count"] == 0
         assert os.path.exists(payload["data"]["filepath"])
         assert payload["message"] == "视频上传成功，已开始后台处理"
 
@@ -292,7 +293,8 @@ class TestVideoAPI:
         assert payload["data"]["status"] == "downloading"
         assert payload["data"]["requested_model"] == "medium"
         assert payload["recommendations"]["scene"] == "related"
-        assert payload["recommendations"]["items"][0]["title"] == "YouTube · Calculus Review"
+        assert payload["recommendations"]["items"][0]["title"] == "站内导数复盘"
+        assert payload["recommendations"]["external_item_count"] == 0
 
         video = db.query(Video).filter(Video.id == payload["id"]).first()
         assert video is not None

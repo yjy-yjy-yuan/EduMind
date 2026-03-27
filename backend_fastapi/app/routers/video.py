@@ -27,12 +27,14 @@ from app.schemas.video import VideoSummaryRequest
 from app.schemas.video import VideoTagRequest
 from app.schemas.video import VideoUploadResponse
 from app.schemas.video import VideoUploadURL
+from app.services.video_api_service import build_processing_metadata
+from app.services.video_api_service import build_processing_options
+from app.services.video_api_service import serialize_video
 from app.services.video_content_service import generate_primary_topic_name
 from app.services.video_content_service import generate_video_summary
 from app.services.video_content_service import normalize_summary_style
 from app.services.video_content_service import read_subtitle_text
 from app.services.video_processing_registry import forget_video_processing_request
-from app.services.video_processing_registry import get_video_processing_request
 from app.services.video_processing_registry import remember_video_processing_request
 from app.services.video_recommendation_service import recommend_videos
 from app.services.video_url_import_service import import_remote_video_from_url
@@ -60,7 +62,6 @@ ALLOWED_EXTENSIONS = {ext.lower() for ext in settings.ALLOWED_EXTENSIONS}
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 STREAM_CHUNK_SIZE = 1024 * 1024
 BYTE_RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
-MODEL_STEP_RE = re.compile(r"（([a-z0-9._-]+)）")
 
 
 def allowed_file(filename: str) -> bool:
@@ -179,58 +180,6 @@ def iter_file_chunk(filepath: str, start: int = 0, end: Optional[int] = None):
                 remaining -= len(chunk)
 
 
-def build_processing_options(
-    *,
-    language: str = "Other",
-    model: Optional[str] = None,
-    auto_generate_summary: bool = True,
-    auto_generate_tags: bool = True,
-    summary_style: str = "study",
-) -> dict:
-    """规范化视频处理参数。"""
-    whisper_language = "en" if str(language or "").strip() == "English" else "zh"
-    auto_tags = bool(auto_generate_tags)
-    try:
-        normalized_model = normalize_whisper_model_name(model or settings.WHISPER_MODEL)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {
-        "language": whisper_language,
-        "model": normalized_model,
-        "auto_generate_summary": bool(auto_generate_summary or auto_tags),
-        "auto_generate_tags": auto_tags,
-        "summary_style": normalize_summary_style(summary_style),
-    }
-
-
-def infer_model_from_step(step: Optional[str]) -> Optional[str]:
-    text = str(step or "").strip()
-    if not text:
-        return None
-    match = MODEL_STEP_RE.search(text)
-    return match.group(1).strip() if match else None
-
-
-def build_processing_metadata(video: Video) -> dict:
-    request_meta = get_video_processing_request(video.id) or {}
-    requested_model = str(request_meta.get("requested_model") or "").strip() or infer_model_from_step(
-        video.current_step
-    )
-    effective_model = str(request_meta.get("effective_model") or requested_model or "").strip() or None
-    requested_language = str(request_meta.get("requested_language") or "").strip() or None
-    return {
-        "requested_model": requested_model or None,
-        "effective_model": effective_model,
-        "requested_language": requested_language,
-    }
-
-
-def serialize_video(video: Video) -> dict:
-    payload = video.to_dict()
-    payload.update(build_processing_metadata(video))
-    return payload
-
-
 def should_use_related_scene_for_upload(video: Video) -> bool:
     """上传后若已有标题/摘要/标签，则优先返回与该视频相关的推荐。"""
     if str(video.title or "").strip():
@@ -241,7 +190,7 @@ def should_use_related_scene_for_upload(video: Video) -> bool:
 
 
 def build_upload_recommendations(db: Session, *, video: Video, limit: int = 4) -> Optional[dict]:
-    """上传后自动获取推荐结果，减少用户二次点击。"""
+    """上传后自动获取推荐结果，默认仅返回站内结果以减少上传链路抖动。"""
     try:
         videos = db.query(Video).order_by(Video.updated_at.desc(), Video.upload_time.desc()).all()
         if not videos:
@@ -253,7 +202,7 @@ def build_upload_recommendations(db: Session, *, video: Video, limit: int = 4) -
             scene=scene,
             limit=limit,
             seed_video=seed_video,
-            include_external=True,
+            include_external=False,
         )
     except Exception as exc:
         logger.debug("上传后自动获取推荐失败 | video_id=%s | error=%s", video.id, exc)

@@ -59,6 +59,29 @@ class GoodAdapter(service.ExternalCandidateAdapter):
         ]
 
 
+class CountingAdapter(service.ExternalCandidateAdapter):
+    """记录调用次数的 provider。"""
+
+    provider = "counting"
+    source_label = "计数源"
+
+    def __init__(self):
+        self.call_count = 0
+
+    def search(self, *args, **kwargs):
+        self.call_count += 1
+        return [
+            self.build_candidate(
+                raw_id=f"count-{self.call_count}",
+                title="导数专题复盘",
+                external_url=f"https://example.com/{self.call_count}",
+                summary="缓存测试使用的站外候选。",
+                tags=["数学", "导数"],
+                subject_hint="数学",
+            )
+        ]
+
+
 def test_bilibili_adapter_parses_search_results(monkeypatch):
     """B 站适配器应能提取标题、作者与链接。"""
     html = """
@@ -128,6 +151,7 @@ def test_youtube_adapter_parses_yt_initial_data(monkeypatch):
 
 def test_fetch_external_candidates_isolates_provider_failures(monkeypatch):
     """单个 provider 失败时，不应阻断其他站外候选返回。"""
+    service.clear_external_candidate_report_cache()
 
     monkeypatch.setattr(service, "EXTERNAL_CANDIDATE_ADAPTERS", (BrokenAdapter(), GoodAdapter()))
 
@@ -140,6 +164,7 @@ def test_fetch_external_candidates_isolates_provider_failures(monkeypatch):
 
 def test_fetch_external_candidates_report_tracks_provider_failures(monkeypatch, caplog):
     """站外抓取报告应包含 provider 失败摘要，并输出 DEBUG 日志。"""
+    service.clear_external_candidate_report_cache()
     monkeypatch.setattr(service, "EXTERNAL_CANDIDATE_ADAPTERS", (BrokenAdapter(), GoodAdapter()))
 
     with caplog.at_level(logging.DEBUG):
@@ -163,6 +188,7 @@ def test_fetch_external_candidates_report_tracks_provider_failures(monkeypatch, 
 
 def test_mooc_adapter_marks_search_candidate_as_non_importable(monkeypatch):
     """慕课搜索页候选应显式标记为暂不可直接导入。"""
+    service.clear_external_candidate_report_cache()
     html = "<title>搜索课程_中国大学MOOC(慕课)</title>"
     monkeypatch.setattr(service.requests, "get", lambda *args, **kwargs: FakeResponse(html))
 
@@ -177,6 +203,7 @@ def test_mooc_adapter_marks_search_candidate_as_non_importable(monkeypatch):
 
 def test_mooc_adapter_resolves_course_page_from_search_result(monkeypatch):
     """慕课适配器应优先把搜索词解析成具体课程页链接。"""
+    service.clear_external_candidate_report_cache()
     duckduckgo_html = """
     <a rel="nofollow" class="result__a"
        href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.icourse163.org%2Flearn%2FZJU-1003315004%3Ftid%3D1472024446">
@@ -192,3 +219,20 @@ def test_mooc_adapter_resolves_course_page_from_search_result(monkeypatch):
     assert items[0].source_label == "中国大学慕课"
     assert items[0].can_import is True
     assert items[0].external_url == "https://www.icourse163.org/learn/ZJU-1003315004?tid=1472024446"
+
+
+def test_fetch_external_candidates_report_uses_short_ttl_cache(monkeypatch):
+    """同一检索条件应短时间命中缓存，避免重复打外部源。"""
+    service.clear_external_candidate_report_cache()
+    adapter = CountingAdapter()
+    monkeypatch.setattr(service, "EXTERNAL_CANDIDATE_ADAPTERS", (adapter,))
+
+    first = service.fetch_external_candidates_report("数学 导数", subject_hint="数学", preferred_tags=["导数"], limit=2)
+    second = service.fetch_external_candidates_report(
+        "数学 导数", subject_hint="数学", preferred_tags=["导数"], limit=2
+    )
+
+    assert adapter.call_count == 1
+    assert first.candidates[0].external_url == "https://example.com/1"
+    assert second.candidates[0].external_url == "https://example.com/1"
+    assert first.candidates[0] is not second.candidates[0]

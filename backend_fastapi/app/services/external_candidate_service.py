@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from html import unescape
+from time import monotonic
 from time import perf_counter
 from typing import Optional
 from urllib.parse import parse_qs
@@ -23,6 +24,7 @@ from app.services.video_content_service import infer_subject_from_text
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT_SECONDS = 8
+EXTERNAL_CANDIDATE_CACHE_TTL_SECONDS = 120
 COMMON_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -38,6 +40,9 @@ DUCKDUCKGO_RESULT_RE = re.compile(
     r'<a[^>]*class="result__a"[^>]*href="(?P<href>[^"]+)"[^>]*>(?P<title>.*?)</a>',
     re.S,
 )
+EXTERNAL_CANDIDATE_REPORT_CACHE: dict[
+    tuple[str, str, tuple[str, ...], int], tuple[float, "ExternalCandidateFetchReport"]
+] = {}
 
 
 @dataclass
@@ -81,6 +86,109 @@ class ExternalCandidateFetchReport:
 
     candidates: list[ExternalCandidate]
     providers: list[ExternalProviderFetchSummary]
+
+
+def build_external_cache_key(
+    query_text: str,
+    *,
+    subject_hint: str = "",
+    preferred_tags: Optional[list[str]] = None,
+    limit: int = 3,
+) -> tuple[str, str, tuple[str, ...], int]:
+    """构建站外候选抓取缓存键。"""
+    normalized_query = clean_text(query_text)
+    normalized_subject = clean_text(subject_hint)
+    normalized_tags = tuple(dedupe_keep_order(list(preferred_tags or [])))
+    normalized_limit = max(1, int(limit))
+    return normalized_query, normalized_subject, normalized_tags, normalized_limit
+
+
+def clone_external_candidate(candidate: ExternalCandidate) -> ExternalCandidate:
+    """复制站外候选，避免缓存对象被调用方修改。"""
+    return ExternalCandidate(
+        id=candidate.id,
+        provider=candidate.provider,
+        source_label=candidate.source_label,
+        title=candidate.title,
+        external_url=candidate.external_url,
+        summary=candidate.summary,
+        tags=list(candidate.tags or []),
+        author=candidate.author,
+        upload_time=candidate.upload_time,
+        subject=candidate.subject,
+        primary_topic=candidate.primary_topic,
+        cluster_key=candidate.cluster_key,
+        can_import=candidate.can_import,
+        import_hint=candidate.import_hint,
+    )
+
+
+def clone_provider_summary(summary: ExternalProviderFetchSummary) -> ExternalProviderFetchSummary:
+    """复制 provider 抓取摘要。"""
+    return ExternalProviderFetchSummary(
+        provider=summary.provider,
+        source_label=summary.source_label,
+        status=summary.status,
+        candidate_count=summary.candidate_count,
+        error_message=summary.error_message,
+        latency_ms=summary.latency_ms,
+    )
+
+
+def clone_external_candidate_fetch_report(report: ExternalCandidateFetchReport) -> ExternalCandidateFetchReport:
+    """复制抓取报告，避免缓存对象被外部修改。"""
+    return ExternalCandidateFetchReport(
+        candidates=[clone_external_candidate(item) for item in report.candidates],
+        providers=[clone_provider_summary(item) for item in report.providers],
+    )
+
+
+def clear_external_candidate_report_cache() -> None:
+    """清空站外候选抓取缓存。"""
+    EXTERNAL_CANDIDATE_REPORT_CACHE.clear()
+
+
+def get_cached_external_candidate_report(
+    query_text: str,
+    *,
+    subject_hint: str = "",
+    preferred_tags: Optional[list[str]] = None,
+    limit: int = 3,
+) -> Optional[ExternalCandidateFetchReport]:
+    """读取有效的站外候选抓取缓存。"""
+    cache_key = build_external_cache_key(
+        query_text,
+        subject_hint=subject_hint,
+        preferred_tags=preferred_tags,
+        limit=limit,
+    )
+    cached = EXTERNAL_CANDIDATE_REPORT_CACHE.get(cache_key)
+    if not cached:
+        return None
+    cached_at, report = cached
+    if monotonic() - cached_at > EXTERNAL_CANDIDATE_CACHE_TTL_SECONDS:
+        EXTERNAL_CANDIDATE_REPORT_CACHE.pop(cache_key, None)
+        return None
+    logger.debug("站外候选抓取命中缓存 | query=%s | subject=%s | limit=%s", cache_key[0], cache_key[1], cache_key[3])
+    return clone_external_candidate_fetch_report(report)
+
+
+def set_cached_external_candidate_report(
+    query_text: str,
+    *,
+    subject_hint: str = "",
+    preferred_tags: Optional[list[str]] = None,
+    limit: int = 3,
+    report: ExternalCandidateFetchReport,
+) -> None:
+    """写入站外候选抓取缓存。"""
+    cache_key = build_external_cache_key(
+        query_text,
+        subject_hint=subject_hint,
+        preferred_tags=preferred_tags,
+        limit=limit,
+    )
+    EXTERNAL_CANDIDATE_REPORT_CACHE[cache_key] = (monotonic(), clone_external_candidate_fetch_report(report))
 
 
 def build_provider_success_summary(
@@ -558,6 +666,14 @@ def fetch_external_candidates_report(
     normalized_query = clean_text(query_text)
     if not normalized_query:
         return ExternalCandidateFetchReport(candidates=[], providers=[])
+    cached_report = get_cached_external_candidate_report(
+        normalized_query,
+        subject_hint=subject_hint,
+        preferred_tags=preferred_tags,
+        limit=limit,
+    )
+    if cached_report is not None:
+        return cached_report
 
     candidates = []
     provider_summaries = []
@@ -627,7 +743,15 @@ def fetch_external_candidates_report(
         if len(candidates) >= limit:
             break
 
-    return ExternalCandidateFetchReport(candidates=candidates[:limit], providers=provider_summaries)
+    report = ExternalCandidateFetchReport(candidates=candidates[:limit], providers=provider_summaries)
+    set_cached_external_candidate_report(
+        normalized_query,
+        subject_hint=subject_hint,
+        preferred_tags=preferred_tags,
+        limit=limit,
+        report=report,
+    )
+    return clone_external_candidate_fetch_report(report)
 
 
 def fetch_external_candidates(
