@@ -34,6 +34,20 @@ const normalizeSegments = (segments) => {
     }))
 }
 
+const normalizeTags = (tags) => {
+  if (!Array.isArray(tags)) return []
+  const seen = new Set()
+  return tags
+    .map((tag) => String(tag || '').trim())
+    .filter((tag) => {
+      if (!tag) return false
+      const key = tag.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+}
+
 const normalizeTranscript = (input = {}) => {
   const now = new Date().toISOString()
   return {
@@ -52,6 +66,8 @@ const normalizeTranscript = (input = {}) => {
     summaryErrorMessage: String(input.summaryErrorMessage || ''),
     summaryUpdatedAt: String(input.summaryUpdatedAt || ''),
     autoGenerateSummary: Boolean(input.autoGenerateSummary),
+    autoGenerateTags: typeof input.autoGenerateTags === 'boolean' ? input.autoGenerateTags : true,
+    tags: normalizeTags(input.tags),
     syncedVideoId: Number(input.syncedVideoId || 0) || 0,
     syncStatus: String(input.syncStatus || 'idle').trim().toLowerCase() || 'idle',
     syncErrorMessage: String(input.syncErrorMessage || ''),

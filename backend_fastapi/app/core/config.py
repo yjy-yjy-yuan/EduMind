@@ -60,7 +60,7 @@ class Settings(BaseSettings):
 
     # Ollama 配置
     OLLAMA_BASE_URL: str = "http://localhost:11434/api"
-    OLLAMA_MODEL: str = "qwen3:8b"
+    OLLAMA_MODEL: str = "qwen-3.5:9b"
 
     # 文件上传配置
     BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))

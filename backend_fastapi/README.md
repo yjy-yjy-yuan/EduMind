@@ -15,6 +15,8 @@
 ## 快速开始
 
 ```bash
+python3 -m venv .venv
+. .venv/bin/activate
 cd backend_fastapi
 pip install -r requirements.txt
 cp .env.example .env
@@ -28,6 +30,14 @@ python run.py
 
 端口和主机由 `.env` 中的 `HOST`、`PORT` 控制，默认值定义在 `app/core/config.py`。
 如果你调整了前端端口，也要同步更新 `.env` 的 `CORS_ORIGINS`。
+
+其中 `/health` 当前会返回：
+
+- `database`
+- `whisper`
+- `ollama`
+
+其中 `ollama` 会进一步给出 `available`、`model`、`model_present` 和 `models`，便于你直接确认本机后端是否已经感知到 Ollama 运行时，以及当前配置目标模型是否真的已经导入。
 
 ## 目录结构
 
@@ -54,6 +64,14 @@ python run.py
 - Ollama
 
 部分接口不依赖全部服务，最小联调时可只启动当前链路所需组件。
+
+说明：
+
+- `ios-app/` 内的本地离线转录走 Apple `Speech` 端侧识别，不走 Ollama
+- `backend_fastapi/` 中的 Ollama 仅用于本地摘要、标题、标签、语义整理等兼容回退链路
+- `POST /api/videos/sync-offline-transcript` 会继续把 iOS 离线结果写入现有 MySQL `videos`、`subtitles`，并支持显式 `tags` 或 `auto_generate_tags`
+- 当前默认 `OLLAMA_MODEL` 已切到 `qwen-3.5:9b`，对应你本地导入的 Qwen 3.5 9B GGUF 别名
+- `backend_fastapi/scripts/import_qwen35_gguf_to_ollama.sh` 同时支持本地 `.gguf` 导入和 `hf.co/...` 直接拉取
 
 ## 用户认证约定
 
@@ -86,6 +104,8 @@ python run.py
 ## 测试
 
 ```bash
+python3 -m venv .venv
+. .venv/bin/activate
 cd backend_fastapi
 pytest tests/ -v
 pytest -m smoke
@@ -107,7 +127,7 @@ pytest --cov=app
 | 服务 | 默认端口 |
 |------|---------|
 | FastAPI 后端 | 2004 |
-| 桌面端 Vite | 328 |
+| Mobile Frontend Vite | 5173 |
 ## 开发说明
 
 - 修改接口时，同时检查根目录 README 和 `docs/` 中是否需要同步更新。

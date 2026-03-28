@@ -12,6 +12,8 @@ from typing import Optional
 
 import requests
 from app.core.config import settings
+from app.utils.ollama_compat import build_ollama_options
+from app.utils.ollama_compat import sanitize_ollama_response_text
 from openai import OpenAI
 
 # 配置日志
@@ -117,7 +119,7 @@ class LLMSimilarityService:
                     "model": settings.OLLAMA_MODEL,
                     "prompt": prompt,
                     "stream": False,
-                    "options": {"temperature": 0.1},
+                    "options": build_ollama_options(temperature=0.1),
                 },
                 timeout=10,
             )
@@ -126,7 +128,7 @@ class LLMSimilarityService:
                 logger.error(f"Ollama API调用失败: {response.status_code} {response.text}")
                 return None
 
-            response_text = response.json().get("response", "").strip()
+            response_text = sanitize_ollama_response_text(response.json().get("response", "")).strip()
 
             # 尝试从响应中提取浮点数
             match = re.search(r'(\d+\.\d+|\d+)', response_text)
@@ -237,12 +239,17 @@ class LLMSimilarityService:
                 logger.info(f"使用Ollama计算标签组直接相似度: {tags1} vs {tags2}")
                 response = requests.post(
                     f"{settings.OLLAMA_BASE_URL}/generate",
-                    json={"model": settings.OLLAMA_MODEL, "prompt": prompt, "stream": False},
+                    json={
+                        "model": settings.OLLAMA_MODEL,
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": build_ollama_options(),
+                    },
                     timeout=30,
                 )
 
                 if response.status_code == 200:
-                    result = response.json().get('response', '').strip()
+                    result = sanitize_ollama_response_text(response.json().get('response', '')).strip()
                     # 提取数字
                     match = re.search(r'\d+(\.\d+)?', result)
                     if match:

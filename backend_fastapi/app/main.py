@@ -10,6 +10,7 @@ from app.core.database import engine
 from app.models.base import Base
 from app.models.video import Video
 from app.models.video import VideoStatus
+from app.services.ollama_runtime import get_ollama_runtime_status
 from app.services.whisper_runtime import get_whisper_runtime_status
 from app.services.whisper_runtime import shutdown_whisper_runtime
 from app.services.whisper_runtime import start_whisper_background_preload
@@ -134,5 +135,6 @@ async def health():
         "services": {
             "database": "connected",
             "whisper": get_whisper_runtime_status(),
+            "ollama": get_ollama_runtime_status(),
         },
     }

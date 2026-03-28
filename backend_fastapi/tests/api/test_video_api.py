@@ -468,12 +468,18 @@ class TestVideoAPI:
 
     def test_sync_offline_transcript_writes_same_video_table(self, client, db, monkeypatch):
         """测试 iOS 本地离线转录结果可写入 videos 表并标记离线来源。"""
+        import json
+
         from app.models.subtitle import Subtitle
         from app.models.video import Video
 
         monkeypatch.setattr(
             "app.routers.video.generate_primary_topic_name",
             lambda *args, **kwargs: {"success": True, "name": "极限与连续核心梳理", "provider": "fallback"},
+        )
+        monkeypatch.setattr(
+            "app.routers.video.generate_video_tags",
+            lambda *args, **kwargs: {"success": True, "tags": ["数学", "极限", "连续函数"], "provider": "fallback"},
         )
 
         response = client.post(
@@ -503,11 +509,14 @@ class TestVideoAPI:
         assert payload["video"]["processing_origin_label"] == "iOS 离线处理"
         assert payload["video"]["title"] == "极限与连续核心梳理"
         assert payload["video"]["task_id"] == "local-task-001"
+        assert "数学" in payload["video"]["tags"]
+        assert payload["video"]["tag_count"] == len(payload["video"]["tags"])
 
         video = db.query(Video).filter(Video.task_id == "local-task-001").first()
         assert video is not None
         assert video.title == "极限与连续核心梳理"
         assert video.summary == "本节重点讲解极限定义、连续函数判定与常见题型。"
+        assert "数学" in json.loads(video.tags)
         assert video.status.value == "completed"
 
         subtitles = db.query(Subtitle).filter(Subtitle.video_id == video.id).order_by(Subtitle.start_time.asc()).all()
@@ -516,6 +525,8 @@ class TestVideoAPI:
 
     def test_sync_offline_transcript_updates_existing_record(self, client, db, monkeypatch):
         """测试同一 task_id 的离线结果会更新原记录而不是重复插入。"""
+        import json
+
         from app.models.video import Video
 
         monkeypatch.setattr(
@@ -548,6 +559,72 @@ class TestVideoAPI:
         videos = db.query(Video).filter(Video.task_id == "local-task-002").all()
         assert len(videos) == 1
         assert videos[0].summary == "更新后的摘要"
+        assert isinstance(json.loads(videos[0].tags), list)
+        assert "数学" in json.loads(videos[0].tags)
+
+    def test_transcribe_audio_uses_backend_whisper(self, client, monkeypatch):
+        """测试音频直传接口会调用后端 Whisper 并返回统一分段结构。"""
+        monkeypatch.setattr(
+            "app.routers.video.transcribe_audio_with_whisper",
+            lambda *args, **kwargs: {
+                "text": "这是后端 Whisper 返回的转录文本。",
+                "segments": [
+                    {"text": "这是后端 Whisper", "start": 0.0, "end": 1.8},
+                    {"text": "返回的转录文本。", "start": 1.8, "end": 3.6},
+                ],
+            },
+        )
+
+        response = client.post(
+            "/api/videos/transcribe-audio",
+            files={"file": ("sample.m4a", io.BytesIO(b"fake audio bytes"), "audio/mp4")},
+            data={"language": "Chinese", "model": "base"},
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["engine"] == "backend_whisper"
+        assert payload["effective_model"] == "base"
+        assert payload["effective_language"] == "zh"
+        assert payload["transcript_text"] == "这是后端 Whisper 返回的转录文本。"
+        assert len(payload["segments"]) == 2
+        assert payload["segments"][0]["duration"] == pytest.approx(1.8)
+
+    def test_sync_offline_transcript_prefers_client_tags_when_present(self, client, db, monkeypatch):
+        """测试离线同步在显式传入 tags 时直接写入数据库。"""
+        import json
+
+        from app.models.video import Video
+
+        monkeypatch.setattr(
+            "app.routers.video.generate_primary_topic_name",
+            lambda *args, **kwargs: {"success": True, "name": "函数与单调性", "provider": "fallback"},
+        )
+
+        response = client.post(
+            "/api/videos/sync-offline-transcript",
+            json={
+                "task_id": "local-task-003",
+                "file_name": "function.mp4",
+                "file_ext": "mp4",
+                "file_size": 512,
+                "locale": "zh-CN",
+                "engine": "apple_speech_on_device",
+                "transcript_text": "本节讲函数单调性与最值。",
+                "summary": "重点分析函数单调性、区间判定和最值题型。",
+                "summary_style": "study",
+                "tags": ["函数", "单调性", "最值"],
+                "auto_generate_tags": False,
+                "segments": [],
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["video"]["tags"] == ["数学", "函数", "单调性", "最值"]
+
+        video = db.query(Video).filter(Video.task_id == "local-task-003").first()
+        assert video is not None
+        assert json.loads(video.tags) == ["数学", "函数", "单调性", "最值"]
 
 
 @pytest.mark.api

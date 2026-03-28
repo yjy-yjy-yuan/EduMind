@@ -156,6 +156,12 @@ bash scripts/blitz_build_ios.sh
 
 如果在线大模型不可用，后端会自动回退到本地摘要与关键词提取逻辑，保证 `videos.summary` 与 `videos.tags` 仍可生成。
 
+补充说明：
+
+- iOS 本地离线转录当前仍然使用 Apple `Speech` 端侧识别
+- 本地 GGUF / Ollama 模型只影响后端本地摘要、标题、标签与语义整理回退链路，不直接替代 iOS 端语音转文字
+- iOS 本地离线转录在同步到后端后，仍然继续写入同一套 MySQL `videos`、`subtitles`，并可按配置补写 `videos.tags`
+
 手动补生成接口：
 
 ```bash

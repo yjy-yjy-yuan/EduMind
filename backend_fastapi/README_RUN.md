@@ -4,11 +4,11 @@
 
 ## 1. 创建环境
 
-你可以使用 `conda` 或系统 Python，环境名不强制。
+按当前仓库约定，统一使用项目根目录下的 `.venv`。
 
 ```bash
-conda create -n edumind python=3.10 -y
-conda activate edumind
+python3 -m venv .venv
+. .venv/bin/activate
 ```
 
 ## 2. 安装依赖
@@ -24,7 +24,7 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-按实际环境修改 `.env` 中的数据库、Neo4j、模型服务和密钥配置。
+按实际环境修改 `.env` 中的数据库、模型服务和密钥配置。
 如果需要改后端端口，请同步调整 `PORT`，并把 `CORS_ORIGINS` 加上前端实际端口。
 
 ## 4. 启动依赖服务
@@ -33,17 +33,34 @@ cp .env.example .env
 
 ```bash
 brew services start mysql
-brew services start neo4j
 ollama serve
 ```
 
 如果某些功能暂时不用，可以只启动当前接口链路需要的依赖。
 
+如果你要把本地 GGUF 模型接入当前项目，请先导入到 Ollama。
+支持两种方式：本地 `.gguf` 文件，或直接使用 `hf.co/...` 模型引用。
+
+```bash
+. .venv/bin/activate
+bash backend_fastapi/scripts/import_qwen35_gguf_to_ollama.sh /absolute/path/to/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF.gguf
+```
+
+```bash
+. .venv/bin/activate
+bash backend_fastapi/scripts/import_qwen35_gguf_to_ollama.sh hf.co/Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-GGUF:Q4_K_M
+```
+
+说明：
+
+- 这一步导入的是“后端本地 LLM 回退模型”，用于摘要、标题、语义整理等能力
+- iOS 本地离线视频转录仍然使用 Apple `Speech` 端侧识别，不会因为这里切换 GGUF 而自动变成新的 ASR 引擎
+
 ## 5. 启动后端
 
 ```bash
 cd backend_fastapi
-conda activate edumind
+. .venv/bin/activate
 python run.py
 ```
 
@@ -60,18 +77,7 @@ curl http://localhost:2004/health
 
 ## 7. 配合前端运行
 
-桌面端：
-
-```bash
-cd frontend
-npm install
-cp .env.example .env
-npm run dev
-```
-
-如果后端端口不是 `2004`，请修改 `frontend/.env` 中的 `VITE_API_PROXY_TARGET`。
-
-移动端：
+当前仓库只保留 `mobile-frontend/`：
 
 ```bash
 cd mobile-frontend
@@ -83,6 +89,7 @@ npm run dev
 
 ```bash
 cd backend_fastapi
+. .venv/bin/activate
 pytest tests/ -v
 pytest -m smoke
 ```
@@ -93,13 +100,6 @@ pytest -m smoke
 
 ```bash
 lsof -i :2004
-```
-
-### Neo4j 连接失败
-
-```bash
-brew services list | grep neo4j
-brew services restart neo4j
 ```
 
 ### 依赖安装失败
