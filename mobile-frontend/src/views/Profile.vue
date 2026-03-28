@@ -70,6 +70,7 @@
 
       <button class="btn" @click="go('/videos')">我的视频</button>
       <button class="btn" @click="go('/notes')">我的笔记</button>
+      <button class="btn" @click="go('/design-assistant')">设计助手</button>
       <button class="danger" @click="doLogout" :disabled="loading">退出登录</button>
     </div>
 
@@ -395,8 +396,8 @@ onBeforeUnmount(() => {
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+  background: rgba(242, 235, 248, 0.92);
+  box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
 }
 
 .topbar h2 {
@@ -417,7 +418,7 @@ onBeforeUnmount(() => {
   gap: 10px;
   border-radius: 24px;
   padding: 16px;
-  background: linear-gradient(180deg, #ffffff, #f8fbfd);
+  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.95));
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
 }
@@ -499,7 +500,7 @@ onBeforeUnmount(() => {
   width: 72px;
   border-radius: 22px;
   overflow: hidden;
-  background: rgba(31, 122, 140, 0.08);
+  background: rgba(139, 121, 157, 0.08);
   flex: 0 0 auto;
   padding: 0;
   border: 0;
@@ -520,7 +521,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   border-radius: 22px;
-  background: linear-gradient(145deg, #1f7a8c, #3d8da0);
+  background: linear-gradient(145deg, #8b799d, #a48eb5);
   color: #fff;
   font-size: 26px;
   font-weight: 900;
@@ -607,12 +608,12 @@ onBeforeUnmount(() => {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  border: 1px solid rgba(31, 122, 140, 0.18);
-  background: rgba(31, 122, 140, 0.08);
+  border: 1px solid rgba(139, 121, 157, 0.18);
+  background: rgba(139, 121, 157, 0.08);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #1f7a8c;
+  color: #8b799d;
   flex: 0 0 auto;
 }
 
@@ -650,8 +651,8 @@ onBeforeUnmount(() => {
   border-radius: 16px;
   padding: 12px;
   font-weight: 900;
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .danger:disabled {
@@ -666,13 +667,13 @@ onBeforeUnmount(() => {
 }
 
 .alert--good {
-  background: rgba(34, 197, 94, 0.12);
-  color: #166534;
+  background: var(--ok-bg);
+  color: var(--ok-text);
 }
 
 .alert--bad {
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .muted {

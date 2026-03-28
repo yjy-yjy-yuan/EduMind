@@ -1,10 +1,7 @@
 <template>
-  <div class="page videos-page">
+  <div class="page">
     <header class="topbar">
-      <div>
-        <span class="topbar__eyebrow">视频库</span>
-        <h2>{{ scopeTitle }}</h2>
-      </div>
+      <h2>{{ scopeTitle }}</h2>
       <div class="top-actions">
         <button
           v-if="failedVideos.length > 1"
@@ -20,44 +17,32 @@
       </div>
     </header>
 
-    <section class="overview-card">
-      <p class="overview-card__desc">{{ scopeDescription }}</p>
+    <div class="scope-switch">
+      <button
+        v-for="item in scopeTabs"
+        :key="item.value"
+        class="scope-pill"
+        :class="{ 'scope-pill--active': scope === item.value }"
+        @click="setScope(item.value)"
+      >
+        {{ item.label }}
+      </button>
+    </div>
 
-      <div class="scope-switch scope-switch--cards">
-        <button
-          v-for="item in scopeTabs"
-          :key="item.value"
-          class="scope-pill scope-pill--stat"
-          :class="{ 'scope-pill--active': scope === item.value }"
-          @click="setScope(item.value)"
-        >
-          <span class="scope-pill__label">{{ item.label }}</span>
-          <strong class="scope-pill__value">{{ scopeCount(item.value) }}</strong>
-        </button>
-      </div>
+    <div v-if="hasActiveTasks" class="polling-tip">
+      <span>{{ pollStatusText }}</span>
+      <button v-if="pollPaused" class="link link--warn" @click="resumePolling" :disabled="loading || batchRetrying">
+        恢复自动刷新
+      </button>
+    </div>
 
-      <div class="quick-actions">
-        <button class="quick-action" @click="go('/upload')">上传新视频</button>
-        <button class="quick-action quick-action--secondary" @click="go('/local-transcripts')">本地转录列表</button>
-      </div>
-    </section>
+    <div v-if="offlineTaskCount > 0" class="queue-tip">
+      还有 {{ offlineTaskCount }} 个离线任务在上传页等待自动补跑；这些任务拿到视频 ID 后会继续回到当前列表和详情页状态链路。
+    </div>
 
-    <div class="status-stack">
-      <div v-if="hasActiveTasks" class="polling-tip">
-        <span>{{ pollStatusText }}</span>
-        <button v-if="pollPaused" class="link link--warn" @click="resumePolling" :disabled="loading || batchRetrying">
-          恢复自动刷新
-        </button>
-      </div>
-
-      <div v-if="offlineTaskCount > 0" class="queue-tip">
-        还有 {{ offlineTaskCount }} 个离线任务在上传页等待自动补跑；这些任务拿到视频 ID 后会继续回到当前列表和详情页状态链路。
-      </div>
-
-      <div class="queue-tip queue-tip--local">
-        iOS 本地离线转录结果已独立收口到本地列表页，不占用后端视频 ID。
-        <button class="link" @click="go('/local-transcripts')">查看本地转录</button>
-      </div>
+    <div class="queue-tip queue-tip--local">
+      iOS 本地离线转录结果已独立收口到本地列表页，不占用后端视频 ID。
+      <button class="link" @click="go('/local-transcripts')">查看本地转录</button>
     </div>
 
     <div v-if="error" class="alert alert--bad">
@@ -69,44 +54,32 @@
       <div v-for="i in 6" :key="i" class="sk-card"></div>
     </div>
 
-    <div v-else-if="filteredVideos.length === 0" class="empty empty--card">
-      <div class="empty__title">{{ emptyText }}</div>
-      <div class="empty__desc">上传后会自动进入处理、摘要和笔记链路，列表页只负责帮你快速回到正确任务。</div>
-      <div class="empty__actions">
-        <button class="empty-action" @click="go('/upload')">去上传</button>
-        <button class="empty-action empty-action--secondary" @click="go('/local-transcripts')">看本地转录</button>
-      </div>
+    <div v-else-if="filteredVideos.length === 0" class="empty">
+      {{ emptyText }}
+      <button class="link" @click="go('/upload')">去上传</button>
     </div>
 
-    <div v-else class="list-wrap">
-      <div class="list-head">
-        <span>当前显示 {{ filteredVideos.length }} 条</span>
-        <span v-if="failedVideos.length > 0">失败 {{ failedVideos.length }} 条</span>
-      </div>
-      <div class="list">
-        <div v-for="v in filteredVideos" :key="v.id" class="card">
-          <button class="card-main" @click="openVideo(v)">
-            <div class="row">
-              <div class="title" :title="v.title || ''">{{ v.title || '未命名视频' }}</div>
-              <i class="arrow">›</i>
-            </div>
-            <div class="meta">
-              <span class="badge" :class="badgeClass(v.status)">{{ statusText(v.status) }}</span>
-              <span v-if="v.processing_origin_label" class="muted">{{ v.processing_origin_label }}</span>
-              <span v-if="isInProgress(v.status)" class="muted">{{ Number(v.process_progress) || 0 }}%</span>
-            </div>
-            <div v-if="processingModelText(v)" class="muted">{{ processingModelText(v) }}</div>
-            <div v-if="v.current_step" class="muted">{{ v.current_step }}</div>
-            <div v-else-if="formatTimeText(v.upload_time || v.updated_at)" class="muted">{{ formatTimeText(v.upload_time || v.updated_at) }}</div>
-            <div v-if="isInProgress(v.status)" class="progress">
-              <div class="bar" :style="{ width: `${Number(v.process_progress) || 0}%` }"></div>
-            </div>
-          </button>
-          <div v-if="v.status === 'failed'" class="card-actions">
-            <button class="mini mini--warn" @click="retryFailed(v)" :disabled="isRetrying(v.id) || batchRetrying">
-              {{ isRetrying(v.id) ? '重试中…' : '一键重试处理' }}
-            </button>
+    <div v-else class="list">
+      <div v-for="v in filteredVideos" :key="v.id" class="card">
+        <button class="card-main" @click="openVideo(v)">
+          <div class="row">
+            <div class="title" :title="v.title || ''">{{ v.title || '未命名视频' }}</div>
+            <i class="arrow">›</i>
           </div>
+          <div class="meta">
+            <span class="badge" :class="badgeClass(v.status)">{{ statusText(v.status) }}</span>
+            <span v-if="v.processing_origin_label" class="muted">{{ v.processing_origin_label }}</span>
+            <span v-if="isInProgress(v.status)" class="muted">{{ Number(v.process_progress) || 0 }}%</span>
+          </div>
+          <div v-if="processingModelText(v)" class="muted">{{ processingModelText(v) }}</div>
+          <div v-if="isInProgress(v.status)" class="progress">
+            <div class="bar" :style="{ width: `${Number(v.process_progress) || 0}%` }"></div>
+          </div>
+        </button>
+        <div v-if="v.status === 'failed'" class="card-actions">
+          <button class="mini mini--warn" @click="retryFailed(v)" :disabled="isRetrying(v.id) || batchRetrying">
+            {{ isRetrying(v.id) ? '重试中…' : '一键重试处理' }}
+          </button>
         </div>
       </div>
     </div>
@@ -177,12 +150,6 @@ const scopeTitle = computed(() => {
   return '最近视频'
 })
 
-const scopeDescription = computed(() => {
-  if (scope.value === 'completed') return '适合复盘和整理笔记，优先看已经完成摘要与标签提取的视频。'
-  if (scope.value === 'active') return '优先跟进当前仍在下载或处理中的任务，避免状态卡住。'
-  return '这里收口最近进入视频库的任务，帮助你从正确的链路继续学习。'
-})
-
 const normalizeList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
   return Array.isArray(list) ? list : []
@@ -199,12 +166,6 @@ const emptyText = computed(() => {
   if (scope.value === 'active') return '暂无进行中的视频。'
   return '暂无视频。'
 })
-
-const scopeCount = (targetScope) => {
-  if (targetScope === 'completed') return videos.value.filter((item) => normalizeVideoStatus(item?.status) === 'completed').length
-  if (targetScope === 'active') return videos.value.filter((item) => isActiveVideoStatus(item?.status)).length
-  return videos.value.length
-}
 
 const failedVideos = computed(() => filteredVideos.value.filter((item) => normalizeVideoStatus(item?.status) === 'failed'))
 const isInProgress = (status) => isActiveVideoStatus(status)
@@ -420,17 +381,6 @@ const badgeClass = (status) => {
   return 'info'
 }
 
-const formatTimeText = (rawValue) => {
-  if (!rawValue) return ''
-  try {
-    const date = new Date(rawValue)
-    if (Number.isNaN(date.getTime())) return ''
-    return date.toLocaleString()
-  } catch {
-    return ''
-  }
-}
-
 const setScope = (nextScope) => {
   if (!validScopes.has(nextScope)) return
   router.push({ path: '/videos', query: { scope: nextScope } })
@@ -507,9 +457,9 @@ onUnmounted(() => {
   margin: -2px 0 10px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(31, 122, 140, 0.08);
-  border: 1px solid rgba(31, 122, 140, 0.16);
-  color: #155e75;
+  background: var(--surface-lilac);
+  border: 1px solid var(--primary-soft-strong);
+  color: var(--primary-deep);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -529,7 +479,7 @@ onUnmounted(() => {
 
 .scope-pill {
   border: 1px solid var(--border);
-  background: #fff;
+  background: rgba(248, 242, 250, 0.98);
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 12px;
@@ -538,8 +488,8 @@ onUnmounted(() => {
 }
 
 .scope-pill--active {
-  border-color: rgba(31, 122, 140, 0.36);
-  background: rgba(31, 122, 140, 0.1);
+  border-color: var(--primary-soft-strong);
+  background: var(--surface-lilac);
   color: var(--primary-deep);
 }
 
@@ -551,7 +501,7 @@ onUnmounted(() => {
 }
 
 .link--warn {
-  color: #92400e;
+  color: var(--lilac-text);
 }
 
 .alert {
@@ -566,14 +516,14 @@ onUnmounted(() => {
 }
 
 .alert--bad {
-  background: rgba(239, 68, 68, 0.10);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .alert--ok {
   margin-top: 10px;
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+  background: var(--ok-bg);
+  color: var(--ok-text);
 }
 
 .skeleton {
@@ -584,7 +534,7 @@ onUnmounted(() => {
 .sk-card {
   height: 92px;
   border-radius: var(--radius);
-  background: linear-gradient(90deg, #f3f4f6, #e5e7eb, #f3f4f6);
+  background: linear-gradient(90deg, #ebe3f4, #e2d8f0, #ebe3f4);
   background-size: 200% 100%;
   animation: shimmer 1.2s infinite;
 }
@@ -674,10 +624,10 @@ onUnmounted(() => {
   text-align: center;
 }
 
-.badge.ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
-.badge.warn { background: rgba(245, 158, 11, 0.14); color: #92400e; }
-.badge.bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
-.badge.info { background: rgba(99, 102, 241, 0.12); color: #3730a3; }
+.badge.ok { background: var(--ok-bg); color: var(--ok-text); }
+.badge.warn { background: var(--lilac-bg); color: var(--lilac-text); }
+.badge.bad { background: var(--lilac-bg); color: var(--lilac-text); }
+.badge.info { background: rgba(139, 121, 157, 0.14); color: #665775; }
 
 .progress {
   height: 8px;
@@ -688,12 +638,12 @@ onUnmounted(() => {
 
 .bar {
   height: 100%;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+  background: linear-gradient(90deg, #665775, #8b799d);
 }
 
 .mini {
   border: 1px solid var(--border);
-  background: #fff;
+  background: rgba(248, 242, 250, 0.98);
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 12px;
@@ -703,9 +653,9 @@ onUnmounted(() => {
 }
 
 .mini--warn {
-  border-color: rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.10);
-  color: #92400e;
+  border-color: var(--lilac-border);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .mini:disabled {
@@ -720,7 +670,7 @@ onUnmounted(() => {
 
 .load-more {
   border: 1px solid rgba(0, 0, 0, 0.08);
-  background: #fff;
+  background: rgba(248, 242, 250, 0.98);
   border-radius: 999px;
   padding: 10px 14px;
   font-weight: 900;
@@ -754,142 +704,21 @@ onUnmounted(() => {
   z-index: 5;
   padding: 12px 14px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(248, 242, 250, 0.94);
   border: 1px solid rgba(32, 42, 55, 0.08);
-  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+  box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
 }
 
 .topbar h2 {
   font-size: 18px;
 }
 
-.videos-page {
-  display: grid;
-  gap: 12px;
-}
-
-.topbar__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  margin-bottom: 6px;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--primary-deep);
-  background: rgba(31, 122, 140, 0.12);
-}
-
-.overview-card {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 22px;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 8px 20px rgba(24, 45, 73, 0.06);
-}
-
-.overview-card__desc,
-.list-head,
-.empty__desc {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--muted);
-}
-
-.scope-switch--cards {
-  margin: 0;
-}
-
-.scope-pill--stat {
-  min-width: 96px;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-}
-
-.scope-pill__label {
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.scope-pill__value {
-  font-size: 16px;
-  font-weight: 900;
-  color: var(--text);
-}
-
-.quick-actions,
-.empty__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.quick-action,
-.empty-action {
-  border-radius: 14px;
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: 900;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.88);
-  color: var(--primary-deep);
-}
-
-.quick-action {
-  flex: 1 1 160px;
-}
-
-.quick-action--secondary,
-.empty-action--secondary {
-  border-color: rgba(32, 42, 55, 0.08);
-  color: var(--text);
-}
-
-.status-stack {
-  display: grid;
-  gap: 8px;
-}
-
-.list-wrap {
-  display: grid;
-  gap: 10px;
-}
-
-.list-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.empty--card {
-  display: grid;
-  gap: 10px;
-  padding: 18px;
-  border-radius: 22px;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.empty__title {
-  font-size: 16px;
-  font-weight: 900;
-  color: var(--text);
-}
-
 .polling-tip {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: 14px;
-  border: 1px solid rgba(31, 122, 140, 0.14);
-  background: rgba(31, 122, 140, 0.08);
+  border: 1px dashed var(--primary-soft-strong);
+  background: var(--surface-lilac);
 }
 
 .list {
@@ -898,10 +727,10 @@ onUnmounted(() => {
 }
 
 .card {
-  border-radius: 18px;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 8px 18px rgba(24, 45, 73, 0.05);
+  border-radius: 20px;
+  border: 1px solid rgba(32, 42, 55, 0.09);
+  background: linear-gradient(180deg, rgba(248, 242, 250, 0.98), rgba(242, 235, 248, 0.96));
+  box-shadow: 0 12px 24px rgba(101, 87, 117, 0.08);
 }
 
 .card-main {
@@ -919,13 +748,13 @@ onUnmounted(() => {
 }
 
 .badge.warn {
-  background: var(--warn-bg);
-  color: var(--warn-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .badge.bad {
-  background: var(--bad-bg);
-  color: var(--bad-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .badge.info {
@@ -934,11 +763,11 @@ onUnmounted(() => {
 }
 
 .bar {
-  background: linear-gradient(90deg, #1f7a8c, #3d8da0);
+  background: linear-gradient(90deg, #665775, #8b799d);
 }
 
 .load-more {
-  border-color: rgba(24, 45, 73, 0.08);
+  border-color: var(--primary-soft-strong);
   color: var(--primary-deep);
 }
 </style>

@@ -4,6 +4,7 @@ import * as authStore from '@/store/auth'
 import Home from '@/views/Home.vue'
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
+import Recommendations from '@/views/Recommendations.vue'
 import Videos from '@/views/Videos.vue'
 import VideoDetail from '@/views/VideoDetail.vue'
 import LocalTranscripts from '@/views/LocalTranscripts.vue'
@@ -16,6 +17,7 @@ import QA from '@/views/QA.vue'
 import Profile from '@/views/Profile.vue'
 import LearningPath from '@/views/LearningPath.vue'
 import Guide from '@/views/Guide.vue'
+import DesignAssistant from '@/views/DesignAssistant.vue'
 
 const isFileProtocol = window.location.protocol === 'file:'
 const history = isFileProtocol ? createMemoryHistory() : createWebHistory()
@@ -24,6 +26,7 @@ const router = createRouter({
   history,
   routes: [
     { path: '/', name: 'Home', component: Home, meta: { title: '首页' } },
+    { path: '/recommendations', name: 'Recommendations', component: Recommendations, meta: { title: '推荐学习' } },
     { path: '/videos', name: 'Videos', component: Videos, meta: { title: '视频' } },
     { path: '/local-transcripts', name: 'LocalTranscripts', component: LocalTranscripts, meta: { title: '本地转录' } },
     { path: '/videos/:id', name: 'VideoDetail', component: VideoDetail, meta: { title: '视频详情' } },
@@ -36,6 +39,7 @@ const router = createRouter({
     { path: '/qa', name: 'QA', component: QA, meta: { title: 'AI 问答', hideTabBar: true } },
     { path: '/learning-path', name: 'LearningPath', component: LearningPath, meta: { title: '学习路径' } },
     { path: '/guide', name: 'Guide', component: Guide, meta: { title: '使用指南', hideTabBar: true } },
+    { path: '/design-assistant', name: 'DesignAssistant', component: DesignAssistant, meta: { title: '设计助手', hideTabBar: true, requiresAuth: true } },
     { path: '/profile', name: 'Profile', component: Profile, meta: { title: '我的', requiresAuth: true } },
     { path: '/login', name: 'Login', component: Login, meta: { title: '登录', hideTabBar: true } },
     { path: '/register', name: 'Register', component: Register, meta: { title: '注册', hideTabBar: true } },

@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     QA_MAX_HISTORY_MESSAGES: int = 8
     QA_MAX_HISTORY_CHARS: int = 2200
 
+    # Sleek 设计能力配置
+    SLEEK_API_KEY: str = ""
+    SLEEK_API_BASE: str = "https://sleek.design"
+    SLEEK_PROJECT_LIMIT: int = 50
+    SLEEK_POLL_TIMEOUT_SECONDS: int = 300
+    SLEEK_POLL_INITIAL_INTERVAL_SECONDS: int = 2
+    SLEEK_POLL_BACKOFF_AFTER_SECONDS: int = 10
+    SLEEK_POLL_BACKOFF_INTERVAL_SECONDS: int = 5
+
     # Ollama 配置
     OLLAMA_BASE_URL: str = "http://localhost:11434/api"
     OLLAMA_MODEL: str = "qwen3:8b"

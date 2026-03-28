@@ -126,8 +126,8 @@ const refresh = () => {
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+  background: rgba(242, 235, 248, 0.92);
+  box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
 }
 
 .topbar h2 {
@@ -138,11 +138,11 @@ const refresh = () => {
 .step {
   border-radius: 20px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: linear-gradient(180deg, #ffffff, #f9fbfd);
+  background: linear-gradient(180deg, #ffffff, #f0e8f7);
 }
 
 .badge {
-  background: rgba(31, 122, 140, 0.16);
+  background: rgba(139, 121, 157, 0.16);
   color: var(--primary-deep);
 }
 </style>

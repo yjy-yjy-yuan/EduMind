@@ -314,8 +314,8 @@ onMounted(reload)
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
+  background: rgba(242, 235, 248, 0.94);
+  box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
 }
 
 .topbar h2 {
@@ -346,20 +346,20 @@ onMounted(reload)
 }
 
 .alert--bad {
-  background: rgba(239, 68, 68, 0.1);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .alert--ok {
-  background: rgba(15, 118, 110, 0.12);
-  color: #0f766e;
+  background: var(--surface-lilac);
+  color: var(--primary-deep);
 }
 .filter-card,
 .card {
   border-radius: 22px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: linear-gradient(180deg, #ffffff, #f9fbfd);
-  box-shadow: 0 16px 30px rgba(24, 45, 73, 0.08);
+  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.96));
+  box-shadow: 0 16px 30px rgba(101, 87, 117, 0.08);
 }
 
 .filter-card {
@@ -392,7 +392,7 @@ onMounted(reload)
 
 .ghost {
   border: 1px solid rgba(32, 42, 55, 0.12);
-  background: #fff;
+  background: rgba(242, 235, 248, 0.98);
   color: #334155;
   border-radius: 12px;
   padding: 8px 12px;
@@ -422,7 +422,7 @@ onMounted(reload)
   border-radius: 14px;
   padding: 11px 12px;
   font-size: 14px;
-  background: #fff;
+  background: rgba(242, 235, 248, 0.98);
 }
 
 .tag-filter {
@@ -439,16 +439,16 @@ onMounted(reload)
 }
 
 .tag-chip {
-  border: 1px solid rgba(31, 122, 140, 0.18);
-  background: rgba(31, 122, 140, 0.08);
-  color: #155e75;
+  border: 1px solid var(--primary-soft-strong);
+  background: var(--surface-lilac);
+  color: var(--primary-deep);
   padding: 8px 10px;
   font-weight: 800;
 }
 
 .tag-chip--active {
-  background: #1f7a8c;
-  color: #fff;
+  background: linear-gradient(135deg, #665775, #8b799d);
+  color: #f9fafb;
   border-color: transparent;
 }
 
@@ -470,8 +470,8 @@ onMounted(reload)
 }
 
 .btn--primary {
-  color: #fff;
-  background: linear-gradient(135deg, #1f7a8c, #3d8da0);
+  color: #f9fafb;
+  background: linear-gradient(135deg, #665775, #8b799d);
 }
 
 .skeleton,
@@ -502,7 +502,7 @@ onMounted(reload)
   margin-top: 16px;
   border-radius: 20px;
   padding: 18px;
-  background: rgba(31, 122, 140, 0.08);
+  background: rgba(242, 235, 248, 0.92);
   color: #0f172a;
 }
 
@@ -524,11 +524,12 @@ onMounted(reload)
   padding: 16px;
   display: grid;
   gap: 10px;
+  background: rgba(242, 235, 248, 0.98);
 }
 
 .card--focus {
-  border: 1px solid rgba(31, 122, 140, 0.28);
-  box-shadow: 0 0 0 2px rgba(31, 122, 140, 0.12), 0 16px 30px rgba(24, 45, 73, 0.1);
+  border: 1px solid var(--primary-soft-strong);
+  box-shadow: 0 0 0 2px var(--primary-soft), 0 16px 30px rgba(101, 87, 117, 0.1);
 }
 
 .title {
@@ -567,19 +568,19 @@ onMounted(reload)
 }
 
 .meta-pill--video {
-  background: rgba(31, 122, 140, 0.12);
-  color: #155e75;
+  background: var(--surface-lilac);
+  color: var(--primary-deep);
 }
 
 .meta-pill--time {
-  background: rgba(14, 116, 144, 0.1);
-  color: #0c4a6e;
+  background: var(--surface-lilac-deep);
+  color: var(--lilac-text);
 }
 
 .tag-pill {
   padding: 6px 10px;
-  background: rgba(15, 118, 110, 0.12);
-  color: #0f766e;
+  background: var(--surface-lilac-deep);
+  color: var(--lilac-text);
   font-weight: 800;
 }
 

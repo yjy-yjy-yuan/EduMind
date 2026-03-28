@@ -1,7 +1,6 @@
 """视频摘要与标签服务测试。"""
 
 import pytest
-
 from app.services.video_content_service import SUMMARY_STYLE_STUDY
 from app.services.video_content_service import fallback_summary
 from app.services.video_content_service import generate_video_summary
@@ -44,6 +43,7 @@ def test_generate_video_tags_falls_back_to_keywords(monkeypatch):
     assert result["success"] is True
     assert result["provider"] == "fallback"
     assert 1 <= len(result["tags"]) <= 5
+    assert result["tags"][0] == "数学"
     assert any("导数" in tag for tag in result["tags"])
 
 

@@ -28,6 +28,9 @@ class VideoUploadURL(BaseModel):
     """URL 上传请求"""
 
     url: str = Field(..., description="视频链接 (B站/YouTube/慕课)")
+    title: str = Field(default="", description="推荐候选预填标题")
+    summary: str = Field(default="", description="推荐候选预填摘要")
+    tags: List[str] = Field(default_factory=list, description="推荐候选预填标签")
     language: str = Field(default="Other", description="视频语言")
     model: str = Field(default="base", description="Whisper 模型")
     auto_generate_summary: bool = Field(default=True, description="处理完成后自动生成摘要")
@@ -117,6 +120,7 @@ class VideoUploadResponse(BaseModel):
     message: str
     duplicate: bool = False
     data: Optional[dict] = None
+    recommendations: Optional[dict] = None
 
 
 class VideoDetail(BaseModel):

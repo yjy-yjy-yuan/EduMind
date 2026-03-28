@@ -1,9 +1,28 @@
 """API 测试 - 视频接口"""
 
 import io
+import json
 import os
 
 import pytest
+
+
+def fake_upload_recommendations(*args, **kwargs):
+    """上传后自动返回的推荐结果假数据。"""
+    return {
+        "scene": "related",
+        "strategy": "video_status_interest_v1",
+        "items": [
+            {
+                "id": 88,
+                "title": "站内导数复盘",
+                "is_external": False,
+                "source_label": "站内视频",
+            }
+        ],
+        "external_item_count": 0,
+        "internal_item_count": 1,
+    }
 
 
 @pytest.mark.api
@@ -36,6 +55,40 @@ class TestVideoAPI:
         """测试获取不存在的视频"""
         response = client.get("/api/videos/99999")
         assert response.status_code == 404
+
+    def test_generate_tags_includes_subject_tag(self, client, db, monkeypatch):
+        """重提标签后应写回科目标签，便于视频详情页直接展示。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        monkeypatch.setattr("app.services.video_content_service.call_online_chat", lambda *args, **kwargs: None)
+        monkeypatch.setattr("app.services.video_content_service.call_ollama", lambda *args, **kwargs: None)
+
+        video = Video(
+            title="勾股定理详细讲解",
+            filename="math.mp4",
+            filepath="/tmp/math.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="讲解勾股定理、直角三角形性质和几何证明方法。",
+            tags=None,
+        )
+        db.add(video)
+        db.commit()
+        db.refresh(video)
+
+        response = client.post(f"/api/videos/{video.id}/generate-tags", json={"max_tags": 6})
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["success"] is True
+        assert payload["tags"][0] == "数学"
+        assert any("勾股" in tag for tag in payload["tags"])
+
+        db.refresh(video)
+        stored_tags = json.loads(video.tags)
+        assert stored_tags[0] == "数学"
 
     def test_delete_video(self, client, sample_video):
         """测试删除视频"""
@@ -152,6 +205,7 @@ class TestVideoAPI:
             return None
 
         monkeypatch.setattr("app.core.executor.submit_task", fake_submit_task)
+        monkeypatch.setattr("app.routers.video.recommend_videos", fake_upload_recommendations)
 
         response = client.post(
             "/api/videos/upload",
@@ -166,6 +220,9 @@ class TestVideoAPI:
         assert payload["data"]["filename"] == "local-lesson.mp4"
         assert payload["data"]["requested_model"] == "small"
         assert payload["data"]["effective_model"] == "small"
+        assert payload["recommendations"]["scene"] == "related"
+        assert payload["recommendations"]["items"][0]["source_label"] == "站内视频"
+        assert payload["recommendations"]["external_item_count"] == 0
         assert os.path.exists(payload["data"]["filepath"])
         assert payload["message"] == "视频上传成功，已开始后台处理"
 
@@ -222,6 +279,7 @@ class TestVideoAPI:
             return None
 
         monkeypatch.setattr("app.core.executor.submit_task", fake_submit_task)
+        monkeypatch.setattr("app.routers.video.recommend_videos", fake_upload_recommendations)
 
         response = client.post(
             "/api/videos/upload-url",
@@ -234,6 +292,9 @@ class TestVideoAPI:
         assert payload["duplicate"] is False
         assert payload["data"]["status"] == "downloading"
         assert payload["data"]["requested_model"] == "medium"
+        assert payload["recommendations"]["scene"] == "related"
+        assert payload["recommendations"]["items"][0]["title"] == "站内导数复盘"
+        assert payload["recommendations"]["external_item_count"] == 0
 
         video = db.query(Video).filter(Video.id == payload["id"]).first()
         assert video is not None
@@ -242,6 +303,34 @@ class TestVideoAPI:
         assert submitted["name"] == "download_video_from_url_task"
         assert submitted["args"][0] == video.id
         assert submitted["kwargs"]["model"] == "medium"
+
+    def test_upload_video_url_persists_recommendation_metadata(self, client, db, monkeypatch):
+        """测试链接上传可预填推荐候选标题、摘要与标签。"""
+        from app.models.video import Video
+
+        def fake_submit_task(task_func, *args, **kwargs):
+            return None
+
+        monkeypatch.setattr("app.core.executor.submit_task", fake_submit_task)
+
+        response = client.post(
+            "/api/videos/upload-url",
+            json={
+                "url": "https://www.youtube.com/watch?v=abc123",
+                "title": "YouTube · Calculus Review",
+                "summary": "适合配合当前数学主题继续学习。",
+                "tags": ["数学", "导数"],
+                "model": "medium",
+            },
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        video = db.query(Video).filter(Video.id == payload["id"]).first()
+        assert video is not None
+        assert video.title == "YouTube · Calculus Review"
+        assert video.summary == "适合配合当前数学主题继续学习。"
+        assert json.loads(video.tags)[0] == "数学"
 
     def test_upload_video_url_duplicate_reuses_existing_video(self, client, db, monkeypatch):
         """测试重复提交同一链接时复用已有视频记录。"""

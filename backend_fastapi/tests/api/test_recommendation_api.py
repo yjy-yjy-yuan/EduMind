@@ -1,6 +1,47 @@
 """API 测试 - 推荐接口。"""
 
 import pytest
+from app.services import video_recommendation_service as recommendation_service
+from app.services.external_candidate_service import ExternalCandidate
+from app.services.external_candidate_service import ExternalCandidateFetchReport
+from app.services.external_candidate_service import ExternalProviderFetchSummary
+
+
+def fake_fetch_external_candidates_report(*args, **kwargs):
+    """返回推荐接口测试用的站外候选假数据。"""
+    return ExternalCandidateFetchReport(
+        candidates=[
+            ExternalCandidate(
+                id="youtube:abc123",
+                provider="youtube",
+                source_label="YouTube",
+                title="YouTube · Calculus Review",
+                external_url="https://www.youtube.com/watch?v=abc123",
+                summary="适合配合当前数学主题继续学习。",
+                tags=["数学", "导数"],
+                subject="数学",
+                primary_topic="导数",
+                cluster_key="数学::导数",
+            )
+        ],
+        providers=[
+            ExternalProviderFetchSummary(
+                provider="youtube",
+                source_label="YouTube",
+                status="success",
+                candidate_count=1,
+                latency_ms=145,
+            ),
+            ExternalProviderFetchSummary(
+                provider="icourse163",
+                source_label="中国大学慕课",
+                status="failed",
+                candidate_count=0,
+                error_message="search failed",
+                latency_ms=620,
+            ),
+        ],
+    )
 
 
 @pytest.mark.api
@@ -72,6 +113,7 @@ class TestRecommendationAPI:
         assert len(payload["items"]) == 3
         assert payload["items"][0]["id"] == processing_video.id
         assert payload["items"][0]["reason_code"] == "continue"
+        assert payload["items"][0]["tags"][0] == "数学"
         assert any(item["reason_code"] in {"interest", "continue"} for item in payload["items"])
 
     def test_related_recommendations_require_seed_video(self, client):
@@ -129,4 +171,148 @@ class TestRecommendationAPI:
         assert payload["seed_video_title"] == seed_video.title
         assert payload["items"][0]["id"] == best_match.id
         assert payload["items"][0]["reason_code"] == "related"
+        assert payload["items"][0]["tags"][0] == "数学"
         assert all(item["id"] != seed_video.id for item in payload["items"])
+
+    def test_related_recommendations_infer_subject_from_title_only(self, client, db):
+        """即使原始标签为空，相关推荐也应能根据科目归一返回同科目内容。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        seed_video = Video(
+            title="牛顿第二定律串讲",
+            filename="seed-physics.mp4",
+            filepath="/tmp/seed-physics.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="高中物理受力分析与牛顿第二定律综合应用。",
+            tags=None,
+        )
+        physics_match = Video(
+            title="受力分析复习",
+            filename="physics-match.mp4",
+            filepath="/tmp/physics-match.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="物理力学里常见的受力分析步骤整理。",
+            tags=None,
+        )
+        english_video = Video(
+            title="英语听力技巧",
+            filename="english-listening.mp4",
+            filepath="/tmp/english-listening.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="整理英语听力高频信号词。",
+            tags='["英语听力"]',
+        )
+        db.add_all([seed_video, physics_match, english_video])
+        db.commit()
+
+        response = client.get(
+            "/api/recommendations/videos",
+            params={"scene": "related", "seed_video_id": seed_video.id, "limit": 2},
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["items"][0]["id"] == physics_match.id
+        assert payload["items"][0]["tags"][0] == "物理"
+        assert payload["items"][0]["reason_code"] in {"related", "subject"}
+
+    def test_home_recommendations_include_external_candidates(self, client, db, monkeypatch):
+        """推荐接口应支持在返回中混入站外候选元数据。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        internal_video = Video(
+            title="高数导数专题",
+            filename="math.mp4",
+            filepath="/tmp/math.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="围绕导数定义与函数单调性做复盘。",
+            tags='["导数","函数"]',
+        )
+        db.add(internal_video)
+        db.commit()
+
+        monkeypatch.setattr(
+            recommendation_service,
+            "fetch_external_candidates_report",
+            fake_fetch_external_candidates_report,
+        )
+
+        response = client.get(
+            "/api/recommendations/videos",
+            params={"scene": "home", "limit": 4, "include_external": True},
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["strategy"] == "video_status_interest_external_v2"
+        assert any(item["id"] == internal_video.id for item in payload["items"])
+        assert payload["internal_item_count"] == 1
+        assert payload["external_item_count"] == 1
+        assert payload["external_failed_provider_count"] == 1
+        assert payload["external_fetch_failed"] is True
+        assert payload["external_query"]["subject"] == "数学"
+        assert any(item["provider"] == "internal" for item in payload["sources"])
+        assert any(item["provider"] == "youtube" for item in payload["sources"])
+        assert any(
+            item["provider"] == "icourse163" and item["status"] == "failed" for item in payload["external_providers"]
+        )
+        external_item = next(item for item in payload["items"] if item.get("is_external") is True)
+        assert external_item["source_label"] == "YouTube"
+        assert external_item["external_url"] == "https://www.youtube.com/watch?v=abc123"
+        assert external_item["item_type"] == "external_candidate"
+        assert external_item["can_import"] is True
+        assert external_item["action_api"] == "/api/recommendations/import-external"
+        assert external_item["action_method"] == "POST"
+        assert external_item["action_type"] == "import_external_url"
+        assert external_item["action_target"].startswith("/upload?mode=url&url=")
+
+    def test_import_external_recommendation_creates_downloading_record(self, client, db, monkeypatch):
+        """推荐候选应能直接走后端链接下载入库链路。"""
+        from app.models.video import Video
+
+        submitted = {}
+
+        def fake_submit_task(task_func, *args, **kwargs):
+            submitted["name"] = task_func.__name__
+            submitted["args"] = args
+            submitted["kwargs"] = kwargs
+            return None
+
+        monkeypatch.setattr("app.core.executor.submit_task", fake_submit_task)
+
+        response = client.post(
+            "/api/recommendations/import-external",
+            json={
+                "url": "https://www.bilibili.com/video/BV1xx411c7mD",
+                "title": "B站·导数与函数单调性综合串讲",
+                "summary": "适合配合当前数学主题继续学习。",
+                "tags": ["数学", "导数", "函数"],
+                "model": "small",
+            },
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["status"] == "downloading"
+        assert payload["duplicate"] is False
+        assert payload["data"]["title"] == "B站·导数与函数单调性综合串讲"
+        assert payload["data"]["summary"] == "适合配合当前数学主题继续学习。"
+        assert payload["data"]["tags"][0] == "数学"
+
+        video = db.query(Video).filter(Video.id == payload["id"]).first()
+        assert video is not None
+        assert video.url == "https://www.bilibili.com/video/BV1xx411c7mD"
+        assert video.status.value == "downloading"
+        assert submitted["name"] == "download_video_from_url_task"
+        assert submitted["args"][0] == video.id
+        assert submitted["kwargs"]["model"] == "small"

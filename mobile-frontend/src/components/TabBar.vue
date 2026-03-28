@@ -1,6 +1,7 @@
 <template>
-  <nav class="tabbar-wrap safe-bottom" aria-label="底部导航">
-    <div class="tabbar ios-card">
+  <nav class="tabbar-wrap" aria-label="底部导航">
+    <div class="tabbar-shell">
+      <div class="tabbar ios-card">
       <RouterLink to="/" class="tab" :class="{ active: isActive('/') }">
         <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
           <path d="M3 10.4L12 3l9 7.4v9.6a1 1 0 0 1-1 1h-5.8v-6.4h-4.4V21H4a1 1 0 0 1-1-1z" />
@@ -37,6 +38,7 @@
         </svg>
         <span class="label">我的</span>
       </RouterLink>
+      </div>
     </div>
   </nav>
 </template>
@@ -58,73 +60,95 @@ const isActive = (prefix) => {
   right: 0;
   bottom: 0;
   z-index: 1000;
-  padding: 0 12px calc(12px + env(safe-area-inset-bottom));
+  padding: 0 0 var(--tabbar-shell-gap);
+  background: transparent;
+  border-top: 0;
+  pointer-events: none;
+}
+
+.tabbar-shell {
+  width: min(100%, 620px);
+  margin: 0 auto;
+  padding: 0 clamp(12px, 4vw, 18px);
+  box-sizing: border-box;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
 }
 
 .tabbar {
-  height: 70px;
-  padding: 9px;
+  min-height: var(--tabbar-card-height);
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
   display: flex;
   align-items: stretch;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.98);
-  border-color: rgba(32, 42, 55, 0.08);
-  box-shadow: 0 12px 28px rgba(23, 45, 72, 0.12);
+  background: linear-gradient(180deg, rgba(245, 238, 250, 0.98), rgba(237, 227, 246, 0.98));
+  border: 1px solid rgba(95, 71, 126, 0.12);
+  box-shadow:
+    0 16px 28px rgba(95, 71, 126, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  border-radius: 28px;
+  overflow: hidden;
+  pointer-events: auto;
 }
 
 .tab {
   flex: 1;
   text-decoration: none;
-  color: var(--muted);
-  border-radius: 14px;
+  color: #6f6185;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
+  min-width: 0;
+  padding: 2px 0;
 }
 
 .icon {
-  width: 19px;
-  height: 19px;
+  width: 18px;
+  height: 18px;
   fill: currentColor;
 }
 
 .label {
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .tab.active {
   color: var(--primary-deep);
-  background: rgba(31, 122, 140, 0.12);
+  background: linear-gradient(180deg, rgba(236, 227, 246, 0.98), rgba(247, 241, 251, 0.98));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .tab--upload {
-  color: var(--primary);
+  color: #6d5a86;
 }
 
 .upload-dot {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #1f7a8c, #3d8da0);
-  box-shadow: 0 8px 16px rgba(31, 122, 140, 0.34);
+  background: linear-gradient(135deg, #6a4b9b, #9b82c7);
+  box-shadow: 0 12px 18px rgba(106, 75, 155, 0.26);
 }
 
 .icon--upload {
-  width: 16px;
-  height: 16px;
-  fill: #f7feff;
+  width: 15px;
+  height: 15px;
+  fill: #f8fafc;
 }
 
 @media (min-width: 700px) {
   .tabbar-wrap {
-    max-width: 560px;
-    margin: 0 auto;
+    padding-left: 0;
+    padding-right: 0;
   }
 }
 </style>

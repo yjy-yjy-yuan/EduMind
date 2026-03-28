@@ -317,44 +317,94 @@ const recommendationScenes = [
 ]
 
 const recommendationTime = (video) => video.upload_time || video.updated_at || video.created_at || nowISO()
-
-const buildMockRecommendationItem = (video, reasonCode, reasonLabel, reasonText, score) => ({
-  id: Number(video.id),
-  title: String(video.title || '未命名视频'),
-  status: String(video.status || 'uploaded'),
-  upload_time: recommendationTime(video),
-  summary: String(video.summary || ''),
-  tags: Array.isArray(video.tags) ? clone(video.tags) : [],
-  process_progress: Number(video.process_progress || 0),
-  current_step: String(video.current_step || ''),
-  processing_origin: String(video.processing_origin || 'online_backend'),
-  processing_origin_label: String(video.processing_origin_label || '在线处理'),
-  upload_source: String(video.upload_source || 'local_file'),
-  upload_source_label: String(video.upload_source_label || '本地上传'),
-  recommendation_score: Number(score || 0),
-  reason_code: reasonCode,
-  reason_label: reasonLabel,
-  reason_text: reasonText
-})
-
-export const mockGetRecommendationScenes = () =>
-  mockResponse({ message: '获取推荐场景成功', scenes: clone(recommendationScenes) })
-
-export const mockGetVideoRecommendations = (params = {}) => {
-  const scene = String(params?.scene || 'home').trim().toLowerCase() || 'home'
-  const limit = Math.max(1, Math.min(12, Number(params?.limit || 4) || 4))
-  const seedVideoId = Number(params?.seed_video_id || 0) || null
-  const seedVideo = seedVideoId ? findVideo(seedVideoId) : null
-
-  if (scene === 'related' && !seedVideo) {
-    return Promise.reject({
-      response: {
-        status: 422,
-        data: { detail: 'scene=related 时必须传入 seed_video_id' }
-      }
-    })
+const externalRecommendationCatalog = [
+  {
+    key: 'bilibili-derivative-review',
+    title: 'B站·导数与函数单调性综合串讲',
+    source_label: 'B站',
+    url: 'https://www.bilibili.com/video/BV1xk4y1x7m9',
+    summary: '围绕导数、函数单调性和常见压轴题型做集中复盘。',
+    tags: ['导数定义', '函数', '题型复盘'],
+    published_at: nowISO()
+  },
+  {
+    key: 'youtube-python-structures',
+    title: 'YouTube · Python Data Structures Crash Review',
+    source_label: 'YouTube',
+    url: 'https://www.youtube.com/watch?v=python-structures-demo',
+    summary: '用更短的节奏复盘列表、字典和集合在学习项目里的典型用法。',
+    tags: ['Python', '数据结构', '列表'],
+    published_at: nowISO()
+  },
+  {
+    key: 'mooc-english-tense',
+    title: '中国大学慕课 · 英语时态专项精讲',
+    source_label: '中国大学慕课',
+    url: 'https://www.icourse163.org/learn/FOREIGN-1001',
+    summary: '聚焦一般过去时、现在完成时与写作语境辨析，适合配合已上传语法视频继续学习。',
+    tags: ['英语', '时态', '写作'],
+    published_at: nowISO()
   }
+]
 
+const resolveMockRecommendationSubject = (video) => {
+  const title = String(video?.title || '').trim()
+  if (/数学|导数|几何|函数/.test(title)) return '数学'
+  if (/英语|语法|时态/.test(title)) return '英语'
+  if (/python|数据结构|编程/i.test(title)) return '计算机'
+  if (/物理|力学/.test(title)) return '物理'
+  if (/历史/.test(title)) return '历史'
+  return '综合学习'
+}
+
+const buildMockImportTarget = (candidate) => {
+  const source = encodeURIComponent(String(candidate?.source_label || '站外推荐'))
+  const url = encodeURIComponent(String(candidate?.url || ''))
+  return `/upload?mode=url&url=${url}&source=${source}`
+}
+
+const buildMockRecommendationSources = (items) => {
+  const bucket = new Map()
+  items.forEach((item) => {
+    const isExternal = Boolean(item?.is_external)
+    const sourceType = isExternal ? 'external' : 'internal'
+    const provider = isExternal
+      ? String(item?.provider || item?.source_label || 'external')
+      : String(item?.upload_source || 'video_library')
+    const sourceLabel = isExternal ? String(item?.source_label || '站外候选') : String(item?.upload_source_label || '站内视频')
+    const key = `${sourceType}:${provider}`
+    const current = bucket.get(key) || { source_type: sourceType, provider, source_label: sourceLabel, count: 0 }
+    current.count += 1
+    bucket.set(key, current)
+  })
+  return Array.from(bucket.values())
+}
+
+const buildMockExternalProviderSummary = (includeExternal) => {
+  if (!includeExternal) return []
+  return externalRecommendationCatalog.map((candidate) => ({
+    provider: String(candidate.source_label || '站外候选').toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '_'),
+    source_label: String(candidate.source_label || '站外候选'),
+    status: 'success',
+    candidate_count: 1,
+    error_message: '',
+    latency_ms: 120
+  }))
+}
+
+const buildMockExternalQuery = (scene, seedVideo) => {
+  const tags = Array.isArray(seedVideo?.tags) ? seedVideo.tags.slice(0, 4) : []
+  const subject = resolveMockRecommendationSubject(seedVideo)
+  const primaryTopic = tags[0] || String(seedVideo?.title || '当前主题').trim() || '当前主题'
+  return {
+    query_text: `${subject} ${primaryTopic}`.trim(),
+    subject,
+    primary_topic: primaryTopic,
+    preferred_tags: tags
+  }
+}
+
+const buildMockRecommendationPayload = ({ scene, limit, includeExternal, seedVideo }) => {
   const ranked = sortByUpdatedDesc(videos)
     .filter((video) => !seedVideo || Number(video.id) !== Number(seedVideo.id))
     .map((video) => {
@@ -387,19 +437,168 @@ export const mockGetVideoRecommendations = (params = {}) => {
 
       return buildMockRecommendationItem(video, 'recent', '最近内容', '最近进入视频库，适合从这里继续学习。', 56)
     })
+
+  const externalItems = includeExternal ? buildMockExternalCandidates(scene, seedVideo) : []
+  const items = [...ranked, ...externalItems]
     .sort((a, b) => b.recommendation_score - a.recommendation_score)
     .slice(0, limit)
+  const internalItemCount = items.filter((item) => !item?.is_external).length
+  const externalItemCount = items.filter((item) => item?.is_external).length
 
-  return mockResponse({
+  return {
     message: '获取推荐视频成功',
     scene,
-    strategy: 'ui_mock_recommendation_v1',
+    strategy: 'ui_mock_recommendation_v2',
     personalized: true,
     fallback_used: false,
     seed_video_id: seedVideo?.id || null,
     seed_video_title: seedVideo?.title || null,
-    items: ranked
+    internal_item_count: internalItemCount,
+    external_item_count: externalItemCount,
+    external_failed_provider_count: 0,
+    external_fetch_failed: false,
+    sources: buildMockRecommendationSources(items),
+    external_query: includeExternal ? buildMockExternalQuery(scene, seedVideo) : null,
+    external_providers: buildMockExternalProviderSummary(includeExternal),
+    items
+  }
+}
+
+const buildMockUploadRecommendations = (video) => {
+  const hasSeedSignal = Boolean(String(video?.title || '').trim() || String(video?.summary || '').trim() || (Array.isArray(video?.tags) && video.tags.length > 0))
+  return buildMockRecommendationPayload({
+    scene: hasSeedSignal ? 'related' : 'home',
+    limit: 4,
+    includeExternal: false,
+    seedVideo: hasSeedSignal ? video : null
   })
+}
+
+const buildMockRecommendationItem = (video, reasonCode, reasonLabel, reasonText, score) => ({
+  id: Number(video.id),
+  title: String(video.title || '未命名视频'),
+  status: String(video.status || 'uploaded'),
+  upload_time: recommendationTime(video),
+  summary: String(video.summary || ''),
+  tags: Array.isArray(video.tags) ? clone(video.tags) : [],
+  process_progress: Number(video.process_progress || 0),
+  current_step: String(video.current_step || ''),
+  processing_origin: String(video.processing_origin || 'online_backend'),
+  processing_origin_label: String(video.processing_origin_label || '在线处理'),
+  upload_source: String(video.upload_source || 'local_file'),
+  upload_source_label: String(video.upload_source_label || '本地上传'),
+  recommendation_score: Number(score || 0),
+  reason_code: reasonCode,
+  reason_label: reasonLabel,
+  reason_text: reasonText,
+  subject: resolveMockRecommendationSubject(video),
+  cluster_key: (Array.isArray(video.tags) && video.tags[0]) ? String(video.tags[0]) : resolveMockRecommendationSubject(video),
+  action_type: 'route',
+  action_label: video.processing_origin === 'ios_offline' ? '打开本地结果' : '打开详情',
+  action_target: video.processing_origin === 'ios_offline'
+    ? `/local-transcripts/${video.task_id || video.id}`
+    : `/videos/${video.id}`
+})
+
+const buildMockExternalRecommendationItem = (candidate, reasonCode, reasonLabel, reasonText, score) => ({
+  title: String(candidate.title || '站外候选'),
+  status: '',
+  upload_time: candidate.published_at || nowISO(),
+  summary: String(candidate.summary || ''),
+  tags: Array.isArray(candidate.tags) ? clone(candidate.tags) : [],
+  process_progress: 0,
+  current_step: '',
+  processing_origin: 'external_candidate',
+  processing_origin_label: '站外候选',
+  upload_source: 'external_candidate',
+  upload_source_label: String(candidate.source_label || '站外候选'),
+  recommendation_score: Number(score || 0),
+  reason_code: reasonCode,
+  reason_label: reasonLabel,
+  reason_text: reasonText,
+  is_external: true,
+  item_type: 'external_candidate',
+  source_label: String(candidate.source_label || '站外候选'),
+  external_url: String(candidate.url || ''),
+  external_source_label: String(candidate.source_label || '站外候选'),
+  subject: resolveMockRecommendationSubject({ title: candidate.title }),
+  cluster_key: Array.isArray(candidate.tags) && candidate.tags[0] ? String(candidate.tags[0]) : resolveMockRecommendationSubject({ title: candidate.title }),
+  provider: String(candidate.source_label || '站外候选').toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '_'),
+  can_import: true,
+  import_hint: '点导入后会带着链接进入上传链路，不会直接当作已入库视频播放。',
+  action_type: 'route',
+  action_label: '导入学习',
+  action_target: buildMockImportTarget(candidate),
+  action_api: '/api/recommendations/import-external',
+  action_method: 'POST'
+})
+
+const buildMockExternalCandidates = (scene, seedVideo) => {
+  const seedTags = new Set(Array.isArray(seedVideo?.tags) ? seedVideo.tags : [])
+  return externalRecommendationCatalog.map((candidate) => {
+    const overlap = candidate.tags.filter((tag) => seedTags.has(tag))
+    if (scene === 'related' && seedVideo) {
+      return buildMockExternalRecommendationItem(
+        candidate,
+        overlap.length > 0 ? 'external_related' : 'external_recent',
+        overlap.length > 0 ? '站外同主题' : '站外扩展',
+        overlap.length > 0
+          ? `与《${seedVideo.title || '当前视频'}》共享 ${overlap.slice(0, 2).join('、')} 等主题，可直接导入继续学习。`
+          : '当前暂无更强主题重合，但可以作为站外扩展内容导入。',
+        overlap.length > 0 ? 79 + overlap.length : 48
+      )
+    }
+
+    if (scene === 'review') {
+      return buildMockExternalRecommendationItem(
+        candidate,
+        'external_review',
+        '站外复盘',
+        '适合配合当前已完成内容继续做复盘或横向补充。',
+        68
+      )
+    }
+
+    if (scene === 'continue') {
+      return buildMockExternalRecommendationItem(
+        candidate,
+        'external_continue',
+        '站外延伸',
+        '当前场景可继续从站外课程扩展同主题内容，并随时导回学习链路。',
+        64
+      )
+    }
+
+    return buildMockExternalRecommendationItem(
+      candidate,
+      'external_discovery',
+      '站外发现',
+      '把站内学习主题继续扩展到 B站、YouTube 或慕课内容。',
+      62
+    )
+  })
+}
+
+export const mockGetRecommendationScenes = () =>
+  mockResponse({ message: '获取推荐场景成功', scenes: clone(recommendationScenes) })
+
+export const mockGetVideoRecommendations = (params = {}) => {
+  const scene = String(params?.scene || 'home').trim().toLowerCase() || 'home'
+  const limit = Math.max(1, Math.min(12, Number(params?.limit || 4) || 4))
+  const includeExternal = ['1', 'true', 'yes'].includes(String(params?.include_external || '').trim().toLowerCase())
+  const seedVideoId = Number(params?.seed_video_id || 0) || null
+  const seedVideo = seedVideoId ? findVideo(seedVideoId) : null
+
+  if (scene === 'related' && !seedVideo) {
+    return Promise.reject({
+      response: {
+        status: 422,
+        data: { detail: 'scene=related 时必须传入 seed_video_id' }
+      }
+    })
+  }
+
+  return mockResponse(buildMockRecommendationPayload({ scene, limit, includeExternal, seedVideo }))
 }
 
 const normalizePhone = (value) => {
@@ -547,7 +746,8 @@ export const mockUploadLocalVideo = (formData, { onUploadProgress } = {}) =>
           success: true,
           message: 'UI 模式：本地视频上传成功',
           video_id: id,
-          data: clone(created)
+          data: clone(created),
+          recommendations: buildMockUploadRecommendations(created)
         },
         status: 200,
         headers: { 'x-edumind-ui-only': 'true' }
@@ -574,8 +774,16 @@ export const mockUploadVideoUrl = (payload) => {
     updated_at: nowISO()
   }
   videos.unshift(created)
-  return mockResponse({ success: true, message: 'UI 模式：链接提交成功', video_id: id, data: clone(created) })
+  return mockResponse({
+    success: true,
+    message: 'UI 模式：链接提交成功',
+    video_id: id,
+    data: clone(created),
+    recommendations: buildMockUploadRecommendations(created)
+  })
 }
+
+export const mockImportExternalRecommendation = (payload) => mockUploadVideoUrl(payload)
 
 export const mockGenerateVideoSummary = (videoId) => {
   const video = findVideo(videoId)

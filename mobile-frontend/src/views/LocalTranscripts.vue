@@ -248,8 +248,8 @@ onUnmounted(() => {
 }
 
 .alert--bad {
-  background: rgba(239, 68, 68, 0.1);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .skeleton {
@@ -337,23 +337,23 @@ onUnmounted(() => {
 }
 
 .badge.ok {
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+  background: var(--ok-bg);
+  color: var(--ok-text);
 }
 
 .badge.bad {
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .badge.warn {
-  background: rgba(245, 158, 11, 0.14);
-  color: #92400e;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .badge.info {
-  background: rgba(99, 102, 241, 0.12);
-  color: #3730a3;
+  background: rgba(139, 121, 157, 0.14);
+  color: #665775;
 }
 
 .muted {
@@ -372,7 +372,7 @@ onUnmounted(() => {
 
 .bar {
   height: 100%;
-  background: linear-gradient(90deg, #10b981, #14b8a6);
+  background: linear-gradient(90deg, #5f477e, #9b82c7);
 }
 
 .mini {
@@ -385,7 +385,7 @@ onUnmounted(() => {
 }
 
 .mini--warn {
-  color: #b91c1c;
+  color: var(--lilac-text);
 }
 
 @keyframes shimmer {

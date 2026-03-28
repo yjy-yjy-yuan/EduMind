@@ -122,7 +122,7 @@ const optionText = (option) => {
   font-size: 10px;
   font-weight: 900;
   color: var(--primary-deep);
-  background: rgba(21, 141, 178, 0.1);
+  background: rgba(139, 121, 157, 0.1);
 }
 
 .picker-advantage__text {
@@ -140,7 +140,7 @@ const optionText = (option) => {
   border-radius: 16px;
   padding: 12px 42px 12px 14px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 250, 253, 0.94)),
+    linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(235, 226, 246, 0.94)),
     rgba(255, 255, 255, 0.96);
   box-shadow: inset 0 -1px 0 rgba(32, 42, 55, 0.06);
 }
@@ -153,7 +153,7 @@ const optionText = (option) => {
   font-size: 15px;
   font-weight: 800;
   line-height: 1.2;
-  color: #2563d8;
+  color: #7f698f;
 }
 
 .picker-select {
@@ -177,8 +177,8 @@ const optionText = (option) => {
   right: 14px;
   width: 10px;
   height: 10px;
-  border-right: 2px solid #2563d8;
-  border-bottom: 2px solid #2563d8;
+  border-right: 2px solid #7f698f;
+  border-bottom: 2px solid #7f698f;
   transform: rotate(45deg);
   pointer-events: none;
 }

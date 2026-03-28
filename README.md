@@ -82,6 +82,24 @@ bash ios-app/sync_ios_web_assets.sh
 2. 读取 `backend_fastapi/.env` 中的 `PORT`，自动刷新 iOS 真机默认后端地址
 3. 将最新 `dist/` 同步到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
 
+## 后端测试目录
+
+后端测试已经统一放在 [backend_fastapi/tests](/Users/yuan/final-work/EduMind/backend_fastapi/tests)：
+
+- `backend_fastapi/tests/unit/`：单元测试
+- `backend_fastapi/tests/api/`：接口测试
+- `backend_fastapi/tests/smoke/`：冒烟测试
+- `backend_fastapi/tests/integration/`：集成测试
+
+执行方式：
+
+```bash
+. .venv/bin/activate
+pytest backend_fastapi/tests/ -v
+```
+
+更具体的测试放置规则见 [backend_fastapi/tests/README.md](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)。
+
 ## Blitz / Codex CLI 开发工作流
 
 面向 Blitz、Codex CLI、Claude Code 等本地代码代理，当前仓库新增了 4 个统一脚本：
@@ -213,6 +231,50 @@ QA_MAX_HISTORY_CHARS=2200
 3. 若希望默认问答走 DeepSeek，可将 `QA_DEFAULT_PROVIDER` 改为 `deepseek`。
 4. 当前版本不要求修改现有 MySQL `questions` 表；数据库继续只保存基础问答记录，视频问答空间隔离以前端本地缓存与请求参数为准。
 
+## 设计助手（接入 agent-skills / Sleek）
+
+你提供的 `agent-skills` 仓库本质上是 Sleek API 的技能说明，而不是可直接放进 `mobile-frontend/` 的组件包。当前仓库已经按 EduMind 的 iOS-only 架构，将它收敛为一条新的后端代理链路：
+
+1. `backend_fastapi/` 负责保存 `SLEEK_API_KEY`，统一代理 `projects`、`components`、`chat runs`、`screenshots`
+2. `mobile-frontend/` 新增“设计助手”页面，只调用 EduMind 自己的 `/api/design/*`
+3. `ios-app/` 无需直连 Sleek，也不会暴露第三方 API Key
+
+启用步骤：
+
+```bash
+cp backend_fastapi/.env.example backend_fastapi/.env
+# 在 backend_fastapi/.env 中补齐：
+# SLEEK_API_KEY=...
+python backend_fastapi/run.py
+```
+
+需要的 Sleek scope 至少包括：
+
+1. `projects:read`
+2. `projects:write`
+3. `components:read`
+4. `chats:read`
+5. `chats:write`
+6. `screenshots`
+
+当前新增的 EduMind 后端接口：
+
+1. `GET /api/design/status`
+2. `GET /api/design/projects`
+3. `POST /api/design/projects`
+4. `GET /api/design/projects/{project_id}/components`
+5. `GET /api/design/projects/{project_id}/components/{component_id}`
+6. `POST /api/design/projects/{project_id}/messages`
+7. `GET /api/design/projects/{project_id}/runs/{run_id}`
+8. `POST /api/design/projects/{project_id}/screenshots`
+
+移动端入口位于“我的”页中的“设计助手”。当前流程支持：
+
+1. 创建或选择 Sleek 项目
+2. 直接输入自然语言描述生成页面
+3. 自动回显生成结果截图
+4. 查看生成组件的 HTML 原型
+
 ## MySQL 表管理
 
 当前后端显式管理的业务表只有 6 张：
@@ -320,6 +382,8 @@ bash scripts/install_git_hooks.sh
 - [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)
 - [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)
 - [`docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md)
+- [`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md)
+- [`docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md)
 - [`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)
 - [`backend_fastapi/README_RUN.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README_RUN.md)
 - [`mobile-frontend/README.md`](/Users/yuan/final-work/EduMind/mobile-frontend/README.md)

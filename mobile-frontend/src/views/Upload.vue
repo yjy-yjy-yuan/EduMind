@@ -1,182 +1,142 @@
 <template>
-  <div class="page upload-page">
-    <header class="topbar topbar--hero">
+  <div class="page">
+    <header class="topbar">
       <div class="topbar__copy">
-        <span class="topbar__eyebrow">上传与转录</span>
-        <h2>把素材送进学习链路</h2>
-        <p class="topbar__desc">先选方式，再提交素材，状态会自动回到视频库或本地转录列表。</p>
+        <h2>导入学习内容</h2>
+        <p>本地上传和推荐导入都走同一条处理链路。</p>
       </div>
-      <div class="topbar__actions">
-        <button class="link" @click="go('/videos')">视频库</button>
-        <button class="link" @click="resetAll" :disabled="busy">重置</button>
-      </div>
+      <button class="link" @click="resetAll" :disabled="busy">重置</button>
     </header>
 
-    <div class="card card--hero">
-      <div class="card-head card-head--stack">
+    <div v-if="hasRecommendationImport" class="card import-banner">
+      <div class="import-banner__top">
         <div>
-          <div class="card-title">处理设置</div>
-          <div class="muted">设置一次，后续上传、重试和推荐链路都会沿用。</div>
+          <div class="card-title">推荐导入</div>
+          <div class="muted">你正在承接来自 {{ importSourceLabel }} 的推荐内容，提交后会进入现有下载与处理链路，不会直接当作已入库视频播放。</div>
         </div>
-        <div class="flow-stats">
-          <div class="flow-stat">
-            <span>最近任务</span>
-            <strong>{{ recentUploads.length }}</strong>
-          </div>
-          <div class="flow-stat">
-            <span>进行中</span>
-            <strong>{{ activeRecentCount }}</strong>
-          </div>
-          <div class="flow-stat">
-            <span>本地转录</span>
-            <strong>{{ nativeHistory.length }}</strong>
-          </div>
-        </div>
+        <span class="import-badge">{{ importSourceLabel }}</span>
       </div>
+      <div class="import-banner__url">{{ importPreviewUrl }}</div>
+      <div class="import-banner__actions">
+        <button class="btn btn--primary" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交当前推荐链接' }}</button>
+        <button class="btn" @click="router.push('/recommendations')" :disabled="busy">返回推荐页</button>
+      </div>
+    </div>
+
+    <div class="card" :class="{ 'card--active': submissionMode === 'file' }">
       <WhisperModelPicker
         title="Whisper 模型"
         :model="processingSettings.model"
         :options="whisperModelOptions"
         :disabled="busy"
-        hint="在线处理会使用当前 Whisper 模型；iOS 本地离线转录会优先走原生识别。"
         @select="selectProcessingModel"
       />
-      <div class="settings-summary">
-        <span class="hero-pill">{{ processingSettingsSummary }}</span>
-        <button class="hero-link" @click="go('/profile')">去“我的”页调整默认设置</button>
-      </div>
     </div>
 
-    <div class="card">
-      <div class="card-head card-head--stack">
-        <div>
-          <div class="card-title">1. 选择提交方式</div>
-          <div class="muted">三条入口只保留一种激活态，避免表单同时抢视线。</div>
-        </div>
-      </div>
-      <div class="mode-switch">
-        <button
-          v-for="mode in SUBMISSION_MODES"
-          :key="mode.value"
-          class="mode-tab"
-          :class="{ 'mode-tab--active': submissionMode === mode.value }"
-          @click="submissionMode = mode.value"
-        >
-          {{ mode.label }}
+    <div class="card" :class="{ 'card--active': submissionMode === 'file' }">
+      <div class="card-title">本地视频</div>
+      <input
+        ref="fileInputRef"
+        class="file file--hidden"
+        type="file"
+        accept=".mp4,.avi,.mov,.mkv,.webm,.flv"
+        @change="onFileChange"
+        :disabled="busy"
+      />
+      <div class="file-picker" :class="{ 'file-picker--selected': hasVisibleFileMeta }">
+        <button class="file-picker__button" type="button" @click="openFilePicker" :disabled="busy">
+          {{ hasVisibleFileMeta ? '重新选择视频' : '选择本地视频' }}
         </button>
-      </div>
-      <div class="mode-caption">{{ currentSubmissionMode.description }}</div>
-    </div>
-
-    <div class="card submit-card">
-      <div class="card-head card-head--stack">
-        <div>
-          <div class="card-title">2. {{ currentSubmissionMode.title }}</div>
-          <div class="muted">{{ currentSubmissionMode.description }}</div>
+        <div class="file-picker__meta">
+          <strong class="file-picker__title">{{ currentFileDisplayName }}</strong>
+          <span class="file-picker__desc">{{ currentFileDisplayHint }}</span>
         </div>
       </div>
+      <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
+        {{ busy ? '上传中…' : '开始上传' }}
+      </button>
+      <button class="btn btn--native" @click="startNativeOfflineTranscriptionFlow" :disabled="busy || nativeBusy">
+        {{ nativeBusy ? '准备本地离线转录…' : 'iOS 本地离线转录' }}
+      </button>
+      <label class="field field--native">
+        <span class="field-label">本地识别语言/方言</span>
+        <select
+          class="input"
+          :value="processingSettings.nativeLocale"
+          :disabled="busy || nativeBusy"
+          @change="selectNativeLocale($event.target.value)"
+        >
+          <option v-for="option in NATIVE_LOCALE_OPTIONS" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
+      <div class="muted">当前处理：{{ processingSettingsSummary }}</div>
+      <div class="muted">本地离线转录优先使用 iOS 原生识别能力，只处理当前设备上的本地视频，不依赖 FastAPI。</div>
+      <div class="muted">如果视频是粤语、吴语、繁体中文或明显口音内容，请先切换到更接近的本地识别语言/方言。</div>
 
-      <template v-if="submissionMode === 'file'">
-        <label class="field">
-          <span class="field-label">本地视频文件</span>
-          <input
-            ref="fileInputRef"
-            class="file file--panel"
-            type="file"
-            accept=".mp4,.avi,.mov,.mkv,.webm,.flv"
-            @change="onFileChange"
-            :disabled="busy"
-          />
-        </label>
-        <div v-if="file" class="selection-note">已选择：{{ file.name }}（{{ readableSize(file.size) }}）</div>
-        <div v-else-if="savedFileMeta" class="selection-note">
-          上次选择：{{ savedFileMeta.name }}（{{ readableSize(savedFileMeta.size) }}，返回后需重新选择文件才能再次上传）
-        </div>
-        <div v-if="busy" class="progress-shell">
-          <div class="progress">
-            <div class="bar" :style="{ width: `${progress}%` }"></div>
-          </div>
-          <div class="muted">上传进度：{{ progress }}%</div>
-        </div>
-        <div class="action-row">
-          <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
-            {{ busy ? '上传中…' : '上传并开始处理' }}
-          </button>
-          <button class="btn btn--ghost" @click="go('/videos')" :disabled="busy">查看视频状态</button>
-        </div>
-        <div class="supporting-list">
-          <span class="supporting-chip">支持 mp4 / avi / mov / mkv / webm / flv</span>
-          <span class="supporting-chip">单文件上限 500 MB</span>
-          <span class="supporting-chip">后端短时不可达会尝试离线补跑</span>
-        </div>
-      </template>
-
-      <template v-else-if="submissionMode === 'url'">
-        <label class="field">
-          <span class="field-label">视频链接</span>
-          <input
-            class="input input--prominent"
-            v-model.trim="videoUrl"
-            placeholder="请输入视频链接（B站/YouTube等）"
-            :disabled="busy"
-          />
-        </label>
-        <div class="supporting-list">
-          <span class="supporting-chip">支持 B站 / YouTube / 中国大学慕课</span>
-          <span class="supporting-chip">将沿用当前处理设置</span>
-        </div>
-        <div class="action-row">
-          <button class="btn btn--primary" @click="uploadUrl" :disabled="!videoUrl || busy">
-            {{ busy ? '提交中…' : '提交链接并开始下载' }}
-          </button>
-          <button class="btn btn--ghost" @click="go('/videos')" :disabled="busy">查看视频状态</button>
-        </div>
-      </template>
-
-      <template v-else>
-        <div class="native-panel">
-          <div class="supporting-list">
-            <span class="supporting-chip supporting-chip--native">{{ nativeAvailabilityText }}</span>
-            <span class="supporting-chip">结果进入本地转录列表</span>
-          </div>
-          <label class="field field--native">
-            <span class="field-label">本地识别语言/方言</span>
-            <select
-              class="input"
-              :value="processingSettings.nativeLocale"
-              :disabled="busy || nativeBusy"
-              @change="selectNativeLocale($event.target.value)"
-            >
-              <option v-for="option in NATIVE_LOCALE_OPTIONS" :key="option.value" :value="option.value">
-                {{ option.label }}
-              </option>
-            </select>
-          </label>
-          <div class="action-row">
-            <button class="btn btn--native" @click="startNativeOfflineTranscriptionFlow" :disabled="busy || nativeBusy">
-              {{ nativeBusy ? '准备本地离线转录…' : '启动 iOS 本地离线转录' }}
-            </button>
-            <button class="btn btn--ghost" @click="go('/local-transcripts')" :disabled="busy || nativeBusy">
-              查看本地转录列表
-            </button>
-          </div>
-          <div class="muted">本地离线转录优先使用 iOS 原生识别能力，只处理当前设备上的本地视频，不依赖 FastAPI。</div>
-          <div class="muted">如果视频是粤语、吴语、繁体中文或明显口音内容，请先切换到更接近的本地识别语言/方言。</div>
-        </div>
-      </template>
+      <div v-if="busy" class="progress">
+        <div class="bar" :style="{ width: `${progress}%` }"></div>
+      </div>
+      <div v-if="busy" class="muted">进度：{{ progress }}%</div>
+      <div class="muted">离线补跑仅适用于已配置真实后端地址但暂时不可达；纯 UI ONLY 演示模式不会进入真实离线补跑。</div>
     </div>
 
-    <div v-if="message" class="alert alert--ok">{{ message }}</div>
-    <div v-if="error" class="alert alert--bad">{{ error }}</div>
+    <div class="card" :class="{ 'card--active': submissionMode === 'url', 'card--spotlight': hasRecommendationImport }">
+      <div class="card-title">视频链接</div>
+      <div v-if="hasRecommendationImport" class="import-tip">
+        <span class="import-badge import-badge--inline">{{ importSourceLabel }}</span>
+        <span class="muted">当前链接来自推荐系统，提交后不会直接播放，而是进入导入学习流程。</span>
+      </div>
+      <input class="input" v-model.trim="videoUrl" placeholder="请输入视频链接（B站/YouTube等）" :disabled="busy" />
+      <button class="btn" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交链接' }}</button>
+      <div class="muted">支持：B站、YouTube、中国大学慕课（icourse163）</div>
+      <div class="muted">将沿用当前处理设置：{{ processingSettingsSummary }}</div>
+    </div>
 
-    <div v-if="!nativeTask && nativeHistory.length === 0 && recentUploads.length === 0" class="card card--empty">
-      <div class="card-title">提交后的任务会出现在这里</div>
-      <div class="muted">在线任务会回到视频库，本地离线任务会回到本地转录列表，避免状态散落在多个入口。</div>
+    <div v-if="uploadRecommendationItems.length > 0" class="card upload-followup">
+      <div class="card-head">
+        <div class="card-title">上传后推荐</div>
+        <div class="card-head-actions">
+          <button class="link link--small" @click="openLatestUploadedVideo" :disabled="!latestUploadedVideoId">查看刚上传内容</button>
+          <button class="link link--small" @click="clearUploadRecommendations" :disabled="busy">收起</button>
+        </div>
+      </div>
+      <div class="muted">{{ uploadRecommendationIntro }}</div>
+      <div v-if="uploadRecommendationQuerySummary" class="upload-followup__context">
+        当前推荐围绕：{{ uploadRecommendationQuerySummary }}
+      </div>
+      <div class="upload-followup__list">
+        <article v-for="item in uploadRecommendationItems" :key="item.key" class="upload-followup__item">
+          <div class="upload-followup__top">
+            <span class="recent-tag">{{ item.reasonLabel }}</span>
+            <span class="recent-tag recent-tag--soft">{{ item.sourceLabel }}</span>
+          </div>
+          <strong class="upload-followup__title">{{ item.title }}</strong>
+          <p class="upload-followup__desc">{{ item.summaryText }}</p>
+          <div v-if="item.tags.length > 0" class="upload-followup__tags">
+            <span v-for="tag in item.tags.slice(0, 4)" :key="`${item.key}-${tag}`" class="upload-followup__tag">{{ tag }}</span>
+          </div>
+          <div class="upload-followup__meta">
+            <span v-if="item.statusText">{{ item.statusText }}</span>
+            <span v-if="item.subjectText">{{ item.subjectText }}</span>
+            <span v-if="item.timeText">{{ item.timeText }}</span>
+          </div>
+          <div v-if="item.importHint" class="upload-followup__hint">{{ item.importHint }}</div>
+          <button
+            class="btn btn--primary"
+            @click="openUploadRecommendation(item)"
+            :disabled="item.primaryActionDisabled || busy"
+          >
+            {{ item.primaryActionLabel }}
+          </button>
+        </article>
+      </div>
     </div>
 
     <div v-if="nativeTask" class="card">
       <div class="card-head">
-        <div class="card-title">当前本地离线任务</div>
+        <div class="card-title">iOS 本地离线转录</div>
         <div class="card-head-actions">
           <button class="link link--small" @click="openNativeTaskDetail(nativeTask.taskId)" :disabled="!nativeTask.taskId">查看详情</button>
           <button class="link link--small" @click="clearNativeTask" :disabled="nativeBusy">清除结果</button>
@@ -204,7 +164,7 @@
 
     <div v-if="nativeHistory.length > 0" class="card">
       <div class="card-head">
-        <div class="card-title">本地离线记录</div>
+        <div class="card-title">本地转录历史</div>
         <button class="link link--small" @click="reloadNativeHistory" :disabled="nativeBusy">刷新</button>
       </div>
       <div class="recent-list">
@@ -227,7 +187,7 @@
 
     <div v-if="recentUploads.length > 0" class="card">
       <div class="card-head">
-        <div class="card-title">最近在线任务</div>
+        <div class="card-title">最近上传</div>
         <div class="card-head-actions">
           <button class="link link--small" @click="syncRecentStatuses" :disabled="busy || syncingRecent">
             {{ syncingRecent ? '刷新中…' : '刷新状态' }}
@@ -280,12 +240,15 @@
         <div v-if="filteredRecentUploads.length === 0" class="empty">当前筛选下没有记录。</div>
       </div>
     </div>
+
+    <div v-if="message" class="alert alert--ok">{{ message }}</div>
+    <div v-if="error" class="alert alert--bad">{{ error }}</div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   generateTranscriptSummary,
   getVideoProcessingOptions,
@@ -342,12 +305,14 @@ import {
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
 const router = useRouter()
+const route = useRoute()
 const fileInputRef = ref(null)
-const go = (path) => router.push(path)
 
 const file = ref(null)
 const savedFileMeta = ref(null)
 const videoUrl = ref('')
+const submissionMode = ref('file')
+const recommendationSource = ref('')
 const busy = ref(false)
 const nativeBusy = ref(false)
 const progress = ref(0)
@@ -358,33 +323,12 @@ const nativeTask = ref(null)
 const nativeHistory = ref([])
 const syncingRecent = ref(false)
 const statusFilter = ref('all')
-const submissionMode = ref('file')
 let recentStatusTimer = null
 const processingSettings = ref(getProcessingSettings())
 const whisperModelOptions = ref(getWhisperModelOptions())
 
 const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
 const ALLOWED_EXTENSIONS = new Set(['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'])
-const SUBMISSION_MODES = [
-  {
-    value: 'file',
-    label: '本地文件',
-    title: '上传本地视频',
-    description: '适合把当前设备里的视频直接上传到后端，自动进入转录、摘要和标签链路。'
-  },
-  {
-    value: 'url',
-    label: '视频链接',
-    title: '提交视频链接',
-    description: '适合导入 B站、YouTube 和中国大学慕课链接，后端会先下载再处理。'
-  },
-  {
-    value: 'native',
-    label: 'iOS 本地离线',
-    title: '启动 iOS 本地离线转录',
-    description: '适合在原生容器里直接调用设备能力处理本地视频，不依赖 FastAPI。'
-  }
-]
 const RECENT_UPLOADS_KEY = 'm_recent_uploads'
 const MAX_RECENT_UPLOADS = 8
 const STATUS_FILTERS = [
@@ -395,6 +339,12 @@ const STATUS_FILTERS = [
 ]
 let syncingOfflineRecent = false
 const nativeEventDisposers = []
+const UPLOAD_RECOMMENDATION_SCENE_LABELS = {
+  home: '首页推荐',
+  continue: '继续学习',
+  review: '复盘推荐',
+  related: '相关推荐'
+}
 
 const processingSettingsSummary = computed(() => {
   const current = processingSettings.value || getProcessingSettings()
@@ -412,14 +362,134 @@ const processingSettingsSummary = computed(() => {
   if (current.autoGenerateTags) parts.push('自动标签')
   return parts.join(' · ')
 })
+const hasRecommendationImport = computed(() => Boolean(recommendationSource.value || videoUrl.value) && submissionMode.value === 'url')
+const importSourceLabel = computed(() => recommendationSource.value || '推荐系统')
+const importPreviewUrl = computed(() => String(videoUrl.value || '').trim() || '等待带入推荐链接')
+const hasVisibleFileMeta = computed(() => Boolean(file.value || savedFileMeta.value))
+const currentFileDisplayName = computed(() => {
+  if (file.value?.name) return file.value.name
+  if (savedFileMeta.value?.name) return savedFileMeta.value.name
+  return '未选择本地视频'
+})
+const currentFileDisplayHint = computed(() => {
+  if (file.value) {
+    return `已选择 · ${readableSize(file.value.size)}`
+  }
+  if (savedFileMeta.value?.name) {
+    return `上次选择 · ${readableSize(savedFileMeta.value.size)} · 返回后需重新选择`
+  }
+  return '支持 MP4、AVI、MOV、MKV、WEBM、FLV'
+})
+const uploadRecommendationPayload = ref(null)
+const latestUploadedVideoId = ref(0)
+const latestUploadedTitle = ref('')
+const normalizeRecommendationItems = (payload) => Array.isArray(payload?.items) ? payload.items : []
+const normalizeRecommendationQuery = (payload) => payload?.external_query || null
+const resolveRecommendationItemKey = (item, index = 0) =>
+  String(item?.id || item?.video_id || item?.external_url || item?.url || `upload-recommendation-${index}`)
+const resolveRecommendationUrl = (item) =>
+  String(item?.external_url || item?.target_url || item?.source_url || item?.url || item?.link || '').trim()
+const isExternalRecommendationItem = (item) => {
+  const itemType = String(item?.item_type || item?.content_type || '').trim().toLowerCase()
+  if (item?.is_external === true) return true
+  return ['external', 'external_candidate', 'candidate'].includes(itemType) || (!item?.id && Boolean(resolveRecommendationUrl(item)))
+}
+const parseRecommendationActionTarget = (target) => {
+  const text = String(target || '').trim()
+  if (!text || !text.startsWith('/')) return null
+  const [path, search = ''] = text.split('?')
+  if (!search) return { path }
+  const params = new URLSearchParams(search)
+  const query = {}
+  params.forEach((value, key) => {
+    query[key] = value
+  })
+  return { path, query }
+}
+const formatRecommendationTime = (rawValue) => {
+  if (!rawValue) return ''
+  const date = new Date(rawValue)
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString()
+}
+const decorateUploadRecommendationItem = (item, index = 0) => {
+  const tags = Array.isArray(item?.tags) ? item.tags.filter(Boolean).map((tag) => String(tag).trim()) : []
+  const isExternal = isExternalRecommendationItem(item)
+  const sourceLabel = String(item?.source_label || item?.upload_source_label || (isExternal ? '站外候选' : '站内视频')).trim() || '站内视频'
+  return {
+    ...item,
+    key: resolveRecommendationItemKey(item, index),
+    title: String(item?.title || '未命名内容'),
+    tags,
+    sourceLabel,
+    reasonLabel: String(item?.reason_label || '推荐'),
+    summaryText: String(item?.reason_text || item?.summary || '可继续从这里进入学习链路。'),
+    statusText: item?.status ? videoStatusText(item.status) : '',
+    timeText: formatRecommendationTime(item?.upload_time || item?.updated_at || item?.created_at),
+    subjectText: String(item?.subject || '').trim() ? `科目 · ${String(item.subject).trim()}` : '',
+    importHint: String(item?.import_hint || '').trim(),
+    primaryActionLabel: String(item?.action_label || '').trim() || (isExternal ? '导入学习' : '打开详情'),
+    primaryActionDisabled: isExternal ? !Boolean(item?.can_import ?? resolveRecommendationUrl(item)) : false,
+    actionTarget: String(item?.action_target || '').trim()
+  }
+}
+const uploadRecommendationItems = computed(() =>
+  normalizeRecommendationItems(uploadRecommendationPayload.value).map((item, index) => decorateUploadRecommendationItem(item, index))
+)
+const uploadRecommendationIntro = computed(() => {
+  const scene = String(uploadRecommendationPayload.value?.scene || '').trim().toLowerCase()
+  const label = UPLOAD_RECOMMENDATION_SCENE_LABELS[scene] || '下一步推荐'
+  const title = latestUploadedTitle.value ? `《${latestUploadedTitle.value}》` : '当前上传内容'
+  return `${title} 上传后，后端已自动返回 ${label}，你可以直接从这里决定下一步学什么。`
+})
+const uploadRecommendationQuerySummary = computed(() => {
+  const query = normalizeRecommendationQuery(uploadRecommendationPayload.value)
+  if (!query) return ''
+  const parts = [query.subject, query.primary_topic].filter(Boolean)
+  if (Array.isArray(query.preferred_tags) && query.preferred_tags.length > 0) {
+    parts.push(`优先标签：${query.preferred_tags.join('、')}`)
+  }
+  return parts.join(' · ')
+})
 
-const currentSubmissionMode = computed(
-  () => SUBMISSION_MODES.find((item) => item.value === submissionMode.value) || SUBMISSION_MODES[0]
-)
-const activeRecentCount = computed(() => recentUploads.value.filter((item) => isActiveStatus(item.status)).length)
-const nativeAvailabilityText = computed(() =>
-  hasNativeBridge() ? '当前环境支持 iOS 本地离线转录' : '当前环境不是 iOS 原生容器，仅可使用在线入口'
-)
+const clearUploadRecommendations = () => {
+  uploadRecommendationPayload.value = null
+}
+
+const storeUploadRecommendations = (payload, videoId, title) => {
+  uploadRecommendationPayload.value = payload && normalizeRecommendationItems(payload).length > 0 ? payload : null
+  latestUploadedVideoId.value = Number(videoId || 0) || 0
+  latestUploadedTitle.value = String(title || '').trim()
+}
+
+const openLatestUploadedVideo = () => {
+  if (!latestUploadedVideoId.value) return
+  router.push(`/videos/${latestUploadedVideoId.value}`)
+}
+
+const openUploadRecommendation = (item) => {
+  if (isExternalRecommendationItem(item) && item.primaryActionDisabled) {
+    error.value = item.importHint || '当前站外候选暂不可直接导入。'
+    return
+  }
+  const actionLocation = parseRecommendationActionTarget(item.actionTarget || item?.action_target)
+  if (actionLocation) {
+    router.push(actionLocation)
+    return
+  }
+  if (isExternalRecommendationItem(item)) {
+    const url = resolveRecommendationUrl(item)
+    if (!url) return
+    router.push({ path: '/upload', query: { mode: 'url', url, source: item.sourceLabel || '站外推荐' } })
+    return
+  }
+  if (item?.task_id) {
+    router.push(`/local-transcripts/${item.task_id}`)
+    return
+  }
+  if (item?.id) {
+    router.push(`/videos/${item.id}`)
+  }
+}
 
 const selectProcessingModel = (model) => {
   if (busy.value) return
@@ -435,6 +505,46 @@ const selectNativeLocale = (nativeLocale) => {
     ...processingSettings.value,
     nativeLocale: String(nativeLocale || '').trim()
   })
+}
+
+const consumeUploadRouteIntent = async () => {
+  const query = route.query || {}
+  const normalizedMode = String(query.mode || '').trim().toLowerCase()
+  const normalizedUrl = String(query.url || '').trim()
+  const normalizedSource = String(query.source || '').trim()
+  recommendationSource.value = normalizedSource
+
+  const restQuery = { ...query }
+  delete restQuery.mode
+  delete restQuery.url
+  delete restQuery.source
+
+  let consumed = false
+  if (normalizedMode === 'url' || normalizedUrl) {
+    submissionMode.value = 'url'
+    consumed = true
+  } else if (normalizedMode === 'native') {
+    submissionMode.value = 'native'
+    consumed = true
+  } else if (normalizedMode === 'file') {
+    submissionMode.value = 'file'
+    consumed = true
+  }
+
+  if (normalizedUrl) {
+    videoUrl.value = normalizedUrl
+    message.value = normalizedSource
+      ? `已从 ${normalizedSource} 推荐带入链接，可直接提交导入。`
+      : '已带入推荐链接，可直接提交导入。'
+    consumed = true
+  } else if (normalizedSource && normalizedMode === 'url') {
+    message.value = `已切换到链接导入，可粘贴 ${normalizedSource} 链接。`
+    consumed = true
+  }
+
+  if (consumed) {
+    await router.replace({ path: route.path, query: restQuery }).catch(() => {})
+  }
 }
 
 const readableSize = (size) => {
@@ -1069,7 +1179,6 @@ const validateVideoUrl = (url) => {
 }
 
 const onFileChange = (e) => {
-  submissionMode.value = 'file'
   const selected = e?.target?.files?.[0] || null
   error.value = ''
   message.value = ''
@@ -1101,15 +1210,24 @@ const resetAll = () => {
   savedFileMeta.value = null
   if (fileInputRef.value) fileInputRef.value.value = ''
   videoUrl.value = ''
+  submissionMode.value = 'file'
+  recommendationSource.value = ''
   progress.value = 0
   message.value = ''
   error.value = ''
+  clearUploadRecommendations()
+  latestUploadedVideoId.value = 0
+  latestUploadedTitle.value = ''
   if (!nativeBusy.value) nativeTask.value = null
+}
+
+const openFilePicker = () => {
+  if (busy.value) return
+  fileInputRef.value?.click()
 }
 
 const startNativeOfflineTranscriptionFlow = async () => {
   if (busy.value || nativeBusy.value) return
-  submissionMode.value = 'native'
   processingSettings.value = getProcessingSettings()
   message.value = ''
   error.value = ''
@@ -1218,6 +1336,7 @@ const uploadFile = async () => {
   progress.value = 0
   message.value = ''
   error.value = ''
+  clearUploadRecommendations()
   try {
     const form = new FormData()
     form.append('file', file.value)
@@ -1231,24 +1350,29 @@ const uploadFile = async () => {
     })
     const data = res?.data || {}
     const videoId = resolveVideoId(data)
+    const uploadedTitle = data?.data?.title || file.value?.name || '本地视频'
     progress.value = 100
     message.value = data?.duplicate
       ? (data?.message || '视频已存在，已为你跳转到详情页')
       : (data?.message || '上传成功，已为你自动开始处理')
+    storeUploadRecommendations(data?.recommendations, videoId, uploadedTitle)
     addRecentUpload({
       videoId,
-      title: data?.data?.title || file.value?.name || '本地视频',
+      title: uploadedTitle,
       typeText: `本地文件 · ${readableSize(file.value?.size)}`,
       duplicate: Boolean(data?.duplicate),
       status: data?.status || 'uploaded',
       requestedModel: data?.data?.requested_model || processingSettings.value.model,
       effectiveModel: data?.data?.effective_model || data?.data?.requested_model || processingSettings.value.model
     })
-    router.push(
-      videoId
-        ? { path: `/videos/${videoId}`, query: data?.duplicate ? undefined : { autostart: '1' } }
-        : '/videos'
-    )
+    savedFileMeta.value = file.value ? { name: file.value.name, size: Number(file.value.size || 0) } : savedFileMeta.value
+    file.value = null
+    if (fileInputRef.value) fileInputRef.value.value = ''
+    if (uploadRecommendationItems.value.length > 0) {
+      message.value = `${message.value} 下方已自动给出下一步推荐。`
+      return
+    }
+    router.push(videoId ? { path: `/videos/${videoId}`, query: data?.duplicate ? undefined : { autostart: '1' } } : '/videos')
   } catch (e) {
     if (isVideoUploadQueueableError(e)) {
       try {
@@ -1275,27 +1399,32 @@ const uploadUrl = async () => {
   progress.value = 0
   message.value = ''
   error.value = ''
+  clearUploadRecommendations()
   try {
     const trimmedUrl = String(videoUrl.value).trim()
     processingSettings.value = getProcessingSettings()
     const res = await uploadVideoUrl({ url: trimmedUrl, ...buildProcessPayload(processingSettings.value) })
     const data = res?.data || {}
     const videoId = resolveVideoId(data)
+    const uploadedTitle = data?.data?.title || trimmedUrl
     message.value = data?.message || '已提交链接，下载完成后会自动开始处理'
+    storeUploadRecommendations(data?.recommendations, videoId, uploadedTitle)
+    recommendationSource.value = ''
     addRecentUpload({
       videoId,
-      title: data?.data?.title || trimmedUrl,
+      title: uploadedTitle,
       typeText: '链接导入',
       duplicate: Boolean(data?.duplicate),
       status: data?.status || 'downloading',
       requestedModel: data?.data?.requested_model || processingSettings.value.model,
       effectiveModel: data?.data?.effective_model || data?.data?.requested_model || processingSettings.value.model
     })
-    router.push(
-      videoId
-        ? { path: `/videos/${videoId}`, query: data?.duplicate ? undefined : { autostart: '1' } }
-        : '/videos'
-    )
+    videoUrl.value = ''
+    if (uploadRecommendationItems.value.length > 0) {
+      message.value = `${message.value} 下方已自动给出下一步推荐。`
+      return
+    }
+    router.push(videoId ? { path: `/videos/${videoId}`, query: data?.duplicate ? undefined : { autostart: '1' } } : '/videos')
   } catch (e) {
     if (isVideoUploadQueueableError(e)) {
       try {
@@ -1312,6 +1441,7 @@ const uploadUrl = async () => {
 }
 
 onMounted(async () => {
+  await consumeUploadRouteIntent()
   nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_PROGRESS_EVENT, handleNativeProgressEvent))
   nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_COMPLETED_EVENT, handleNativeCompletedEvent))
   nativeEventDisposers.push(onNativeEvent(NATIVE_OFFLINE_TRANSCRIPTION_FAILED_EVENT, handleNativeFailedEvent))
@@ -1328,6 +1458,13 @@ onMounted(async () => {
   scheduleRecentStatusSync()
 })
 
+watch(
+  () => route.fullPath,
+  async () => {
+    await consumeUploadRouteIntent()
+  }
+)
+
 onUnmounted(() => {
   clearRecentStatusSync()
   window.removeEventListener(OFFLINE_QUEUE_EVENT_NAME, handleOfflineQueueEvent)
@@ -1340,28 +1477,55 @@ onUnmounted(() => {
 .page {
   max-width: 520px;
   margin: 0 auto;
-  padding: 16px 16px 0;
+  padding: calc(14px + env(safe-area-inset-top)) 16px 0;
+  font-family: 'Avenir Next', 'SF Pro Display', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.topbar,
+.card {
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(242, 235, 248, 0.93);
+  box-shadow: 0 18px 38px rgba(73, 51, 104, 0.12);
 }
 
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 12px 14px;
+  border-radius: 20px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 10px;
-  gap: 8px;
+}
+
+.topbar__copy {
+  display: grid;
+  gap: 4px;
 }
 
 .topbar h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 20px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: #221a30;
+}
+
+.topbar__copy p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #706781;
 }
 
 .link {
   border: 0;
   background: transparent;
-  color: var(--primary);
-  font-weight: 900;
+  color: var(--primary-deep);
+  font-weight: 700;
 }
 
 .link--small {
@@ -1369,34 +1533,140 @@ onUnmounted(() => {
 }
 
 .card {
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 14px;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
+  padding: 16px;
+  border-radius: 24px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
-.card-title {
-  font-weight: 900;
-  font-size: 13px;
+.card--active {
+  border-color: var(--primary-soft-strong);
+  background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(247, 241, 251, 0.98));
 }
 
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.card--spotlight {
+  background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(247, 241, 251, 0.98));
 }
 
+.import-banner {
+  gap: 14px;
+  border-color: var(--primary-soft);
+  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.96));
+}
+
+.import-banner__top,
+.import-banner__actions,
+.import-tip,
+.card-head,
 .card-head-actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.import-banner__url {
+  border-radius: 16px;
+  padding: 13px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #221a30;
+  background: rgba(247, 241, 251, 0.92);
+  border: 1px dashed rgba(17, 24, 39, 0.12);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.upload-followup__context,
+.upload-followup__hint {
+  border-radius: 16px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--primary-deep);
+  background: var(--surface-lilac);
+  border: 1px solid rgba(143, 115, 186, 0.18);
+}
+
+.upload-followup__list {
+  display: grid;
+  gap: 10px;
+}
+
+.upload-followup__item {
+  display: grid;
+  gap: 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(238, 230, 246, 0.92);
+  padding: 14px;
+}
+
+.upload-followup__top,
+.upload-followup__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.upload-followup__title {
+  font-size: 15px;
+  line-height: 1.45;
+  color: #221a30;
+}
+
+.upload-followup__desc,
+.upload-followup__meta {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #706781;
+}
+
+.upload-followup__tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.upload-followup__tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: var(--surface-lilac-deep);
+  color: var(--lilac-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.import-badge,
+.recent-tag,
+.status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.import-badge {
+  padding: 5px 10px;
+  color: var(--primary-deep);
+  background: var(--primary-soft);
+}
+
+.import-badge--inline {
+  flex-shrink: 0;
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #221a30;
 }
 
 .filters {
@@ -1405,93 +1675,170 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.filter {
-  border: 1px solid var(--border);
-  background: #fff;
+.filter,
+.mini {
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(247, 241, 251, 0.96);
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 7px 11px;
   font-size: 12px;
-  font-weight: 800;
-  color: var(--text);
+  font-weight: 700;
+  color: #111827;
+  text-align: center;
 }
 
 .filter--active {
-  border-color: rgba(79, 70, 229, 0.35);
-  background: rgba(79, 70, 229, 0.10);
-  color: #3730a3;
-}
-
-.file {
-  width: 100%;
+  border-color: var(--primary-soft-strong);
+  background: var(--surface-lilac);
+  color: var(--primary-deep);
 }
 
 .input {
   width: 100%;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  padding: 12px;
   outline: none;
+  background: rgba(238, 230, 246, 0.92);
+  color: #221a30;
 }
 
 .btn {
-  border-radius: 14px;
-  padding: 12px;
-  font-weight: 900;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: #fff;
+  border-radius: 16px;
+  padding: 13px;
+  font-weight: 800;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(242, 235, 248, 0.98);
   width: 100%;
   text-align: center;
 }
 
 .btn--primary {
   border: 0;
-  color: #fff;
-  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #f9fafb;
+  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  box-shadow: 0 16px 24px rgba(95, 71, 126, 0.24);
 }
 
 .btn--native {
-  border: 1px solid rgba(16, 185, 129, 0.22);
-  color: #065f46;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(45, 212, 191, 0.08));
+  border: 1px solid rgba(41, 98, 66, 0.16);
+  color: var(--primary-deep);
+  background: linear-gradient(180deg, var(--surface-lilac-deep), rgba(242, 235, 248, 0.98));
 }
 
-.btn:disabled {
+.btn:disabled,
+.mini:disabled {
   opacity: 0.6;
+}
+
+.bar {
+  height: 100%;
+  background: linear-gradient(90deg, #5f477e, #8f73ba);
+}
+
+.bar--native {
+  background: linear-gradient(90deg, #9b82c7, #b79dd5);
 }
 
 .progress {
   height: 8px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(17, 24, 39, 0.06);
   overflow: hidden;
 }
 
-.bar {
-  height: 100%;
-  background: linear-gradient(90deg, #667eea, #764ba2);
+.progress--compact {
+  height: 6px;
 }
 
-.bar--native {
-  background: linear-gradient(90deg, #10b981, #14b8a6);
-}
-
-.muted {
+.muted,
+.empty {
   font-size: 12px;
-  color: var(--muted);
+  line-height: 1.6;
+  color: #706781;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.file {
+  width: 100%;
+}
+
+.file--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.file-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 132px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  border-radius: 18px;
+  border: 1px solid rgba(95, 71, 126, 0.14);
+  background: rgba(238, 230, 246, 0.92);
+  padding: 12px;
+}
+
+.file-picker--selected {
+  background: linear-gradient(180deg, rgba(236, 227, 246, 0.96), rgba(247, 241, 251, 0.96));
+}
+
+.file-picker__button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 14px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #f9fafb;
+  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  box-shadow: 0 12px 20px rgba(95, 71, 126, 0.2);
+}
+
+.file-picker__button:disabled {
+  opacity: 0.6;
+}
+
+.file-picker__meta {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.file-picker__title {
+  font-size: 14px;
+  line-height: 1.45;
+  color: #221a30;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.file-picker__desc {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #706781;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .recent-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .recent-item {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #fff;
-  padding: 10px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(238, 230, 246, 0.92);
+  padding: 12px 14px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1500,18 +1847,21 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.recent-main {
+.recent-main,
+.native-result {
   min-width: 0;
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
 .recent-title {
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
+  color: #221a30;
 }
 
 .recent-meta {
@@ -1526,40 +1876,33 @@ onUnmounted(() => {
 
 .recent-progress__text {
   font-size: 12px;
-  color: var(--muted);
+  color: #706781;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-.progress--compact {
-  height: 6px;
-}
-
 .status {
-  border-radius: 999px;
-  padding: 3px 8px;
-  font-size: 12px;
-  font-weight: 800;
+  padding: 4px 9px;
 }
 
 .status--ok {
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
+  background: rgba(242, 235, 248, 0.92);
+  color: var(--ok-text);
 }
 
 .status--bad {
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .status--warn {
-  background: rgba(245, 158, 11, 0.14);
-  color: #92400e;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .status--info {
-  background: rgba(99, 102, 241, 0.12);
-  color: #3730a3;
+  background: var(--info-bg);
+  color: var(--info-text);
 }
 
 .recent-actions {
@@ -1571,17 +1914,12 @@ onUnmounted(() => {
   margin-left: auto;
 }
 
-.native-result {
-  display: grid;
-  gap: 8px;
-}
-
 .native-result__text {
   margin: 0;
   padding: 12px;
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.04);
-  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(17, 24, 39, 0.04);
+  border: 1px solid rgba(17, 24, 39, 0.08);
   white-space: pre-wrap;
   word-break: break-word;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -1592,108 +1930,68 @@ onUnmounted(() => {
 }
 
 .recent-tag {
-  border-radius: 999px;
-  padding: 3px 9px;
-  font-size: 12px;
-  font-weight: 800;
-  background: rgba(99, 102, 241, 0.12);
-  color: #3730a3;
+  padding: 4px 10px;
+  background: var(--info-bg);
+  color: var(--info-text);
   white-space: normal;
   text-align: center;
 }
 
 .recent-tag--dup {
-  background: rgba(245, 158, 11, 0.14);
-  color: #92400e;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .recent-tag--offline {
-  background: rgba(31, 122, 140, 0.12);
-  color: #155e75;
+  background: var(--surface-lilac);
+  color: var(--primary-deep);
 }
 
-.mini {
-  border: 1px solid var(--border);
-  background: #fff;
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--text);
-  text-align: center;
+.recent-tag--soft {
+  background: var(--surface-lilac-deep);
+  color: var(--lilac-text);
 }
 
 .mini--warn {
-  border-color: rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.10);
-  color: #92400e;
-}
-
-.mini:disabled {
-  opacity: 0.6;
-}
-
-.empty {
-  font-size: 12px;
-  color: var(--muted);
+  border-color: rgba(106, 75, 155, 0.16);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .alert {
-  padding: 10px 12px;
-  border-radius: 12px;
-  font-weight: 800;
+  padding: 11px 13px;
+  border-radius: 16px;
+  font-weight: 700;
   margin-bottom: 12px;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
-.alert--ok { background: rgba(34, 197, 94, 0.12); color: #15803d; }
-.alert--bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
-</style>
-<style scoped>
-.page {
-  padding-top: calc(14px + env(safe-area-inset-top));
+.alert--ok {
+  background: var(--surface-lilac);
+  color: var(--primary-deep);
 }
 
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  padding: 12px 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 10px 22px rgba(24, 45, 73, 0.09);
-}
-
-.topbar h2 {
-  font-size: 18px;
-}
-
-.card {
-  border-radius: 22px;
-  padding: 16px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: linear-gradient(180deg, #ffffff, #f9fbfd);
-  box-shadow: 0 14px 26px rgba(24, 45, 73, 0.08);
-}
-
-.card-title {
-  font-size: 15px;
-  color: #1f2a37;
-}
-
-.input {
-  border-radius: 14px;
-  border-color: rgba(32, 42, 55, 0.14);
-  padding: 12px;
-}
-
-.btn {
-  border-radius: 16px;
+.alert--bad {
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 @media (max-width: 480px) {
+  .topbar,
+  .card {
+    padding: 14px;
+  }
+
+  .file-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .import-banner__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
   .recent-actions {
     width: 100%;
     margin-left: 0;
@@ -1704,236 +2002,6 @@ onUnmounted(() => {
   .recent-tag,
   .link--small {
     max-width: 100%;
-  }
-}
-
-.btn--primary {
-  background: linear-gradient(135deg, #1f7a8c, #3d8da0);
-}
-
-.bar {
-  background: linear-gradient(90deg, #1f7a8c, #3d8da0);
-}
-
-.recent-item {
-  border-radius: 15px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: #fff;
-}
-
-.filter--active {
-  border-color: rgba(31, 122, 140, 0.36);
-  background: rgba(31, 122, 140, 0.1);
-  color: var(--primary-deep);
-}
-
-.status--ok {
-  background: var(--ok-bg);
-  color: var(--ok-text);
-}
-
-.status--bad {
-  background: var(--bad-bg);
-  color: var(--bad-text);
-}
-
-.status--warn {
-  background: var(--warn-bg);
-  color: var(--warn-text);
-}
-
-.status--info {
-  background: var(--info-bg);
-  color: var(--info-text);
-}
-</style>
-<style scoped>
-.upload-page {
-  display: grid;
-  gap: 12px;
-}
-
-.topbar--hero {
-  display: grid;
-  gap: 12px;
-}
-
-.topbar__copy {
-  display: grid;
-  gap: 6px;
-}
-
-.topbar__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--primary-deep);
-  background: rgba(31, 122, 140, 0.12);
-}
-
-.topbar__desc {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--muted);
-}
-
-.topbar__actions,
-.settings-summary,
-.action-row,
-.supporting-list,
-.flow-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.card-head--stack {
-  align-items: flex-start;
-}
-
-.flow-stats {
-  width: 100%;
-}
-
-.flow-stat {
-  flex: 1 1 100px;
-  min-width: 0;
-  border-radius: 14px;
-  padding: 10px 12px;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.72);
-}
-
-.flow-stat span {
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-}
-
-.flow-stat strong {
-  display: block;
-  margin-top: 4px;
-  font-size: 22px;
-  color: var(--text);
-}
-
-.hero-pill,
-.supporting-chip {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.hero-pill {
-  color: var(--primary-deep);
-  background: rgba(31, 122, 140, 0.1);
-}
-
-.hero-link {
-  border: 0;
-  background: transparent;
-  color: var(--primary-deep);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.mode-switch {
-  display: flex;
-  gap: 8px;
-  padding: 4px;
-  border-radius: 999px;
-  background: rgba(21, 43, 59, 0.06);
-}
-
-.mode-tab {
-  flex: 1;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  padding: 10px 12px;
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--muted);
-}
-
-.mode-tab--active {
-  color: var(--primary-deep);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 6px 14px rgba(24, 45, 73, 0.08);
-}
-
-.mode-caption {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--muted);
-}
-
-.field {
-  display: grid;
-  gap: 8px;
-}
-
-.field-label {
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--text);
-}
-
-.file--panel {
-  padding: 12px;
-  border: 1px dashed rgba(31, 122, 140, 0.32);
-  border-radius: 16px;
-  background: rgba(244, 251, 253, 0.88);
-}
-
-.selection-note {
-  border-radius: 14px;
-  padding: 12px;
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--muted);
-  background: rgba(245, 249, 250, 0.94);
-}
-
-.progress-shell,
-.native-panel {
-  display: grid;
-  gap: 10px;
-}
-
-.btn--ghost {
-  color: var(--primary-deep);
-  background: rgba(255, 255, 255, 0.86);
-}
-
-.supporting-chip {
-  color: var(--muted);
-  background: rgba(15, 23, 42, 0.04);
-}
-
-.supporting-chip--native {
-  color: #0f6c4f;
-  background: rgba(31, 157, 116, 0.12);
-}
-
-@media (max-width: 640px) {
-  .mode-switch {
-    flex-direction: column;
-    border-radius: 18px;
-  }
-
-  .action-row > * {
-    flex: 1 1 100%;
   }
 }
 </style>

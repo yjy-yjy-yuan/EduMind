@@ -619,3 +619,319 @@
 ### Videos 页层级优化
 
 - 更新 [`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：列表页增加更清晰的概览、筛选计数、空状态和快捷动作，并把自动刷新与离线补跑提示集中展示，降低“后台控制台”感。
+
+## 2026-03-25
+
+### 对 2026-03-25 首页、上传页与视频库布局收束的更正说明
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：撤回 2026-03-25 的首页、上传页和视频库层级重排，恢复为上一版页面布局，保留推荐、上传、视频状态与本地转录能力本身，不再继续使用收束后的新版界面结构。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：重新同步恢复后前端产物，确保 iOS `WKWebView` 容器加载到的是旧版页面布局而不是先前打包进 App 的新版资源。
+
+## 2026-03-25
+
+### 视频推荐实现提示词
+
+- 新增 [`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md)：补充面向 Codex / Claude / Blitz 的专用提示词，明确视频推荐要基于现有 `videos` 标签先做站内聚类，再扩展 B 站 / YouTube / 中国大学慕课外部候选元数据、标签处理和导入链路，并把“按可独立提交切片推进、每组改动超过 800 行必须继续拆分、CHANGELOG 只能追加”等硬约束写进主提示词。
+- 更新 [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：在总控实现文档和仓库文档索引中补充视频推荐实现边界与专用提示词入口，保持 iOS-only 架构说明与推荐建设方向一致。
+
+## 2026-03-25
+
+### 首页推荐预览
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：在保留当前首页基础结构的前提下新增“推荐学习”入口和首页推荐预览区，接入现有推荐接口，并兼容站外候选跳转到上传页预填 URL。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页推荐预览切片对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 首页 Hero 刷新
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页顶部欢迎区调整为更聚焦的 hero 结构，补充上传新内容和查看视频库的主按钮，并同步刷新统计卡片的视觉层级。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页 hero 切片对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 首页继续学习总览
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：把首页中段从分散的快捷卡片和列表收成“继续学习”总览，新增聚焦视频卡、最近进入列表、离线转录与复盘概览，并补充辅助入口条带。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页继续学习总览切片对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 首页推荐区精修
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页推荐区改为更清晰的推荐面板，补充推荐理由、标签与时间信息展示，并增加直达推荐页的入口按钮。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页推荐区精修切片对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 推荐页上下文总览
+
+- 更新 [`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)：新增“当前推荐上下文”面板，把当前场景、主题筛选、相关推荐种子和结果构成集中展示，并补充清除主题、清除相关推荐、导入新链接的快捷动作。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步推荐页上下文总览切片对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 首页推荐系统卡片
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：在首页顶部统计区补充“推荐系统”卡片，复用当前首页推荐数据展示入口状态，并直接接到推荐页。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页推荐系统卡片切片对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 首页统计卡统一尺寸
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：为首页顶部 4 张统计卡统一补齐底部提示文案，并调整卡片为一致的最小高度和内部布局，避免“推荐系统”卡片与其他卡片尺寸不一致。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页统计卡尺寸修正对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 对 2026-03-25 首页统计卡记录的更正说明
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页顶部 4 张统计卡改为单行横排展示，移除底部提示文案，统一为与原统计卡一致的紧凑卡片结构，避免“推荐系统”入口破坏横向排布。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页统计卡横排修正对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 对 2026-03-25 首页统计卡横排记录的补充更正
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：补上首页统计区容器的 `grid` 布局声明，并让 4 张统计卡在 iOS 首页顶部按单行四列真正横向铺开，修复卡片被块级堆叠成竖列的问题。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页统计区横排布局补充修正对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 对 2026-03-25 首页统计卡移动端尺寸的补充更正
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：修正移动端断点下 `.stats` 被错误降为单列的问题，并将首页顶部 4 张统计卡压回更接近原始尺寸的紧凑规格，确保一横排放下且卡片大小一致。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)：同步首页统计卡移动端横排与尺寸修正对应的 iOS `WKWebView` 静态资源。
+
+## 2026-03-25
+
+### 推荐后端科目归一与主题聚类
+
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：在现有推荐服务中新增科目识别、标签别名归一、主题主键提取和聚类桶排序逻辑，让已上传视频可以按“科目 + 主题”信号参与首页推荐、复盘推荐和相关推荐排序。
+- 更新 [`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)、[`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)：补充推荐接口和推荐服务测试，覆盖科目标签回填、标题/摘要推断科目以及相关推荐优先返回同科目内容的主路径。
+
+## 2026-03-25
+
+### 对 2026-03-25 推荐后端科目归一记录的补充更正
+
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：补充“排列组合 / 插空法 / 勾股定理 / 三角形”等数学主题关键词，修正真实已上传视频里部分数学内容未稳定归入“数学”科目的问题。
+- 更新 [`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)：新增排列组合类视频归入数学科目的单测，避免后续回归。
+
+## 2026-03-25
+
+### 对 2026-03-25 重提标签科目未展示问题的修正
+
+- 更新 [`backend_fastapi/app/services/video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_content_service.py)：为真实标签生成链路补上科目识别与科目标签回写，让“提取标签 / 重提标签”在写回 `videos.tags` 时直接带上“数学”等科目标签，而不是只生成知识点标签。
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：改为复用视频内容服务里的共享科目归一规则，保证视频详情页标签与推荐聚类使用同一套科目判断逻辑。
+- 更新 [`backend_fastapi/tests/unit/test_video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_content_service.py)、[`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充“生成标签后返回并写回科目标签”的单测和 API 测试，覆盖 `generate-tags` 主路径。
+
+## 2026-03-26
+
+### 推荐后端接入站外候选元数据
+
+- 新增 [`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)：抽象 B 站、YouTube、中国大学慕课 3 个站外候选 provider，统一抓取轻量元数据并补上科目、主题、标签归一，且单个 provider 失败不会阻断整体推荐接口。
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：为推荐链路新增 `include_external` 混合推荐能力，根据当前场景与站内主题推导站外检索词，并把站内视频与站外候选按统一的“科目 + 主题”信号合并排序。
+- 更新 [`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)、[`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)：扩展推荐接口参数与返回结构，支持 `include_external`、`is_external`、`item_type`、`external_url`、`source_label`、`subject`、`cluster_key` 等字段，让移动端可以直接区分站内视频和站外候选。
+- 更新 [`backend_fastapi/tests/unit/test_external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_external_candidate_service.py)、[`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)、[`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)：补充 provider 解析、失败隔离和推荐接口混合返回测试，覆盖站外候选主路径。
+
+## 2026-03-26
+
+### 新增推荐系统 UI 优先实现提示词
+
+- 新增 [`docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md)：补充“推荐系统 UI 优先”的专用提示词，明确本轮以首页推荐入口、独立推荐页、站外候选卡片、上传页导入承接和 iOS `WKWebView` 可用性为主，不优先扩展推荐后端算法。
+- 更新 [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：补充 UI 优先推荐提示词入口，便于后续直接给 AI 编码助手下达“先改推荐界面”的任务。
+
+## 2026-03-26
+
+### 推荐系统 UI 第一轮页面修改
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页推荐区收成“推荐中枢预览”，补充站内/站外构成概览、下一步学习动作提示，并让首页预览直接混入真实推荐接口返回的站外候选。
+- 更新 [`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)：强化推荐页的中枢感，新增推荐路线、来源总览、站外候选导入说明和当前场景的站外提示，让用户更容易区分站内视频与站外导入项。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：补充“从推荐导入”承接横幅，明确推荐链接会进入导入学习链路，并高亮链接导入卡片，减少从推荐页跳转到上传页后的理解成本。
+
+## 2026-03-26
+
+### 推荐系统 UI 视觉重构首轮
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页欢迎区替换为更克制的浅底白卡布局，新增“当前重心”聚焦卡，并把学习概览、辅助入口和推荐预览统一到更简洁的移动端卡片体系中。
+- 更新 [`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)：将推荐页整体改为 clean minimal 风格，压低渐变和发光感，统一 hero、场景卡、标签卡、相关推荐卡和站外导入卡的版式与层级。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：将上传页的推荐导入承接区域改为同一套轻量视觉语言，统一顶部信息、导入横幅、按钮和最近任务列表的表现。
+- 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)：将全局背景、卡片、阴影、主强调色和状态色从原来的高饱和青蓝玻璃感收回到中性浅底和深色按钮体系，避免局部页面重构后仍被全局视觉变量拖回旧风格。
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：重做底部导航栏的外壳、激活态和上传入口表现，改为更贴近原生移动端的浮动导航条，减少旧版导航栏的生硬感和廉价发光感。
+- 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)、[`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：移除底部导航激活态上方的短横杠，并将整套推荐 UI 主色改为更柔和的莫兰迪黄紫系，让底部导航、首页、推荐页和导入页使用统一的柔和色板。
+- 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：清理笔记页和视频列表页中残留的蓝绿色筛选态、主按钮、标签与卡片高亮，补齐到同一套莫兰迪黄紫色板，避免这两页继续暴露旧主题。
+- 更新 [`mobile-frontend/src/assets/morandi-surface.svg`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/morandi-surface.svg)、[`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)：删除旧的冷调渐变背景，改用参考 Figma/Pencil 简约移动端模板氛围自制的莫兰迪黄紫背景图，并让全局页面统一使用该背景图作为底层氛围。
+- 更新 [`mobile-frontend/src/views/Login.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Register.vue)、[`mobile-frontend/src/views/Guide.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)、[`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)、[`mobile-frontend/src/views/LocalTranscripts.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscripts.vue)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)、[`mobile-frontend/src/views/LearningPath.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LearningPath.vue)、[`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)：继续清扫其余页面残留的蓝色、青色和冷调阴影，把登录、详情、播放器、问答、笔记编辑、离线转录和学习路径等页面统一到黄紫莫兰迪色板。
+- 对 2026-03-26 同日背景图记录的更正说明：将背景图承载方式改为独立全屏背景层，并增强背景图内黄紫图形的对比度与面积，避免在 iOS `WKWebView` 中被浅色底覆盖后看起来像“背景没有变化”。
+- 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)、[`mobile-frontend/src/assets/edumind-logo.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo.png)、[`ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png)：将前端品牌 logo 与 iOS App 图标统一替换为新的紫色 EduMind 品牌图，并移除前端 logo 的旧正方形约束，避免横版品牌图被压缩变形。
+- 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)：将品牌图展示方式改为带留白和圆角承载框的品牌卡片，补充暖紫阴影与边框高光，让首页和登录/注册页里的 logo 不再像生硬贴图。
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：继续优化首页左上角品牌区，将 logo 收成更完整的品牌牌匾样式，补充独立承载面、品牌标识和更稳定的留白比例，让首页 logo 看起来更像主品牌入口而不是普通小图片。
+
+## 2026-03-26
+
+### 接入 agent-skills 对应的 Sleek 设计助手链路
+
+- 新增 [`backend_fastapi/app/services/sleek_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/sleek_service.py)、[`backend_fastapi/app/schemas/design.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/design.py)、[`backend_fastapi/app/routers/design.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/design.py)：将 `agent-skills` 仓库里的 Sleek API 能力收敛为 EduMind 后端代理，支持项目列表、项目创建、聊天生成、运行状态查询、组件 HTML 拉取与截图预览，并要求沿用现有 EduMind 登录态访问。
+- 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)：新增 `SLEEK_API_KEY` 等配置项，把设计助手路由挂进 FastAPI，并补充 Sleek key 所需 scope 与启用说明。
+- 新增 [`backend_fastapi/tests/api/test_design_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_design_api.py)：补充设计助手接口测试，覆盖鉴权、项目列表、项目创建、设计生成截图回显与组件 HTML 拉取主路径。
+- 新增 [`mobile-frontend/src/api/design.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/design.js)、[`mobile-frontend/src/views/DesignAssistant.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/DesignAssistant.vue)：为移动端新增“设计助手”页面，支持选择或创建 Sleek 项目、提交自然语言设计描述、查看生成截图和读取组件 HTML 原型。
+- 更新 [`mobile-frontend/src/router/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/router/index.js)、[`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)、[`mobile-frontend/README.md`](/Users/yuan/final-work/EduMind/mobile-frontend/README.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：新增移动端路由与“我的”页入口，并把 `agent-skills` 的接入方式、后端代理原则和使用步骤写入文档。
+
+## 2026-03-27
+
+### 降低推荐路由与视频路由的耦合
+
+- 新增 [`backend_fastapi/app/services/video_api_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_api_service.py)：集中承载视频接口共享的处理参数构建、处理元数据补充和视频序列化逻辑，避免这些 API 辅助函数继续散落在 router 层。
+- 更新 [`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：推荐路由不再直接依赖视频路由中的函数，视频路由也改为复用共享 service，收紧 router 间耦合，为后续继续拆分推荐链路做准备。
+
+## 2026-03-27
+
+### 收紧上传后推荐链路并增加站外抓取缓存
+
+- 更新 [`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)：为站外候选抓取增加短 TTL 内存缓存，避免首页、推荐页和上传回流在短时间内重复打 B 站、YouTube、中国大学慕课等外部源；同时保持返回对象复制，避免缓存对象被调用方改写。
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：将上传成功响应中的自动推荐收紧为“先返回站内推荐”，不再在上传主链路里同步触发站外抓取，降低外部源波动对上传接口延迟的影响。
+- 更新 [`backend_fastapi/tests/unit/test_external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_external_candidate_service.py)、[`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充站外抓取缓存命中测试，并调整上传接口测试，确保上传后自动返回的是轻量站内推荐结果。
+
+## 2026-03-27
+
+### 首页接入推荐增强摘要
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：首页推荐预览开始消费后端返回的 `external_query`、`external_providers`、`action_target`、`can_import`、`import_hint` 等增强字段，直接展示站外检索主题、provider 抓取状态和可导入提示，并按后端动作元数据决定首页推荐卡片的跳转目标。
+- 更新 [`CHANGELOG.md`](/Users/yuan/final-work/EduMind/CHANGELOG.md)：追加记录首页推荐摘要接入，不改历史。
+
+## 2026-03-27
+
+### 接通推荐增强字段与上传后推荐回流
+
+- 更新 [`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)、[`mobile-frontend/src/api/recommendation.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/recommendation.js)：推荐页开始消费后端返回的 `external_providers`、`external_query`、`action_target`、`can_import`、`import_hint` 等增强字段，直接在页面里展示站外 provider 状态、检索上下文和可导入/不可导入提示，并按后端动作元数据决定跳转目标。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：上传成功后不再默认立刻跳出当前页，而是优先展示后端回流的 `recommendations`，让用户在上传完成后立即看到“下一步学什么”的推荐结果，并保留查看刚上传视频的快捷入口。
+- 更新 [`mobile-frontend/src/api/mockGateway.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/mockGateway.js)：为 UI-only 模式补齐推荐增强字段、站外 provider 摘要和上传后推荐返回，保证 mock 流程与真实后端接口保持一致。
+
+## 2026-03-27
+
+### 强化推荐接口编排信息
+
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)：为站内视频和站外候选统一补充 `provider`、`action_type`、`action_label`、`action_target` 等动作字段，并在推荐结果中新增站内/站外数量统计、来源分布汇总和站外检索上下文摘要，方便前端按“打开详情 / 导入学习”两类动作直接消费。
+- 更新 [`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)：扩展推荐返回 schema，增加来源统计和站外检索摘要结构，保持现有推荐接口向后兼容。
+- 更新 [`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)、[`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)：补充推荐动作目标、来源统计和站外检索摘要测试，确保新字段在 service 与 API 两层都稳定返回。
+
+## 2026-03-28
+
+### 收紧首页品牌头视觉层级
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页左上角品牌区从厚重的套娃卡片改成更轻的横向品牌条，缩小 logo 展示面积，补充简洁说明文字，并同步收紧指南按钮的底色与阴影，减少首页头部的装饰感。
+- 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)：为品牌组件增加无边框 `plain` 展示变体，方便首页等位置直接使用干净贴图，避免每处都强制带厚边框品牌卡。
+
+## 2026-03-27
+
+### 增强站外 provider 可观测性与失败摘要
+
+- 更新 [`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)：为 B 站、YouTube、中国大学慕课等站外 provider 增加抓取报告结构，记录每个 provider 的状态、候选数量、失败摘要和耗时，并在抓取失败时输出 DEBUG 级别日志到后端运行终端。
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)：将 provider 级抓取摘要接入推荐接口返回，新增 `external_providers`、`external_failed_provider_count`、`external_fetch_failed`，让前端或调试面板可以直接看到本次站外抓取成功/失败情况。
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)：根据 `settings.DEBUG` 自动设置日志级别，确保本地开发运行时可以直接看到站外 provider 抓取失败的 DEBUG 输出。
+- 更新 [`backend_fastapi/tests/unit/test_external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_external_candidate_service.py)、[`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)、[`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)：补充 provider 报告、失败摘要和推荐接口可观测性字段测试，覆盖抓取失败不阻断主路径的场景。
+
+## 2026-03-27
+
+### 补全推荐候选直连下载入库链路
+
+- 新增 [`backend_fastapi/app/services/video_url_import_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_url_import_service.py)：抽出远程视频链接导入共享服务，统一处理外部 URL 来源识别、重复提交去重、下载中记录创建、预填摘要/标签写回以及后台下载任务提交，避免推荐导入和普通 URL 上传各自维护一套逻辑。
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)：让原有 `/api/videos/upload-url` 支持接收推荐候选的 `title`、`summary`、`tags` 预填元数据，下载前先写入 `videos` 记录，保证入库后立刻保留推荐侧的上下文信息。
+- 更新 [`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)、[`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)、[`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)：新增 `/api/recommendations/import-external` 直连入库接口，并在推荐条目中显式返回 `can_import`、`import_hint`、`action_api`、`action_method`，同时把中国大学慕课搜索页候选标记为“暂不可直接导入”，避免前端继续把不可下载的搜索页当成可入库视频。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)、[`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)、[`backend_fastapi/tests/unit/test_external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_external_candidate_service.py)、[`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)：补充推荐候选直连入库、推荐元数据预填持久化和慕课候选不可导入标记测试，覆盖推荐到视频入库的主路径。
+
+## 2026-03-27
+
+### 强化慕课课程页解析与上传后自动推荐触发
+
+- 更新 [`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)：为中国大学慕课 provider 增加“搜索词 -> 具体课程页”解析链路，优先通过公开搜索结果定位 `icourse163.org/learn/...` 课程页，再把课程详情页作为可导入候选返回；仅在无法解析课程页时才回退为不可直接导入的搜索页候选。
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)：在本地上传和 URL 上传成功响应里自动附带一份实时推荐结果，上传后立即触发推荐获取，不再要求用户额外点击按钮才能拿到下一步推荐内容。
+- 更新 [`backend_fastapi/tests/unit/test_external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_external_candidate_service.py)、[`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：补充慕课课程页解析与上传后自动返回推荐结果的回归测试，覆盖“上传即得推荐”和“慕课候选真正可导入”两条主路径。
+
+## 2026-03-27
+
+### 明确后端测试目录结构
+
+- 新增 [`backend_fastapi/tests/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)：明确 `unit/`、`api/`、`smoke/`、`integration/` 的职责边界和测试文件命名规则，统一后端测试入口，避免测试继续散落到业务目录。
+- 更新 [`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：补充后端测试目录说明和常用运行命令，强调新增后端测试应统一放在 `backend_fastapi/tests/` 下。
+
+## 2026-03-28
+
+### 进一步压缩首页品牌头装饰感
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：移除首页品牌头中的长段说明文案和厚重品牌展示卡，改成更轻的横向品牌头，只保留小尺寸 logo、品牌名和简短标题，让首页开头更接近原生应用导航头而不是宣传海报。
+
+### 切换紫色莫兰迪背景与全局主题
+
+- 新增 [`mobile-frontend/src/assets/morandi-purple-surface.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/morandi-purple-surface.png)：将你提供的紫色背景图压平生成前端背景资源，替换回这一轮指定的紫色莫兰迪背景方案。
+- 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)、[`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：将全局背景、底部导航、首页、推荐页和上传页重新切回紫色莫兰迪主色，并压掉暖黄/米色硬编码。
+
+### 继续收紧首页顶部品牌头
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页顶部品牌头进一步收成更轻的导航式布局，缩小 logo 承载块、压低字标尺寸，并把“使用指南”按钮调整得更细，减少和下方主标题的视觉重复。
+
+### 将首页 logo 承载块调整为正方形
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页顶部 logo 承载面改成更突出的正方形卡片，同时收小右侧字标，让品牌视觉重点更明确落在 logo 本身。
+
+### 将首页顶部品牌头改为大 logo 面板
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：移除顶部品牌头里的小字标组合，改成更接近参考图的大 logo 品牌面板，让首页开头直接突出你的品牌图形本身。
+
+### 更正首页 logo 头部布局
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：撤回大 logo 面板样式，恢复为更轻的横向 logo 结构，继续使用当前新 logo 图片，只调整承载格式，不再使用整块大面板。
+
+### 将底部导航恢复为贴底样式
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：移除悬浮外壳和底部悬空留白，将底部导航改成真正贴着屏幕底部的导航条，保留顶部圆角但不再做漂浮胶囊效果。
+
+### 收紧 logo 图源留白并居中显示
+
+- 更新 [`mobile-frontend/src/assets/edumind-logo.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo.png)：基于当前使用的 logo 图裁掉外围大面积留白，保留中间品牌主体，让小尺寸位置也能看清图形。
+- 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)：将 logo 组件改成严格居中显示，确保首页和其他位置都以居中的方式承载新的 logo 资源。
+
+### 为首页小尺寸 logo 单独切换 mark 图
+
+- 新增 [`mobile-frontend/src/assets/edumind-logo-mark.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo-mark.png)，并更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：让首页顶部的小尺寸 logo 改用去留白的方形 mark 图，其它大 logo 位置继续保留完整字标图。
+
+### 优化首页 logo 与字标衔接
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：给首页顶部的 `logo + 字标` 增加更轻的共同承载层，收小 logo 卡的边框和阴影，并压细字标层级，让图标与文字的过渡更自然。
+
+### 对当日 logo 衔接调整的更正说明
+
+- 更正上条首页 logo 衔接调整：移除新增的共同外层承载框，恢复为原有横向结构，只通过间距、对齐和 logo 卡本身的轻量样式来让 `logo + 字标` 衔接更自然。
+
+### 收紧底部导航圆角样式
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：保持底部导航贴底，不恢复悬浮效果，只通过收窄左右边距、补边框和增大顶部圆角，让底栏本体的圆角更明确。
+
+### 继续收窄底部导航宽度
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：在保留当前圆角贴底样式的前提下，继续增大左右留白，让底部导航在手机里不再铺得过宽。
+
+### 再次压缩底部导航占宽
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：进一步收小底栏最大宽度并继续加大左右留白，让贴底圆角导航看起来更紧凑，不再显得发胀。
+
+### 压低底部导航底边留白
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：减少底栏内部的底部安全区额外留白，并同步收小最小高度，让导航视觉上更贴近屏幕底边。
+
+### 继续压低底部导航贴底距离
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：继续减少底栏底部安全区上的额外 padding，并再次收小最小高度，让贴底感更明显。
+
+### 统一残留暖黄卡面为浅紫色
+
+- 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)、[`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/views/LearningPath.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LearningPath.vue)、[`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：将前端里残留的暖黄/米杏卡片面统一替换为首页同系浅紫色卡面，避免页面间继续串色。
+
+### 更正底部导航为圆角卡片样式
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)、[`mobile-frontend/src/App.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/App.vue)、[`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)：将底部导航从透明贴底条恢复为不透明的圆角卡片样式，并统一页面底部预留高度，确保导航适应屏幕宽度但不遮挡主页面卡片内容。
+
+### 美化本地视频文件选择控件
+
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：隐藏原生文件选择框，改为自定义的“选择本地视频”按钮和文件状态展示卡，避免 iOS `WKWebView` 中出现缺字方块和默认系统样式破坏页面观感。

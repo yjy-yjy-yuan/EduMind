@@ -60,7 +60,7 @@ onUnmounted(() => {
   min-height: 100dvh;
   width: 100%;
   overflow-x: hidden;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--tabbar-space) + 14px);
 }
 
 .bg-decor {

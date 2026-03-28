@@ -15,31 +15,40 @@
     'Noto Sans SC',
     'Microsoft YaHei',
     sans-serif;
-  --bg: #d6edf4;
-  --bg-decor-a: rgba(111, 231, 255, 0.5);
-  --bg-decor-b: rgba(14, 132, 171, 0.38);
-  --card: rgba(247, 253, 255, 0.5);
-  --card-soft: rgba(238, 250, 255, 0.42);
-  --text: #173949;
-  --muted: #55798a;
-  --primary: #158db2;
-  --primary-deep: #0f617a;
-  --accent: #3fb7d8;
-  --danger: #d64545;
-  --border: rgba(255, 255, 255, 0.28);
-  --shadow: 0 24px 48px rgba(28, 112, 143, 0.12);
-  --shadow-sm: 0 12px 26px rgba(28, 112, 143, 0.08);
+  --bg: #cdbbe6;
+  --bg-decor-a: rgba(176, 149, 214, 0.18);
+  --bg-decor-b: rgba(106, 75, 155, 0.16);
+  --card: rgba(242, 235, 248, 0.88);
+  --card-soft: rgba(235, 228, 243, 0.92);
+  --text: #20192c;
+  --muted: #706781;
+  --primary: #8f73ba;
+  --primary-deep: #5f477e;
+  --accent: #b79dd5;
+  --danger: #9c6479;
+  --border: rgba(17, 24, 39, 0.08);
+  --shadow: 0 24px 48px rgba(15, 23, 42, 0.08);
+  --shadow-sm: 0 16px 34px rgba(15, 23, 42, 0.06);
   --radius: 22px;
   --radius-sm: 14px;
-  --tap: rgba(31, 122, 140, 0.14);
-  --ok-bg: rgba(36, 176, 114, 0.14);
-  --ok-text: #14835a;
-  --warn-bg: rgba(235, 140, 52, 0.18);
-  --warn-text: #8f4f12;
-  --info-bg: rgba(31, 122, 140, 0.16);
-  --info-text: #1b6170;
-  --bad-bg: rgba(214, 69, 69, 0.16);
-  --bad-text: #a22c2c;
+  --tap: rgba(143, 115, 186, 0.14);
+  --primary-soft: rgba(143, 115, 186, 0.14);
+  --primary-soft-strong: rgba(143, 115, 186, 0.24);
+  --accent-soft: rgba(183, 157, 213, 0.22);
+  --surface-lilac: rgba(235, 226, 246, 0.96);
+  --surface-lilac-deep: rgba(225, 214, 240, 0.96);
+  --surface-rose: rgba(242, 227, 236, 0.96);
+  --ok-bg: rgba(228, 220, 241, 0.95);
+  --ok-text: #5f477e;
+  --info-bg: rgba(235, 226, 246, 0.96);
+  --lilac-bg: rgba(234, 225, 246, 0.96);
+  --lilac-text: #6b5b84;
+  --info-text: #675280;
+  --bad-bg: rgba(234, 225, 246, 0.96);
+  --bad-text: #6b5b84;
+  --tabbar-shell-gap: 10px;
+  --tabbar-card-height: 72px;
+  --tabbar-space: calc(var(--tabbar-card-height) + var(--tabbar-shell-gap) + env(safe-area-inset-bottom));
 }
 
 html,
@@ -58,21 +67,27 @@ html {
 
 body {
   margin: 0;
+  position: relative;
   min-width: 320px;
   overflow-x: hidden;
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.55;
   letter-spacing: 0.01em;
-  background:
-    linear-gradient(180deg, rgba(246, 253, 255, 0.94), rgba(214, 238, 246, 0.74)),
-    radial-gradient(circle at 12% 60%, rgba(105, 231, 255, 0.48), transparent 28%),
-    radial-gradient(circle at 70% 38%, rgba(4, 125, 166, 0.92), transparent 34%),
-    radial-gradient(circle at 56% 76%, rgba(64, 196, 229, 0.44), transparent 34%),
-    radial-gradient(circle at 90% 8%, rgba(245, 252, 255, 0.94), transparent 18%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.86) 0%, rgba(255, 255, 255, 0.24) 20%, rgba(255, 255, 255, 0) 40%),
-    var(--bg);
+  background: linear-gradient(180deg, rgba(240, 232, 250, 0.78), rgba(210, 192, 232, 0.86)), var(--bg);
   color: var(--text);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(244, 238, 252, 0.16), rgba(199, 180, 225, 0.22)),
+    url('./assets/morandi-purple-surface.png') center top / cover no-repeat;
+  opacity: 0.98;
+  pointer-events: none;
+  z-index: -1;
 }
 
 * {
@@ -123,6 +138,8 @@ button {
 .app-surface,
 #app {
   min-height: 100%;
+  position: relative;
+  isolation: isolate;
 }
 
 .tabbar,
@@ -148,7 +165,7 @@ textarea {
   padding:
     calc(12px + env(safe-area-inset-top))
     clamp(14px, 4vw, 22px)
-    calc(102px + env(safe-area-inset-bottom));
+    calc(var(--tabbar-space) + 12px);
 }
 
 .ios-page > * {
@@ -195,7 +212,7 @@ p {
 
 .gradient-text {
   color: transparent;
-  background-image: linear-gradient(135deg, #7ee7fb 0%, #38b9e1 36%, #2278dc 68%, #1849c9 100%);
+  background-image: linear-gradient(135deg, #5f477e 0%, #8f73ba 55%, #b79dd5 100%);
   -webkit-background-clip: text;
   background-clip: text;
 }
@@ -227,8 +244,8 @@ textarea::placeholder {
 }
 
 .status-chip--warn {
-  background: var(--warn-bg);
-  color: var(--warn-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .status-chip--info {
@@ -237,8 +254,8 @@ textarea::placeholder {
 }
 
 .status-chip--bad {
-  background: var(--bad-bg);
-  color: var(--bad-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 button,
@@ -256,7 +273,7 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid rgba(31, 157, 116, 0.45);
+  outline: 2px solid rgba(139, 121, 157, 0.4);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
@@ -279,6 +296,6 @@ textarea:focus-visible {
     padding:
       calc(10px + env(safe-area-inset-top))
       12px
-      calc(98px + env(safe-area-inset-bottom));
+      calc(76px + env(safe-area-inset-bottom));
   }
 }

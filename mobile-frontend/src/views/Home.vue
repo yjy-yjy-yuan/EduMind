@@ -3,21 +3,44 @@
     <header class="welcome ios-card">
       <div class="welcome__top">
         <div class="welcome__brand">
-          <BrandLogo :width="138" compact />
+          <div class="welcome__brand-surface">
+            <div class="welcome__brand-icon">
+              <BrandLogo :width="64" variant="plain" logo-type="mark" rounded />
+            </div>
+            <div class="welcome__brand-copy">
+              <span class="welcome__brand-mark">EduMind</span>
+              <strong class="welcome__brand-title">智能伴学</strong>
+            </div>
+          </div>
         </div>
         <button class="guide-btn" @click="go('/guide')" aria-label="打开使用指南">使用指南</button>
       </div>
 
       <div class="welcome__hero">
         <div class="welcome__copy">
-          <p class="welcome__eyebrow">首页更聚焦</p>
-          <h1 class="welcome__title gradient-text">智能伴学中心</h1>
-          <p class="welcome__subtitle">先上传，再跟进处理，最后复盘沉淀，不用在多个页面之间反复找入口。</p>
+          <p class="welcome__eyebrow">Learning Dashboard</p>
+          <h1 class="welcome__title">智能伴学中心</h1>
+          <p class="welcome__subtitle">把上传、跟进、复盘和推荐收进同一条学习动线里，页面保持简洁，下一步一眼就能决定。</p>
         </div>
-        <div class="hero-actions">
-          <button class="hero-btn hero-btn--primary" @click="go('/upload')">上传新内容</button>
-          <button class="hero-btn hero-btn--secondary" @click="go('/videos')">查看视频库</button>
-        </div>
+        <aside class="welcome__spotlight">
+          <span class="welcome__spotlight-label">当前重心</span>
+          <strong class="welcome__spotlight-value">{{ featuredVideo ? featuredVideoEyebrow : '从上传开始' }}</strong>
+          <p class="welcome__spotlight-note">
+            {{ featuredVideo ? (featuredVideo.title || '未命名视频') : '先上传一个视频，系统就会开始整理学习轨迹。' }}
+          </p>
+          <button class="welcome__spotlight-link" @click="featuredVideo ? openVideo(featuredVideo) : go('/upload')">
+            {{ featuredVideo ? featuredVideoActionLabel : '开始上传' }}
+          </button>
+        </aside>
+      </div>
+
+      <div class="hero-actions">
+        <button class="hero-btn hero-btn--primary" @click="go('/upload')">立即上传</button>
+        <button class="hero-btn hero-btn--secondary" @click="go('/videos')">浏览视频库</button>
+      </div>
+
+      <div class="welcome__subnote">
+        <span>推荐页会继续承接站内学习与站外导入，首页只保留最重要的下一步。</span>
       </div>
 
       <div class="stats">
@@ -33,14 +56,18 @@
           <span class="stat-pill__label">进行中</span>
           <strong class="stat-pill__value">{{ inProgressCount }}</strong>
         </button>
+        <button type="button" class="stat-pill stat-pill--feature" @click="go('/recommendations')">
+          <span class="stat-pill__label">推荐系统</span>
+          <strong class="stat-pill__value">{{ recommendationEntryValue }}</strong>
+        </button>
       </div>
     </header>
 
     <section class="overview ios-card">
       <div class="section-head">
         <div>
-          <h2>继续学习</h2>
-          <p>把最近任务和本地离线结果收口到一个区域里，减少来回跳转。</p>
+          <h2>学习概览</h2>
+          <p>把最近任务、本地离线结果和回看入口压缩成一屏里的稳定节奏。</p>
         </div>
         <button class="overview-link" @click="reloadDashboard" :disabled="loading || recommendationLoading">
           {{ loading ? '刷新中…' : '刷新' }}
@@ -107,7 +134,7 @@
       <div class="section-head section-head--compact">
         <div>
           <h2>辅助入口</h2>
-          <p>高频动作留在前面，低频入口收成轻量跳转。</p>
+          <p>保留高频学习动作，其余入口用轻量方式承接，不打断主页面节奏。</p>
         </div>
       </div>
       <div class="support-strip__list">
@@ -127,12 +154,52 @@
     <section class="recommend-panel ios-card">
       <div class="section-head">
         <div>
-          <h2>推荐视频</h2>
-          <p>预留真实后端推荐链路，优先返回值得继续处理、复盘或与你方向相关的内容。</p>
+          <h2>推荐中枢预览</h2>
+          <p>首页只预览最值得继续的方向，真正的相关推荐和站外导入放进推荐页里完成。</p>
         </div>
         <button class="overview-link" @click="reloadRecommendations" :disabled="recommendationLoading">
           {{ recommendationLoading ? '刷新中…' : '刷新推荐' }}
         </button>
+      </div>
+
+      <div v-if="recommendations.length > 0" class="recommend-summary">
+        <article class="recommend-summary__card">
+          <span class="recommend-summary__label">当前预览</span>
+          <strong class="recommend-summary__value">{{ recommendations.length }}</strong>
+          <span class="recommend-summary__note">首页先看最值得继续的 {{ recommendations.length }} 条内容</span>
+        </article>
+        <article class="recommend-summary__card recommend-summary__card--soft">
+          <span class="recommend-summary__label">结果构成</span>
+          <strong class="recommend-summary__value">{{ recommendationMixValue }}</strong>
+          <span class="recommend-summary__note">{{ recommendationMixNote }}</span>
+        </article>
+        <article class="recommend-summary__card recommend-summary__card--action">
+          <span class="recommend-summary__label">下一步</span>
+          <strong class="recommend-summary__value">进推荐页</strong>
+          <span class="recommend-summary__note">继续筛场景、看相关推荐或导入站外候选</span>
+        </article>
+      </div>
+
+      <div v-if="recommendationQuerySummary" class="message message--hint">
+        <span>本轮站外检索围绕：{{ recommendationQuerySummary }}</span>
+      </div>
+
+      <div v-if="recommendationProviderReports.length > 0" class="recommend-provider-list">
+        <article
+          v-for="provider in recommendationProviderReports"
+          :key="provider.provider"
+          class="recommend-provider-card"
+          :class="{
+            'recommend-provider-card--failed': provider.status === 'failed',
+            'recommend-provider-card--empty': provider.status === 'empty'
+          }"
+        >
+          <div class="recommend-provider-card__top">
+            <strong>{{ provider.source_label }}</strong>
+            <span>{{ providerStatusText(provider) }}</span>
+          </div>
+          <p>{{ providerStatusDetail(provider) }}</p>
+        </article>
       </div>
 
       <div v-if="recommendationLoading && recommendations.length === 0" class="skeleton-list">
@@ -146,23 +213,34 @@
 
       <div v-else class="recommend-list">
         <button
-          v-for="item in recommendations"
-          :key="item.id"
+          v-for="item in recommendationCards"
+          :key="recommendationKey(item)"
           class="recommend-card"
           @click="openRecommendation(item)"
         >
           <div class="recommend-card__top">
             <span class="recommend-card__reason">{{ item.reason_label || '推荐' }}</span>
-            <span class="video-item__status" :class="statusClass(item.status)">{{ statusText(item.status) }}</span>
+            <span
+              v-if="recommendationStatusLabel(item)"
+              class="video-item__status"
+              :class="recommendationStatusClass(item)"
+            >
+              {{ recommendationStatusLabel(item) }}
+            </span>
           </div>
           <div class="recommend-card__title">{{ item.title || '未命名视频' }}</div>
           <p class="recommend-card__desc">{{ item.reason_text || item.summary || '从这里继续进入学习。' }}</p>
           <div class="recommend-card__meta">
             <span v-if="Array.isArray(item.tags) && item.tags.length > 0">{{ item.tags.slice(0, 2).join(' · ') }}</span>
+            <span v-if="item.subjectText">{{ item.subjectText }}</span>
             <span v-if="formatTimeText(item.upload_time)">{{ formatTimeText(item.upload_time) }}</span>
           </div>
+          <div v-if="item.importHint" class="recommend-card__hint">{{ item.importHint }}</div>
+          <span class="recommend-card__next">{{ recommendationNextStepText(item) }}</span>
         </button>
       </div>
+
+      <button class="hero-btn hero-btn--secondary" @click="go('/recommendations')">进入推荐中枢</button>
     </section>
   </div>
 </template>
@@ -179,7 +257,8 @@ import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStat
 const quickActions = [
   { route: '/local-transcripts', tag: '本地', tagClass: 'tag--mint', title: '本地转录', desc: '查看 iOS 离线转录结果' },
   { route: '/notes', tag: '笔记', tagClass: 'tag--leaf', title: '学习笔记', desc: '把结论沉淀成稳定回看入口' },
-  { route: '/qa', tag: '问答', tagClass: 'tag--amber', title: 'AI 问答', desc: '围绕课程内容继续追问' },
+  { route: '/qa', tag: '问答', tagClass: 'tag--lilac', title: 'AI 问答', desc: '围绕课程内容继续追问' },
+  { route: '/recommendations', tag: '推荐', tagClass: 'tag--cobalt', title: '推荐学习', desc: '集中查看继续学习、复盘与相关推荐' },
   { route: '/learning-path', tag: '路径', tagClass: 'tag--teal', title: '学习路径', desc: '后续承接推荐学习顺序' }
 ]
 
@@ -191,6 +270,15 @@ const recommendationError = ref('')
 const allVideos = ref([])
 const localTranscriptCount = ref(0)
 const recommendations = ref([])
+const recommendationMeta = ref({
+  sources: [],
+  externalProviders: [],
+  externalQuery: null,
+  internalItemCount: 0,
+  externalItemCount: 0,
+  externalFailedProviderCount: 0,
+  externalFetchFailed: false
+})
 
 const supportActions = computed(() => quickActions)
 
@@ -203,20 +291,31 @@ const normalizeRecommendationItems = (payload) => {
   const items = payload?.items || payload?.recommendations || payload?.data || []
   return Array.isArray(items) ? items : []
 }
-
-const resolveVideoTime = (video) => {
-  const current = video || {}
-  return current.upload_time || current.updated_at || current.created_at || ''
+const normalizeRecommendationSources = (payload) => Array.isArray(payload?.sources) ? payload.sources : []
+const normalizeRecommendationProviders = (payload) => Array.isArray(payload?.external_providers) ? payload.external_providers : []
+const normalizeRecommendationQuery = (payload) => payload?.external_query || null
+const normalizeRecommendationCount = (payload, key) => {
+  const numeric = Number(payload?.[key] || 0)
+  return Number.isFinite(numeric) ? numeric : 0
 }
-
-const mergeVideosById = (items) => {
-  const map = new Map()
-  for (const item of items) {
-    if (!item?.id) continue
-    map.set(Number(item.id), item)
-  }
-  return Array.from(map.values()).sort((a, b) => new Date(resolveVideoTime(b)).getTime() - new Date(resolveVideoTime(a)).getTime())
-}
+const createRecommendationMeta = () => ({
+  sources: [],
+  externalProviders: [],
+  externalQuery: null,
+  internalItemCount: 0,
+  externalItemCount: 0,
+  externalFailedProviderCount: 0,
+  externalFetchFailed: false
+})
+const buildRecommendationMeta = (payload) => ({
+  sources: normalizeRecommendationSources(payload),
+  externalProviders: normalizeRecommendationProviders(payload),
+  externalQuery: normalizeRecommendationQuery(payload),
+  internalItemCount: normalizeRecommendationCount(payload, 'internal_item_count'),
+  externalItemCount: normalizeRecommendationCount(payload, 'external_item_count'),
+  externalFailedProviderCount: normalizeRecommendationCount(payload, 'external_failed_provider_count'),
+  externalFetchFailed: Boolean(payload?.external_fetch_failed || false)
+})
 
 const formatTimeText = (rawValue) => {
   if (!rawValue) return ''
@@ -228,13 +327,6 @@ const formatTimeText = (rawValue) => {
     return ''
   }
 }
-
-const fallbackRecommendations = (videos) =>
-  videos.slice(0, 4).map((video, index) => ({
-    ...video,
-    reason_label: index === 0 ? '继续学习' : '最近内容',
-    reason_text: index === 0 ? '当前最适合从这个任务继续进入。' : '最近进入视频库，适合继续学习。'
-  }))
 
 const statusText = videoStatusText
 
@@ -249,6 +341,10 @@ const statusClass = (status) => {
 const recentCount = computed(() => allVideos.value.length)
 const completedCount = computed(() => allVideos.value.filter((item) => isCompletedVideoStatus(item?.status)).length)
 const inProgressCount = computed(() => allVideos.value.filter((item) => isActiveVideoStatus(item?.status)).length)
+const recommendationEntryValue = computed(() => {
+  if (recommendationLoading.value && recommendations.value.length === 0) return '...'
+  return String(recommendations.value.length)
+})
 const featuredVideo = computed(() => allVideos.value.find((item) => isActiveVideoStatus(item?.status)) || allVideos.value[0] || null)
 const recentListVideos = computed(() => {
   const featuredId = Number(featuredVideo.value?.id || 0)
@@ -262,20 +358,31 @@ const featuredVideoEyebrow = computed(() => {
 })
 const featuredVideoNote = computed(() => {
   if (!featuredVideo.value) return ''
-  const timeText = formatTimeText(resolveVideoTime(featuredVideo.value))
-  if (isActiveVideoStatus(featuredVideo.value?.status)) {
-    return timeText ? `当前任务仍在推进 · ${timeText}` : '当前任务仍在推进'
-  }
-  if (isCompletedVideoStatus(featuredVideo.value?.status)) {
-    return timeText ? `已完成处理 · ${timeText}` : '已完成处理，可继续复盘'
-  }
-  return timeText ? `最近进入 · ${timeText}` : '从这里继续进入'
+  if (isActiveVideoStatus(featuredVideo.value?.status)) return '当前任务仍在推进'
+  if (isCompletedVideoStatus(featuredVideo.value?.status)) return '已完成处理，可继续复盘'
+  return '从这里继续进入'
 })
 const featuredVideoActionLabel = computed(() => (isActiveVideoStatus(featuredVideo.value?.status) ? '查看进度' : '打开详情'))
-const recommendationEmptyText = computed(() => {
-  if (recommendationError.value) return recommendationError.value
-  return '上传更多视频后，这里会按处理状态和内容相关度给你推荐下一步。'
-})
+
+const mergeVideosById = (items) => {
+  const map = new Map()
+  for (const item of items) {
+    if (!item?.id) continue
+    map.set(Number(item.id), item)
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    const ta = new Date(a?.upload_time || 0).getTime()
+    const tb = new Date(b?.upload_time || 0).getTime()
+    return tb - ta
+  })
+}
+
+const fallbackRecommendations = (videos) =>
+  videos.slice(0, 4).map((video, index) => ({
+    ...video,
+    reason_label: index === 0 ? '继续学习' : '最近内容',
+    reason_text: index === 0 ? '当前最适合从这个任务继续进入。' : '最近进入视频库，适合继续学习。'
+  }))
 
 const fetchAllVideos = async () => {
   const first = await getVideoList(1, 100)
@@ -285,15 +392,53 @@ const fetchAllVideos = async () => {
   if (totalPages <= 1) return firstList
 
   const all = [...firstList]
-  for (let page = 2; page <= totalPages; page += 1) {
-    const res = await getVideoList(page, 100)
+  for (let p = 2; p <= totalPages; p += 1) {
+    const res = await getVideoList(p, 100)
     all.push(...normalizeList(res?.data || {}))
   }
   return all
 }
 
+const reload = async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    const [videos, transcripts] = await Promise.all([
+      fetchAllVideos(),
+      listNativeOfflineTranscripts().catch(() => [])
+    ])
+    allVideos.value = mergeVideosById(videos)
+    localTranscriptCount.value = transcripts.length
+  } catch (e) {
+    error.value = e?.message || '加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+const reloadRecommendations = async () => {
+  recommendationLoading.value = true
+  recommendationError.value = ''
+  try {
+    const res = await getVideoRecommendations({ scene: 'home', limit: 4, include_external: true })
+    const payload = res?.data || {}
+    const items = normalizeRecommendationItems(payload)
+    recommendations.value = items.length > 0 ? items : fallbackRecommendations(allVideos.value)
+    recommendationMeta.value = buildRecommendationMeta(payload)
+  } catch (e) {
+    recommendationError.value = e?.message || '推荐加载失败'
+    recommendations.value = fallbackRecommendations(allVideos.value)
+    recommendationMeta.value = createRecommendationMeta()
+  } finally {
+    recommendationLoading.value = false
+  }
+}
+
 const go = (path) => router.push(path)
-const goStat = (scope) => router.push({ path: '/videos', query: { scope } })
+const goStat = (scope) => {
+  console.info(`[INFO][Home] stat-card-click scope=${scope}`)
+  router.push({ path: '/videos', query: { scope } })
+}
 
 const openVideo = (video) => {
   const current = video || {}
@@ -305,60 +450,125 @@ const openVideo = (video) => {
   router.push(`/videos/${current.id}`)
 }
 
-const openRecommendation = (item) => openVideo(item)
-
-const reloadRecommendations = async () => {
-  recommendationLoading.value = true
-  recommendationError.value = ''
-  try {
-    const res = await getVideoRecommendations({ scene: 'home', limit: 4 })
-    const items = normalizeRecommendationItems(res?.data || {})
-    recommendations.value = items.length > 0 ? items : fallbackRecommendations(allVideos.value)
-  } catch (e) {
-    recommendationError.value = e?.message || '推荐加载失败'
-    recommendations.value = fallbackRecommendations(allVideos.value)
-  } finally {
-    recommendationLoading.value = false
+const recommendationEmptyText = computed(() => {
+  if (recommendationError.value) return recommendationError.value
+  return '上传更多视频后，这里会按处理状态和内容相关度给你推荐下一步。'
+})
+const decorateRecommendationItem = (item) => ({
+  ...item,
+  subjectText: String(item?.subject || '').trim() ? `科目 · ${String(item.subject).trim()}` : '',
+  importHint: String(item?.import_hint || '').trim(),
+  actionTarget: String(item?.action_target || '').trim(),
+  primaryActionDisabled: isExternalRecommendation(item)
+    ? !Boolean(item?.can_import ?? resolveRecommendationUrl(item))
+    : false
+})
+const recommendationCards = computed(() => recommendations.value.map((item) => decorateRecommendationItem(item)))
+const externalRecommendationCount = computed(() => recommendationCards.value.filter((item) => isExternalRecommendation(item)).length)
+const internalRecommendationCount = computed(() => {
+  if (recommendationMeta.value.internalItemCount > 0 || recommendationMeta.value.externalItemCount > 0) {
+    return recommendationMeta.value.internalItemCount
   }
+  return Math.max(recommendationCards.value.length - externalRecommendationCount.value, 0)
+})
+const recommendationProviderReports = computed(() => recommendationMeta.value.externalProviders || [])
+const recommendationQuerySummary = computed(() => {
+  const query = recommendationMeta.value.externalQuery
+  if (!query) return ''
+  const parts = [query.subject, query.primary_topic].filter(Boolean)
+  if (Array.isArray(query.preferred_tags) && query.preferred_tags.length > 0) {
+    parts.push(`优先标签：${query.preferred_tags.join('、')}`)
+  }
+  return parts.join(' · ')
+})
+const recommendationMixValue = computed(() => {
+  if (externalRecommendationCount.value === 0) return `站内 ${internalRecommendationCount.value}`
+  return `${internalRecommendationCount.value} / ${externalRecommendationCount.value}`
+})
+const recommendationMixNote = computed(() => {
+  if (recommendations.value.length === 0) return '当前还没有推荐结果。'
+  if (externalRecommendationCount.value === 0) return '当前首页预览以站内学习内容为主。'
+  if (internalRecommendationCount.value === 0) return '当前首页预览以站外候选为主。'
+  return `站内 ${internalRecommendationCount.value} 条，站外 ${externalRecommendationCount.value} 条。`
+})
+const providerStatusText = (provider) => {
+  if (provider?.status === 'failed') return '抓取失败'
+  if (provider?.status === 'empty') return '暂无候选'
+  return `${Number(provider?.candidate_count || 0)} 条候选`
+}
+const providerStatusDetail = (provider) => {
+  if (provider?.status === 'failed') return String(provider?.error_message || '当前 provider 抓取失败，请到推荐页查看详情。')
+  if (provider?.status === 'empty') return `当前已检索但没有返回可用候选，耗时 ${Number(provider?.latency_ms || 0)} ms`
+  return `本轮抓取耗时 ${Number(provider?.latency_ms || 0)} ms，可在推荐页继续导入。`
+}
+
+const recommendationKey = (item) =>
+  String(item?.id || item?.external_url || item?.target_url || item?.source_url || item?.link || item?.title || 'recommendation')
+
+const resolveRecommendationUrl = (item) =>
+  String(item?.external_url || item?.target_url || item?.source_url || item?.link || '').trim()
+const parseRecommendationActionTarget = (target) => {
+  const text = String(target || '').trim()
+  if (!text || !text.startsWith('/')) return null
+  const [path, search = ''] = text.split('?')
+  if (!search) return { path }
+  const query = {}
+  new URLSearchParams(search).forEach((value, key) => {
+    query[key] = value
+  })
+  return { path, query }
+}
+
+const isExternalRecommendation = (item) => {
+  const itemType = String(item?.item_type || item?.content_type || item?.origin_type || '').trim().toLowerCase()
+  if (item?.is_external === true) return true
+  if (['external', 'external_candidate', 'candidate'].includes(itemType)) return true
+  return !item?.id && Boolean(resolveRecommendationUrl(item))
+}
+
+const recommendationStatusLabel = (item) => {
+  if (isExternalRecommendation(item)) {
+    return String(item?.source_label || item?.external_source_label || item?.source_platform_label || '站外候选')
+  }
+  return item?.status ? statusText(item.status) : '站内推荐'
+}
+
+const recommendationStatusClass = (item) => {
+  if (isExternalRecommendation(item)) return 'status--warn'
+  return statusClass(item?.status)
+}
+
+const recommendationNextStepText = (item) =>
+  String(item?.action_label || '').trim() || (isExternalRecommendation(item) ? '下一步：带着链接进入导入学习链路' : '下一步：打开详情继续学习')
+
+const openRecommendation = (item) => {
+  if (isExternalRecommendation(item) && item.primaryActionDisabled) {
+    recommendationError.value = item.importHint || '当前站外候选暂不可直接导入。'
+    return
+  }
+  const actionLocation = parseRecommendationActionTarget(item?.actionTarget || item?.action_target)
+  if (actionLocation) {
+    router.push(actionLocation)
+    return
+  }
+  if (isExternalRecommendation(item)) {
+    const url = resolveRecommendationUrl(item)
+    if (!url) return
+    router.push({
+      path: '/upload',
+      query: {
+        mode: 'url',
+        url,
+        source: String(item?.source_label || item?.external_source_label || item?.source_platform_label || '站外推荐')
+      }
+    })
+    return
+  }
+  openVideo(item)
 }
 
 const reloadDashboard = async () => {
-  loading.value = true
-  recommendationLoading.value = true
-  error.value = ''
-  recommendationError.value = ''
-
-  const [videosResult, transcriptsResult, recommendationsResult] = await Promise.allSettled([
-    fetchAllVideos(),
-    listNativeOfflineTranscripts().catch(() => []),
-    getVideoRecommendations({ scene: 'home', limit: 4 })
-  ])
-
-  let mergedVideos = []
-
-  if (videosResult.status === 'fulfilled') {
-    mergedVideos = mergeVideosById(videosResult.value)
-    allVideos.value = mergedVideos
-  } else {
-    error.value = videosResult.reason?.message || '首页数据加载失败'
-  }
-
-  if (transcriptsResult.status === 'fulfilled') {
-    localTranscriptCount.value = Array.isArray(transcriptsResult.value) ? transcriptsResult.value.length : 0
-  } else {
-    localTranscriptCount.value = 0
-  }
-
-  if (recommendationsResult.status === 'fulfilled') {
-    const items = normalizeRecommendationItems(recommendationsResult.value?.data || {})
-    recommendations.value = items.length > 0 ? items : fallbackRecommendations(mergedVideos)
-  } else {
-    recommendationError.value = recommendationsResult.reason?.message || '推荐加载失败'
-    recommendations.value = fallbackRecommendations(mergedVideos)
-  }
-
-  loading.value = false
-  recommendationLoading.value = false
+  await Promise.all([reload(), reloadRecommendations()])
 }
 
 onMounted(reloadDashboard)
@@ -367,30 +577,48 @@ onMounted(reloadDashboard)
 <style scoped>
 .home-page {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding-top: calc(16px + env(safe-area-inset-top));
+  font-family: 'Avenir Next', 'SF Pro Display', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.welcome,
+.overview,
+.recommend-panel,
+.support-strip {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(242, 235, 248, 0.92);
+  box-shadow: 0 18px 38px rgba(73, 51, 104, 0.12);
 }
 
 .welcome {
-  position: relative;
-  overflow: hidden;
-  padding: 22px;
-  border-radius: 28px;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: linear-gradient(155deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 251, 252, 0.9) 58%, rgba(232, 247, 250, 0.84) 100%);
-  box-shadow: 0 10px 28px rgba(24, 45, 73, 0.08);
+  padding: 24px;
+  border-radius: 30px;
+  background:
+    linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.95)),
+    radial-gradient(circle at top right, rgba(143, 115, 186, 0.18), transparent 34%),
+    radial-gradient(circle at 18% 100%, rgba(183, 157, 213, 0.14), transparent 28%);
+}
+
+.welcome::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(95, 71, 126, 0), rgba(95, 71, 126, 0.14), rgba(95, 71, 126, 0));
 }
 
 .welcome::after {
   content: '';
   position: absolute;
-  width: 180px;
-  height: 180px;
-  right: -70px;
-  top: -90px;
+  width: 240px;
+  height: 240px;
+  right: -90px;
+  top: -120px;
   border-radius: 999px;
-  transform: none;
-  background: radial-gradient(circle, rgba(31, 122, 140, 0.14) 0%, rgba(31, 122, 140, 0.03) 62%, transparent 74%);
+  background: radial-gradient(circle, rgba(95, 71, 126, 0.08) 0%, rgba(95, 71, 126, 0.01) 64%, transparent 72%);
   pointer-events: none;
 }
 
@@ -415,9 +643,63 @@ onMounted(reloadDashboard)
 }
 
 .welcome__brand {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.welcome__brand-surface {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.welcome__brand-icon {
   display: inline-flex;
   align-items: center;
-  min-width: 132px;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border-radius: 20px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.welcome__brand-copy {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  padding-top: 0;
+}
+
+.welcome__brand-mark {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  color: var(--primary-deep);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  opacity: 0.82;
+}
+
+.welcome__brand-title {
+  color: #221a30;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
 }
 
 .guide-btn,
@@ -426,20 +708,26 @@ onMounted(reloadDashboard)
   background: transparent;
   color: var(--primary-deep);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .guide-btn {
-  border: 1px solid rgba(24, 45, 73, 0.08);
+  border: 1px solid rgba(17, 24, 39, 0.09);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  padding: 6px 12px;
+  background: rgba(244, 238, 249, 0.84);
+  padding: 7px 11px;
+  font-size: 11px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 6px 14px rgba(106, 75, 155, 0.06);
 }
 
 .welcome__hero {
   display: grid;
-  gap: 16px;
-  margin-top: 16px;
+  gap: 14px;
+  margin-top: 18px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(180px, 0.9fr);
 }
 
 .welcome__eyebrow,
@@ -448,17 +736,22 @@ onMounted(reloadDashboard)
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 800;
-  background: rgba(31, 122, 140, 0.12);
+  width: fit-content;
+  padding: 5px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--primary-soft);
   color: var(--primary-deep);
 }
 
 .welcome__title {
-  margin: 8px 0 0;
-  font-size: 31px;
-  line-height: 1.08;
+  margin: 10px 0 0;
+  font-size: 34px;
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+  color: #111827;
 }
 
 .welcome__subtitle,
@@ -472,14 +765,66 @@ onMounted(reloadDashboard)
 }
 
 .welcome__subtitle {
-  margin-top: 8px;
+  margin-top: 12px;
   font-size: 14px;
   line-height: 1.6;
-  max-width: 32rem;
+  max-width: 28rem;
+}
+
+.welcome__spotlight {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.94));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.welcome__spotlight-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.welcome__spotlight-value {
+  font-size: 20px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #221a30;
+}
+
+.welcome__spotlight-note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #706781;
+}
+
+.welcome__spotlight-link {
+  width: fit-content;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--primary-deep);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.welcome__subnote {
+  margin-top: 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b7280;
 }
 
 .hero-actions,
 .summary-grid,
+.recommend-summary,
 .video-list,
 .recommend-list,
 .skeleton-list {
@@ -489,6 +834,7 @@ onMounted(reloadDashboard)
 
 .hero-actions {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 14px;
 }
 
 .hero-btn,
@@ -498,26 +844,27 @@ onMounted(reloadDashboard)
 .recommend-card,
 .video-item,
 .support-link {
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(247, 241, 251, 0.96);
 }
 
 .hero-btn {
-  border-radius: 14px;
-  padding: 13px 14px;
+  border-radius: 16px;
+  padding: 14px 15px;
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .hero-btn--primary {
   border: 0;
-  color: #f4feff;
-  background: linear-gradient(135deg, #145b66, #1f7a8c);
-  box-shadow: 0 10px 18px rgba(31, 122, 140, 0.18);
+  color: #f9fafb;
+  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  box-shadow: 0 16px 24px rgba(95, 71, 126, 0.24);
 }
 
 .hero-btn--secondary {
   color: var(--primary-deep);
+  background: rgba(235, 226, 246, 0.94);
 }
 
 .stats,
@@ -526,104 +873,199 @@ onMounted(reloadDashboard)
 }
 
 .stats {
-  margin-top: 16px;
+  display: grid;
+  margin-top: 18px;
   gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
 }
 
 .stat-pill {
-  text-align: left;
-  border-radius: 14px;
-  padding: 10px 12px;
-  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+  min-height: 78px;
+  text-align: center;
+  border-radius: 18px;
+  padding: 10px 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.68);
+  width: 100%;
+  min-width: 0;
 }
 
 .stat-pill--ok {
-  background: rgba(31, 157, 116, 0.1);
+  background: rgba(234, 225, 246, 0.9);
 }
 
 .stat-pill--warn {
-  background: rgba(242, 154, 74, 0.14);
+  background: var(--surface-lilac-deep);
+}
+
+.stat-pill--feature {
+  background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(243, 237, 249, 0.96));
 }
 
 .stat-pill__label,
 .summary-card__label {
   display: block;
-  font-size: 12px;
+  font-size: 10px;
+  line-height: 1.3;
   font-weight: 700;
-  color: var(--muted);
+  color: #6b7280;
 }
 
 .stat-pill__value,
 .summary-card__value {
   display: block;
-  margin-top: 4px;
-  font-size: 22px;
-  font-weight: 900;
-  color: var(--text);
+  margin-top: 0;
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: #111827;
 }
 
 .overview,
 .recommend-panel,
 .support-strip {
   display: grid;
-  gap: 14px;
-  padding: 18px;
-  border-radius: 24px;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.7);
-  box-shadow: 0 10px 24px rgba(24, 45, 73, 0.06);
+  gap: 16px;
+  padding: 20px;
+  border-radius: 28px;
+}
+
+.recommend-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.recommend-summary__card {
+  display: grid;
+  gap: 5px;
+  border-radius: 20px;
+  padding: 15px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(239, 231, 247, 0.92);
+}
+
+.recommend-summary__card--soft {
+  background: rgba(232, 221, 244, 0.94);
+}
+
+.recommend-summary__card--action {
+  background: linear-gradient(180deg, rgba(223, 210, 238, 0.98), rgba(244, 238, 249, 0.96));
+}
+
+.recommend-summary__label,
+.recommend-summary__note,
+.recommend-card__next {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b7280;
+}
+
+.recommend-summary__value {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #111827;
+}
+
+.recommend-provider-list {
+  display: grid;
+  gap: 10px;
+}
+
+.recommend-provider-card {
+  display: grid;
+  gap: 6px;
+  border-radius: 18px;
+  padding: 14px 15px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(239, 231, 247, 0.92);
+}
+
+.recommend-provider-card--failed {
+  border-color: rgba(139, 121, 157, 0.18);
+  background: var(--lilac-bg);
+}
+
+.recommend-provider-card--empty {
+  background: rgba(237, 228, 245, 0.88);
+}
+
+.recommend-provider-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: #221a30;
+}
+
+.recommend-provider-card__top span,
+.recommend-provider-card p {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #6b7280;
 }
 
 .section-head h2,
 .recent-inline__head h3 {
   margin: 0;
-  font-size: 17px;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  color: #111827;
 }
 
 .section-head p {
   margin-top: 4px;
   font-size: 13px;
   line-height: 1.55;
+  max-width: 28rem;
 }
 
 .focus-card {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 18px 16px;
+  padding: 18px;
   text-align: left;
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 252, 0.94));
-  border-left: 4px solid rgba(31, 122, 140, 0.5);
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(247, 241, 251, 0.98), rgba(228, 217, 241, 0.92));
+  border: 1px solid rgba(17, 24, 39, 0.08);
 }
 
 .focus-card__title,
 .recommend-card__title,
 .quick-card__title {
   margin: 0;
-  font-size: 17px;
-  color: #1f2a37;
+  font-size: 18px;
+  line-height: 1.35;
+  color: #111827;
 }
 
 .focus-card__cta {
   color: var(--primary-deep);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .summary-card {
   display: grid;
   gap: 6px;
   width: 100%;
-  padding: 14px;
+  padding: 16px;
   text-align: left;
-  border-radius: 16px;
-  border: 1px solid rgba(24, 45, 73, 0.08);
-  background: rgba(255, 255, 255, 0.82);
+  border-radius: 20px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(238, 230, 246, 0.92);
 }
 
 .summary-card--soft {
-  background: rgba(244, 250, 252, 0.92);
+  background: var(--surface-lilac);
 }
 
 .summary-card__note {
@@ -640,9 +1082,9 @@ onMounted(reloadDashboard)
 .recommend-card,
 .quick-card {
   width: 100%;
-  padding: 14px;
+  padding: 16px;
   text-align: left;
-  border-radius: 18px;
+  border-radius: 20px;
 }
 
 .video-item {
@@ -659,9 +1101,10 @@ onMounted(reloadDashboard)
 .video-item__title {
   margin: 0;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   overflow-wrap: anywhere;
   word-break: break-word;
+  color: #111827;
 }
 
 .video-item__status {
@@ -671,7 +1114,7 @@ onMounted(reloadDashboard)
   border-radius: 999px;
   padding: 3px 9px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .status--ok {
@@ -680,13 +1123,13 @@ onMounted(reloadDashboard)
 }
 
 .status--warn {
-  background: var(--warn-bg);
-  color: var(--warn-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .status--bad {
-  background: var(--bad-bg);
-  color: var(--bad-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .status--info {
@@ -696,7 +1139,7 @@ onMounted(reloadDashboard)
 
 .video-item__arrow,
 .support-card__arrow {
-  color: #8ba4ae;
+  color: #8b7da3;
   font-size: 20px;
   line-height: 1;
 }
@@ -707,27 +1150,32 @@ onMounted(reloadDashboard)
   border-radius: 999px;
   padding: 4px 9px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .tag--mint {
-  background: rgba(31, 157, 116, 0.14);
-  color: #0f6c4f;
+  background: rgba(234, 225, 246, 0.92);
+  color: var(--ok-text);
 }
 
 .tag--leaf {
-  background: rgba(114, 196, 106, 0.14);
-  color: #326f2e;
+  background: rgba(233, 224, 243, 0.92);
+  color: #6b5b84;
 }
 
-.tag--amber {
-  background: rgba(242, 154, 74, 0.16);
-  color: #905214;
+.tag--lilac {
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .tag--teal {
-  background: rgba(76, 173, 195, 0.16);
-  color: #166376;
+  background: rgba(231, 220, 243, 0.94);
+  color: #6e5d7f;
+}
+
+.tag--cobalt {
+  background: var(--info-bg);
+  color: var(--info-text);
 }
 
 .section-head--compact {
@@ -737,12 +1185,13 @@ onMounted(reloadDashboard)
 .support-strip__list {
   display: grid;
   gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .support-link {
   width: 100%;
-  border-radius: 16px;
-  padding: 12px 14px;
+  border-radius: 18px;
+  padding: 14px 15px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -752,12 +1201,12 @@ onMounted(reloadDashboard)
 .support-link__label {
   flex: 1;
   font-size: 14px;
-  font-weight: 800;
-  color: #1f2a37;
+  font-weight: 700;
+  color: #111827;
 }
 
 .support-link__arrow {
-  color: #8ba4ae;
+  color: #8b7da3;
   font-size: 18px;
 }
 
@@ -767,10 +1216,10 @@ onMounted(reloadDashboard)
 
 .recommend-card {
   display: grid;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.86);
-  border-radius: 18px;
-  padding: 14px 15px;
+  gap: 10px;
+  background: rgba(238, 230, 246, 0.92);
+  border-radius: 20px;
+  padding: 16px;
 }
 
 .recommend-card__reason {
@@ -784,31 +1233,57 @@ onMounted(reloadDashboard)
   line-height: 1.55;
 }
 
+.recommend-card__hint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--primary-deep);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(240, 232, 245, 0.72);
+  border: 1px solid rgba(139, 121, 157, 0.14);
+}
+
+.recommend-card__next {
+  color: var(--primary-deep);
+  font-weight: 700;
+}
+
 .message {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 14px;
   font-size: 13px;
-  background: var(--card-soft);
+  background: rgba(238, 230, 246, 0.92);
+  border: 1px dashed rgba(17, 24, 39, 0.12);
 }
 
 .message--error {
-  background: rgba(223, 82, 82, 0.1);
-  color: #aa3232;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
+  border-style: solid;
+  border-color: rgba(139, 121, 157, 0.14);
 }
 
 .message--empty {
   justify-content: flex-start;
 }
 
+.message--hint {
+  justify-content: flex-start;
+  color: var(--primary-deep);
+  background: var(--surface-lilac);
+  border-style: solid;
+  border-color: var(--primary-soft);
+}
+
 .skeleton-item {
   height: 64px;
-  border-radius: 16px;
-  background: linear-gradient(90deg, #edf3f0, #e3efe9, #edf3f0);
+  border-radius: 18px;
+  background: linear-gradient(90deg, #f2ecf9, #e5daf2, #f2ecf9);
   background-size: 220% 100%;
   animation: shimmer 1.2s linear infinite;
 }
@@ -828,11 +1303,56 @@ onMounted(reloadDashboard)
 }
 
 @media (max-width: 640px) {
+  .welcome {
+    padding: 20px;
+  }
+
+  .welcome__hero,
   .hero-actions,
-  .stats,
   .summary-grid,
-  .recommend-list {
+  .recommend-summary,
+  .recommend-list,
+  .support-strip__list {
     grid-template-columns: 1fr;
+  }
+
+  .welcome__top {
+    align-items: flex-start;
+  }
+
+  .welcome__brand {
+    min-width: 0;
+  }
+
+  .welcome__brand-surface {
+    width: auto;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  .welcome__brand-icon {
+    width: 64px;
+    height: 64px;
+    padding: 6px;
+    border-radius: 18px;
+  }
+
+  .welcome__brand-title {
+    font-size: 15px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .stat-pill {
+    min-height: 70px;
+    padding: 8px 2px;
+  }
+
+  .welcome__title {
+    font-size: 30px;
   }
 }
 </style>

@@ -50,6 +50,14 @@ npm run preview
 | `src/store/` | 状态管理 |
 | `src/views/` | 页面视图 |
 
+## 设计助手入口
+
+当前移动端已新增“设计助手”页，入口位于“我的”页面中。它不会直接请求 Sleek，而是统一走 EduMind 后端的 `/api/design/*` 代理接口：
+
+- 先在 `backend_fastapi/.env` 中配置 `SLEEK_API_KEY`
+- 登录 EduMind 后进入“我的” -> “设计助手”
+- 可创建 Sleek 项目、提交自然语言设计描述、查看截图预览和组件 HTML 原型
+
 ## 原生容器配合方式（以 iOS 为主）
 
 如果用于 iOS / 原生容器离线资源打包，优先使用 iOS 构建命令：

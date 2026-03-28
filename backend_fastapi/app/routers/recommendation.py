@@ -7,10 +7,15 @@ from app.models.user import User
 from app.models.video import Video
 from app.schemas.recommendation import RecommendationSceneListResponse
 from app.schemas.recommendation import VideoRecommendationResponse
+from app.schemas.video import VideoUploadResponse
+from app.schemas.video import VideoUploadURL
+from app.services.video_api_service import build_processing_options
+from app.services.video_api_service import serialize_video
 from app.services.video_recommendation_service import SCENE_MAP
 from app.services.video_recommendation_service import list_recommendation_scenes
 from app.services.video_recommendation_service import normalize_scene
 from app.services.video_recommendation_service import recommend_videos
+from app.services.video_url_import_service import import_remote_video_from_url
 from app.utils.auth_token import parse_auth_token
 from app.utils.auth_token import parse_bearer_token
 from fastapi import APIRouter
@@ -52,6 +57,7 @@ async def get_recommendation_scenes():
 async def get_video_recommendations(
     scene: str = Query(default="home", description="推荐场景：home/continue/review/related"),
     limit: int = Query(default=4, ge=1, le=12, description="返回条数"),
+    include_external: bool = Query(default=False, description="是否附带站外候选元数据"),
     seed_video_id: Optional[int] = Query(default=None, description="相关推荐的种子视频 ID"),
     exclude_video_ids: Optional[str] = Query(default=None, description="排除的视频 ID，逗号分隔"),
     user_id: Optional[int] = Query(default=None, description="兼容旧链路的用户 ID"),
@@ -80,6 +86,35 @@ async def get_video_recommendations(
         seed_video=seed_video,
         user=user,
         exclude_ids=parse_exclude_ids(exclude_video_ids),
+        include_external=include_external,
     )
     payload["message"] = "获取推荐视频成功"
     return payload
+
+
+@router.post("/import-external", response_model=VideoUploadResponse)
+async def import_external_recommendation(data: VideoUploadURL, db: Session = Depends(get_db)):
+    """将推荐页中的站外候选直接提交到现有链接下载入库链路。"""
+    process_options = build_processing_options(
+        language=data.language,
+        model=data.model,
+        auto_generate_summary=data.auto_generate_summary,
+        auto_generate_tags=data.auto_generate_tags,
+        summary_style=data.summary_style,
+    )
+    result = import_remote_video_from_url(
+        db,
+        video_url=data.url,
+        process_options=process_options,
+        preferred_title=data.title,
+        preferred_summary=data.summary,
+        preferred_tags=list(data.tags or []),
+        request_source="recommendation_import_external",
+    )
+    return VideoUploadResponse(
+        id=result.video.id,
+        status=result.status,
+        message=result.message,
+        duplicate=result.duplicate,
+        data=serialize_video(result.video),
+    )
