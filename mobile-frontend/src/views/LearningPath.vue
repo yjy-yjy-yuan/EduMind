@@ -126,7 +126,7 @@ const refresh = () => {
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(251, 245, 239, 0.92);
+  background: rgba(242, 235, 248, 0.92);
   box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
 }
 
@@ -138,7 +138,7 @@ const refresh = () => {
 .step {
   border-radius: 20px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: linear-gradient(180deg, #ffffff, #f7f0ea);
+  background: linear-gradient(180deg, #ffffff, #f0e8f7);
 }
 
 .badge {

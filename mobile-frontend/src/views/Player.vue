@@ -238,8 +238,8 @@ onMounted(loadVideoMeta)
 }
 
 .alert--bad {
-  background: rgba(239, 68, 68, 0.1);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .status-row {
@@ -264,8 +264,8 @@ onMounted(loadVideoMeta)
 }
 
 .badge--status {
-  background: rgba(200, 171, 108, 0.14);
-  color: #8f7040;
+  background: var(--ok-bg);
+  color: var(--ok-text);
 }
 
 .muted {
@@ -303,7 +303,7 @@ onMounted(loadVideoMeta)
   text-align: center;
   gap: 10px;
   background:
-    radial-gradient(circle at top right, rgba(200, 171, 108, 0.22), transparent 34%),
+    radial-gradient(circle at top right, rgba(183, 157, 213, 0.28), transparent 34%),
     linear-gradient(145deg, rgba(139, 121, 157, 0.94), rgba(73, 60, 82, 0.98));
 }
 
@@ -381,7 +381,7 @@ onMounted(loadVideoMeta)
   padding: 10px 12px;
   border-radius: 16px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(251, 245, 239, 0.92);
+  background: rgba(242, 235, 248, 0.92);
   box-shadow: 0 10px 20px rgba(101, 87, 117, 0.08);
 }
 

@@ -702,8 +702,8 @@ onMounted(reloadAll)
   padding: 20px;
   border-radius: 28px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(251, 245, 239, 0.97);
-  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+  background: rgba(242, 235, 248, 0.93);
+  box-shadow: 0 18px 38px rgba(73, 51, 104, 0.12);
 }
 
 .panel--compact {
@@ -714,9 +714,9 @@ onMounted(reloadAll)
   position: relative;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(251, 245, 239, 0.98), rgba(246, 238, 230, 0.96)),
-    radial-gradient(circle at top right, rgba(139, 121, 157, 0.12), transparent 34%),
-    radial-gradient(circle at 16% 100%, rgba(200, 171, 108, 0.12), transparent 28%);
+    linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.95)),
+    radial-gradient(circle at top right, rgba(143, 115, 186, 0.18), transparent 34%),
+    radial-gradient(circle at 16% 100%, rgba(183, 157, 213, 0.14), transparent 28%);
 }
 
 .hero::after {
@@ -727,7 +727,7 @@ onMounted(reloadAll)
   top: -130px;
   right: -100px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(15, 23, 42, 0.06) 0%, rgba(15, 23, 42, 0.01) 64%, transparent 72%);
+  background: radial-gradient(circle, rgba(95, 71, 126, 0.08) 0%, rgba(95, 71, 126, 0.01) 64%, transparent 72%);
   pointer-events: none;
 }
 
@@ -764,19 +764,19 @@ onMounted(reloadAll)
 
 .badge--reason {
   padding: 5px 10px;
-  background: rgba(17, 24, 39, 0.06);
-  color: #1f2937;
+  background: rgba(95, 71, 126, 0.1);
+  color: #5f477e;
 }
 
 .badge--external {
   padding: 5px 10px;
-  background: var(--surface-gold);
-  color: var(--warn-text);
+  background: var(--surface-lilac-deep);
+  color: var(--lilac-text);
 }
 
 .badge--mint {
   padding: 5px 10px;
-  background: rgba(243, 235, 215, 0.94);
+  background: rgba(229, 217, 241, 0.94);
   color: var(--ok-text);
 }
 
@@ -785,7 +785,7 @@ onMounted(reloadAll)
   font-size: 34px;
   line-height: 1.03;
   letter-spacing: -0.04em;
-  color: #111827;
+  color: #221a30;
 }
 
 .hero__desc,
@@ -800,7 +800,7 @@ onMounted(reloadAll)
 .context-card__desc,
 .journey-card__desc,
 .source-card__desc {
-  color: #6b7280;
+  color: #706781;
 }
 
 .hero__desc {
@@ -851,7 +851,7 @@ onMounted(reloadAll)
 .action-btn,
 .context-action {
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(251, 245, 239, 0.98);
+  background: rgba(247, 241, 251, 0.96);
 }
 
 .hero-btn,
@@ -868,8 +868,8 @@ onMounted(reloadAll)
 .context-action--primary {
   border: 0;
   color: #f9fafb;
-  background: linear-gradient(135deg, #665775, #8b799d);
-  box-shadow: 0 16px 24px rgba(17, 24, 39, 0.16);
+  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  box-shadow: 0 16px 24px rgba(95, 71, 126, 0.24);
 }
 
 .hero-btn--ghost,
@@ -880,7 +880,7 @@ onMounted(reloadAll)
 }
 
 .hero-btn--ghost {
-  background: rgba(245, 236, 229, 0.96);
+  background: rgba(242, 235, 248, 0.94);
 }
 
 .hero-stat,
@@ -892,7 +892,7 @@ onMounted(reloadAll)
   gap: 6px;
   border-radius: 20px;
   padding: 15px;
-  background: rgba(247, 239, 232, 0.94);
+  background: rgba(238, 230, 246, 0.92);
   border: 1px solid rgba(17, 24, 39, 0.08);
 }
 
@@ -904,7 +904,7 @@ onMounted(reloadAll)
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #6b7280;
+  color: #706781;
 }
 
 .hero-stat strong,
@@ -914,7 +914,7 @@ onMounted(reloadAll)
   font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.04em;
-  color: #111827;
+  color: #221a30;
 }
 
 .context-card__value {
@@ -932,15 +932,15 @@ onMounted(reloadAll)
   gap: 4px;
   padding: 14px 15px;
   border-radius: 20px;
-  background: rgba(245, 236, 229, 0.92);
+  background: rgba(234, 224, 244, 0.92);
   border: 1px solid rgba(17, 24, 39, 0.08);
   font-size: 12px;
   line-height: 1.6;
-  color: #6b7280;
+  color: #706781;
 }
 
 .hero__notice strong {
-  color: #111827;
+  color: #221a30;
   font-size: 13px;
 }
 
@@ -960,7 +960,7 @@ onMounted(reloadAll)
 .journey-card__title {
   font-size: 15px;
   font-weight: 800;
-  color: #111827;
+  color: #221a30;
 }
 
 .journey-card__desc,
@@ -1043,7 +1043,7 @@ onMounted(reloadAll)
 .scene-tab--active,
 .tag-card--active {
   border-color: var(--primary-soft-strong);
-  background: linear-gradient(180deg, rgba(240, 232, 245, 0.96), rgba(251, 245, 239, 0.98));
+  background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(247, 241, 251, 0.98));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
@@ -1054,7 +1054,7 @@ onMounted(reloadAll)
   font-size: 16px;
   font-weight: 800;
   line-height: 1.35;
-  color: #111827;
+  color: #221a30;
 }
 
 .scene-tab__desc,
@@ -1078,7 +1078,7 @@ onMounted(reloadAll)
 .tag-card__name {
   font-size: 14px;
   font-weight: 800;
-  color: #111827;
+  color: #221a30;
 }
 
 .tag-card__count {
@@ -1108,8 +1108,8 @@ onMounted(reloadAll)
   font-size: 12px;
   line-height: 1.6;
   color: var(--primary-deep);
-  background: rgba(240, 232, 245, 0.72);
-  border: 1px solid rgba(139, 121, 157, 0.14);
+  background: rgba(232, 221, 244, 0.76);
+  border: 1px solid rgba(143, 115, 186, 0.18);
   border-radius: 16px;
   padding: 10px 12px;
 }
@@ -1130,16 +1130,16 @@ onMounted(reloadAll)
   border-radius: 18px;
   padding: 14px 16px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(251, 245, 239, 0.94);
+  background: rgba(247, 241, 251, 0.94);
 }
 
 .provider-status-card--failed {
-  border-color: rgba(217, 119, 6, 0.18);
-  background: var(--bad-bg);
+  border-color: rgba(139, 121, 157, 0.18);
+  background: var(--lilac-bg);
 }
 
 .provider-status-card--empty {
-  background: rgba(245, 236, 229, 0.84);
+  background: rgba(236, 227, 246, 0.84);
 }
 
 .provider-status-card__top {
@@ -1148,14 +1148,14 @@ onMounted(reloadAll)
   justify-content: space-between;
   gap: 10px;
   flex-wrap: wrap;
-  color: #111827;
+  color: #221a30;
 }
 
 .provider-status-card__top span,
 .provider-status-card p {
   font-size: 12px;
   line-height: 1.6;
-  color: #6b7280;
+  color: #706781;
 }
 
 .message {
@@ -1165,17 +1165,17 @@ onMounted(reloadAll)
   gap: 10px;
   padding: 14px 15px;
   border-radius: 18px;
-  background: rgba(247, 239, 232, 0.92);
+  background: rgba(238, 230, 246, 0.92);
   border: 1px dashed rgba(17, 24, 39, 0.12);
   font-size: 13px;
   line-height: 1.6;
 }
 
 .message--error {
-  color: #b45309;
-  background: var(--bad-bg);
+  color: var(--lilac-text);
+  background: var(--lilac-bg);
   border-style: solid;
-  border-color: rgba(217, 119, 6, 0.14);
+  border-color: rgba(139, 121, 157, 0.14);
 }
 
 .message--hint {
@@ -1189,7 +1189,7 @@ onMounted(reloadAll)
 .skeleton-card {
   height: 132px;
   border-radius: 20px;
-  background: linear-gradient(90deg, #f5f5f1, #eceee7, #f5f5f1);
+  background: linear-gradient(90deg, #f2ecf9, #e5daf2, #f2ecf9);
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }

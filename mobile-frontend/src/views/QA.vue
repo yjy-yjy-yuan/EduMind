@@ -550,7 +550,7 @@ watch(
 .mode-chip--active {
   color: #fff;
   border-color: transparent;
-  background: linear-gradient(135deg, #8f7040, #7a667f);
+  background: linear-gradient(135deg, #5f477e, #8f73ba);
 }
 
 .mode-panel__hint {
@@ -708,7 +708,7 @@ watch(
   padding: 10px 12px;
   border-radius: 16px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(251, 245, 239, 0.92);
+  background: rgba(242, 235, 248, 0.92);
   box-shadow: 0 10px 20px rgba(101, 87, 117, 0.08);
 }
 

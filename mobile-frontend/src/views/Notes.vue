@@ -314,7 +314,7 @@ onMounted(reload)
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(251, 245, 239, 0.94);
+  background: rgba(242, 235, 248, 0.94);
   box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
 }
 
@@ -346,8 +346,8 @@ onMounted(reload)
 }
 
 .alert--bad {
-  background: rgba(239, 68, 68, 0.1);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .alert--ok {
@@ -358,7 +358,7 @@ onMounted(reload)
 .card {
   border-radius: 22px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: linear-gradient(180deg, rgba(251, 245, 239, 0.98), rgba(246, 238, 230, 0.96));
+  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.96));
   box-shadow: 0 16px 30px rgba(101, 87, 117, 0.08);
 }
 
@@ -392,7 +392,7 @@ onMounted(reload)
 
 .ghost {
   border: 1px solid rgba(32, 42, 55, 0.12);
-  background: rgba(251, 245, 239, 0.98);
+  background: rgba(242, 235, 248, 0.98);
   color: #334155;
   border-radius: 12px;
   padding: 8px 12px;
@@ -422,7 +422,7 @@ onMounted(reload)
   border-radius: 14px;
   padding: 11px 12px;
   font-size: 14px;
-  background: rgba(251, 245, 239, 0.98);
+  background: rgba(242, 235, 248, 0.98);
 }
 
 .tag-filter {
@@ -448,7 +448,7 @@ onMounted(reload)
 
 .tag-chip--active {
   background: linear-gradient(135deg, #665775, #8b799d);
-  color: #fffaf7;
+  color: #f9fafb;
   border-color: transparent;
 }
 
@@ -470,7 +470,7 @@ onMounted(reload)
 }
 
 .btn--primary {
-  color: #fffaf7;
+  color: #f9fafb;
   background: linear-gradient(135deg, #665775, #8b799d);
 }
 
@@ -502,7 +502,7 @@ onMounted(reload)
   margin-top: 16px;
   border-radius: 20px;
   padding: 18px;
-  background: rgba(247, 239, 232, 0.92);
+  background: rgba(242, 235, 248, 0.92);
   color: #0f172a;
 }
 
@@ -524,6 +524,7 @@ onMounted(reload)
   padding: 16px;
   display: grid;
   gap: 10px;
+  background: rgba(242, 235, 248, 0.98);
 }
 
 .card--focus {
@@ -572,14 +573,14 @@ onMounted(reload)
 }
 
 .meta-pill--time {
-  background: var(--surface-gold);
-  color: var(--warn-text);
+  background: var(--surface-lilac-deep);
+  color: var(--lilac-text);
 }
 
 .tag-pill {
   padding: 6px 10px;
-  background: var(--surface-gold);
-  color: var(--warn-text);
+  background: var(--surface-lilac-deep);
+  color: var(--lilac-text);
   font-weight: 800;
 }
 

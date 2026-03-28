@@ -396,7 +396,7 @@ onBeforeUnmount(() => {
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(251, 245, 239, 0.92);
+  background: rgba(242, 235, 248, 0.92);
   box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
 }
 
@@ -418,7 +418,7 @@ onBeforeUnmount(() => {
   gap: 10px;
   border-radius: 24px;
   padding: 16px;
-  background: linear-gradient(180deg, #ffffff, #f8fbfd);
+  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.95));
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
 }
@@ -651,8 +651,8 @@ onBeforeUnmount(() => {
   border-radius: 16px;
   padding: 12px;
   font-weight: 900;
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .danger:disabled {
@@ -667,13 +667,13 @@ onBeforeUnmount(() => {
 }
 
 .alert--good {
-  background: rgba(200, 171, 108, 0.16);
-  color: #166534;
+  background: var(--ok-bg);
+  color: var(--ok-text);
 }
 
 .alert--bad {
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .muted {

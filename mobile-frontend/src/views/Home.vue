@@ -4,8 +4,13 @@
       <div class="welcome__top">
         <div class="welcome__brand">
           <div class="welcome__brand-surface">
-            <span class="welcome__brand-mark">EduMind</span>
-            <BrandLogo :width="172" />
+            <div class="welcome__brand-icon">
+              <BrandLogo :width="64" variant="plain" logo-type="mark" rounded />
+            </div>
+            <div class="welcome__brand-copy">
+              <span class="welcome__brand-mark">EduMind</span>
+              <strong class="welcome__brand-title">智能伴学</strong>
+            </div>
           </div>
         </div>
         <button class="guide-btn" @click="go('/guide')" aria-label="打开使用指南">使用指南</button>
@@ -252,7 +257,7 @@ import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStat
 const quickActions = [
   { route: '/local-transcripts', tag: '本地', tagClass: 'tag--mint', title: '本地转录', desc: '查看 iOS 离线转录结果' },
   { route: '/notes', tag: '笔记', tagClass: 'tag--leaf', title: '学习笔记', desc: '把结论沉淀成稳定回看入口' },
-  { route: '/qa', tag: '问答', tagClass: 'tag--amber', title: 'AI 问答', desc: '围绕课程内容继续追问' },
+  { route: '/qa', tag: '问答', tagClass: 'tag--lilac', title: 'AI 问答', desc: '围绕课程内容继续追问' },
   { route: '/recommendations', tag: '推荐', tagClass: 'tag--cobalt', title: '推荐学习', desc: '集中查看继续学习、复盘与相关推荐' },
   { route: '/learning-path', tag: '路径', tagClass: 'tag--teal', title: '学习路径', desc: '后续承接推荐学习顺序' }
 ]
@@ -584,17 +589,17 @@ onMounted(reloadDashboard)
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(251, 245, 239, 0.96);
-  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+  background: rgba(242, 235, 248, 0.92);
+  box-shadow: 0 18px 38px rgba(73, 51, 104, 0.12);
 }
 
 .welcome {
   padding: 24px;
   border-radius: 30px;
   background:
-    linear-gradient(180deg, rgba(251, 245, 239, 0.98), rgba(246, 238, 230, 0.96)),
-    radial-gradient(circle at top right, rgba(139, 121, 157, 0.12), transparent 34%),
-    radial-gradient(circle at 18% 100%, rgba(200, 171, 108, 0.12), transparent 28%);
+    linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.95)),
+    radial-gradient(circle at top right, rgba(143, 115, 186, 0.18), transparent 34%),
+    radial-gradient(circle at 18% 100%, rgba(183, 157, 213, 0.14), transparent 28%);
 }
 
 .welcome::before {
@@ -602,7 +607,7 @@ onMounted(reloadDashboard)
   position: absolute;
   inset: 0 0 auto;
   height: 1px;
-  background: linear-gradient(90deg, rgba(15, 23, 42, 0), rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0));
+  background: linear-gradient(90deg, rgba(95, 71, 126, 0), rgba(95, 71, 126, 0.14), rgba(95, 71, 126, 0));
 }
 
 .welcome::after {
@@ -613,7 +618,7 @@ onMounted(reloadDashboard)
   right: -90px;
   top: -120px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(15, 23, 42, 0.06) 0%, rgba(15, 23, 42, 0.01) 64%, transparent 72%);
+  background: radial-gradient(circle, rgba(95, 71, 126, 0.08) 0%, rgba(95, 71, 126, 0.01) 64%, transparent 72%);
   pointer-events: none;
 }
 
@@ -638,37 +643,63 @@ onMounted(reloadDashboard)
 }
 
 .welcome__brand {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  min-width: 180px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .welcome__brand-surface {
-  display: grid;
+  display: flex;
+  align-items: center;
   gap: 10px;
-  padding: 12px 14px;
-  border-radius: 28px;
-  background:
-    linear-gradient(180deg, rgba(251, 245, 239, 0.98), rgba(243, 235, 227, 0.94)),
-    rgba(255, 255, 255, 0.74);
-  border: 1px solid rgba(255, 255, 255, 0.64);
-  box-shadow:
-    0 18px 28px rgba(102, 87, 117, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.welcome__brand-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border-radius: 20px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.welcome__brand-copy {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  padding-top: 0;
 }
 
 .welcome__brand-mark {
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: rgba(139, 121, 157, 0.12);
   color: var(--primary-deep);
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
+  opacity: 0.82;
+}
+
+.welcome__brand-title {
+  color: #221a30;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
 }
 
 .guide-btn,
@@ -684,8 +715,12 @@ onMounted(reloadDashboard)
 .guide-btn {
   border: 1px solid rgba(17, 24, 39, 0.09);
   border-radius: 999px;
-  background: rgba(245, 236, 229, 0.92);
-  padding: 8px 13px;
+  background: rgba(244, 238, 249, 0.84);
+  padding: 7px 11px;
+  font-size: 11px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.68),
+    0 6px 14px rgba(106, 75, 155, 0.06);
 }
 
 .welcome__hero {
@@ -743,7 +778,7 @@ onMounted(reloadDashboard)
   padding: 16px;
   border-radius: 22px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: linear-gradient(180deg, rgba(240, 232, 245, 0.96), rgba(251, 245, 239, 0.96));
+  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.94));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
@@ -760,14 +795,14 @@ onMounted(reloadDashboard)
   line-height: 1.1;
   font-weight: 800;
   letter-spacing: -0.03em;
-  color: #111827;
+  color: #221a30;
 }
 
 .welcome__spotlight-note {
   margin: 0;
   font-size: 13px;
   line-height: 1.55;
-  color: #6b7280;
+  color: #706781;
 }
 
 .welcome__spotlight-link {
@@ -810,7 +845,7 @@ onMounted(reloadDashboard)
 .video-item,
 .support-link {
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(251, 245, 239, 0.98);
+  background: rgba(247, 241, 251, 0.96);
 }
 
 .hero-btn {
@@ -823,13 +858,13 @@ onMounted(reloadDashboard)
 .hero-btn--primary {
   border: 0;
   color: #f9fafb;
-  background: linear-gradient(135deg, #665775, #8b799d);
-  box-shadow: 0 16px 24px rgba(17, 24, 39, 0.16);
+  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  box-shadow: 0 16px 24px rgba(95, 71, 126, 0.24);
 }
 
 .hero-btn--secondary {
   color: var(--primary-deep);
-  background: rgba(245, 236, 229, 0.96);
+  background: rgba(235, 226, 246, 0.94);
 }
 
 .stats,
@@ -861,15 +896,15 @@ onMounted(reloadDashboard)
 }
 
 .stat-pill--ok {
-  background: rgba(212, 240, 223, 0.78);
+  background: rgba(234, 225, 246, 0.9);
 }
 
 .stat-pill--warn {
-  background: var(--surface-gold);
+  background: var(--surface-lilac-deep);
 }
 
 .stat-pill--feature {
-  background: linear-gradient(180deg, rgba(240, 232, 245, 0.96), rgba(247, 239, 228, 0.96));
+  background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(243, 237, 249, 0.96));
 }
 
 .stat-pill__label,
@@ -912,15 +947,15 @@ onMounted(reloadDashboard)
   border-radius: 20px;
   padding: 15px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(247, 239, 232, 0.92);
+  background: rgba(239, 231, 247, 0.92);
 }
 
 .recommend-summary__card--soft {
-  background: rgba(240, 232, 245, 0.94);
+  background: rgba(232, 221, 244, 0.94);
 }
 
 .recommend-summary__card--action {
-  background: linear-gradient(180deg, rgba(243, 235, 215, 0.96), rgba(251, 245, 239, 0.96));
+  background: linear-gradient(180deg, rgba(223, 210, 238, 0.98), rgba(244, 238, 249, 0.96));
 }
 
 .recommend-summary__label,
@@ -949,16 +984,16 @@ onMounted(reloadDashboard)
   border-radius: 18px;
   padding: 14px 15px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(247, 239, 232, 0.92);
+  background: rgba(239, 231, 247, 0.92);
 }
 
 .recommend-provider-card--failed {
-  border-color: rgba(217, 119, 6, 0.16);
-  background: var(--bad-bg);
+  border-color: rgba(139, 121, 157, 0.18);
+  background: var(--lilac-bg);
 }
 
 .recommend-provider-card--empty {
-  background: rgba(245, 236, 229, 0.88);
+  background: rgba(237, 228, 245, 0.88);
 }
 
 .recommend-provider-card__top {
@@ -967,7 +1002,7 @@ onMounted(reloadDashboard)
   justify-content: space-between;
   gap: 8px;
   flex-wrap: wrap;
-  color: #111827;
+  color: #221a30;
 }
 
 .recommend-provider-card__top span,
@@ -999,7 +1034,7 @@ onMounted(reloadDashboard)
   padding: 18px;
   text-align: left;
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(251, 245, 239, 0.98), rgba(243, 235, 215, 0.9));
+  background: linear-gradient(180deg, rgba(247, 241, 251, 0.98), rgba(228, 217, 241, 0.92));
   border: 1px solid rgba(17, 24, 39, 0.08);
 }
 
@@ -1026,7 +1061,7 @@ onMounted(reloadDashboard)
   text-align: left;
   border-radius: 20px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(247, 239, 232, 0.92);
+  background: rgba(238, 230, 246, 0.92);
 }
 
 .summary-card--soft {
@@ -1088,13 +1123,13 @@ onMounted(reloadDashboard)
 }
 
 .status--warn {
-  background: var(--warn-bg);
-  color: var(--warn-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .status--bad {
-  background: var(--bad-bg);
-  color: var(--bad-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .status--info {
@@ -1104,7 +1139,7 @@ onMounted(reloadDashboard)
 
 .video-item__arrow,
 .support-card__arrow {
-  color: #94a3b8;
+  color: #8b7da3;
   font-size: 20px;
   line-height: 1;
 }
@@ -1119,22 +1154,22 @@ onMounted(reloadDashboard)
 }
 
 .tag--mint {
-  background: rgba(212, 240, 223, 0.92);
+  background: rgba(234, 225, 246, 0.92);
   color: var(--ok-text);
 }
 
 .tag--leaf {
-  background: rgba(245, 236, 229, 0.92);
-  color: #7f6755;
+  background: rgba(233, 224, 243, 0.92);
+  color: #6b5b84;
 }
 
-.tag--amber {
-  background: var(--warn-bg);
-  color: var(--warn-text);
+.tag--lilac {
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .tag--teal {
-  background: rgba(240, 232, 245, 0.94);
+  background: rgba(231, 220, 243, 0.94);
   color: #6e5d7f;
 }
 
@@ -1171,7 +1206,7 @@ onMounted(reloadDashboard)
 }
 
 .support-link__arrow {
-  color: #94a3b8;
+  color: #8b7da3;
   font-size: 18px;
 }
 
@@ -1182,7 +1217,7 @@ onMounted(reloadDashboard)
 .recommend-card {
   display: grid;
   gap: 10px;
-  background: rgba(251, 245, 239, 0.98);
+  background: rgba(238, 230, 246, 0.92);
   border-radius: 20px;
   padding: 16px;
 }
@@ -1222,15 +1257,15 @@ onMounted(reloadDashboard)
   border-radius: 18px;
   padding: 14px;
   font-size: 13px;
-  background: rgba(247, 239, 232, 0.92);
+  background: rgba(238, 230, 246, 0.92);
   border: 1px dashed rgba(17, 24, 39, 0.12);
 }
 
 .message--error {
-  background: var(--bad-bg);
-  color: #b45309;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
   border-style: solid;
-  border-color: rgba(217, 119, 6, 0.14);
+  border-color: rgba(139, 121, 157, 0.14);
 }
 
 .message--empty {
@@ -1248,7 +1283,7 @@ onMounted(reloadDashboard)
 .skeleton-item {
   height: 64px;
   border-radius: 18px;
-  background: linear-gradient(90deg, #f5f5f1, #eceee7, #f5f5f1);
+  background: linear-gradient(90deg, #f2ecf9, #e5daf2, #f2ecf9);
   background-size: 220% 100%;
   animation: shimmer 1.2s linear infinite;
 }
@@ -1290,8 +1325,20 @@ onMounted(reloadDashboard)
   }
 
   .welcome__brand-surface {
-    padding: 10px 12px;
-    border-radius: 24px;
+    width: auto;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  .welcome__brand-icon {
+    width: 64px;
+    height: 64px;
+    padding: 6px;
+    border-radius: 18px;
+  }
+
+  .welcome__brand-title {
+    font-size: 15px;
   }
 
   .stats {

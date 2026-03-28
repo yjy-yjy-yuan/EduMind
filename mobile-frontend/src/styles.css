@@ -15,37 +15,40 @@
     'Noto Sans SC',
     'Microsoft YaHei',
     sans-serif;
-  --bg: #f3eee8;
-  --bg-decor-a: rgba(139, 121, 157, 0.09);
-  --bg-decor-b: rgba(201, 172, 106, 0.08);
-  --card: rgba(250, 244, 238, 0.92);
-  --card-soft: rgba(244, 236, 229, 0.94);
-  --text: #171b22;
-  --muted: #6a6f7a;
-  --primary: #8b799d;
-  --primary-deep: #665775;
-  --accent: #c8ab6c;
-  --danger: #b45309;
+  --bg: #cdbbe6;
+  --bg-decor-a: rgba(176, 149, 214, 0.18);
+  --bg-decor-b: rgba(106, 75, 155, 0.16);
+  --card: rgba(242, 235, 248, 0.88);
+  --card-soft: rgba(235, 228, 243, 0.92);
+  --text: #20192c;
+  --muted: #706781;
+  --primary: #8f73ba;
+  --primary-deep: #5f477e;
+  --accent: #b79dd5;
+  --danger: #9c6479;
   --border: rgba(17, 24, 39, 0.08);
   --shadow: 0 24px 48px rgba(15, 23, 42, 0.08);
   --shadow-sm: 0 16px 34px rgba(15, 23, 42, 0.06);
   --radius: 22px;
   --radius-sm: 14px;
-  --tap: rgba(139, 121, 157, 0.12);
-  --primary-soft: rgba(139, 121, 157, 0.12);
-  --primary-soft-strong: rgba(139, 121, 157, 0.2);
-  --accent-soft: rgba(200, 171, 108, 0.18);
-  --surface-lilac: rgba(238, 232, 242, 0.96);
-  --surface-gold: rgba(243, 235, 215, 0.96);
-  --surface-rose: rgba(248, 238, 235, 0.96);
-  --ok-bg: rgba(221, 240, 227, 0.95);
-  --ok-text: #2b6847;
-  --warn-bg: rgba(243, 235, 215, 0.96);
-  --warn-text: #8f7040;
-  --info-bg: rgba(238, 232, 242, 0.96);
-  --info-text: #6e5d7f;
-  --bad-bg: rgba(248, 238, 235, 0.96);
-  --bad-text: #b45309;
+  --tap: rgba(143, 115, 186, 0.14);
+  --primary-soft: rgba(143, 115, 186, 0.14);
+  --primary-soft-strong: rgba(143, 115, 186, 0.24);
+  --accent-soft: rgba(183, 157, 213, 0.22);
+  --surface-lilac: rgba(235, 226, 246, 0.96);
+  --surface-lilac-deep: rgba(225, 214, 240, 0.96);
+  --surface-rose: rgba(242, 227, 236, 0.96);
+  --ok-bg: rgba(228, 220, 241, 0.95);
+  --ok-text: #5f477e;
+  --info-bg: rgba(235, 226, 246, 0.96);
+  --lilac-bg: rgba(234, 225, 246, 0.96);
+  --lilac-text: #6b5b84;
+  --info-text: #675280;
+  --bad-bg: rgba(234, 225, 246, 0.96);
+  --bad-text: #6b5b84;
+  --tabbar-shell-gap: 10px;
+  --tabbar-card-height: 72px;
+  --tabbar-space: calc(var(--tabbar-card-height) + var(--tabbar-shell-gap) + env(safe-area-inset-bottom));
 }
 
 html,
@@ -71,7 +74,7 @@ body {
   font-size: 16px;
   line-height: 1.55;
   letter-spacing: 0.01em;
-  background: linear-gradient(180deg, rgba(255, 249, 241, 0.76), rgba(241, 233, 223, 0.82)), var(--bg);
+  background: linear-gradient(180deg, rgba(240, 232, 250, 0.78), rgba(210, 192, 232, 0.86)), var(--bg);
   color: var(--text);
 }
 
@@ -80,8 +83,8 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(255, 249, 241, 0.1), rgba(241, 233, 223, 0.16)),
-    url('./assets/morandi-surface.svg') center top / cover no-repeat;
+    linear-gradient(180deg, rgba(244, 238, 252, 0.16), rgba(199, 180, 225, 0.22)),
+    url('./assets/morandi-purple-surface.png') center top / cover no-repeat;
   opacity: 0.98;
   pointer-events: none;
   z-index: -1;
@@ -162,7 +165,7 @@ textarea {
   padding:
     calc(12px + env(safe-area-inset-top))
     clamp(14px, 4vw, 22px)
-    calc(102px + env(safe-area-inset-bottom));
+    calc(var(--tabbar-space) + 12px);
 }
 
 .ios-page > * {
@@ -209,7 +212,7 @@ p {
 
 .gradient-text {
   color: transparent;
-  background-image: linear-gradient(135deg, #665775 0%, #8b799d 52%, #c8ab6c 100%);
+  background-image: linear-gradient(135deg, #5f477e 0%, #8f73ba 55%, #b79dd5 100%);
   -webkit-background-clip: text;
   background-clip: text;
 }
@@ -241,8 +244,8 @@ textarea::placeholder {
 }
 
 .status-chip--warn {
-  background: var(--warn-bg);
-  color: var(--warn-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .status-chip--info {
@@ -251,8 +254,8 @@ textarea::placeholder {
 }
 
 .status-chip--bad {
-  background: var(--bad-bg);
-  color: var(--bad-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 button,
@@ -293,6 +296,6 @@ textarea:focus-visible {
     padding:
       calc(10px + env(safe-area-inset-top))
       12px
-      calc(98px + env(safe-area-inset-bottom));
+      calc(76px + env(safe-area-inset-bottom));
   }
 }

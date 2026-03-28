@@ -365,13 +365,13 @@ onMounted(() => {
 }
 
 .status-pill--ok {
-  background: rgba(212, 240, 223, 0.9);
-  color: #22543d;
+  background: rgba(234, 225, 246, 0.9);
+  color: var(--lilac-text);
 }
 
 .status-pill--warn {
-  background: rgba(252, 230, 206, 0.92);
-  color: #9a3412;
+  background: rgba(234, 225, 246, 0.92);
+  color: var(--lilac-text);
 }
 
 .status-pill--pending {
@@ -392,7 +392,7 @@ onMounted(() => {
 }
 
 .note--warn {
-  color: #9a3412;
+  color: var(--lilac-text);
 }
 
 .textarea {
@@ -409,7 +409,7 @@ onMounted(() => {
 .operation-chip {
   border: 1px solid rgba(17, 24, 39, 0.08);
   border-radius: 999px;
-  background: rgba(247, 239, 232, 0.94);
+  background: rgba(242, 235, 248, 0.94);
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 700;

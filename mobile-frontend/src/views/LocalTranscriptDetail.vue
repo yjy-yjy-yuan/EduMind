@@ -523,8 +523,8 @@ onUnmounted(() => {
 }
 
 .alert--bad {
-  background: rgba(239, 68, 68, 0.10);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .skeleton {
@@ -624,11 +624,11 @@ onUnmounted(() => {
 }
 
 .hero-shell--warn {
-  background: linear-gradient(145deg, #d97706, #b45309);
+  background: linear-gradient(145deg, #8f73ba, #5f477e);
 }
 
 .hero-shell--ok {
-  background: linear-gradient(145deg, #c29a59, #8f7040);
+  background: linear-gradient(145deg, #b79dd5, #6b5b84);
 }
 
 .hero-shell--bad {
@@ -698,9 +698,9 @@ onUnmounted(() => {
   text-align: center;
 }
 
-.badge.ok { background: rgba(200, 171, 108, 0.16); color: #8f7040; }
-.badge.warn { background: rgba(245, 158, 11, 0.14); color: #92400e; }
-.badge.bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
+.badge.ok { background: var(--ok-bg); color: var(--ok-text); }
+.badge.warn { background: var(--lilac-bg); color: var(--lilac-text); }
+.badge.bad { background: var(--lilac-bg); color: var(--lilac-text); }
 .badge.info { background: rgba(139, 121, 157, 0.14); color: #665775; }
 
 .setting-hint {
@@ -730,7 +730,7 @@ onUnmounted(() => {
 }
 
 .inline-tip--bad {
-  color: #b91c1c;
+  color: var(--lilac-text);
 }
 
 .actions {
@@ -745,12 +745,12 @@ onUnmounted(() => {
   border-radius: 14px;
   padding: 12px 10px;
   font-weight: 900;
-  background: rgba(200, 171, 108, 0.14);
-  color: #8f7040;
+  background: var(--ok-bg);
+  color: var(--ok-text);
 }
 
 .btn--primary {
-  background: linear-gradient(135deg, #8f7040, #c8ab6c);
+  background: linear-gradient(135deg, #5f477e, #8f73ba);
   color: #fff;
 }
 
@@ -801,8 +801,8 @@ onUnmounted(() => {
 .block-placeholder {
   border-radius: 14px;
   padding: 12px;
-  background: rgba(200, 171, 108, 0.12);
-  color: #8f7040;
+  background: var(--ok-bg);
+  color: var(--ok-text);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.6;
@@ -835,8 +835,8 @@ onUnmounted(() => {
   margin-top: 14px;
   border: 0;
   border-radius: 14px;
-  background: rgba(239, 68, 68, 0.12);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
   padding: 12px;
   font-weight: 900;
   width: 100%;

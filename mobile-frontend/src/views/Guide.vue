@@ -272,7 +272,7 @@ const go = (path) => router.push(path)
   position: relative;
   padding: 10px 14px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(139, 121, 157, 0.12), rgba(200, 171, 108, 0.18));
+  background: linear-gradient(135deg, rgba(139, 121, 157, 0.12), rgba(183, 157, 213, 0.22));
   color: #0f4c5c;
   font-size: 12px;
   font-weight: 900;
@@ -407,7 +407,7 @@ const go = (path) => router.push(path)
 
 .acc {
   border-color: rgba(32, 42, 55, 0.1);
-  background: linear-gradient(180deg, #ffffff, #f7f0ea);
+  background: linear-gradient(180deg, #ffffff, #f0e8f7);
 }
 
 .acc-badge {

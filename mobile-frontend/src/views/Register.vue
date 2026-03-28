@@ -184,8 +184,8 @@ const submit = async () => {
   font-weight: 800;
 }
 
-.alert--ok { background: rgba(200, 171, 108, 0.16); color: #8f7040; }
-.alert--bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
+.alert--ok { background: var(--ok-bg); color: var(--ok-text); }
+.alert--bad { background: var(--lilac-bg); color: var(--lilac-text); }
 </style>
 <style scoped>
 .page {

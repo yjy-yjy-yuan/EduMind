@@ -479,7 +479,7 @@ onUnmounted(() => {
 
 .scope-pill {
   border: 1px solid var(--border);
-  background: rgba(251, 245, 239, 0.98);
+  background: rgba(248, 242, 250, 0.98);
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 12px;
@@ -501,7 +501,7 @@ onUnmounted(() => {
 }
 
 .link--warn {
-  color: #92400e;
+  color: var(--lilac-text);
 }
 
 .alert {
@@ -516,14 +516,14 @@ onUnmounted(() => {
 }
 
 .alert--bad {
-  background: rgba(239, 68, 68, 0.10);
-  color: #b91c1c;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .alert--ok {
   margin-top: 10px;
-  background: rgba(200, 171, 108, 0.16);
-  color: #8f7040;
+  background: var(--ok-bg);
+  color: var(--ok-text);
 }
 
 .skeleton {
@@ -534,7 +534,7 @@ onUnmounted(() => {
 .sk-card {
   height: 92px;
   border-radius: var(--radius);
-  background: linear-gradient(90deg, #f7efe8, #efe6dc, #f7efe8);
+  background: linear-gradient(90deg, #ebe3f4, #e2d8f0, #ebe3f4);
   background-size: 200% 100%;
   animation: shimmer 1.2s infinite;
 }
@@ -624,9 +624,9 @@ onUnmounted(() => {
   text-align: center;
 }
 
-.badge.ok { background: rgba(200, 171, 108, 0.16); color: #8f7040; }
-.badge.warn { background: rgba(245, 158, 11, 0.14); color: #92400e; }
-.badge.bad { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
+.badge.ok { background: var(--ok-bg); color: var(--ok-text); }
+.badge.warn { background: var(--lilac-bg); color: var(--lilac-text); }
+.badge.bad { background: var(--lilac-bg); color: var(--lilac-text); }
 .badge.info { background: rgba(139, 121, 157, 0.14); color: #665775; }
 
 .progress {
@@ -643,7 +643,7 @@ onUnmounted(() => {
 
 .mini {
   border: 1px solid var(--border);
-  background: rgba(251, 245, 239, 0.98);
+  background: rgba(248, 242, 250, 0.98);
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 12px;
@@ -653,9 +653,9 @@ onUnmounted(() => {
 }
 
 .mini--warn {
-  border-color: rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.10);
-  color: #92400e;
+  border-color: var(--lilac-border);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .mini:disabled {
@@ -670,7 +670,7 @@ onUnmounted(() => {
 
 .load-more {
   border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(251, 245, 239, 0.98);
+  background: rgba(248, 242, 250, 0.98);
   border-radius: 999px;
   padding: 10px 14px;
   font-weight: 900;
@@ -704,7 +704,7 @@ onUnmounted(() => {
   z-index: 5;
   padding: 12px 14px;
   border-radius: 18px;
-  background: rgba(251, 245, 239, 0.94);
+  background: rgba(248, 242, 250, 0.94);
   border: 1px solid rgba(32, 42, 55, 0.08);
   box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
 }
@@ -729,7 +729,7 @@ onUnmounted(() => {
 .card {
   border-radius: 20px;
   border: 1px solid rgba(32, 42, 55, 0.09);
-  background: linear-gradient(180deg, rgba(251, 245, 239, 0.98), rgba(246, 238, 230, 0.96));
+  background: linear-gradient(180deg, rgba(248, 242, 250, 0.98), rgba(242, 235, 248, 0.96));
   box-shadow: 0 12px 24px rgba(101, 87, 117, 0.08);
 }
 
@@ -748,13 +748,13 @@ onUnmounted(() => {
 }
 
 .badge.warn {
-  background: var(--warn-bg);
-  color: var(--warn-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .badge.bad {
-  background: var(--bad-bg);
-  color: var(--bad-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .badge.info {

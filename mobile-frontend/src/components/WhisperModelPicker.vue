@@ -140,7 +140,7 @@ const optionText = (option) => {
   border-radius: 16px;
   padding: 12px 42px 12px 14px;
   background:
-    linear-gradient(180deg, rgba(251, 245, 239, 0.98), rgba(245, 237, 229, 0.94)),
+    linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(235, 226, 246, 0.94)),
     rgba(255, 255, 255, 0.96);
   box-shadow: inset 0 -1px 0 rgba(32, 42, 55, 0.06);
 }
