@@ -598,12 +598,26 @@ const statusClass = (status) => {
 }
 
 const nativeEngineLabel = (engine) => {
-  if (String(engine || '').trim() === 'apple_speech_on_device') return 'Apple 端侧识别'
+  const normalized = String(engine || '').trim()
+  if (normalized === 'whisper_cpp_on_device') return 'Whisper 本机离线转录'
+  if (normalized === 'apple_speech_on_device') return 'Apple 端侧识别'
+  if (normalized === 'backend_whisper') return 'Whisper 后端转录'
   return 'iOS 原生识别'
+}
+
+const logOfflineFlow = (stage, payload = {}) => {
+  try {
+    console.info(`[OfflineFlow] ${stage} ${JSON.stringify(payload)}`)
+  } catch {
+    console.info(`[OfflineFlow] ${stage}`)
+  }
 }
 
 const upsertNativeTask = (patch = {}) => {
   const current = nativeTask.value || {}
+  const tags = Array.isArray(patch.tags)
+    ? patch.tags.filter(Boolean).map((tag) => String(tag).trim())
+    : (Array.isArray(current.tags) ? current.tags : [])
   const next = {
     taskId: String(patch.taskId || current.taskId || ''),
     fileName: String(patch.fileName || current.fileName || '本地视频'),
@@ -622,6 +636,10 @@ const upsertNativeTask = (patch = {}) => {
     autoGenerateSummary: typeof patch.autoGenerateSummary === 'boolean'
       ? patch.autoGenerateSummary
       : Boolean(current.autoGenerateSummary),
+    autoGenerateTags: typeof patch.autoGenerateTags === 'boolean'
+      ? patch.autoGenerateTags
+      : (typeof current.autoGenerateTags === 'boolean' ? current.autoGenerateTags : Boolean(processingSettings.value.autoGenerateTags)),
+    tags,
     syncedVideoId: Number(patch.syncedVideoId ?? current.syncedVideoId ?? 0) || 0,
     syncStatus: String(patch.syncStatus || current.syncStatus || 'idle').trim().toLowerCase() || 'idle',
     syncErrorMessage: String(patch.syncErrorMessage ?? current.syncErrorMessage ?? ''),
@@ -665,8 +683,17 @@ const syncOfflineTranscriptRecord = async (taskId, { silent = false } = {}) => {
 
   const current = await getNativeOfflineTranscript(id)
   if (!current?.transcriptText?.trim()) return null
+  logOfflineFlow('sync-start', {
+    taskId: id,
+    apiBaseAvailable: hasLiveVideoBackend(),
+    transcriptLength: String(current.transcriptText || '').trim().length,
+    hasSummary: Boolean(String(current.summary || '').trim())
+  })
 
   if (!hasLiveVideoBackend()) {
+    logOfflineFlow('sync-skipped-backend-unavailable', {
+      taskId: id
+    })
     const skipped = await saveNativeOfflineTranscript({
       taskId: id,
       syncStatus: 'failed',
@@ -693,18 +720,30 @@ const syncOfflineTranscriptRecord = async (taskId, { silent = false } = {}) => {
       transcript_text: pending.transcriptText,
       summary: pending.summary || '',
       summary_style: pending.summaryStyle || processingSettings.value.summaryStyle || 'study',
+      tags: Array.isArray(pending.tags) ? pending.tags : [],
+      auto_generate_tags: typeof pending.autoGenerateTags === 'boolean'
+        ? pending.autoGenerateTags
+        : Boolean(processingSettings.value.autoGenerateTags),
       segments: Array.isArray(current.segments) ? current.segments : []
     })
     const data = res?.data || {}
     const videoId = resolveVideoId(data)
     const title = data?.video?.title || pending.fileName || '本地视频'
+    const tags = Array.isArray(data?.video?.tags) ? data.video.tags : (Array.isArray(pending.tags) ? pending.tags : [])
+    logOfflineFlow('sync-success', {
+      taskId: id,
+      videoId: videoId || 0,
+      title,
+      tagCount: tags.length
+    })
     const saved = await persistNativeTask({
       taskId: id,
       syncedVideoId: videoId || 0,
       syncStatus: 'completed',
       syncErrorMessage: '',
       syncUpdatedAt: new Date().toISOString(),
-      fileName: title
+      fileName: title,
+      tags
     })
     upsertRecentUpload({
       key: `offline-synced-${videoId || id}`,
@@ -715,6 +754,7 @@ const syncOfflineTranscriptRecord = async (taskId, { silent = false } = {}) => {
       status: 'completed',
       progress: 100,
       currentStep: 'iOS 本地离线结果已写入视频库',
+      tags,
       offlineTaskId: id,
       tempKey: `ios-offline-${id}`,
       requestedModel: '',
@@ -725,6 +765,10 @@ const syncOfflineTranscriptRecord = async (taskId, { silent = false } = {}) => {
     }
     return saved
   } catch (e) {
+    logOfflineFlow('sync-failed', {
+      taskId: id,
+      error: extractErrorMessage(e, '写入视频库失败')
+    })
     const saved = await persistNativeTask({
       taskId: id,
       syncStatus: 'failed',
@@ -744,8 +788,16 @@ const generateOfflineTranscriptSummaryForTask = async (taskId, { silent = false 
 
   const current = await getNativeOfflineTranscript(id)
   if (!current?.transcriptText?.trim()) return null
+  logOfflineFlow('summary-start', {
+    taskId: id,
+    apiBaseAvailable: hasLiveVideoBackend(),
+    style: String(current.summaryStyle || processingSettings.value.summaryStyle || 'study')
+  })
 
   if (!hasLiveVideoBackend()) {
+    logOfflineFlow('summary-skipped-backend-unavailable', {
+      taskId: id
+    })
     const skipped = await saveNativeOfflineTranscript({
       taskId: id,
       summaryStatus: 'failed',
@@ -770,6 +822,11 @@ const generateOfflineTranscriptSummaryForTask = async (taskId, { silent = false 
       style
     })
     const data = res?.data || {}
+    logOfflineFlow('summary-success', {
+      taskId: id,
+      style: data.style || style,
+      summaryLength: String(data.summary || '').trim().length
+    })
     const saved = await persistNativeTask({
       taskId: id,
       summary: data.summary || '',
@@ -777,6 +834,7 @@ const generateOfflineTranscriptSummaryForTask = async (taskId, { silent = false 
       summaryStatus: 'completed',
       summaryErrorMessage: '',
       summaryUpdatedAt: new Date().toISOString(),
+      autoGenerateTags: Boolean(processingSettings.value.autoGenerateTags),
       currentStep: current.status === 'completed' ? '本地离线转录完成' : current.currentStep
     })
     await syncOfflineTranscriptRecord(id, { silent })
@@ -785,6 +843,10 @@ const generateOfflineTranscriptSummaryForTask = async (taskId, { silent = false 
     }
     return saved
   } catch (e) {
+    logOfflineFlow('summary-failed', {
+      taskId: id,
+      error: extractErrorMessage(e, '摘要提取失败')
+    })
     const saved = await persistNativeTask({
       taskId: id,
       summaryStatus: 'failed',
@@ -846,6 +908,7 @@ const normalizeRecentUploads = (list) => {
       status: normalizeVideoStatus(item.status || (item.duplicate ? 'uploaded' : 'pending')),
       progress: displayProgress(item.progress),
       currentStep: String(item.currentStep || ''),
+      tags: Array.isArray(item.tags) ? item.tags.filter(Boolean).map((tag) => String(tag).trim()) : [],
       offlineTaskId: item.offlineTaskId ? String(item.offlineTaskId) : '',
       tempKey: item.tempKey ? String(item.tempKey) : '',
       requestedModel: String(item.requestedModel || item.requested_model || '').trim().toLowerCase(),
@@ -998,6 +1061,7 @@ const buildRecentUploadFromOfflineTask = (task, current = {}) => {
     status: liveStatus,
     progress: task.videoId ? current.progress || 0 : 0,
     currentStep: buildOfflineCurrentStep(task),
+    tags: Array.isArray(current.tags) ? current.tags : [],
     requestedModel,
     effectiveModel: String(current.effectiveModel || requestedModel).trim().toLowerCase(),
     retrying: false
@@ -1241,6 +1305,12 @@ const startNativeOfflineTranscriptionFlow = async () => {
   let started = false
   try {
     const requestedLocale = resolveNativeTranscriptionLocale(processingSettings.value)
+    logOfflineFlow('native-start-request', {
+      locale: requestedLocale,
+      language: processingSettings.value.language,
+      model: processingSettings.value.model,
+      apiBaseAvailable: hasLiveVideoBackend()
+    })
     const response = await startNativeOfflineTranscription({
       locale: requestedLocale,
       language: processingSettings.value.language,
@@ -1268,8 +1338,16 @@ const startNativeOfflineTranscriptionFlow = async () => {
       transcriptText: '',
       errorMessage: ''
     })
+    logOfflineFlow('native-started', {
+      taskId: response?.taskId,
+      fileName: response?.fileName,
+      locale: response?.locale || requestedLocale || processingSettings.value.language
+    })
     message.value = '已启动 iOS 本地离线转录'
   } catch (e) {
+    logOfflineFlow('native-start-failed', {
+      error: extractErrorMessage(e, '无法启动 iOS 本地离线转录')
+    })
     error.value = extractErrorMessage(e, '无法启动 iOS 本地离线转录')
   } finally {
     if (!started) nativeBusy.value = false
@@ -1278,6 +1356,12 @@ const startNativeOfflineTranscriptionFlow = async () => {
 
 const handleNativeProgressEvent = async (detail = {}) => {
   nativeBusy.value = true
+  logOfflineFlow('native-progress', {
+    taskId: detail.taskId,
+    status: detail.status || detail.phase || 'processing',
+    progress: Number(detail.progress ?? 0) || 0,
+    message: detail.message || '正在本地离线转录'
+  })
   await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,
@@ -1292,6 +1376,12 @@ const handleNativeProgressEvent = async (detail = {}) => {
 
 const handleNativeCompletedEvent = async (detail = {}) => {
   nativeBusy.value = false
+  logOfflineFlow('native-completed', {
+    taskId: detail.taskId,
+    progress: Number(detail.progress ?? 100) || 100,
+    transcriptLength: String(detail.transcriptText || '').trim().length,
+    segmentCount: Array.isArray(detail.segments) ? detail.segments.length : 0
+  })
   const saved = await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,
@@ -1316,6 +1406,11 @@ const handleNativeCompletedEvent = async (detail = {}) => {
 
 const handleNativeFailedEvent = async (detail = {}) => {
   nativeBusy.value = false
+  logOfflineFlow('native-failed', {
+    taskId: detail.taskId,
+    progress: Number(detail.progress ?? 0) || 0,
+    error: detail.message || 'iOS 本地离线转录失败'
+  })
   await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,

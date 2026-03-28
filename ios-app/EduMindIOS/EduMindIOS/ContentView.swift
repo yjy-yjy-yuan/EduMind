@@ -348,6 +348,7 @@ private struct H5WebView: UIViewRepresentable {
             let text: String
             let segments: [[String: Any]]
             let localeIdentifier: String
+            let engine: String
         }
 
         private struct NativeAudioChunk {
@@ -369,6 +370,8 @@ private struct H5WebView: UIViewRepresentable {
             case speechAuthorizationDenied
             case recognizerUnavailable
             case onDeviceRecognitionUnavailable
+            case onDeviceWhisperUnavailable
+            case backendWhisperUnavailable
             case emptyTranscript
 
             var errorDescription: String? {
@@ -391,6 +394,10 @@ private struct H5WebView: UIViewRepresentable {
                     return "当前设备不支持所选语言的语音识别"
                 case .onDeviceRecognitionUnavailable:
                     return "当前设备或当前语言暂不支持 Apple 端侧离线识别"
+                case .onDeviceWhisperUnavailable:
+                    return "当前设备上的本机 Whisper 离线模型暂不可用"
+                case .backendWhisperUnavailable:
+                    return "Apple 端侧识别不可用，且未能连接后端 Whisper fallback"
                 case .emptyTranscript:
                     return "本地识别已完成，但未生成可用文本"
                 }
@@ -842,7 +849,9 @@ private struct H5WebView: UIViewRepresentable {
                 "supportsNativeVideoPicker": true,
                 "supportsPageStateReporting": true,
                 "pageStateHandlerName": Self.pageStateHandlerName,
-                "transcriptionEngine": "apple_speech_on_device",
+                "transcriptionEngine": "whisper_cpp_on_device_with_apple_speech_fallback",
+                "supportsOnDeviceWhisper": true,
+                "supportsBackendWhisperFallback": true,
                 "requiresSpeechAuthorization": true,
                 "availableActions": [
                     "ping",
@@ -1121,11 +1130,12 @@ private struct H5WebView: UIViewRepresentable {
             phase: String,
             progress: Int,
             message: String,
-            localeIdentifier: String = ""
+            localeIdentifier: String = "",
+            engine: String = "apple_speech_on_device"
         ) {
             EduMindLog.info(
                 "OfflineTranscription",
-                "\(offlineProgressBar(progress)) taskId=\(taskId) phase=\(phase) locale=\(localeIdentifier.isEmpty ? "<auto>" : localeIdentifier) message=\(message)"
+                "\(offlineProgressBar(progress)) taskId=\(taskId) phase=\(phase) engine=\(engine) locale=\(localeIdentifier.isEmpty ? "<auto>" : localeIdentifier) message=\(message)"
             )
             sendNativeEvent(name: "offline-transcription-progress", payload: [
                 "taskId": taskId,
@@ -1136,7 +1146,7 @@ private struct H5WebView: UIViewRepresentable {
                 "progress": progress,
                 "message": message,
                 "locale": localeIdentifier,
-                "engine": "apple_speech_on_device"
+                "engine": engine
             ])
         }
 
@@ -1144,11 +1154,12 @@ private struct H5WebView: UIViewRepresentable {
             taskId: String,
             fileName: String,
             fileSize: Int,
-            message: String
+            message: String,
+            engine: String = "apple_speech_on_device"
         ) {
             EduMindLog.error(
                 "OfflineTranscription",
-                "\(offlineProgressBar(0)) taskId=\(taskId) phase=failed message=\(message)"
+                "\(offlineProgressBar(0)) taskId=\(taskId) phase=failed engine=\(engine) message=\(message)"
             )
             sendNativeEvent(name: "offline-transcription-failed", payload: [
                 "taskId": taskId,
@@ -1157,8 +1168,160 @@ private struct H5WebView: UIViewRepresentable {
                 "status": "failed",
                 "progress": 0,
                 "message": message,
-                "engine": "apple_speech_on_device"
+                "engine": engine
             ])
+        }
+
+        private func currentAPIBaseURL() -> URL? {
+            let configuredAPIBase = (
+                Bundle.main.object(forInfoDictionaryKey: "EDUMIND_API_BASE_URL") as? String
+            )?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let apiBase = configuredAPIBase.isEmpty ? "http://yuandeMacBook-Pro.local:2004" : configuredAPIBase
+            return URL(string: apiBase.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+
+        private func resolvedOnDeviceWhisperModel(
+            localeIdentifier: String,
+            payload: [String: Any]
+        ) -> String {
+            let requestedModel = firstString(in: payload, keys: ["whisperModel", "model"]).lowercased()
+            return EduMindOnDeviceWhisperSession.resolveModelName(
+                requestedModel: requestedModel,
+                localeIdentifier: localeIdentifier
+            )
+        }
+
+        private func transcribeAudioFileWithOnDeviceWhisper(
+            taskId: String,
+            audioURL: URL,
+            fileName: String,
+            fileSize: Int,
+            localeIdentifier: String,
+            payload: [String: Any]
+        ) async throws -> NativeTranscriptionResult {
+            let requestedLanguage = firstString(in: payload, keys: ["language", "locale"])
+            let effectiveModel = resolvedOnDeviceWhisperModel(localeIdentifier: localeIdentifier, payload: payload)
+
+            sendOfflineProgressEvent(
+                taskId: taskId,
+                fileName: fileName,
+                fileSize: fileSize,
+                phase: "transcribing",
+                progress: 58,
+                message: "正在检查本机 Whisper 离线模型（\(effectiveModel)）",
+                localeIdentifier: localeIdentifier,
+                engine: "whisper_cpp_on_device"
+            )
+
+            let modelURL: URL
+            do {
+                modelURL = try await EduMindOnDeviceWhisperSession.ensureModel(named: effectiveModel)
+            } catch {
+                throw NativeOfflineTranscriptionError.onDeviceWhisperUnavailable
+            }
+
+            sendOfflineProgressEvent(
+                taskId: taskId,
+                fileName: fileName,
+                fileSize: fileSize,
+                phase: "transcribing",
+                progress: 66,
+                message: "本机 Whisper 模型已就绪，开始离线转录（\(effectiveModel)）",
+                localeIdentifier: localeIdentifier,
+                engine: "whisper_cpp_on_device"
+            )
+
+            let session: EduMindOnDeviceWhisperSession
+            do {
+                session = try EduMindOnDeviceWhisperSession(modelURL: modelURL, effectiveModel: effectiveModel)
+            } catch {
+                throw NativeOfflineTranscriptionError.onDeviceWhisperUnavailable
+            }
+
+            let chunks = try await buildAudioChunks(audioURL: audioURL, taskId: taskId)
+            var mergedText = ""
+            var mergedSegments: [[String: Any]] = []
+
+            for chunk in chunks {
+                let chunkLabel = chunks.count > 1 ? "（\(chunk.index + 1)/\(chunk.total)）" : ""
+                let progressBase = 70 + Int((Double(chunk.index) / Double(max(chunk.total, 1))) * 20)
+                sendOfflineProgressEvent(
+                    taskId: taskId,
+                    fileName: fileName,
+                    fileSize: fileSize,
+                    phase: "transcribing",
+                    progress: progressBase,
+                    message: "正在使用本机 Whisper 离线识别\(chunkLabel)",
+                    localeIdentifier: localeIdentifier,
+                    engine: "whisper_cpp_on_device"
+                )
+
+                let chunkResult = try session.transcribeChunk(
+                    audioURL: chunk.url,
+                    chunkStartSeconds: chunk.startSeconds,
+                    localeIdentifier: localeIdentifier,
+                    requestedLanguage: requestedLanguage
+                )
+
+                if !chunkResult.text.isEmpty {
+                    mergedText = mergeTranscriptionText(mergedText, chunkResult.text)
+                }
+                mergedSegments.append(contentsOf: chunkResult.segments.map { segment in
+                    [
+                        "text": segment.text,
+                        "start": segment.start,
+                        "duration": segment.duration,
+                        "confidence": segment.confidence
+                    ]
+                })
+
+                if chunk.requiresCleanup {
+                    try? FileManager.default.removeItem(at: chunk.url)
+                }
+            }
+
+            let finalText = mergedText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !finalText.isEmpty else {
+                throw NativeOfflineTranscriptionError.emptyTranscript
+            }
+
+            return NativeTranscriptionResult(
+                text: finalText,
+                segments: mergedSegments,
+                localeIdentifier: localeIdentifier,
+                engine: "whisper_cpp_on_device"
+            )
+        }
+
+        private func makeMultipartBody(
+            boundary: String,
+            fileURL: URL,
+            fieldName: String,
+            fileName: String,
+            mimeType: String,
+            formFields: [String: String]
+        ) throws -> Data {
+            var body = Data()
+            let lineBreak = "\r\n"
+
+            for (key, value) in formFields {
+                body.append(Data("--\(boundary)\(lineBreak)".utf8))
+                body.append(Data("Content-Disposition: form-data; name=\"\(key)\"\(lineBreak)\(lineBreak)".utf8))
+                body.append(Data("\(value)\(lineBreak)".utf8))
+            }
+
+            body.append(Data("--\(boundary)\(lineBreak)".utf8))
+            body.append(
+                Data(
+                    "Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\(lineBreak)".utf8
+                )
+            )
+            body.append(Data("Content-Type: \(mimeType)\(lineBreak)\(lineBreak)".utf8))
+            body.append(try Data(contentsOf: fileURL))
+            body.append(Data(lineBreak.utf8))
+            body.append(Data("--\(boundary)--\(lineBreak)".utf8))
+            return body
         }
 
         private func requestSpeechAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
@@ -1438,14 +1601,50 @@ private struct H5WebView: UIViewRepresentable {
                 fallbackCandidates = [localeIdentifier, Locale.preferredLanguages.first ?? "", "zh-CN", "en-US"]
             }
             let candidates = Array(NSOrderedSet(array: fallbackCandidates.filter { !$0.isEmpty })) as? [String] ?? fallbackCandidates.filter { !$0.isEmpty }
+            var firstRecognizer: SFSpeechRecognizer?
+            var inspectedCandidates: [String] = []
 
             for candidate in candidates {
                 if let recognizer = SFSpeechRecognizer(locale: Locale(identifier: candidate)) {
-                    EduMindLog.info("OfflineTranscription", "using recognizer locale=\(recognizer.locale.identifier) requested=\(localeIdentifier)")
-                    return recognizer
+                    if firstRecognizer == nil {
+                        firstRecognizer = recognizer
+                    }
+                    let supportFlag = recognizer.supportsOnDeviceRecognition ? "on-device=yes" : "on-device=no"
+                    inspectedCandidates.append("\(recognizer.locale.identifier)(\(supportFlag))")
+                    EduMindLog.info(
+                        "OfflineTranscription",
+                        "candidate recognizer locale=\(recognizer.locale.identifier) requested=\(localeIdentifier) \(supportFlag)"
+                    )
+                    if recognizer.supportsOnDeviceRecognition {
+                        EduMindLog.info(
+                            "OfflineTranscription",
+                            "using recognizer locale=\(recognizer.locale.identifier) requested=\(localeIdentifier)"
+                        )
+                        return recognizer
+                    }
+                } else {
+                    inspectedCandidates.append("\(candidate)(unavailable)")
+                    EduMindLog.notice(
+                        "OfflineTranscription",
+                        "candidate recognizer unavailable locale=\(candidate) requested=\(localeIdentifier)"
+                    )
                 }
             }
 
+            if firstRecognizer != nil {
+                let inspectedSummary = inspectedCandidates.joined(separator: ", ")
+                EduMindLog.error(
+                    "OfflineTranscription",
+                    "no on-device recognizer available requested=\(localeIdentifier) candidates=\(inspectedSummary)"
+                )
+                throw NativeOfflineTranscriptionError.onDeviceRecognitionUnavailable
+            }
+
+            let candidateSummary = candidates.joined(separator: ", ")
+            EduMindLog.error(
+                "OfflineTranscription",
+                "no recognizer available requested=\(localeIdentifier) candidates=\(candidateSummary)"
+            )
             throw NativeOfflineTranscriptionError.recognizerUnavailable
         }
 
@@ -1538,7 +1737,8 @@ private struct H5WebView: UIViewRepresentable {
                                 continuation.resume(returning: NativeTranscriptionResult(
                                     text: text,
                                     segments: segments,
-                                    localeIdentifier: recognizer.locale.identifier
+                                    localeIdentifier: recognizer.locale.identifier,
+                                    engine: "apple_speech_on_device"
                                 ))
                             }
                             recognitionTask?.cancel()
@@ -1570,9 +1770,6 @@ private struct H5WebView: UIViewRepresentable {
             }
 
             let recognizer = try buildSpeechRecognizer(localeIdentifier: localeIdentifier)
-            guard recognizer.supportsOnDeviceRecognition else {
-                throw NativeOfflineTranscriptionError.onDeviceRecognitionUnavailable
-            }
             let chunks = try await buildAudioChunks(audioURL: audioURL, taskId: taskId)
             var mergedText = ""
             var chunkSegments: [[String: Any]] = []
@@ -1621,13 +1818,15 @@ private struct H5WebView: UIViewRepresentable {
             return NativeTranscriptionResult(
                 text: finalText,
                 segments: chunkSegments,
-                localeIdentifier: recognizer.locale.identifier
+                localeIdentifier: recognizer.locale.identifier,
+                engine: "apple_speech_on_device"
             )
         }
 
         private func runOfflineTranscription(task: NativeSelectedVideo, payload: [String: Any]) async {
             let localeIdentifier = normalizeSpeechLocaleIdentifier(from: payload)
             let requestedLanguage = String(describing: payload["locale"] ?? payload["language"] ?? "")
+            var activeEngine = "whisper_cpp_on_device"
             EduMindLog.info(
                 "OfflineTranscription",
                 "taskId=\(task.taskId) requestedLanguage=\(requestedLanguage) normalizedLocale=\(localeIdentifier)"
@@ -1661,20 +1860,50 @@ private struct H5WebView: UIViewRepresentable {
                     fileSize: task.fileSize,
                     phase: "transcribing",
                     progress: 55,
-                    message: "音频提取完成，开始本地离线识别",
-                    localeIdentifier: localeIdentifier
+                    message: "音频提取完成，开始本机离线转录",
+                    localeIdentifier: localeIdentifier,
+                    engine: "whisper_cpp_on_device"
                 )
-                let transcription = try await transcribeAudioFile(
-                    taskId: task.taskId,
-                    audioURL: audioURL,
-                    fileName: task.fileName,
-                    fileSize: task.fileSize,
-                    localeIdentifier: localeIdentifier
-                )
+                let transcription: NativeTranscriptionResult
+                do {
+                    activeEngine = "whisper_cpp_on_device"
+                    EduMindLog.notice(
+                        "OfflineTranscription",
+                        "taskId=\(task.taskId) prefer on-device whisper for locale=\(localeIdentifier) model=\(resolvedOnDeviceWhisperModel(localeIdentifier: localeIdentifier, payload: payload))"
+                    )
+                    transcription = try await transcribeAudioFileWithOnDeviceWhisper(
+                        taskId: task.taskId,
+                        audioURL: audioURL,
+                        fileName: task.fileName,
+                        fileSize: task.fileSize,
+                        localeIdentifier: localeIdentifier,
+                        payload: payload
+                    )
+                } catch let error as NativeOfflineTranscriptionError where error == .onDeviceWhisperUnavailable {
+                    activeEngine = "apple_speech_on_device"
+                    EduMindLog.notice(
+                        "OfflineTranscription",
+                        "taskId=\(task.taskId) on-device-whisper-unavailable fallback=apple_speech reason=\(error.localizedDescription)"
+                    )
+                    transcription = try await transcribeAudioFile(
+                        taskId: task.taskId,
+                        audioURL: audioURL,
+                        fileName: task.fileName,
+                        fileSize: task.fileSize,
+                        localeIdentifier: localeIdentifier
+                    )
+                }
+
+                if transcription.engine == "whisper_cpp_on_device" {
+                    EduMindLog.notice(
+                        "OfflineTranscription",
+                        "taskId=\(task.taskId) on-device whisper selected effective_model=\(resolvedOnDeviceWhisperModel(localeIdentifier: localeIdentifier, payload: payload))"
+                    )
+                }
 
                 EduMindLog.info(
                     "OfflineTranscription",
-                    "\(offlineProgressBar(100)) taskId=\(task.taskId) phase=completed textLength=\(transcription.text.count) segments=\(transcription.segments.count)"
+                    "\(offlineProgressBar(100)) taskId=\(task.taskId) phase=completed engine=\(transcription.engine) textLength=\(transcription.text.count) segments=\(transcription.segments.count)"
                 )
                 sendNativeEvent(name: "offline-transcription-completed", payload: [
                     "taskId": task.taskId,
@@ -1685,7 +1914,7 @@ private struct H5WebView: UIViewRepresentable {
                     "progress": 100,
                     "message": "本地离线转录完成",
                     "locale": transcription.localeIdentifier,
-                    "engine": "apple_speech_on_device",
+                    "engine": transcription.engine,
                     "transcriptText": transcription.text,
                     "segments": transcription.segments
                 ])
@@ -1695,7 +1924,8 @@ private struct H5WebView: UIViewRepresentable {
                     taskId: task.taskId,
                     fileName: task.fileName,
                     fileSize: task.fileSize,
-                    message: error.localizedDescription
+                    message: error.localizedDescription,
+                    engine: activeEngine
                 )
             }
 

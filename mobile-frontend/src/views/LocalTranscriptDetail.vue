@@ -164,7 +164,11 @@ const canGenerateSummary = computed(() => {
 })
 const summaryStyleText = computed(() => `${summaryStyleLabel(transcript.value?.summaryStyle || processingSettings.value.summaryStyle)}风格`)
 const engineLabel = computed(() =>
-  String(transcript.value?.engine || '').trim() === 'apple_speech_on_device' ? 'Apple 端侧识别' : 'iOS 原生识别'
+  String(transcript.value?.engine || '').trim() === 'whisper_cpp_on_device'
+    ? 'Whisper 本机离线转录'
+    : (String(transcript.value?.engine || '').trim() === 'apple_speech_on_device'
+        ? 'Apple 端侧识别'
+        : (String(transcript.value?.engine || '').trim() === 'backend_whisper' ? 'Whisper 后端转录' : 'iOS 原生识别'))
 )
 const updatedText = computed(() => {
   const value = transcript.value?.updatedAt || transcript.value?.createdAt
@@ -243,9 +247,22 @@ const extractErrorMessage = (err, fallback) => {
   return err?.message || fallback
 }
 
+const logOfflineDetail = (stage, payload = {}) => {
+  try {
+    console.info(`[OfflineDetail] ${stage} ${JSON.stringify(payload)}`)
+  } catch {
+    console.info(`[OfflineDetail] ${stage}`)
+  }
+}
+
 const syncToVideoLibrary = async ({ silent = false } = {}) => {
   if (!transcript.value?.taskId || !String(transcript.value?.transcriptText || '').trim()) return
   if (!summaryBackendConfigured.value) return
+  logOfflineDetail('sync-start', {
+    taskId: transcript.value.taskId,
+    apiBaseAvailable: summaryBackendConfigured.value,
+    hasSummary: Boolean(String(transcript.value.summary || '').trim())
+  })
 
   transcript.value = await saveNativeOfflineTranscript({
     taskId: transcript.value.taskId,
@@ -264,12 +281,22 @@ const syncToVideoLibrary = async ({ silent = false } = {}) => {
       transcript_text: transcript.value.transcriptText,
       summary: transcript.value.summary || '',
       summary_style: transcript.value.summaryStyle || processingSettings.value.summaryStyle || 'study',
+      tags: Array.isArray(transcript.value.tags) ? transcript.value.tags : [],
+      auto_generate_tags: typeof transcript.value.autoGenerateTags === 'boolean'
+        ? transcript.value.autoGenerateTags
+        : Boolean(processingSettings.value.autoGenerateTags),
       segments: Array.isArray(transcript.value.segments) ? transcript.value.segments : []
     })
     const data = res?.data || {}
+    logOfflineDetail('sync-success', {
+      taskId: transcript.value.taskId,
+      videoId: Number(data?.video?.id || data?.id || 0) || 0,
+      tagCount: Array.isArray(data?.video?.tags) ? data.video.tags.length : 0
+    })
     transcript.value = await saveNativeOfflineTranscript({
       taskId: transcript.value.taskId,
       fileName: data?.video?.title || transcript.value.fileName,
+      tags: Array.isArray(data?.video?.tags) ? data.video.tags : transcript.value.tags,
       syncedVideoId: Number(data?.video?.id || data?.id || 0) || 0,
       syncStatus: 'completed',
       syncErrorMessage: '',
@@ -277,6 +304,10 @@ const syncToVideoLibrary = async ({ silent = false } = {}) => {
     })
   } catch (e) {
     const messageText = extractErrorMessage(e, '写入视频库失败')
+    logOfflineDetail('sync-failed', {
+      taskId: transcript.value.taskId,
+      error: messageText
+    })
     transcript.value = await saveNativeOfflineTranscript({
       taskId: transcript.value.taskId,
       syncStatus: 'failed',

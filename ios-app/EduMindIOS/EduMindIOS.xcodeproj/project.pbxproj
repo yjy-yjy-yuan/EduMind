@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		8B6A6A2C3C1D4100A1000001 /* whisper in Frameworks */ = {isa = PBXBuildFile; productRef = 8B6A6A2C3C1D4100A1000002 /* whisper */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		1C23BC252F62C3DB00D572F8 /* EduMindIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EduMindIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8B6A6A2C3C1D4100A1000001 /* whisper in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = EduMindIOS;
 			packageProductDependencies = (
+				8B6A6A2C3C1D4100A1000002 /* whisper */,
 			);
 			productName = EduMindIOS;
 			productReference = 1C23BC252F62C3DB00D572F8 /* EduMindIOS.app */;
@@ -98,6 +104,9 @@
 			productRefGroup = 1C23BC262F62C3DB00D572F8 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
+			packageReferences = (
+				8B6A6A2C3C1D4100A1000003 /* XCLocalSwiftPackageReference "../../../../Library/Caches/EduMind/whisper.spm" */,
+			);
 			targets = (
 				1C23BC242F62C3DB00D572F8 /* EduMindIOS */,
 			);
@@ -123,6 +132,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		8B6A6A2C3C1D4100A1000003 /* XCLocalSwiftPackageReference "../../../../Library/Caches/EduMind/whisper.spm" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../../Library/Caches/EduMind/whisper.spm;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		8B6A6A2C3C1D4100A1000002 /* whisper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = whisper;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1C23BC2E2F62C3DC00D572F8 /* Debug */ = {

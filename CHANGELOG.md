@@ -901,6 +901,17 @@
 
 - 新增 [`mobile-frontend/src/assets/edumind-logo-mark.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo-mark.png)，并更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：让首页顶部的小尺寸 logo 改用去留白的方形 mark 图，其它大 logo 位置继续保留完整字标图。
 
+### 恢复 Ollama 运行时状态可见性
+
+- 新增 [`backend_fastapi/app/services/ollama_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/ollama_runtime.py)：统一探测 `Ollama` 配置、可用性、当前目标模型和已加载模型列表，避免程序层面对本地 Ollama 再次“失明”。
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)、[`backend_fastapi/tests/smoke/test_app_startup.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/smoke/test_app_startup.py)、[`backend_fastapi/tests/unit/test_ollama_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_ollama_runtime.py)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)：健康检查现在会返回 `ollama` 运行时状态，并补充对应测试与说明，在不恢复旧本地问答分支的前提下恢复对 Ollama 的可观测性。
+
+### 记录 iOS 离线模型现状并切换本地 GGUF 默认模型
+
+- 新增 [`docs/iOS离线模型评估与切换说明.md`](/Users/yuan/final-work/EduMind/docs/iOS离线模型评估与切换说明.md)：记录当前 iOS 离线视频处理实际使用的 Apple `Speech` 端侧识别、目标 `Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF` 模型信息、两者差异，以及“是否需要 Ollama”的结论，明确 GGUF 适合本地推理而不适合作为 ASR 替身。
+- 新增 [`backend_fastapi/scripts/import_qwen35_gguf_to_ollama.sh`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/import_qwen35_gguf_to_ollama.sh)，并更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)、[`backend_fastapi/.env`](/Users/yuan/final-work/EduMind/backend_fastapi/.env)：将当前项目本地 LLM 默认模型别名切到 `qwen35-9b-opus-distilled`，方便用 Ollama 导入并接管摘要、标题、语义整理等本地回退能力。
+- 更新 [`backend_fastapi/README_RUN.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README_RUN.md)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：把后端运行说明统一回 `.venv`，补充 GGUF 导入命令，并明确 iOS 端本地离线转录仍然走 Apple `Speech`。
+
 ### 优化首页 logo 与字标衔接
 
 - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：给首页顶部的 `logo + 字标` 增加更轻的共同承载层，收小 logo 卡的边框和阴影，并压细字标层级，让图标与文字的过渡更自然。
@@ -940,3 +951,37 @@
 ### 美化本地视频文件选择控件
 
 - 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：隐藏原生文件选择框，改为自定义的“选择本地视频”按钮和文件状态展示卡，避免 iOS `WKWebView` 中出现缺字方块和默认系统样式破坏页面观感。
+
+### 补强 Ollama 模型在位探测与远程导入
+
+- 更新 [`backend_fastapi/app/services/ollama_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/ollama_runtime.py)、[`backend_fastapi/tests/unit/test_ollama_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_ollama_runtime.py)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)：在现有 `ollama` 运行时状态基础上补充 `model_present`，让健康检查可以直接看出当前配置模型是否已真正导入。
+- 更新 [`backend_fastapi/scripts/import_qwen35_gguf_to_ollama.sh`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/import_qwen35_gguf_to_ollama.sh)、[`backend_fastapi/README_RUN.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README_RUN.md)、[`docs/iOS离线模型评估与切换说明.md`](/Users/yuan/final-work/EduMind/docs/iOS离线模型评估与切换说明.md)：导入脚本现在同时支持本地 `.gguf` 和 `hf.co/...` 直接拉取，便于在不恢复旧 Ollama 问答分支的前提下恢复本地模型加载能力。
+
+### 兼容推理模型的思维标签输出
+
+- 新增 [`backend_fastapi/app/utils/ollama_compat.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/ollama_compat.py)、[`backend_fastapi/tests/unit/test_ollama_compat.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_ollama_compat.py)，并更新 [`backend_fastapi/app/services/video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_content_service.py)、[`backend_fastapi/app/utils/semantic_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/semantic_utils.py)、[`backend_fastapi/app/services/llm_similarity_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/llm_similarity_service.py)：为本地 Ollama 调用统一加上 stop tokens，并清理 `<think>`、`<analysis>`、`<|endoftext|>` 等推理模型残留标记，避免新模型污染现有摘要、标题、语义分段和相似度链路的输出格式。
+
+### 离线转录同步继续写入数据库标签
+
+- 更新 [`backend_fastapi/app/schemas/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/video.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：`/api/videos/sync-offline-transcript` 现在在继续写入现有 `videos` / `subtitles` 的同时，也支持把离线结果的 `tags` 与 `auto_generate_tags` 一起落到 `videos.tags`。
+- 更新 [`mobile-frontend/src/services/nativeOfflineTranscripts.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/nativeOfflineTranscripts.js)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)、[`docs/iOS离线模型评估与切换说明.md`](/Users/yuan/final-work/EduMind/docs/iOS离线模型评估与切换说明.md)：前端本地离线记录会继续携带标签与自动标签配置，相关文档也补充说明了 iOS 离线结果仍然回写同一套 MySQL 主库。
+
+### 对齐本地 Qwen 3.5 9B 模型别名
+
+- 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env`](/Users/yuan/final-work/EduMind/backend_fastapi/.env)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)、[`backend_fastapi/tests/unit/test_ollama_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_ollama_runtime.py)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)：将后端本地 Ollama 默认模型别名从 `qwen35-9b-opus-distilled` 对齐为 `qwen-3.5:9b`，方便按你当前的测试口径直接确认运行时模型名称。
+
+## 2026-03-28 22:35 (Asia/Shanghai) 对齐导入脚本默认模型别名
+
+- 更新 [`backend_fastapi/scripts/import_qwen35_gguf_to_ollama.sh`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/import_qwen35_gguf_to_ollama.sh)：将 `OLLAMA_MODEL_NAME` 默认值从 `qwen35-9b-opus-distilled` 对齐为 `qwen-3.5:9b`，避免后续重新导入 GGUF 时又回到旧别名。
+
+## 2026-03-28 22:55 (Asia/Shanghai) 强化方言与儿化音转录链路
+
+- 更新 [`backend_fastapi/app/services/whisper_runtime.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/whisper_runtime.py)：将产品可选 Whisper 模型扩展到 `large-v3` / `large-v3-turbo`，并为中文转录补充更严格的提示词与解码参数，提升方言、儿化音和课堂口语场景下的准确率。
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)、[`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：新增音频直传到后端 Whisper 的转录接口，保证 iPhone 原生链路可以在 Apple Speech 不可靠时继续走统一的高质量转录入口。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/LocalTranscripts.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscripts.vue)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)：iPhone 端现在对中文/方言场景优先切换到 `large-v3` Whisper，高精度转录失败时也会在日志和页面里明确显示当前使用的引擎，不再把 Apple Speech 当成唯一主识别器。
+
+## 2026-03-28 23:10 (Asia/Shanghai) 落地 iPhone 本机 Whisper 离线转录
+
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/OnDeviceWhisperRuntime.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/OnDeviceWhisperRuntime.swift)、[`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：为 iOS 工程接入本机 `whisper.spm` 依赖，并新增本地 Whisper 运行时，支持模型缓存、首次下载、多语种参数映射和本机分段转录。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：将原生离线主链路改为“本机 Whisper 优先，Apple Speech 兜底”，并在 Xcode 日志与桥接事件里持续输出当前引擎和处理进度，避免再因为后端未启动而阻断本地转录。
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/LocalTranscripts.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscripts.vue)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)：新增 `Whisper 本机离线转录` 引擎展示，方便区分本机 Whisper、Apple Speech 与旧的后端 Whisper。
