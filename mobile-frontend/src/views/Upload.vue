@@ -37,15 +37,20 @@
       <div class="card-title">本地视频</div>
       <input
         ref="fileInputRef"
-        class="file"
+        class="file file--hidden"
         type="file"
         accept=".mp4,.avi,.mov,.mkv,.webm,.flv"
         @change="onFileChange"
         :disabled="busy"
       />
-      <div v-if="file" class="muted">已选择：{{ file.name }}（{{ readableSize(file.size) }}）</div>
-      <div v-else-if="savedFileMeta" class="muted">
-        上次选择：{{ savedFileMeta.name }}（{{ readableSize(savedFileMeta.size) }}，返回后需重新选择文件才能再次上传）
+      <div class="file-picker" :class="{ 'file-picker--selected': hasVisibleFileMeta }">
+        <button class="file-picker__button" type="button" @click="openFilePicker" :disabled="busy">
+          {{ hasVisibleFileMeta ? '重新选择视频' : '选择本地视频' }}
+        </button>
+        <div class="file-picker__meta">
+          <strong class="file-picker__title">{{ currentFileDisplayName }}</strong>
+          <span class="file-picker__desc">{{ currentFileDisplayHint }}</span>
+        </div>
       </div>
       <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
         {{ busy ? '上传中…' : '开始上传' }}
@@ -360,6 +365,21 @@ const processingSettingsSummary = computed(() => {
 const hasRecommendationImport = computed(() => Boolean(recommendationSource.value || videoUrl.value) && submissionMode.value === 'url')
 const importSourceLabel = computed(() => recommendationSource.value || '推荐系统')
 const importPreviewUrl = computed(() => String(videoUrl.value || '').trim() || '等待带入推荐链接')
+const hasVisibleFileMeta = computed(() => Boolean(file.value || savedFileMeta.value))
+const currentFileDisplayName = computed(() => {
+  if (file.value?.name) return file.value.name
+  if (savedFileMeta.value?.name) return savedFileMeta.value.name
+  return '未选择本地视频'
+})
+const currentFileDisplayHint = computed(() => {
+  if (file.value) {
+    return `已选择 · ${readableSize(file.value.size)}`
+  }
+  if (savedFileMeta.value?.name) {
+    return `上次选择 · ${readableSize(savedFileMeta.value.size)} · 返回后需重新选择`
+  }
+  return '支持 MP4、AVI、MOV、MKV、WEBM、FLV'
+})
 const uploadRecommendationPayload = ref(null)
 const latestUploadedVideoId = ref(0)
 const latestUploadedTitle = ref('')
@@ -1201,6 +1221,11 @@ const resetAll = () => {
   if (!nativeBusy.value) nativeTask.value = null
 }
 
+const openFilePicker = () => {
+  if (busy.value) return
+  fileInputRef.value?.click()
+}
+
 const startNativeOfflineTranscriptionFlow = async () => {
   if (busy.value || nativeBusy.value) return
   processingSettings.value = getProcessingSettings()
@@ -1459,8 +1484,8 @@ onUnmounted(() => {
 .topbar,
 .card {
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(251, 245, 239, 0.97);
-  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+  background: rgba(242, 235, 248, 0.93);
+  box-shadow: 0 18px 38px rgba(73, 51, 104, 0.12);
 }
 
 .topbar {
@@ -1486,14 +1511,14 @@ onUnmounted(() => {
   font-size: 20px;
   line-height: 1.1;
   letter-spacing: -0.03em;
-  color: #111827;
+  color: #221a30;
 }
 
 .topbar__copy p {
   margin: 0;
   font-size: 12px;
   line-height: 1.6;
-  color: #6b7280;
+  color: #706781;
 }
 
 .link {
@@ -1517,17 +1542,17 @@ onUnmounted(() => {
 
 .card--active {
   border-color: var(--primary-soft-strong);
-  background: linear-gradient(180deg, rgba(240, 232, 245, 0.96), rgba(251, 245, 239, 0.98));
+  background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(247, 241, 251, 0.98));
 }
 
 .card--spotlight {
-  background: linear-gradient(180deg, rgba(240, 232, 245, 0.96), rgba(251, 245, 239, 0.98));
+  background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(247, 241, 251, 0.98));
 }
 
 .import-banner {
   gap: 14px;
   border-color: var(--primary-soft);
-  background: linear-gradient(180deg, rgba(243, 235, 215, 0.96), rgba(251, 245, 239, 0.98));
+  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.96));
 }
 
 .import-banner__top,
@@ -1547,8 +1572,8 @@ onUnmounted(() => {
   padding: 13px 14px;
   font-size: 12px;
   line-height: 1.6;
-  color: #111827;
-  background: rgba(251, 245, 239, 0.92);
+  color: #221a30;
+  background: rgba(247, 241, 251, 0.92);
   border: 1px dashed rgba(17, 24, 39, 0.12);
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -1562,7 +1587,7 @@ onUnmounted(() => {
   line-height: 1.6;
   color: var(--primary-deep);
   background: var(--surface-lilac);
-  border: 1px solid rgba(139, 121, 157, 0.14);
+  border: 1px solid rgba(143, 115, 186, 0.18);
 }
 
 .upload-followup__list {
@@ -1575,7 +1600,7 @@ onUnmounted(() => {
   gap: 10px;
   border-radius: 20px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(247, 239, 232, 0.9);
+  background: rgba(238, 230, 246, 0.92);
   padding: 14px;
 }
 
@@ -1591,14 +1616,14 @@ onUnmounted(() => {
 .upload-followup__title {
   font-size: 15px;
   line-height: 1.45;
-  color: #111827;
+  color: #221a30;
 }
 
 .upload-followup__desc,
 .upload-followup__meta {
   font-size: 12px;
   line-height: 1.6;
-  color: #6b7280;
+  color: #706781;
 }
 
 .upload-followup__tags {
@@ -1612,8 +1637,8 @@ onUnmounted(() => {
   align-items: center;
   border-radius: 999px;
   padding: 5px 10px;
-  background: rgba(243, 235, 215, 0.92);
-  color: var(--warn-text);
+  background: var(--surface-lilac-deep);
+  color: var(--lilac-text);
   font-size: 11px;
   font-weight: 700;
 }
@@ -1641,7 +1666,7 @@ onUnmounted(() => {
 .card-title {
   font-size: 15px;
   font-weight: 800;
-  color: #111827;
+  color: #221a30;
 }
 
 .filters {
@@ -1653,7 +1678,7 @@ onUnmounted(() => {
 .filter,
 .mini {
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(251, 245, 239, 0.98);
+  background: rgba(247, 241, 251, 0.96);
   border-radius: 999px;
   padding: 7px 11px;
   font-size: 12px;
@@ -1674,8 +1699,8 @@ onUnmounted(() => {
   border: 1px solid rgba(17, 24, 39, 0.12);
   padding: 12px;
   outline: none;
-  background: rgba(247, 239, 232, 0.92);
-  color: #111827;
+  background: rgba(238, 230, 246, 0.92);
+  color: #221a30;
 }
 
 .btn {
@@ -1683,7 +1708,7 @@ onUnmounted(() => {
   padding: 13px;
   font-weight: 800;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(251, 245, 239, 0.98);
+  background: rgba(242, 235, 248, 0.98);
   width: 100%;
   text-align: center;
 }
@@ -1691,14 +1716,14 @@ onUnmounted(() => {
 .btn--primary {
   border: 0;
   color: #f9fafb;
-  background: linear-gradient(135deg, #665775, #8b799d);
-  box-shadow: 0 16px 24px rgba(17, 24, 39, 0.16);
+  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  box-shadow: 0 16px 24px rgba(95, 71, 126, 0.24);
 }
 
 .btn--native {
   border: 1px solid rgba(41, 98, 66, 0.16);
   color: var(--primary-deep);
-  background: linear-gradient(180deg, var(--surface-gold), rgba(251, 245, 239, 0.98));
+  background: linear-gradient(180deg, var(--surface-lilac-deep), rgba(242, 235, 248, 0.98));
 }
 
 .btn:disabled,
@@ -1708,11 +1733,11 @@ onUnmounted(() => {
 
 .bar {
   height: 100%;
-  background: linear-gradient(90deg, #665775, #8b799d);
+  background: linear-gradient(90deg, #5f477e, #8f73ba);
 }
 
 .bar--native {
-  background: linear-gradient(90deg, #c8ab6c, #a98d58);
+  background: linear-gradient(90deg, #9b82c7, #b79dd5);
 }
 
 .progress {
@@ -1730,13 +1755,78 @@ onUnmounted(() => {
 .empty {
   font-size: 12px;
   line-height: 1.6;
-  color: #6b7280;
+  color: #706781;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .file {
   width: 100%;
+}
+
+.file--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.file-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 132px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  border-radius: 18px;
+  border: 1px solid rgba(95, 71, 126, 0.14);
+  background: rgba(238, 230, 246, 0.92);
+  padding: 12px;
+}
+
+.file-picker--selected {
+  background: linear-gradient(180deg, rgba(236, 227, 246, 0.96), rgba(247, 241, 251, 0.96));
+}
+
+.file-picker__button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 14px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #f9fafb;
+  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  box-shadow: 0 12px 20px rgba(95, 71, 126, 0.2);
+}
+
+.file-picker__button:disabled {
+  opacity: 0.6;
+}
+
+.file-picker__meta {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.file-picker__title {
+  font-size: 14px;
+  line-height: 1.45;
+  color: #221a30;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.file-picker__desc {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #706781;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .recent-list {
@@ -1747,7 +1837,7 @@ onUnmounted(() => {
 .recent-item {
   border-radius: 18px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(247, 239, 232, 0.9);
+  background: rgba(238, 230, 246, 0.92);
   padding: 12px 14px;
   display: flex;
   align-items: flex-start;
@@ -1771,7 +1861,7 @@ onUnmounted(() => {
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
-  color: #111827;
+  color: #221a30;
 }
 
 .recent-meta {
@@ -1786,7 +1876,7 @@ onUnmounted(() => {
 
 .recent-progress__text {
   font-size: 12px;
-  color: #6b7280;
+  color: #706781;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
@@ -1796,18 +1886,18 @@ onUnmounted(() => {
 }
 
 .status--ok {
-  background: rgba(212, 240, 223, 0.92);
+  background: rgba(242, 235, 248, 0.92);
   color: var(--ok-text);
 }
 
 .status--bad {
-  background: var(--bad-bg);
-  color: #b45309;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .status--warn {
-  background: var(--warn-bg);
-  color: var(--warn-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .status--info {
@@ -1848,8 +1938,8 @@ onUnmounted(() => {
 }
 
 .recent-tag--dup {
-  background: var(--warn-bg);
-  color: var(--warn-text);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .recent-tag--offline {
@@ -1858,14 +1948,14 @@ onUnmounted(() => {
 }
 
 .recent-tag--soft {
-  background: rgba(243, 235, 215, 0.92);
-  color: var(--warn-text);
+  background: var(--surface-lilac-deep);
+  color: var(--lilac-text);
 }
 
 .mini--warn {
-  border-color: rgba(217, 119, 6, 0.16);
-  background: var(--bad-bg);
-  color: #b45309;
+  border-color: rgba(106, 75, 155, 0.16);
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 .alert {
@@ -1883,14 +1973,18 @@ onUnmounted(() => {
 }
 
 .alert--bad {
-  background: var(--bad-bg);
-  color: #b45309;
+  background: var(--lilac-bg);
+  color: var(--lilac-text);
 }
 
 @media (max-width: 480px) {
   .topbar,
   .card {
     padding: 14px;
+  }
+
+  .file-picker {
+    grid-template-columns: 1fr;
   }
 
   .import-banner__actions {

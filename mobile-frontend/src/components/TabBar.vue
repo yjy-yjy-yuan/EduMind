@@ -1,5 +1,5 @@
 <template>
-  <nav class="tabbar-wrap safe-bottom" aria-label="底部导航">
+  <nav class="tabbar-wrap" aria-label="底部导航">
     <div class="tabbar-shell">
       <div class="tabbar ios-card">
       <RouterLink to="/" class="tab" :class="{ active: isActive('/') }">
@@ -60,80 +60,88 @@ const isActive = (prefix) => {
   right: 0;
   bottom: 0;
   z-index: 1000;
-  padding: 0 12px calc(10px + env(safe-area-inset-bottom));
+  padding: 0 0 var(--tabbar-shell-gap);
+  background: transparent;
+  border-top: 0;
+  pointer-events: none;
 }
 
 .tabbar-shell {
-  width: min(100%, 560px);
+  width: min(100%, 620px);
   margin: 0 auto;
-  padding: 6px;
-  border-radius: 30px;
-  background: linear-gradient(180deg, rgba(247, 239, 232, 0.72), rgba(240, 232, 245, 0.38));
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+  padding: 0 clamp(12px, 4vw, 18px);
+  box-sizing: border-box;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
 }
 
 .tabbar {
-  height: 74px;
-  padding: 10px;
+  min-height: var(--tabbar-card-height);
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
   display: flex;
   align-items: stretch;
-  gap: 8px;
-  background: rgba(251, 245, 239, 0.94);
-  border-color: rgba(17, 24, 39, 0.08);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-  border-radius: 24px;
+  gap: 6px;
+  background: linear-gradient(180deg, rgba(245, 238, 250, 0.98), rgba(237, 227, 246, 0.98));
+  border: 1px solid rgba(95, 71, 126, 0.12);
+  box-shadow:
+    0 16px 28px rgba(95, 71, 126, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  border-radius: 28px;
+  overflow: hidden;
+  pointer-events: auto;
 }
 
 .tab {
   flex: 1;
   text-decoration: none;
-  color: #7c7088;
-  border-radius: 18px;
+  color: #6f6185;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 3px;
   min-width: 0;
+  padding: 2px 0;
 }
 
 .icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   fill: currentColor;
 }
 
 .label {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
 .tab.active {
   color: var(--primary-deep);
-  background: linear-gradient(180deg, var(--surface-lilac), rgba(251, 245, 239, 0.98));
+  background: linear-gradient(180deg, rgba(236, 227, 246, 0.98), rgba(247, 241, 251, 0.98));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .tab--upload {
-  color: #756884;
+  color: #6d5a86;
 }
 
 .upload-dot {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #766587, #9a87ab);
-  box-shadow: 0 12px 18px rgba(118, 101, 135, 0.22);
+  background: linear-gradient(135deg, #6a4b9b, #9b82c7);
+  box-shadow: 0 12px 18px rgba(106, 75, 155, 0.26);
 }
 
 .icon--upload {
-  width: 17px;
-  height: 17px;
+  width: 15px;
+  height: 15px;
   fill: #f8fafc;
 }
 

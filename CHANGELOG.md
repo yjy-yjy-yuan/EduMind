@@ -816,6 +816,13 @@
 - 更新 [`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)：扩展推荐返回 schema，增加来源统计和站外检索摘要结构，保持现有推荐接口向后兼容。
 - 更新 [`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)、[`backend_fastapi/tests/api/test_recommendation_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_recommendation_api.py)：补充推荐动作目标、来源统计和站外检索摘要测试，确保新字段在 service 与 API 两层都稳定返回。
 
+## 2026-03-28
+
+### 收紧首页品牌头视觉层级
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页左上角品牌区从厚重的套娃卡片改成更轻的横向品牌条，缩小 logo 展示面积，补充简洁说明文字，并同步收紧指南按钮的底色与阴影，减少首页头部的装饰感。
+- 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)：为品牌组件增加无边框 `plain` 展示变体，方便首页等位置直接使用干净贴图，避免每处都强制带厚边框品牌卡。
+
 ## 2026-03-27
 
 ### 增强站外 provider 可观测性与失败摘要
@@ -848,3 +855,83 @@
 
 - 新增 [`backend_fastapi/tests/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)：明确 `unit/`、`api/`、`smoke/`、`integration/` 的职责边界和测试文件命名规则，统一后端测试入口，避免测试继续散落到业务目录。
 - 更新 [`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：补充后端测试目录说明和常用运行命令，强调新增后端测试应统一放在 `backend_fastapi/tests/` 下。
+
+## 2026-03-28
+
+### 进一步压缩首页品牌头装饰感
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：移除首页品牌头中的长段说明文案和厚重品牌展示卡，改成更轻的横向品牌头，只保留小尺寸 logo、品牌名和简短标题，让首页开头更接近原生应用导航头而不是宣传海报。
+
+### 切换紫色莫兰迪背景与全局主题
+
+- 新增 [`mobile-frontend/src/assets/morandi-purple-surface.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/morandi-purple-surface.png)：将你提供的紫色背景图压平生成前端背景资源，替换回这一轮指定的紫色莫兰迪背景方案。
+- 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)、[`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：将全局背景、底部导航、首页、推荐页和上传页重新切回紫色莫兰迪主色，并压掉暖黄/米色硬编码。
+
+### 继续收紧首页顶部品牌头
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页顶部品牌头进一步收成更轻的导航式布局，缩小 logo 承载块、压低字标尺寸，并把“使用指南”按钮调整得更细，减少和下方主标题的视觉重复。
+
+### 将首页 logo 承载块调整为正方形
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：将首页顶部 logo 承载面改成更突出的正方形卡片，同时收小右侧字标，让品牌视觉重点更明确落在 logo 本身。
+
+### 将首页顶部品牌头改为大 logo 面板
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：移除顶部品牌头里的小字标组合，改成更接近参考图的大 logo 品牌面板，让首页开头直接突出你的品牌图形本身。
+
+### 更正首页 logo 头部布局
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：撤回大 logo 面板样式，恢复为更轻的横向 logo 结构，继续使用当前新 logo 图片，只调整承载格式，不再使用整块大面板。
+
+### 将底部导航恢复为贴底样式
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：移除悬浮外壳和底部悬空留白，将底部导航改成真正贴着屏幕底部的导航条，保留顶部圆角但不再做漂浮胶囊效果。
+
+### 收紧 logo 图源留白并居中显示
+
+- 更新 [`mobile-frontend/src/assets/edumind-logo.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo.png)：基于当前使用的 logo 图裁掉外围大面积留白，保留中间品牌主体，让小尺寸位置也能看清图形。
+- 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)：将 logo 组件改成严格居中显示，确保首页和其他位置都以居中的方式承载新的 logo 资源。
+
+### 为首页小尺寸 logo 单独切换 mark 图
+
+- 新增 [`mobile-frontend/src/assets/edumind-logo-mark.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo-mark.png)，并更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：让首页顶部的小尺寸 logo 改用去留白的方形 mark 图，其它大 logo 位置继续保留完整字标图。
+
+### 优化首页 logo 与字标衔接
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：给首页顶部的 `logo + 字标` 增加更轻的共同承载层，收小 logo 卡的边框和阴影，并压细字标层级，让图标与文字的过渡更自然。
+
+### 对当日 logo 衔接调整的更正说明
+
+- 更正上条首页 logo 衔接调整：移除新增的共同外层承载框，恢复为原有横向结构，只通过间距、对齐和 logo 卡本身的轻量样式来让 `logo + 字标` 衔接更自然。
+
+### 收紧底部导航圆角样式
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：保持底部导航贴底，不恢复悬浮效果，只通过收窄左右边距、补边框和增大顶部圆角，让底栏本体的圆角更明确。
+
+### 继续收窄底部导航宽度
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：在保留当前圆角贴底样式的前提下，继续增大左右留白，让底部导航在手机里不再铺得过宽。
+
+### 再次压缩底部导航占宽
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：进一步收小底栏最大宽度并继续加大左右留白，让贴底圆角导航看起来更紧凑，不再显得发胀。
+
+### 压低底部导航底边留白
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：减少底栏内部的底部安全区额外留白，并同步收小最小高度，让导航视觉上更贴近屏幕底边。
+
+### 继续压低底部导航贴底距离
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：继续减少底栏底部安全区上的额外 padding，并再次收小最小高度，让贴底感更明显。
+
+### 统一残留暖黄卡面为浅紫色
+
+- 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)、[`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/views/LearningPath.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LearningPath.vue)、[`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/components/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：将前端里残留的暖黄/米杏卡片面统一替换为首页同系浅紫色卡面，避免页面间继续串色。
+
+### 更正底部导航为圆角卡片样式
+
+- 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)、[`mobile-frontend/src/App.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/App.vue)、[`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)：将底部导航从透明贴底条恢复为不透明的圆角卡片样式，并统一页面底部预留高度，确保导航适应屏幕宽度但不遮挡主页面卡片内容。
+
+### 美化本地视频文件选择控件
+
+- 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：隐藏原生文件选择框，改为自定义的“选择本地视频”按钮和文件状态展示卡，避免 iOS `WKWebView` 中出现缺字方块和默认系统样式破坏页面观感。
