@@ -280,6 +280,42 @@ async def get_similar_notes(content: str, limit: int = 5, db: Session = Depends(
     return {"status": "success", "data": [note.to_dict() for note in unique_notes]}
 
 
+@router.get("")
+async def get_notes_alias(
+    video_id: Optional[int] = None,
+    tag: Optional[str] = None,
+    search: Optional[str] = None,
+    note_type: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """兼容 REST 风格的笔记列表入口。"""
+    return await get_notes(video_id=video_id, tag=tag, search=search, note_type=note_type, db=db)
+
+
+@router.post("")
+async def create_note_alias(data: NoteCreate, db: Session = Depends(get_db)):
+    """兼容 REST 风格的创建笔记入口。"""
+    return await create_note(data=data, db=db)
+
+
+@router.get("/{note_id}")
+async def get_note_alias(note_id: int, db: Session = Depends(get_db)):
+    """兼容 REST 风格的读取笔记入口。"""
+    return await get_note(note_id=note_id, db=db)
+
+
+@router.put("/{note_id}")
+async def update_note_alias(note_id: int, data: NoteUpdate, db: Session = Depends(get_db)):
+    """兼容 REST 风格的更新笔记入口。"""
+    return await update_note(note_id=note_id, data=data, db=db)
+
+
+@router.delete("/{note_id}")
+async def delete_note_alias(note_id: int, db: Session = Depends(get_db)):
+    """兼容 REST 风格的删除笔记入口。"""
+    return await delete_note(note_id=note_id, db=db)
+
+
 @router.post("/notes/batch-delete")
 async def batch_delete_notes(note_ids: List[int], db: Session = Depends(get_db)):
     """批量删除笔记"""

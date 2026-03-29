@@ -13,22 +13,22 @@ import {
 
 export function getNotes(params) {
   if (shouldUseMockApi()) return mockGetNotes(params)
-  return request({ url: '/api/notes/notes', method: 'get', params })
+  return request({ url: '/api/notes', method: 'get', params })
 }
 
 export function getNote(noteId) {
   if (shouldUseMockApi()) return mockGetNote(noteId)
-  return request({ url: `/api/notes/notes/${noteId}`, method: 'get' })
+  return request({ url: `/api/notes/${noteId}`, method: 'get' })
 }
 
 export function createNote(data) {
   if (shouldUseMockApi()) return mockCreateNote(data)
-  return request({ url: '/api/notes/notes', method: 'post', data })
+  return request({ url: '/api/notes', method: 'post', data })
 }
 
 export function updateNote(noteId, data) {
   if (shouldUseMockApi()) return mockUpdateNote(noteId, data)
-  return request({ url: `/api/notes/notes/${noteId}`, method: 'put', data })
+  return request({ url: `/api/notes/${noteId}`, method: 'put', data })
 }
 
 export function addNoteTimestamp(noteId, data) {
@@ -55,5 +55,5 @@ export function getNoteTags() {
 
 export function deleteNote(noteId) {
   if (shouldUseMockApi()) return mockDeleteNote(noteId)
-  return request({ url: `/api/notes/notes/${noteId}`, method: 'delete' })
+  return request({ url: `/api/notes/${noteId}`, method: 'delete' })
 }
