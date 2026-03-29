@@ -11,6 +11,8 @@ import jieba
 import jieba.analyse
 import requests
 from app.core.config import settings
+from app.utils.ollama_compat import build_ollama_options
+from app.utils.ollama_compat import sanitize_ollama_response_text
 
 logger = logging.getLogger(__name__)
 
@@ -573,15 +575,15 @@ def call_ollama(prompt: str, *, system_prompt: str, model: Optional[str] = None)
                 "model": model or settings.OLLAMA_MODEL,
                 "prompt": f"{system_prompt}\n\n{prompt}",
                 "stream": False,
-                "options": {
-                    "temperature": 0.3,
-                    "num_predict": 1024,
-                },
+                "options": build_ollama_options(
+                    temperature=0.3,
+                    num_predict=1024,
+                ),
             },
             timeout=120,
         )
         response.raise_for_status()
-        return clean_multiline_text(response.json().get("response", ""))
+        return clean_multiline_text(sanitize_ollama_response_text(response.json().get("response", "")))
     except Exception as exc:
         logger.warning("Ollama 摘要/标签生成失败，准备回退 | error=%s", exc)
         return None

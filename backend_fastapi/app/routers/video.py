@@ -30,8 +30,10 @@ from app.schemas.video import VideoUploadURL
 from app.services.video_api_service import build_processing_metadata
 from app.services.video_api_service import build_processing_options
 from app.services.video_api_service import serialize_video
+from app.services.video_content_service import build_subject_enriched_tags
 from app.services.video_content_service import generate_primary_topic_name
 from app.services.video_content_service import generate_video_summary
+from app.services.video_content_service import generate_video_tags
 from app.services.video_content_service import normalize_summary_style
 from app.services.video_content_service import read_subtitle_text
 from app.services.video_processing_registry import forget_video_processing_request
@@ -41,6 +43,7 @@ from app.services.video_url_import_service import import_remote_video_from_url
 from app.services.whisper_runtime import get_supported_whisper_models
 from app.services.whisper_runtime import get_whisper_model_catalog
 from app.services.whisper_runtime import normalize_whisper_model_name
+from app.services.whisper_runtime import transcribe_audio_with_whisper
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import File
@@ -463,6 +466,72 @@ async def upload_video(
             os.remove(temp_path)
 
 
+@router.post("/transcribe-audio")
+async def transcribe_audio(
+    file: UploadFile = File(...),
+    language: str = Form("Other"),
+    model: str = Form("base"),
+):
+    """直接调用后端 Whisper 转录音频，供 iOS 原生 fallback 使用。"""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="缺少音频文件名")
+
+    temp_path = None
+    try:
+        process_options = build_processing_options(
+            language=language,
+            model=model,
+            auto_generate_summary=False,
+            auto_generate_tags=False,
+            summary_style="study",
+        )
+        temp_path, _, file_size = await save_upload_to_temp(file)
+        result = transcribe_audio_with_whisper(
+            temp_path,
+            process_options["model"],
+            process_options["language"],
+            settings.WHISPER_MODEL_PATH,
+        )
+        transcript_text = str((result or {}).get("text") or "").strip()
+        if not transcript_text:
+            raise HTTPException(status_code=422, detail="Whisper 未返回可用文本")
+
+        segments = []
+        for segment in (result or {}).get("segments") or []:
+            start = max(0.0, float(segment.get("start") or 0.0))
+            end = max(start, float(segment.get("end") or start))
+            segments.append(
+                {
+                    "text": str(segment.get("text") or "").strip(),
+                    "start": start,
+                    "duration": max(0.0, end - start),
+                    "confidence": max(0.0, float(segment.get("confidence") or 0.0)),
+                }
+            )
+
+        return {
+            "success": True,
+            "engine": "backend_whisper",
+            "requested_model": str(model or "").strip() or None,
+            "effective_model": process_options["model"],
+            "requested_language": str(language or "").strip() or None,
+            "effective_language": process_options["language"],
+            "file_size": file_size,
+            "transcript_text": transcript_text,
+            "segments": segments,
+        }
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("后端 Whisper 音频直传转录失败 | file=%s | error=%s", file.filename, exc)
+        raise HTTPException(status_code=500, detail="后端 Whisper 转录失败，请稍后重试") from exc
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
 @router.post("/upload-url", response_model=VideoUploadResponse)
 async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
     """通过 URL 上传视频"""
@@ -857,6 +926,24 @@ async def sync_offline_transcript(request: OfflineTranscriptSyncRequest, db: Ses
     title = build_offline_video_title(summary_text, fallback_title=request.file_name or "")
     filename = normalize_offline_filename(request.file_name, request.file_ext)
     task_id = str(request.task_id or "").strip()
+    normalized_tags = build_subject_enriched_tags(
+        request.tags or [],
+        title=title,
+        summary=summary_text,
+        max_tags=8,
+    )
+    generated_tags = []
+    if not normalized_tags and request.auto_generate_tags:
+        tag_result = generate_video_tags(0, summary_text, title=title, max_tags=8)
+        if tag_result.get("success"):
+            generated_tags = build_subject_enriched_tags(
+                tag_result.get("tags") or [],
+                title=title,
+                summary=summary_text,
+                max_tags=8,
+            )
+    resolved_tags = normalized_tags or generated_tags
+    serialized_tags = json.dumps(resolved_tags, ensure_ascii=False) if resolved_tags else None
     video = (
         db.query(Video)
         .filter(Video.task_id == task_id, Video.processing_origin == VideoProcessingOrigin.IOS_OFFLINE)
@@ -873,6 +960,7 @@ async def sync_offline_transcript(request: OfflineTranscriptSyncRequest, db: Ses
             process_progress=100.0,
             current_step="iOS 本地离线转录已同步",
             summary=summary_text,
+            tags=serialized_tags,
             task_id=task_id,
             processing_origin=VideoProcessingOrigin.IOS_OFFLINE,
         )
@@ -886,6 +974,8 @@ async def sync_offline_transcript(request: OfflineTranscriptSyncRequest, db: Ses
         video.process_progress = 100.0
         video.current_step = "iOS 本地离线转录已同步"
         video.summary = summary_text
+        if serialized_tags is not None:
+            video.tags = serialized_tags
         video.error_message = None
         video.processing_origin = VideoProcessingOrigin.IOS_OFFLINE
         db.commit()
@@ -903,6 +993,7 @@ async def sync_offline_transcript(request: OfflineTranscriptSyncRequest, db: Ses
     payload["offline_locale"] = request.locale
     payload["subtitle_count"] = subtitle_count
     payload["file_size"] = request.file_size
+    payload["tag_count"] = len(resolved_tags)
 
     return {
         "success": True,

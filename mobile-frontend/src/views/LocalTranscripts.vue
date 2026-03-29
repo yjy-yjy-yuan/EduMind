@@ -123,7 +123,10 @@ const readableSize = (size) => {
 const localeLabel = (locale) => nativeLocaleLabel(locale)
 
 const engineLabel = (engine) => {
-  if (String(engine || '').trim() === 'apple_speech_on_device') return 'Apple 端侧识别'
+  const normalized = String(engine || '').trim()
+  if (normalized === 'whisper_cpp_on_device') return 'Whisper 本机离线转录'
+  if (normalized === 'apple_speech_on_device') return 'Apple 端侧识别'
+  if (normalized === 'backend_whisper') return 'Whisper 后端转录'
   return 'iOS 原生识别'
 }
 

@@ -83,6 +83,8 @@ class OfflineTranscriptSyncRequest(BaseModel):
     transcript_text: str = Field(..., description="本地离线转录全文")
     summary: str = Field(default="", description="本地离线摘要")
     summary_style: str = Field(default="study", description="摘要风格")
+    tags: List[str] = Field(default_factory=list, description="本地离线标签")
+    auto_generate_tags: bool = Field(default=True, description="同步到视频库时自动生成标签")
     segments: List[OfflineTranscriptSegment] = Field(default_factory=list, description="本地离线转录分段")
 
 

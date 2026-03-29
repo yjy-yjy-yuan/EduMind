@@ -18,6 +18,7 @@ def test_health_check(client):
     data = response.json()
     assert data["status"] == "healthy"
     assert "whisper" in data["services"]
+    assert "ollama" in data["services"]
 
 
 @pytest.mark.smoke

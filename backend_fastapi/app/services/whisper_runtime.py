@@ -5,6 +5,7 @@
 
 import gc
 import hashlib
+import inspect
 import logging
 import os
 import threading
@@ -18,13 +19,15 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-PRODUCT_WHISPER_MODELS = ("tiny", "base", "small", "medium", "large", "turbo")
+PRODUCT_WHISPER_MODELS = ("tiny", "base", "small", "medium", "large", "large-v3", "large-v3-turbo", "turbo")
 WHISPER_MODEL_HIGHLIGHTS = {
     "tiny": "最快，适合先验证上传和转录流程是否跑通。",
     "base": "默认最稳，资源占用较低，适合日常使用。",
     "small": "速度和准确率更平衡，适合作为常用升级档。",
     "medium": "准确率更高，适合正式内容转录。",
     "large": "效果最好，适合高质量要求场景。",
+    "large-v3": "中文、方言和复杂口音效果更稳，适合严谨转录。",
+    "large-v3-turbo": "接近 large-v3 的效果，但推理更快，适合高质量与速度兼顾。",
     "turbo": "优先提速，适合想更快拿到初稿。",
 }
 
@@ -424,6 +427,27 @@ class WhisperRuntimeManager:
     ) -> dict:
         """使用当前运行时管理器执行转录。"""
         device = force_device or self.get_device()
+        normalized_language = str(language or "").strip().lower()
+        normalized_model = self._resolve_model_name(model_name).strip().lower()
+        transcribe_options: dict[str, Any] = {
+            "language": language if language else None,
+            "verbose": False,
+            "fp16": (device in {"cuda", "mps"}),
+        }
+
+        if normalized_language.startswith("zh"):
+            transcribe_options.update(
+                {
+                    "temperature": (0.0, 0.2),
+                    "condition_on_previous_text": True,
+                    "initial_prompt": (
+                        "以下是中文教学视频逐字转录，可能包含普通话、儿化音、粤语词汇、吴语口音或课堂术语。"
+                        "请尽量按原话准确转写，不要总结，不要意译。"
+                    ),
+                }
+            )
+        if normalized_model in {"large", "large-v3", "large-v3-turbo"}:
+            transcribe_options["hallucination_silence_threshold"] = 1.2
 
         try:
             with self._transcribe_lock:
@@ -434,12 +458,8 @@ class WhisperRuntimeManager:
                     source="transcribe",
                 )
                 start_time = time.time()
-                result = model.transcribe(
-                    audio_path,
-                    language=language if language else None,
-                    verbose=False,
-                    fp16=(device in {"cuda", "mps"}),
-                )
+                filtered_options = self._filter_transcribe_options(model.transcribe, transcribe_options)
+                result = model.transcribe(audio_path, **filtered_options)
 
             elapsed = time.time() - start_time
             logger.info(
@@ -470,6 +490,28 @@ class WhisperRuntimeManager:
                     force_device="cpu",
                 )
             raise
+
+    def _filter_transcribe_options(self, transcribe_callable: Any, options: dict[str, Any]) -> dict[str, Any]:
+        """Filter optional kwargs for Whisper implementations with narrower signatures.
+
+        Some test doubles and older wrappers only accept a subset of OpenAI Whisper's
+        keyword arguments. We keep the core options and silently drop unsupported extras.
+        """
+        try:
+            signature = inspect.signature(transcribe_callable)
+        except (TypeError, ValueError):
+            return options
+
+        parameters = signature.parameters.values()
+        if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters):
+            return options
+
+        accepted = {parameter.name for parameter in parameters}
+        filtered = {key: value for key, value in options.items() if key in accepted}
+        dropped = sorted(set(options) - set(filtered))
+        if dropped:
+            logger.debug("Whisper transcribe() 不支持部分可选参数，已自动忽略 | dropped=%s", ",".join(dropped))
+        return filtered
 
     def start_background_preload(self, model_name: str = "", model_path: str = "") -> bool:
         """在后台线程预热默认 Whisper 模型。"""

@@ -12,6 +12,8 @@ from typing import List
 import jieba.analyse
 import requests
 from app.core.config import settings
+from app.utils.ollama_compat import build_ollama_options
+from app.utils.ollama_compat import sanitize_ollama_response_text
 
 logger = logging.getLogger(__name__)
 
@@ -65,13 +67,13 @@ def generate_title_with_ollama(text: str) -> str:
                 "model": settings.OLLAMA_MODEL,
                 "prompt": prompt,
                 "stream": False,
-                "options": {"temperature": 0.3},
+                "options": build_ollama_options(temperature=0.3),
             },
             timeout=30,
         )
 
         if response.status_code == 200:
-            title = response.json().get("response", "").strip()
+            title = sanitize_ollama_response_text(response.json().get("response", "")).strip()
             return title[:20] if len(title) > 20 else title
         return generate_title_traditional(text)
     except Exception as e:
@@ -164,7 +166,7 @@ def merge_subtitles_by_semantics_ollama(subtitles: List[dict]) -> List[dict]:
                 "model": settings.OLLAMA_MODEL,
                 "prompt": prompt,
                 "stream": False,
-                "options": {"temperature": 0.3},
+                "options": build_ollama_options(temperature=0.3),
             },
             timeout=120,
         )
@@ -174,7 +176,7 @@ def merge_subtitles_by_semantics_ollama(subtitles: List[dict]) -> List[dict]:
             return _simple_merge_subtitles(subtitles)
 
         # 解析响应
-        response_text = response.json().get("response", "")
+        response_text = sanitize_ollama_response_text(response.json().get("response", ""))
 
         # 提取 JSON
         json_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response_text)

@@ -3,16 +3,34 @@
     <header class="topbar">
       <div class="topbar__copy">
         <h2>导入学习内容</h2>
-        <p>本地上传和推荐导入都走同一条处理链路。</p>
       </div>
-      <button class="link" @click="resetAll" :disabled="busy">重置</button>
+      <div class="topbar__actions">
+        <button
+          class="preference-trigger"
+          :class="{ 'preference-trigger--active': showPreferenceCard }"
+          type="button"
+          @click="togglePreferenceCard"
+          :disabled="busy || nativeBusy"
+          :aria-expanded="showPreferenceCard ? 'true' : 'false'"
+          aria-controls="upload-preferences-card"
+        >
+          <span class="preference-trigger__gear" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="preference-trigger__icon">
+              <path d="M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.88 1h-3.76a.5.5 0 0 0-.49.42l-.36 2.54c-.58.22-1.13.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.73 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.05.31-.08.63-.08.94s.03.63.08.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.76a.5.5 0 0 0 .49-.42l.36-2.54c.58-.22 1.13-.53 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z" />
+            </svg>
+          </span>
+          <span class="preference-trigger__text">
+            <strong>偏好设置</strong>
+          </span>
+        </button>
+        <button class="link" @click="resetAll" :disabled="busy">重置</button>
+      </div>
     </header>
 
     <div v-if="hasRecommendationImport" class="card import-banner">
       <div class="import-banner__top">
         <div>
           <div class="card-title">推荐导入</div>
-          <div class="muted">你正在承接来自 {{ importSourceLabel }} 的推荐内容，提交后会进入现有下载与处理链路，不会直接当作已入库视频播放。</div>
         </div>
         <span class="import-badge">{{ importSourceLabel }}</span>
       </div>
@@ -23,42 +41,48 @@
       </div>
     </div>
 
-    <div class="card" :class="{ 'card--active': submissionMode === 'file' }">
-      <WhisperModelPicker
-        title="Whisper 模型"
-        :model="processingSettings.model"
-        :options="whisperModelOptions"
-        :disabled="busy"
-        @select="selectProcessingModel"
-      />
+    <div class="mode-switch-wrap">
+      <div class="mode-switch">
+        <button
+          class="mode-switch__item"
+          :class="{ 'mode-switch__item--active': submissionMode === 'file' }"
+          type="button"
+          @click="selectSubmissionMode('file')"
+          :disabled="busy"
+        >
+          <strong>本地上传</strong>
+        </button>
+        <button
+          class="mode-switch__item"
+          :class="{ 'mode-switch__item--active': submissionMode === 'url' }"
+          type="button"
+          @click="selectSubmissionMode('url')"
+          :disabled="busy"
+        >
+          <strong>视频链接上传</strong>
+        </button>
+      </div>
     </div>
 
-    <div class="card" :class="{ 'card--active': submissionMode === 'file' }">
-      <div class="card-title">本地视频</div>
-      <input
-        ref="fileInputRef"
-        class="file file--hidden"
-        type="file"
-        accept=".mp4,.avi,.mov,.mkv,.webm,.flv"
-        @change="onFileChange"
-        :disabled="busy"
-      />
-      <div class="file-picker" :class="{ 'file-picker--selected': hasVisibleFileMeta }">
-        <button class="file-picker__button" type="button" @click="openFilePicker" :disabled="busy">
-          {{ hasVisibleFileMeta ? '重新选择视频' : '选择本地视频' }}
-        </button>
-        <div class="file-picker__meta">
-          <strong class="file-picker__title">{{ currentFileDisplayName }}</strong>
-          <span class="file-picker__desc">{{ currentFileDisplayHint }}</span>
-        </div>
+    <div v-if="showPreferenceCard" id="upload-preferences-card" class="card preference-card">
+      <div class="preference-card__head">
+        <div class="card-title">偏好设置</div>
+        <button class="link link--small" type="button" @click="showPreferenceCard = false">收起</button>
       </div>
-      <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
-        {{ busy ? '上传中…' : '开始上传' }}
-      </button>
-      <button class="btn btn--native" @click="startNativeOfflineTranscriptionFlow" :disabled="busy || nativeBusy">
-        {{ nativeBusy ? '准备本地离线转录…' : 'iOS 本地离线转录' }}
-      </button>
-      <label class="field field--native">
+      <label class="field">
+        <span class="field-label">识别语言</span>
+        <select
+          class="input"
+          :value="processingSettings.language"
+          :disabled="busy || nativeBusy"
+          @change="selectProcessingLanguage($event.target.value)"
+        >
+          <option v-for="option in LANGUAGE_OPTIONS" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
+      <label class="field">
         <span class="field-label">本地识别语言/方言</span>
         <select
           class="input"
@@ -71,27 +95,84 @@
           </option>
         </select>
       </label>
-      <div class="muted">当前处理：{{ processingSettingsSummary }}</div>
-      <div class="muted">本地离线转录优先使用 iOS 原生识别能力，只处理当前设备上的本地视频，不依赖 FastAPI。</div>
-      <div class="muted">如果视频是粤语、吴语、繁体中文或明显口音内容，请先切换到更接近的本地识别语言/方言。</div>
+      <WhisperModelPicker
+        title="Whisper 模型"
+        :model="processingSettings.model"
+        :options="whisperModelOptions"
+        :disabled="busy || nativeBusy"
+        @select="selectProcessingModel"
+      />
+      <label class="field">
+        <span class="field-label">摘要风格</span>
+        <select
+          class="input"
+          :value="processingSettings.summaryStyle"
+          :disabled="busy || nativeBusy"
+          @change="selectSummaryStyle($event.target.value)"
+        >
+          <option v-for="option in SUMMARY_STYLE_OPTIONS" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
+      <label class="toggle">
+        <input
+          :checked="processingSettings.autoGenerateSummary"
+          type="checkbox"
+          :disabled="busy || nativeBusy"
+          @change="setAutoGenerateSummary($event.target.checked)"
+        />
+        <span>处理完成后自动生成摘要</span>
+      </label>
+      <label class="toggle">
+        <input
+          :checked="processingSettings.autoGenerateTags"
+          type="checkbox"
+          :disabled="busy || nativeBusy"
+          @change="setAutoGenerateTags($event.target.checked)"
+        />
+        <span>处理完成后自动提取标签</span>
+      </label>
+    </div>
+
+    <div v-if="submissionMode === 'file'" class="card" :class="{ 'card--active': submissionMode === 'file' }">
+      <div class="card-title">本地视频</div>
+      <input
+        ref="fileInputRef"
+        class="file file--hidden"
+        type="file"
+        accept=".mp4,.avi,.mov,.mkv,.webm,.flv"
+        @change="onFileChange"
+        :disabled="busy"
+      />
+      <div class="file-picker" :class="{ 'file-picker--selected': hasVisibleFileMeta }">
+        <div class="file-picker__meta">
+          <strong class="file-picker__title">{{ currentFileDisplayName }}</strong>
+          <span class="file-picker__desc">{{ currentFileDisplayHint }}</span>
+        </div>
+        <button v-if="hasVisibleFileMeta" class="file-picker__button file-picker__button--secondary" type="button" @click="openFilePicker" :disabled="busy">
+          重新选择视频
+        </button>
+      </div>
+      <button class="btn btn--primary" @click="uploadFile" :disabled="busy">
+        {{ busy ? '上传中…' : (file ? '确认上传' : '开始上传') }}
+      </button>
+      <div class="muted">处理设置：{{ processingSettingsSummary }}</div>
 
       <div v-if="busy" class="progress">
         <div class="bar" :style="{ width: `${progress}%` }"></div>
       </div>
       <div v-if="busy" class="muted">进度：{{ progress }}%</div>
-      <div class="muted">离线补跑仅适用于已配置真实后端地址但暂时不可达；纯 UI ONLY 演示模式不会进入真实离线补跑。</div>
     </div>
 
-    <div class="card" :class="{ 'card--active': submissionMode === 'url', 'card--spotlight': hasRecommendationImport }">
+    <div v-if="submissionMode === 'url'" class="card" :class="{ 'card--active': submissionMode === 'url', 'card--spotlight': hasRecommendationImport }">
       <div class="card-title">视频链接</div>
       <div v-if="hasRecommendationImport" class="import-tip">
         <span class="import-badge import-badge--inline">{{ importSourceLabel }}</span>
-        <span class="muted">当前链接来自推荐系统，提交后不会直接播放，而是进入导入学习流程。</span>
       </div>
       <input class="input" v-model.trim="videoUrl" placeholder="请输入视频链接（B站/YouTube等）" :disabled="busy" />
       <button class="btn" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交链接' }}</button>
-      <div class="muted">支持：B站、YouTube、中国大学慕课（icourse163）</div>
-      <div class="muted">将沿用当前处理设置：{{ processingSettingsSummary }}</div>
+      <div class="muted">支持：B站、YouTube、中国大学慕课</div>
     </div>
 
     <div v-if="uploadRecommendationItems.length > 0" class="card upload-followup">
@@ -276,12 +357,14 @@ import {
   buildProcessPayload,
   getProcessingSettings,
   getWhisperModelOptions,
+  LANGUAGE_OPTIONS,
   languageLabel,
   NATIVE_LOCALE_OPTIONS,
   nativeLocaleLabel,
   resolveNativeTranscriptionLocale,
   saveWhisperModelCatalog,
   saveProcessingSettings,
+  SUMMARY_STYLE_OPTIONS,
   summaryStyleLabel,
   whisperModelLabel
 } from '@/services/processingSettings'
@@ -326,6 +409,8 @@ const statusFilter = ref('all')
 let recentStatusTimer = null
 const processingSettings = ref(getProcessingSettings())
 const whisperModelOptions = ref(getWhisperModelOptions())
+const transcriptionOnlyMode = true
+const showPreferenceCard = ref(false)
 
 const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
 const ALLOWED_EXTENSIONS = new Set(['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'])
@@ -492,11 +577,24 @@ const openUploadRecommendation = (item) => {
 }
 
 const selectProcessingModel = (model) => {
-  if (busy.value) return
+  if (busy.value || nativeBusy.value) return
   processingSettings.value = saveProcessingSettings({
     ...processingSettings.value,
     model
   })
+}
+
+const selectProcessingLanguage = (language) => {
+  if (busy.value || nativeBusy.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    language: String(language || '').trim() || processingSettings.value.language
+  })
+}
+
+const selectSubmissionMode = (mode) => {
+  if (busy.value) return
+  submissionMode.value = mode === 'url' ? 'url' : 'file'
 }
 
 const selectNativeLocale = (nativeLocale) => {
@@ -505,6 +603,37 @@ const selectNativeLocale = (nativeLocale) => {
     ...processingSettings.value,
     nativeLocale: String(nativeLocale || '').trim()
   })
+}
+
+const selectSummaryStyle = (summaryStyle) => {
+  if (busy.value || nativeBusy.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    summaryStyle: String(summaryStyle || '').trim() || processingSettings.value.summaryStyle
+  })
+}
+
+const setAutoGenerateSummary = (enabled) => {
+  if (busy.value || nativeBusy.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    autoGenerateSummary: Boolean(enabled),
+    autoGenerateTags: enabled ? processingSettings.value.autoGenerateTags : false
+  })
+}
+
+const setAutoGenerateTags = (enabled) => {
+  if (busy.value || nativeBusy.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    autoGenerateTags: Boolean(enabled),
+    autoGenerateSummary: enabled ? true : processingSettings.value.autoGenerateSummary
+  })
+}
+
+const togglePreferenceCard = () => {
+  if (busy.value || nativeBusy.value) return
+  showPreferenceCard.value = !showPreferenceCard.value
 }
 
 const consumeUploadRouteIntent = async () => {
@@ -524,7 +653,7 @@ const consumeUploadRouteIntent = async () => {
     submissionMode.value = 'url'
     consumed = true
   } else if (normalizedMode === 'native') {
-    submissionMode.value = 'native'
+    submissionMode.value = 'file'
     consumed = true
   } else if (normalizedMode === 'file') {
     submissionMode.value = 'file'
@@ -598,12 +727,26 @@ const statusClass = (status) => {
 }
 
 const nativeEngineLabel = (engine) => {
-  if (String(engine || '').trim() === 'apple_speech_on_device') return 'Apple 端侧识别'
+  const normalized = String(engine || '').trim()
+  if (normalized === 'whisper_cpp_on_device') return 'Whisper 本机离线转录'
+  if (normalized === 'apple_speech_on_device') return 'Apple 端侧识别'
+  if (normalized === 'backend_whisper') return 'Whisper 后端转录'
   return 'iOS 原生识别'
+}
+
+const logOfflineFlow = (stage, payload = {}) => {
+  try {
+    console.info(`[OfflineFlow] ${stage} ${JSON.stringify(payload)}`)
+  } catch {
+    console.info(`[OfflineFlow] ${stage}`)
+  }
 }
 
 const upsertNativeTask = (patch = {}) => {
   const current = nativeTask.value || {}
+  const tags = Array.isArray(patch.tags)
+    ? patch.tags.filter(Boolean).map((tag) => String(tag).trim())
+    : (Array.isArray(current.tags) ? current.tags : [])
   const next = {
     taskId: String(patch.taskId || current.taskId || ''),
     fileName: String(patch.fileName || current.fileName || '本地视频'),
@@ -622,6 +765,10 @@ const upsertNativeTask = (patch = {}) => {
     autoGenerateSummary: typeof patch.autoGenerateSummary === 'boolean'
       ? patch.autoGenerateSummary
       : Boolean(current.autoGenerateSummary),
+    autoGenerateTags: typeof patch.autoGenerateTags === 'boolean'
+      ? patch.autoGenerateTags
+      : (typeof current.autoGenerateTags === 'boolean' ? current.autoGenerateTags : Boolean(processingSettings.value.autoGenerateTags)),
+    tags,
     syncedVideoId: Number(patch.syncedVideoId ?? current.syncedVideoId ?? 0) || 0,
     syncStatus: String(patch.syncStatus || current.syncStatus || 'idle').trim().toLowerCase() || 'idle',
     syncErrorMessage: String(patch.syncErrorMessage ?? current.syncErrorMessage ?? ''),
@@ -665,8 +812,17 @@ const syncOfflineTranscriptRecord = async (taskId, { silent = false } = {}) => {
 
   const current = await getNativeOfflineTranscript(id)
   if (!current?.transcriptText?.trim()) return null
+  logOfflineFlow('sync-start', {
+    taskId: id,
+    apiBaseAvailable: hasLiveVideoBackend(),
+    transcriptLength: String(current.transcriptText || '').trim().length,
+    hasSummary: Boolean(String(current.summary || '').trim())
+  })
 
   if (!hasLiveVideoBackend()) {
+    logOfflineFlow('sync-skipped-backend-unavailable', {
+      taskId: id
+    })
     const skipped = await saveNativeOfflineTranscript({
       taskId: id,
       syncStatus: 'failed',
@@ -693,18 +849,30 @@ const syncOfflineTranscriptRecord = async (taskId, { silent = false } = {}) => {
       transcript_text: pending.transcriptText,
       summary: pending.summary || '',
       summary_style: pending.summaryStyle || processingSettings.value.summaryStyle || 'study',
+      tags: Array.isArray(pending.tags) ? pending.tags : [],
+      auto_generate_tags: typeof pending.autoGenerateTags === 'boolean'
+        ? pending.autoGenerateTags
+        : Boolean(processingSettings.value.autoGenerateTags),
       segments: Array.isArray(current.segments) ? current.segments : []
     })
     const data = res?.data || {}
     const videoId = resolveVideoId(data)
     const title = data?.video?.title || pending.fileName || '本地视频'
+    const tags = Array.isArray(data?.video?.tags) ? data.video.tags : (Array.isArray(pending.tags) ? pending.tags : [])
+    logOfflineFlow('sync-success', {
+      taskId: id,
+      videoId: videoId || 0,
+      title,
+      tagCount: tags.length
+    })
     const saved = await persistNativeTask({
       taskId: id,
       syncedVideoId: videoId || 0,
       syncStatus: 'completed',
       syncErrorMessage: '',
       syncUpdatedAt: new Date().toISOString(),
-      fileName: title
+      fileName: title,
+      tags
     })
     upsertRecentUpload({
       key: `offline-synced-${videoId || id}`,
@@ -715,6 +883,7 @@ const syncOfflineTranscriptRecord = async (taskId, { silent = false } = {}) => {
       status: 'completed',
       progress: 100,
       currentStep: 'iOS 本地离线结果已写入视频库',
+      tags,
       offlineTaskId: id,
       tempKey: `ios-offline-${id}`,
       requestedModel: '',
@@ -725,6 +894,10 @@ const syncOfflineTranscriptRecord = async (taskId, { silent = false } = {}) => {
     }
     return saved
   } catch (e) {
+    logOfflineFlow('sync-failed', {
+      taskId: id,
+      error: extractErrorMessage(e, '写入视频库失败')
+    })
     const saved = await persistNativeTask({
       taskId: id,
       syncStatus: 'failed',
@@ -744,8 +917,16 @@ const generateOfflineTranscriptSummaryForTask = async (taskId, { silent = false 
 
   const current = await getNativeOfflineTranscript(id)
   if (!current?.transcriptText?.trim()) return null
+  logOfflineFlow('summary-start', {
+    taskId: id,
+    apiBaseAvailable: hasLiveVideoBackend(),
+    style: String(current.summaryStyle || processingSettings.value.summaryStyle || 'study')
+  })
 
   if (!hasLiveVideoBackend()) {
+    logOfflineFlow('summary-skipped-backend-unavailable', {
+      taskId: id
+    })
     const skipped = await saveNativeOfflineTranscript({
       taskId: id,
       summaryStatus: 'failed',
@@ -770,6 +951,11 @@ const generateOfflineTranscriptSummaryForTask = async (taskId, { silent = false 
       style
     })
     const data = res?.data || {}
+    logOfflineFlow('summary-success', {
+      taskId: id,
+      style: data.style || style,
+      summaryLength: String(data.summary || '').trim().length
+    })
     const saved = await persistNativeTask({
       taskId: id,
       summary: data.summary || '',
@@ -777,6 +963,7 @@ const generateOfflineTranscriptSummaryForTask = async (taskId, { silent = false 
       summaryStatus: 'completed',
       summaryErrorMessage: '',
       summaryUpdatedAt: new Date().toISOString(),
+      autoGenerateTags: Boolean(processingSettings.value.autoGenerateTags),
       currentStep: current.status === 'completed' ? '本地离线转录完成' : current.currentStep
     })
     await syncOfflineTranscriptRecord(id, { silent })
@@ -785,6 +972,10 @@ const generateOfflineTranscriptSummaryForTask = async (taskId, { silent = false 
     }
     return saved
   } catch (e) {
+    logOfflineFlow('summary-failed', {
+      taskId: id,
+      error: extractErrorMessage(e, '摘要提取失败')
+    })
     const saved = await persistNativeTask({
       taskId: id,
       summaryStatus: 'failed',
@@ -846,6 +1037,7 @@ const normalizeRecentUploads = (list) => {
       status: normalizeVideoStatus(item.status || (item.duplicate ? 'uploaded' : 'pending')),
       progress: displayProgress(item.progress),
       currentStep: String(item.currentStep || ''),
+      tags: Array.isArray(item.tags) ? item.tags.filter(Boolean).map((tag) => String(tag).trim()) : [],
       offlineTaskId: item.offlineTaskId ? String(item.offlineTaskId) : '',
       tempKey: item.tempKey ? String(item.tempKey) : '',
       requestedModel: String(item.requestedModel || item.requested_model || '').trim().toLowerCase(),
@@ -998,6 +1190,7 @@ const buildRecentUploadFromOfflineTask = (task, current = {}) => {
     status: liveStatus,
     progress: task.videoId ? current.progress || 0 : 0,
     currentStep: buildOfflineCurrentStep(task),
+    tags: Array.isArray(current.tags) ? current.tags : [],
     requestedModel,
     effectiveModel: String(current.effectiveModel || requestedModel).trim().toLowerCase(),
     retrying: false
@@ -1202,6 +1395,7 @@ const onFileChange = (e) => {
   }
   file.value = selected
   savedFileMeta.value = { name: selected.name, size: Number(selected.size || 0) }
+  message.value = '已选择视频，确认无误后点击“确认上传”；如果选错了，可点击“重新选择视频”。'
 }
 
 const resetAll = () => {
@@ -1241,6 +1435,12 @@ const startNativeOfflineTranscriptionFlow = async () => {
   let started = false
   try {
     const requestedLocale = resolveNativeTranscriptionLocale(processingSettings.value)
+    logOfflineFlow('native-start-request', {
+      locale: requestedLocale,
+      language: processingSettings.value.language,
+      model: processingSettings.value.model,
+      apiBaseAvailable: hasLiveVideoBackend()
+    })
     const response = await startNativeOfflineTranscription({
       locale: requestedLocale,
       language: processingSettings.value.language,
@@ -1268,8 +1468,16 @@ const startNativeOfflineTranscriptionFlow = async () => {
       transcriptText: '',
       errorMessage: ''
     })
+    logOfflineFlow('native-started', {
+      taskId: response?.taskId,
+      fileName: response?.fileName,
+      locale: response?.locale || requestedLocale || processingSettings.value.language
+    })
     message.value = '已启动 iOS 本地离线转录'
   } catch (e) {
+    logOfflineFlow('native-start-failed', {
+      error: extractErrorMessage(e, '无法启动 iOS 本地离线转录')
+    })
     error.value = extractErrorMessage(e, '无法启动 iOS 本地离线转录')
   } finally {
     if (!started) nativeBusy.value = false
@@ -1278,6 +1486,12 @@ const startNativeOfflineTranscriptionFlow = async () => {
 
 const handleNativeProgressEvent = async (detail = {}) => {
   nativeBusy.value = true
+  logOfflineFlow('native-progress', {
+    taskId: detail.taskId,
+    status: detail.status || detail.phase || 'processing',
+    progress: Number(detail.progress ?? 0) || 0,
+    message: detail.message || '正在本地离线转录'
+  })
   await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,
@@ -1292,6 +1506,12 @@ const handleNativeProgressEvent = async (detail = {}) => {
 
 const handleNativeCompletedEvent = async (detail = {}) => {
   nativeBusy.value = false
+  logOfflineFlow('native-completed', {
+    taskId: detail.taskId,
+    progress: Number(detail.progress ?? 100) || 100,
+    transcriptLength: String(detail.transcriptText || '').trim().length,
+    segmentCount: Array.isArray(detail.segments) ? detail.segments.length : 0
+  })
   const saved = await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,
@@ -1305,6 +1525,10 @@ const handleNativeCompletedEvent = async (detail = {}) => {
     locale: detail.locale,
     engine: detail.engine
   })
+  if (transcriptionOnlyMode) {
+    message.value = 'iOS 本地离线转录完成'
+    return
+  }
   if (saved?.autoGenerateSummary) {
     message.value = 'iOS 本地离线转录完成，正在提取摘要'
     void generateOfflineTranscriptSummaryForTask(saved.taskId)
@@ -1316,6 +1540,11 @@ const handleNativeCompletedEvent = async (detail = {}) => {
 
 const handleNativeFailedEvent = async (detail = {}) => {
   nativeBusy.value = false
+  logOfflineFlow('native-failed', {
+    taskId: detail.taskId,
+    progress: Number(detail.progress ?? 0) || 0,
+    error: detail.message || 'iOS 本地离线转录失败'
+  })
   await persistNativeTask({
     taskId: detail.taskId,
     fileName: detail.fileName,
@@ -1331,7 +1560,12 @@ const handleNativeFailedEvent = async (detail = {}) => {
 }
 
 const uploadFile = async () => {
-  if (!file.value || busy.value) return
+  if (busy.value) return
+  if (!file.value) {
+    submissionMode.value = 'file'
+    openFilePicker()
+    return
+  }
   busy.value = true
   progress.value = 0
   message.value = ''
@@ -1490,20 +1724,31 @@ onUnmounted(() => {
 
 .topbar {
   position: sticky;
-  top: 0;
-  z-index: 5;
+  top: 6px;
+  z-index: 8;
   padding: 12px 14px;
+  margin-bottom: 14px;
   border-radius: 20px;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  background: rgba(242, 235, 248, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .topbar__copy {
   display: grid;
   gap: 4px;
+}
+
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .topbar h2 {
@@ -1669,6 +1914,134 @@ onUnmounted(() => {
   color: #221a30;
 }
 
+.mode-switch-wrap {
+  margin-bottom: 14px;
+}
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mode-switch__item {
+  border: 1px solid rgba(95, 71, 126, 0.12);
+  border-radius: 18px;
+  min-width: 0;
+  min-height: 72px;
+  padding: 12px 10px;
+  display: grid;
+  gap: 3px;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  background: rgba(242, 235, 248, 0.78);
+  color: #55496a;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.mode-switch__item strong {
+  font-size: 13px;
+  color: #221a30;
+  line-height: 1.2;
+}
+
+.mode-switch__item--active {
+  border-color: var(--primary-soft-strong);
+  background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(247, 241, 251, 0.98));
+  box-shadow: 0 12px 24px rgba(95, 71, 126, 0.12);
+  transform: translateY(-1px);
+}
+
+.preference-trigger {
+  width: auto;
+  border: 1px solid rgba(95, 71, 126, 0.12);
+  border-radius: 999px;
+  min-height: 38px;
+  padding: 3px 12px 3px 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  background: rgba(247, 241, 251, 0.98);
+  box-shadow: 0 8px 16px rgba(95, 71, 126, 0.08);
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.preference-trigger:disabled {
+  opacity: 0.6;
+}
+
+.preference-trigger--active {
+  border-color: rgba(95, 71, 126, 0.22);
+  background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(247, 241, 251, 0.98));
+  box-shadow: 0 10px 18px rgba(95, 71, 126, 0.12);
+  transform: translateY(-1px);
+}
+
+.preference-trigger__gear {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  box-shadow: 0 6px 12px rgba(95, 71, 126, 0.18);
+}
+
+.preference-trigger__icon {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.preference-trigger__text {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+}
+
+.preference-trigger__text strong {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  color: #5f477e;
+  display: flex;
+  align-items: center;
+  min-height: 100%;
+}
+
+.preference-card {
+  gap: 14px;
+}
+
+.preference-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #221a30;
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
 .filters {
   display: flex;
   gap: 8px;
@@ -1778,7 +2151,7 @@ onUnmounted(() => {
 
 .file-picker {
   display: grid;
-  grid-template-columns: minmax(0, 132px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   border-radius: 18px;
@@ -1801,6 +2174,13 @@ onUnmounted(() => {
   color: #f9fafb;
   background: linear-gradient(135deg, #5f477e, #8f73ba);
   box-shadow: 0 12px 20px rgba(95, 71, 126, 0.2);
+}
+
+.file-picker__button--secondary {
+  color: var(--primary-deep);
+  background: rgba(247, 241, 251, 0.96);
+  border: 1px solid rgba(95, 71, 126, 0.14);
+  box-shadow: none;
 }
 
 .file-picker__button:disabled {
@@ -1985,6 +2365,14 @@ onUnmounted(() => {
 
   .file-picker {
     grid-template-columns: 1fr;
+  }
+
+  .preference-trigger {
+    align-items: flex-start;
+  }
+
+  .topbar__actions {
+    gap: 8px;
   }
 
   .import-banner__actions {
