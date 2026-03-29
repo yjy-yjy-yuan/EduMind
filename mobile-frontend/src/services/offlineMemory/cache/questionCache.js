@@ -1,0 +1,140 @@
+import {
+  OFFLINE_ENTITY_TYPE,
+  OFFLINE_MEMORY_LIMITS,
+  OFFLINE_SYNC_STATUS,
+  createBaseRecord,
+  createLocalId,
+  normalizeIntegerId,
+  normalizeString,
+  nowIso
+} from '@/services/offlineMemory/storage/db'
+import { ensureOfflineCachePolicy } from '@/services/offlineMemory/cache/policies'
+import { findExistingRecord, getTable, upsertRecord } from '@/services/offlineMemory/storage/repository'
+import { cacheLearningState, touchVideoAccess } from '@/services/offlineMemory/cache/videoCache'
+
+const normalizeReferences = (references = []) =>
+  (Array.isArray(references) ? references : [])
+    .map((item, index) => ({
+      index: Number(item?.index || index + 1),
+      label: normalizeString(item?.label, 120),
+      preview: normalizeString(item?.preview, 240),
+      time_range: normalizeString(item?.time_range, 40),
+      source_type: normalizeString(item?.source_type, 40)
+    }))
+    .filter((item) => item.preview)
+
+const buildQuestionRecord = (input = {}, existing = {}) => {
+  const updatedAt = input.updated_at || input.created_at || existing.updated_at || nowIso()
+  const serverId = input.server_id || input.id || existing.server_id || null
+  return createBaseRecord({
+    local_id: existing.local_id || input.local_id || createLocalId('offline-question'),
+    server_id: serverId,
+    updated_at: updatedAt,
+    sync_status: input.sync_status || existing.sync_status || OFFLINE_SYNC_STATUS.SYNCED,
+    lastAccessedAt: input.lastAccessedAt || existing.lastAccessedAt || updatedAt,
+    entity_type: OFFLINE_ENTITY_TYPE.QUESTION,
+    video_id: normalizeIntegerId(input.video_id ?? existing.video_id),
+    user_id: normalizeIntegerId(input.user_id ?? existing.user_id),
+    mode: normalizeString(input.mode ?? existing.mode ?? 'video', 16) || 'video',
+    provider: normalizeString(input.provider ?? existing.provider ?? 'qwen', 32) || 'qwen',
+    model: normalizeString(input.model ?? existing.model, 64),
+    question: normalizeString(input.question ?? input.content ?? existing.question, OFFLINE_MEMORY_LIMITS.MAX_QUESTION_CHARS),
+    answer: normalizeString(input.answer ?? existing.answer, OFFLINE_MEMORY_LIMITS.MAX_ANSWER_CHARS),
+    references: normalizeReferences(input.references ?? existing.references),
+    source: normalizeString(input.source ?? existing.source ?? 'online', 32),
+    deep_thinking: Boolean(input.deep_thinking ?? existing.deep_thinking),
+    history: Array.isArray(input.history) ? input.history : Array.isArray(existing.history) ? existing.history : []
+  })
+}
+
+const mapQuestionToMessagePair = (item) => ([
+  {
+    role: 'user',
+    text: item.question || ''
+  },
+  {
+    role: 'ai',
+    text: item.answer || '',
+    providerLabel: item.source === 'offline' ? '离线记忆' : '',
+    model: item.model || '',
+    references: Array.isArray(item.references) ? item.references : []
+  }
+])
+
+export const cacheQuestionRecord = async (questionInput, { syncStatus = OFFLINE_SYNC_STATUS.SYNCED } = {}) => {
+  const existing = await findExistingRecord('offline_questions', {
+    localId: questionInput?.local_id,
+    serverId: questionInput?.server_id || questionInput?.id
+  })
+  const record = buildQuestionRecord(
+    {
+      ...questionInput,
+      sync_status: syncStatus
+    },
+    existing
+  )
+  const saved = await upsertRecord('offline_questions', record)
+  if (saved.video_id) {
+    await touchVideoAccess(saved.video_id)
+    await cacheLearningState(saved.video_id, {
+      last_question_at: saved.updated_at
+    })
+    await ensureOfflineCachePolicy({ touchedVideoId: saved.video_id })
+  }
+  return saved
+}
+
+export const getOfflineQuestions = async ({
+  videoId = null,
+  mode = '',
+  provider = '',
+  userId = null,
+  limit = OFFLINE_MEMORY_LIMITS.MAX_QUESTIONS_PER_VIDEO
+} = {}) => {
+  let rows = await getTable('offline_questions').toArray()
+  if (videoId != null) {
+    rows = rows.filter((row) => Number(row.video_id || 0) === Number(videoId))
+  }
+  if (mode) {
+    rows = rows.filter((row) => row.mode === mode)
+  }
+  if (provider) {
+    rows = rows.filter((row) => row.provider === provider)
+  }
+  if (userId != null) {
+    rows = rows.filter((row) => Number(row.user_id || 0) === Number(userId))
+  }
+  return rows
+    .sort((left, right) => new Date(right.lastAccessedAt || right.updated_at || 0) - new Date(left.lastAccessedAt || left.updated_at || 0))
+    .slice(0, limit)
+}
+
+export const getOfflineQaMessages = async (scope = {}) => {
+  const rows = await getOfflineQuestions(scope)
+  return rows
+    .slice()
+    .reverse()
+    .flatMap((row) => mapQuestionToMessagePair(row))
+}
+
+export const buildQuestionPayloadForSync = (question) => ({
+  user_id: question?.user_id || null,
+  video_id: question?.video_id || null,
+  question: question?.question || '',
+  mode: question?.mode || 'video',
+  stream: false,
+  provider: question?.provider || 'qwen',
+  model: question?.model || '',
+  deep_thinking: Boolean(question?.deep_thinking),
+  history: Array.isArray(question?.history) ? question.history : []
+})
+
+export const markOfflineQuestionFailed = async (localId, errorMessage) => {
+  if (!localId) return null
+  await getTable('offline_questions').update(String(localId), {
+    sync_status: OFFLINE_SYNC_STATUS.FAILED,
+    sync_error: normalizeString(errorMessage, 500),
+    updated_at: nowIso()
+  })
+  return getTable('offline_questions').get(String(localId))
+}
