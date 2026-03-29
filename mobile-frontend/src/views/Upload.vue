@@ -55,9 +55,6 @@
       <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
         {{ busy ? '上传中…' : '开始上传' }}
       </button>
-      <button class="btn btn--native" @click="startNativeOfflineTranscriptionFlow" :disabled="busy || nativeBusy">
-        {{ nativeBusy ? '准备本地离线转录…' : 'iOS 本地离线转录' }}
-      </button>
       <label class="field field--native">
         <span class="field-label">本地识别语言/方言</span>
         <select
@@ -1291,14 +1288,14 @@ const openFilePicker = () => {
 }
 
 const startNativeOfflineTranscriptionFlow = async () => {
-  if (busy.value || nativeBusy.value) return
+  if (busy.value || nativeBusy.value) return false
   processingSettings.value = getProcessingSettings()
   message.value = ''
   error.value = ''
 
   if (!hasNativeBridge()) {
     error.value = '当前环境不是 iOS 原生容器，无法进行本地离线转录'
-    return
+    return false
   }
 
   nativeBusy.value = true
@@ -1352,6 +1349,7 @@ const startNativeOfflineTranscriptionFlow = async () => {
   } finally {
     if (!started) nativeBusy.value = false
   }
+  return started
 }
 
 const handleNativeProgressEvent = async (detail = {}) => {
@@ -1425,6 +1423,24 @@ const handleNativeFailedEvent = async (detail = {}) => {
   error.value = detail.message || 'iOS 本地离线转录失败'
 }
 
+const fallbackToNativeOfflineTranscription = async (backendError) => {
+  if (!hasNativeBridge()) return false
+
+  const backendMessage = getVideoUploadQueueableMessage(backendError, '后端暂时不可达')
+  const selectedFileName = String(file.value?.name || savedFileMeta.value?.name || '当前文件').trim()
+  logOfflineFlow('backend-unavailable-fallback-native', {
+    fileName: selectedFileName,
+    reason: backendMessage
+  })
+  message.value = `${backendMessage}，已自动切换到 iPhone 本机离线转录，请在系统文件选择器中选择同一视频继续处理。`
+
+  try {
+    return await startNativeOfflineTranscriptionFlow()
+  } catch {
+    return false
+  }
+}
+
 const uploadFile = async () => {
   if (!file.value || busy.value) return
   busy.value = true
@@ -1470,6 +1486,9 @@ const uploadFile = async () => {
     router.push(videoId ? { path: `/videos/${videoId}`, query: data?.duplicate ? undefined : { autostart: '1' } } : '/videos')
   } catch (e) {
     if (isVideoUploadQueueableError(e)) {
+      busy.value = false
+      const switched = await fallbackToNativeOfflineTranscription(e)
+      if (switched) return
       try {
         await queueOfflineLocalUpload(file.value)
       } catch (queueError) {
