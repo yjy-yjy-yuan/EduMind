@@ -5,6 +5,7 @@
 
 import gc
 import hashlib
+import inspect
 import logging
 import os
 import threading
@@ -457,7 +458,8 @@ class WhisperRuntimeManager:
                     source="transcribe",
                 )
                 start_time = time.time()
-                result = model.transcribe(audio_path, **transcribe_options)
+                filtered_options = self._filter_transcribe_options(model.transcribe, transcribe_options)
+                result = model.transcribe(audio_path, **filtered_options)
 
             elapsed = time.time() - start_time
             logger.info(
@@ -488,6 +490,28 @@ class WhisperRuntimeManager:
                     force_device="cpu",
                 )
             raise
+
+    def _filter_transcribe_options(self, transcribe_callable: Any, options: dict[str, Any]) -> dict[str, Any]:
+        """Filter optional kwargs for Whisper implementations with narrower signatures.
+
+        Some test doubles and older wrappers only accept a subset of OpenAI Whisper's
+        keyword arguments. We keep the core options and silently drop unsupported extras.
+        """
+        try:
+            signature = inspect.signature(transcribe_callable)
+        except (TypeError, ValueError):
+            return options
+
+        parameters = signature.parameters.values()
+        if any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters):
+            return options
+
+        accepted = {parameter.name for parameter in parameters}
+        filtered = {key: value for key, value in options.items() if key in accepted}
+        dropped = sorted(set(options) - set(filtered))
+        if dropped:
+            logger.debug("Whisper transcribe() 不支持部分可选参数，已自动忽略 | dropped=%s", ",".join(dropped))
+        return filtered
 
     def start_background_preload(self, model_name: str = "", model_path: str = "") -> bool:
         """在后台线程预热默认 Whisper 模型。"""

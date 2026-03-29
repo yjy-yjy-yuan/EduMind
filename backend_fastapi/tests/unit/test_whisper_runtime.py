@@ -5,7 +5,6 @@ import time
 import types
 
 import pytest
-
 from app.core.config import settings
 from app.services.whisper_runtime import WhisperRuntimeManager
 
@@ -64,7 +63,8 @@ def test_transcribe_retries_on_cpu_after_mps_failure(tmp_path, monkeypatch):
         def __init__(self, device: str):
             self.device = device
 
-        def transcribe(self, audio_path, *, language, verbose, fp16):
+        def transcribe(self, audio_path, *, language, verbose, fp16, **kwargs):
+            # 生产代码对中文等场景会传入 temperature、initial_prompt 等；与 openai-whisper 一致接受额外参数
             transcribe_calls.append((self.device, audio_path, language, verbose, fp16))
             if self.device == "mps":
                 raise RuntimeError("SparseMPS kernel missing")
