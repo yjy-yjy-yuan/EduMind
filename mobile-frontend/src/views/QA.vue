@@ -86,6 +86,15 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { askQuestionStream, getQuestionHistory } from '@/api/qa'
+import {
+  answerOfflineFromContext,
+  buildVideoMemoryContext,
+  getOfflineQaMessages,
+  offlineMemorySync,
+  persistQuestionResult,
+  saveOfflineQuestion,
+  shouldUseOfflineMemoryMode
+} from '@/services/offlineMemory'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
 const QA_PROVIDER_KEY = 'm_qa_provider'
@@ -248,6 +257,24 @@ const persistSpaceMessages = (spaceKey = currentSpaceKey.value) => {
   storageSet(spaceKey, JSON.stringify(cachedMessages))
 }
 
+const buildMessageSignature = (item) => {
+  const normalized = normalizeMessage(item)
+  return `${normalized.role}:${normalized.text}:${normalized.providerLabel}:${normalized.model}`
+}
+
+const mergeMessageLists = (primary = [], secondary = []) => {
+  const merged = []
+  const seen = new Set()
+  ;[...primary, ...secondary].forEach((item) => {
+    const normalized = normalizeMessage(item)
+    const signature = buildMessageSignature(normalized)
+    if (!signature || seen.has(signature)) return
+    seen.add(signature)
+    merged.push(normalized)
+  })
+  return merged
+}
+
 const buildHistoryPayload = () => {
   return messages.value
     .filter((item) => !item.loading)
@@ -256,6 +283,16 @@ const buildHistoryPayload = () => {
       role: item.role === 'ai' ? 'assistant' : 'user',
       content: String(item.text || '')
     }))
+}
+
+const loadOfflineSpaceMessages = async () => {
+  const rows = await getOfflineQaMessages({
+    videoId: normalizedVideoId.value ?? null,
+    provider: provider.value,
+    mode: currentMode.value,
+    userId: currentUserId.value ?? null
+  })
+  return normalizeMessageList(rows)
 }
 
 const extractErrorMessage = (err, fallback) => {
@@ -279,11 +316,15 @@ const restoreCurrentSpace = async () => {
   }
 
   if (remoteHydratedSpaces.value[spaceKey]) {
+    const offlineMessages = await loadOfflineSpaceMessages()
+    messageSpaces.value[spaceKey] = mergeMessageLists(messageSpaces.value[spaceKey], offlineMessages)
     await scrollToBottom()
     return
   }
 
   if (currentMode.value !== 'video' || normalizedVideoId.value == null || currentUserId.value == null) {
+    const offlineMessages = await loadOfflineSpaceMessages()
+    messageSpaces.value[spaceKey] = mergeMessageLists(messageSpaces.value[spaceKey], offlineMessages)
     await scrollToBottom()
     return
   }
@@ -300,12 +341,16 @@ const restoreCurrentSpace = async () => {
     const payload = res.data || {}
     const remoteMessages = normalizeMessageList(payload.messages)
     if (remoteMessages.length > 0) {
-      messageSpaces.value[spaceKey] = remoteMessages
+      messageSpaces.value[spaceKey] = mergeMessageLists(remoteMessages, messageSpaces.value[spaceKey])
     }
     remoteHydratedSpaces.value[spaceKey] = true
+    const offlineMessages = await loadOfflineSpaceMessages()
+    messageSpaces.value[spaceKey] = mergeMessageLists(messageSpaces.value[spaceKey], offlineMessages)
     persistSpaceMessages(spaceKey)
   } catch (error) {
     if (requestId !== historyRestoreSequence || spaceKey !== currentSpaceKey.value) return
+    const offlineMessages = await loadOfflineSpaceMessages()
+    messageSpaces.value[spaceKey] = mergeMessageLists(messageSpaces.value[spaceKey], offlineMessages)
   } finally {
     if (requestId === historyRestoreSequence && spaceKey === currentSpaceKey.value) {
       await scrollToBottom()
@@ -343,6 +388,51 @@ const buildPendingAiMessage = () => ({
   statusText: '问题已提交，等待处理',
   progress: 5
 })
+
+const persistQuestionToOfflineMemory = async ({ questionText, answerText, references, source, model, serverId, historyPayload }) => {
+  const payload = {
+    local_id: null,
+    server_id: serverId || null,
+    question: questionText,
+    answer: answerText,
+    references,
+    video_id: normalizedVideoId.value ?? null,
+    user_id: currentUserId.value ?? null,
+    mode: currentMode.value,
+    provider: provider.value,
+    model,
+    deep_thinking: deepThinkingEnabled.value,
+    history: historyPayload,
+    source
+  }
+
+  if (source === 'offline') {
+    await saveOfflineQuestion(payload)
+    return
+  }
+
+  await persistQuestionResult(payload)
+}
+
+const runOfflineAnswer = async ({ questionText, historyPayload, pendingAiMessage }) => {
+  const context = await buildVideoMemoryContext(normalizedVideoId.value ?? null)
+  const offlineResult = answerOfflineFromContext(context, questionText)
+  pendingAiMessage.providerLabel = '离线记忆'
+  pendingAiMessage.model = 'indexeddb-context'
+  pendingAiMessage.references = offlineResult.references
+  pendingAiMessage.statusText = '已使用本地离线记忆回答'
+  pendingAiMessage.progress = 100
+  pendingAiMessage.loading = false
+  pendingAiMessage.text = offlineResult.answer
+  await persistQuestionToOfflineMemory({
+    questionText,
+    answerText: offlineResult.answer,
+    references: offlineResult.references,
+    source: 'offline',
+    model: 'indexeddb-context',
+    historyPayload
+  })
+}
 
 const applyStreamEventToMessage = async (message, event) => {
   if (!message || !event || typeof event !== 'object') return
@@ -383,7 +473,17 @@ const send = async () => {
 
   asking.value = true
   try {
-    await askQuestionStream(
+    if (shouldUseOfflineMemoryMode()) {
+      await runOfflineAnswer({
+        questionText: q,
+        historyPayload,
+        pendingAiMessage
+      })
+      persistSpaceMessages()
+      return
+    }
+
+    const finalEvent = await askQuestionStream(
       {
         user_id: currentUserId.value ?? undefined,
         question: q,
@@ -399,13 +499,31 @@ const send = async () => {
         }
       }
     )
+    await persistQuestionToOfflineMemory({
+      questionText: q,
+      answerText: finalEvent?.answer || pendingAiMessage.text,
+      references: Array.isArray(finalEvent?.references) ? finalEvent.references : pendingAiMessage.references,
+      source: 'online',
+      model: finalEvent?.model || pendingAiMessage.model,
+      serverId: finalEvent?.id || null,
+      historyPayload
+    })
+    await offlineMemorySync.flush()
     persistSpaceMessages()
   } catch (e) {
-    pendingAiMessage.loading = false
-    pendingAiMessage.statusText = '回答失败'
-    pendingAiMessage.progress = 100
-    pendingAiMessage.references = []
-    pendingAiMessage.text = extractErrorMessage(e, '请求失败，请稍后再试。')
+    if (shouldUseOfflineMemoryMode(e)) {
+      await runOfflineAnswer({
+        questionText: q,
+        historyPayload,
+        pendingAiMessage
+      })
+    } else {
+      pendingAiMessage.loading = false
+      pendingAiMessage.statusText = '回答失败'
+      pendingAiMessage.progress = 100
+      pendingAiMessage.references = []
+      pendingAiMessage.text = extractErrorMessage(e, '请求失败，请稍后再试。')
+    }
   } finally {
     asking.value = false
     persistSpaceMessages()

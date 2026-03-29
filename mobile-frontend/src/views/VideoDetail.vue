@@ -139,8 +139,10 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi } from '@/config'
 import { createNote, getNotes, updateNote } from '@/api/note'
+import { getSubtitleContext } from '@/api/subtitle'
 import { deleteVideo, generateVideoSummary, generateVideoTags, getVideo, getVideoProcessingOptions, getVideoStatus, processVideo } from '@/api/video'
 import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
+import { buildVideoMemoryContext, cacheLearningState, cacheNotes, cacheVideoMetadata, cacheVideoSubtitles, getOfflineNotes, shouldUseOfflineMemoryMode } from '@/services/offlineMemory'
 import { OFFLINE_QUEUE_EVENT_NAME, getPendingOfflineTasks } from '@/services/offlineQueue'
 import {
   buildProcessPayload,
@@ -369,9 +371,13 @@ const normalizeVideo = (payload) => {
   if (!current) return null
   return {
     ...current,
+    id: current.id || Number(current.server_id || current.video_id || 0) || current.local_id,
     tags: Array.isArray(current.tags) ? current.tags : [],
+    filepath: current.filepath || current?.metadata?.filepath || '',
     requested_model: String(current.requested_model || '').trim().toLowerCase(),
-    effective_model: String(current.effective_model || current.requested_model || '').trim().toLowerCase()
+    effective_model: String(current.effective_model || current.requested_model || '').trim().toLowerCase(),
+    summary: String(current.summary || ''),
+    status: String(current.status || '')
   }
 }
 
@@ -381,14 +387,66 @@ const normalizeNoteList = (payload) => {
 }
 
 const normalizeNote = (payload) => payload?.note || payload?.data || payload || null
+
+const normalizeSubtitleContext = (payload) => {
+  const list = payload?.data?.subtitles || payload?.data || payload?.subtitles || payload || []
+  return Array.isArray(list) ? list : []
+}
+
+const hydrateOfflineVideoContext = async (videoId, fallbackMessage = '当前展示的是本地离线缓存') => {
+  const context = await buildVideoMemoryContext(videoId)
+  if (!context?.video && !context?.summary && context?.notes?.length === 0) {
+    throw new Error('当前没有可用的离线视频缓存')
+  }
+
+  video.value = normalizeVideo({
+    ...(context.video || {}),
+    id: Number(videoId),
+    title: context?.video?.title || `视频 ${videoId}`,
+    summary: context.summary || context?.video?.summary || '',
+    tags: context.tags || context?.video?.tags || [],
+    status: context?.video?.status || context?.learning_state?.status || 'cached'
+  })
+  videoNotes.value = (context.notes || []).slice(0, 3)
+  statusInfo.value = {
+    status: context?.video?.status || context?.learning_state?.status || 'cached',
+    progress: Number(context?.learning_state?.progress_percent || 0),
+    current_step: '离线缓存模式'
+  }
+  error.value = fallbackMessage
+}
+
+const refreshOfflineMemoryContext = async (currentVideo) => {
+  const normalizedVideo = normalizeVideo(currentVideo)
+  if (!normalizedVideo?.id) return
+  await cacheVideoMetadata(normalizedVideo)
+  await cacheLearningState(normalizedVideo.id, {
+    status: normalizedVideo.status
+  })
+  try {
+    const subtitleResponse = await getSubtitleContext(normalizedVideo.id, { preferMerged: true })
+    const subtitleFragments = normalizeSubtitleContext(subtitleResponse)
+    if (subtitleFragments.length > 0) {
+      await cacheVideoSubtitles(normalizedVideo.id, subtitleFragments)
+    }
+  } catch {
+    // ignore subtitle cache refresh failures
+  }
+}
+
 const loadVideoNotes = async () => {
   notesLoading.value = true
   try {
     const response = await getNotes({ video_id: Number(id.value) })
     const list = normalizeNoteList(response?.data)
+    await cacheNotes(list)
     videoNotes.value = list.slice(0, 3)
-  } catch {
-    videoNotes.value = []
+  } catch (e) {
+    if (shouldUseOfflineMemoryMode(e)) {
+      videoNotes.value = (await getOfflineNotes({ videoId: Number(id.value) })).slice(0, 3)
+    } else {
+      videoNotes.value = []
+    }
   } finally {
     notesLoading.value = false
   }
@@ -402,16 +460,29 @@ const reload = async () => {
     processingSettings.value = getProcessingSettings()
     const res = await getVideo(id.value)
     video.value = normalizeVideo(res.data)
+    await refreshOfflineMemoryContext(video.value)
     if (video.value?.processing_origin === 'ios_offline' && video.value?.task_id) {
       await router.replace(`/local-transcripts/${video.value.task_id}`)
       return
     }
     await loadVideoNotes()
-    await fetchStatus()
+    try {
+      await fetchStatus()
+    } catch (statusError) {
+      if (!shouldUseOfflineMemoryMode(statusError)) throw statusError
+    }
     startPollingIfNeeded()
     await tryAutoStartProcessing()
   } catch (e) {
-    error.value = e?.message || '加载失败'
+    if (shouldUseOfflineMemoryMode(e)) {
+      try {
+        await hydrateOfflineVideoContext(id.value, '当前后端不可达，已切换到本地离线缓存')
+      } catch {
+        error.value = e?.message || '加载失败'
+      }
+    } else {
+      error.value = e?.message || '加载失败'
+    }
   } finally {
     loading.value = false
   }

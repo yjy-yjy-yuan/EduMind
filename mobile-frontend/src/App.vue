@@ -15,9 +15,15 @@ import { onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import TabBar from '@/components/TabBar.vue'
 import { flushOfflineQueue } from '@/services/offlineQueue'
+import { offlineMemorySync } from '@/services/offlineMemory'
 
 const route = useRoute()
 let wasHidden = typeof document !== 'undefined' ? document.visibilityState === 'hidden' : false
+
+const flushAllOfflineWork = async () => {
+  await flushOfflineQueue()
+  await offlineMemorySync.flush()
+}
 
 const handleVisibilityChange = async () => {
   if (typeof document === 'undefined') return
@@ -27,19 +33,29 @@ const handleVisibilityChange = async () => {
   }
   if (!wasHidden) return
   wasHidden = false
-  await flushOfflineQueue()
+  await flushAllOfflineWork()
+}
+
+const handleOnline = async () => {
+  await flushAllOfflineWork()
 }
 
 onMounted(async () => {
-  await flushOfflineQueue()
+  await flushAllOfflineWork()
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', handleVisibilityChange)
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', handleOnline)
   }
 })
 
 onUnmounted(() => {
   if (typeof document !== 'undefined') {
     document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('online', handleOnline)
   }
 })
 </script>

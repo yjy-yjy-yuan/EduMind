@@ -17,3 +17,14 @@ export function getMergedVideoSubtitles(videoId, { forceRefresh = false } = {}) 
     }
   })
 }
+
+export async function getSubtitleContext(videoId, { preferMerged = true, forceRefresh = false } = {}) {
+  if (preferMerged) {
+    try {
+      return await getMergedVideoSubtitles(videoId, { forceRefresh })
+    } catch (error) {
+      return getVideoSubtitles(videoId)
+    }
+  }
+  return getVideoSubtitles(videoId)
+}
