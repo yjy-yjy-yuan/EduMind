@@ -83,11 +83,11 @@
       <div class="list">
         <button
           v-for="note in notes"
-          :key="note.id"
+          :key="noteKey(note)"
           class="card"
-          :class="{ 'card--focus': Number(note.id) === focusedNoteId }"
-          :data-note-id="note.id"
-          @click="go(`/notes/${note.id}`)"
+          :class="{ 'card--focus': noteKey(note) === focusedNoteKey }"
+          :data-note-id="noteKey(note)"
+          @click="go(`/notes/${noteKey(note)}`)"
         >
           <div class="row">
             <div class="title">{{ note.title || '未命名笔记' }}</div>
@@ -102,6 +102,8 @@
             <span v-if="Array.isArray(note.timestamps) && note.timestamps.length > 0" class="meta-pill meta-pill--time">
               {{ formatTimestampSummary(note.timestamps) }}
             </span>
+            <span v-if="note.sync_status === 'pending'" class="meta-pill">待同步</span>
+            <span v-else-if="note.sync_status === 'failed'" class="meta-pill">同步失败</span>
           </div>
 
           <div v-if="Array.isArray(note.tags) && note.tags.length > 0" class="tag-row">
@@ -120,6 +122,15 @@ import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getNote, getNoteTags, getNotes } from '@/api/note'
 import { getVideoList } from '@/api/video'
+import {
+  cacheNotes,
+  cacheVideoList,
+  getCachedVideoOptions,
+  getOfflineNoteByIdentifier,
+  getOfflineNoteTags,
+  getOfflineNotes,
+  shouldUseOfflineMemoryMode
+} from '@/services/offlineMemory'
 
 const route = useRoute()
 const router = useRouter()
@@ -138,12 +149,9 @@ const filters = reactive({
 })
 
 const hasActiveFilters = computed(() => Boolean(filters.search || filters.videoId || filters.tag))
-const focusedNoteId = computed(() => {
-  const value = Number(route.query.noteId || 0)
-  return Number.isFinite(value) && value > 0 ? value : 0
-})
+const focusedNoteKey = computed(() => String(route.query.noteId || '').trim())
 const focusMessage = computed(() => {
-  if (!focusedNoteId.value) return ''
+  if (!focusedNoteKey.value) return ''
   if (route.query.noteAction === 'created') return '刚保存的笔记已为你置顶显示。'
   if (route.query.noteAction === 'updated') return '刚更新的笔记已为你置顶显示。'
   return '已定位到指定笔记。'
@@ -167,6 +175,8 @@ const normalizeVideoList = (payload) => {
   return Array.isArray(list) ? list : []
 }
 
+const noteKey = (note) => String(note?.id || note?.server_id || note?.local_id || '')
+
 const sortNotes = (list) =>
   [...list].sort((a, b) => {
     const aTime = new Date(a?.updated_at || a?.created_at || 0).getTime()
@@ -187,7 +197,35 @@ const syncRouteQuery = async () => {
   if (filters.search) query.search = filters.search
   if (filters.videoId) query.videoId = String(filters.videoId)
   if (filters.tag) query.tag = filters.tag
+  if (focusedNoteKey.value) query.noteId = focusedNoteKey.value
+  if (route.query.noteAction) query.noteAction = route.query.noteAction
   await router.replace({ path: route.path, query })
+}
+
+const loadOfflineState = async () => {
+  let nextNotes = sortNotes(
+    await getOfflineNotes({
+      search: filters.search,
+      videoId: filters.videoId ? Number(filters.videoId) : null,
+      tag: filters.tag
+    })
+  )
+
+  if (focusedNoteKey.value) {
+    const existing = nextNotes.find((item) => noteKey(item) === focusedNoteKey.value)
+    if (!existing) {
+      const focused = await getOfflineNoteByIdentifier(focusedNoteKey.value)
+      if (focused) {
+        nextNotes = [focused, ...nextNotes]
+      }
+    } else {
+      nextNotes = [existing, ...nextNotes.filter((item) => noteKey(item) !== focusedNoteKey.value)]
+    }
+  }
+
+  notes.value = nextNotes
+  tagOptions.value = await getOfflineNoteTags()
+  videoOptions.value = await getCachedVideoOptions()
 }
 
 const reload = async () => {
@@ -202,20 +240,24 @@ const reload = async () => {
   try {
     if (noteResult.status !== 'fulfilled') throw noteResult.reason
     let nextNotes = sortNotes(normalizeNoteList(noteResult.value?.data))
+    await cacheNotes(nextNotes)
 
-    if (focusedNoteId.value > 0) {
-      const existing = nextNotes.find((item) => Number(item?.id) === focusedNoteId.value)
+    if (focusedNoteKey.value) {
+      const existing = nextNotes.find((item) => noteKey(item) === focusedNoteKey.value)
       if (existing) {
-        nextNotes = [existing, ...nextNotes.filter((item) => Number(item?.id) !== focusedNoteId.value)]
+        nextNotes = [existing, ...nextNotes.filter((item) => noteKey(item) !== focusedNoteKey.value)]
       } else {
         try {
-          const focusedResponse = await getNote(focusedNoteId.value)
+          const focusedResponse = await getNote(focusedNoteKey.value)
           const focusedNote = focusedResponse?.data?.note || focusedResponse?.data?.data || focusedResponse?.data
           if (focusedNote) {
             nextNotes = [focusedNote, ...nextNotes]
           }
         } catch {
-          // keep current list when the focused note cannot be reloaded
+          const focusedNote = await getOfflineNoteByIdentifier(focusedNoteKey.value)
+          if (focusedNote) {
+            nextNotes = [focusedNote, ...nextNotes]
+          }
         }
       }
     }
@@ -223,19 +265,26 @@ const reload = async () => {
     notes.value = nextNotes
 
     tagOptions.value = tagResult.status === 'fulfilled' ? normalizeTagBuckets(tagResult.value?.data) : []
-    videoOptions.value = videoResult.status === 'fulfilled'
-      ? sortNotes(normalizeVideoList(videoResult.value?.data))
-      : []
+    const normalizedVideos = videoResult.status === 'fulfilled' ? normalizeVideoList(videoResult.value?.data) : []
+    if (normalizedVideos.length > 0) {
+      await cacheVideoList(normalizedVideos)
+    }
+    videoOptions.value = videoResult.status === 'fulfilled' ? sortNotes(normalizedVideos) : []
 
-    if (focusedNoteId.value > 0) {
+    if (focusedNoteKey.value) {
       await nextTick()
-      const target = document.querySelector(`[data-note-id="${focusedNoteId.value}"]`)
+      const target = document.querySelector(`[data-note-id="${focusedNoteKey.value}"]`)
       if (target?.scrollIntoView) {
         target.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
     }
   } catch (e) {
-    error.value = e?.message || '加载失败'
+    if (shouldUseOfflineMemoryMode(e)) {
+      await loadOfflineState()
+      error.value = '当前后端不可达，已切换到本地离线笔记缓存'
+    } else {
+      error.value = e?.message || '加载失败'
+    }
   } finally {
     loading.value = false
   }

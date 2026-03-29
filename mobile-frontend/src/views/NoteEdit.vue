@@ -187,8 +187,20 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { addNoteTimestamp, createNote, deleteNote, deleteNoteTimestamp, getNote, getNoteTags, updateNote } from '@/api/note'
-import { getMergedVideoSubtitles, getVideoSubtitles } from '@/api/subtitle'
+import { getSubtitleContext } from '@/api/subtitle'
 import { getVideo, getVideoList } from '@/api/video'
+import {
+  buildVideoMemoryContext,
+  cacheOnlineNote,
+  cacheVideoList,
+  cacheVideoMetadata,
+  cacheVideoSubtitles,
+  getCachedVideoOptions,
+  getOfflineNoteByIdentifier,
+  getOfflineNoteTags,
+  saveNoteOffline,
+  shouldUseOfflineMemoryMode
+} from '@/services/offlineMemory'
 
 const route = useRoute()
 const router = useRouter()
@@ -208,6 +220,8 @@ const videoSummary = ref('')
 const videoSubtitles = ref([])
 const summarySegments = ref([])
 const activeSummaryTheme = ref('all')
+const currentNoteLocalId = ref('')
+const currentNoteServerId = ref('')
 
 const form = reactive({
   title: '',
@@ -448,8 +462,14 @@ const bootstrapFromRouteQuery = () => {
 
 const loadAuxiliaryData = async () => {
   const [videoResult, tagResult] = await Promise.allSettled([getVideoList(1, 100), getNoteTags()])
-  videoOptions.value = videoResult.status === 'fulfilled' ? sortByUpdated(normalizeVideoList(videoResult.value?.data)) : []
-  popularTags.value = tagResult.status === 'fulfilled' ? normalizeTagBuckets(tagResult.value?.data) : []
+  if (videoResult.status === 'fulfilled') {
+    const list = sortByUpdated(normalizeVideoList(videoResult.value?.data))
+    videoOptions.value = list
+    await cacheVideoList(list)
+  } else {
+    videoOptions.value = await getCachedVideoOptions()
+  }
+  popularTags.value = tagResult.status === 'fulfilled' ? normalizeTagBuckets(tagResult.value?.data) : await getOfflineNoteTags()
 }
 
 const loadSelectedVideoContext = async (videoId) => {
@@ -464,8 +484,8 @@ const loadSelectedVideoContext = async (videoId) => {
 
   const [videoResult, subtitleResult, segmentResult] = await Promise.allSettled([
     getVideo(videoId),
-    getVideoSubtitles(videoId),
-    getMergedVideoSubtitles(videoId)
+    getSubtitleContext(videoId, { preferMerged: false }),
+    getSubtitleContext(videoId, { preferMerged: true })
   ])
 
   try {
@@ -478,6 +498,13 @@ const loadSelectedVideoContext = async (videoId) => {
     const themes = parseSummaryOutline(currentSummary)
     const segmentSource = mergedSegments.length > 0 ? mergedSegments : rawSubtitles
 
+    if (videoDetail) {
+      await cacheVideoMetadata(videoDetail)
+    }
+    if (segmentSource.length > 0) {
+      await cacheVideoSubtitles(videoId, segmentSource)
+    }
+
     videoSummary.value = currentSummary
     videoSubtitles.value = rawSubtitles
     summarySegments.value = buildDecoratedSegments(segmentSource, themes, videoId)
@@ -486,10 +513,40 @@ const loadSelectedVideoContext = async (videoId) => {
       videoContextError.value = '当前视频还没有可用字幕，暂时无法自动回填重点时间点。'
     }
   } catch (e) {
-    videoContextError.value = e?.message || '视频摘要与字幕上下文加载失败'
+    if (shouldUseOfflineMemoryMode(e)) {
+      const context = await buildVideoMemoryContext(videoId)
+      const themes = parseSummaryOutline(context?.summary || '')
+      videoSummary.value = normalizeText(context?.summary)
+      videoSubtitles.value = sortByStartTime(context?.subtitles || [])
+      summarySegments.value = buildDecoratedSegments(context?.subtitles || [], themes, videoId)
+      videoContextError.value = summarySegments.value.length > 0 || videoSummary.value
+        ? '当前展示的是本地离线摘要与字幕缓存'
+        : '当前视频还没有可用的离线摘要或字幕缓存。'
+    } else {
+      videoContextError.value = e?.message || '视频摘要与字幕上下文加载失败'
+    }
   } finally {
     videoContextLoading.value = false
   }
+}
+
+const applyLoadedNote = (note) => {
+  if (!note) return
+  currentNoteLocalId.value = String(note.local_id || '')
+  currentNoteServerId.value = String(note.server_id || note.id || '')
+  form.title = note.title || ''
+  form.content = note.content || ''
+  form.tagsText = tagsToInput(note.tags)
+  form.videoId = note.video_id ? String(note.video_id) : ''
+  ensureVideoOption(note.video_id, note.video_title)
+
+  const loadedTimestamps = sortTimestamps((note.timestamps || []).map((item) => toEditableTimestamp(item)))
+  timestamps.value = loadedTimestamps
+  originalTimestamps.value = loadedTimestamps.map((item) => ({
+    id: item.id,
+    timeSeconds: item.timeSeconds,
+    subtitleText: item.subtitleText
+  }))
 }
 
 const load = async () => {
@@ -506,22 +563,20 @@ const load = async () => {
     const res = await getNote(id.value)
     const note = normalizeNote(res.data)
     if (!note) throw new Error('笔记不存在')
-
-    form.title = note.title || ''
-    form.content = note.content || ''
-    form.tagsText = tagsToInput(note.tags)
-    form.videoId = note.video_id ? String(note.video_id) : ''
-    ensureVideoOption(note.video_id, note.video_title)
-
-    const loadedTimestamps = sortTimestamps((note.timestamps || []).map((item) => toEditableTimestamp(item)))
-    timestamps.value = loadedTimestamps
-    originalTimestamps.value = loadedTimestamps.map((item) => ({
-      id: item.id,
-      timeSeconds: item.timeSeconds,
-      subtitleText: item.subtitleText
-    }))
+    const cached = await cacheOnlineNote(note)
+    applyLoadedNote(cached)
   } catch (e) {
-    error.value = e?.message || '加载失败'
+    if (shouldUseOfflineMemoryMode(e)) {
+      const offlineNote = await getOfflineNoteByIdentifier(id.value)
+      if (!offlineNote) {
+        error.value = e?.message || '加载失败'
+      } else {
+        applyLoadedNote(offlineNote)
+        error.value = '当前后端不可达，正在编辑本地离线笔记'
+      }
+    } else {
+      error.value = e?.message || '加载失败'
+    }
   } finally {
     loading.value = false
   }
@@ -784,36 +839,111 @@ const save = async () => {
     }
 
     const payload = buildPayload()
+    const offlineSave = async (noteAction) => {
+      const saved = await saveNoteOffline(
+        {
+          ...payload,
+          timestamps: timestamps.value.map((item) => toTimestampPayload(item)),
+          video_title: selectedVideoLabel.value
+        },
+        {
+          existingLocalId: currentNoteLocalId.value || null,
+          existingServerId: currentNoteServerId.value || null
+        }
+      )
+      currentNoteLocalId.value = saved.local_id
+      currentNoteServerId.value = saved.server_id || ''
+      const query = {
+        noteId: saved.server_id || saved.local_id,
+        noteAction
+      }
+      if (payload.video_id) query.videoId = String(payload.video_id)
+      await router.replace({ path: '/notes', query })
+    }
+
     if (!payload.content) {
       error.value = '请填写内容，或至少关联视频/添加重点时间点后再保存'
       return
     }
 
     if (isNew.value) {
-      const response = await createNote({
-        ...payload,
-        timestamps: timestamps.value.map((item) => toTimestampPayload(item))
-      })
-      const created = normalizeNote(response?.data)
-      const createdId = created?.id ? String(created.id) : ''
-      const query = {}
-      if (createdId) query.noteId = createdId
-      query.noteAction = 'created'
-      if (payload.video_id) query.videoId = String(payload.video_id)
-      await router.replace({ path: '/notes', query })
+      if (shouldUseOfflineMemoryMode()) {
+        await offlineSave('created')
+        return
+      }
+      try {
+        const response = await createNote({
+          ...payload,
+          timestamps: timestamps.value.map((item) => toTimestampPayload(item))
+        })
+        const created = normalizeNote(response?.data)
+        const cached = await cacheOnlineNote({
+          ...created,
+          timestamps: created?.timestamps || timestamps.value.map((item) => toTimestampPayload(item)),
+          video_title: selectedVideoLabel.value
+        })
+        currentNoteLocalId.value = cached.local_id
+        currentNoteServerId.value = cached.server_id || created?.id || ''
+        const query = {}
+        if (cached.server_id || cached.local_id) query.noteId = cached.server_id || cached.local_id
+        query.noteAction = 'created'
+        if (payload.video_id) query.videoId = String(payload.video_id)
+        await router.replace({ path: '/notes', query })
+      } catch (e) {
+        if (shouldUseOfflineMemoryMode(e)) {
+          await offlineSave('created')
+          return
+        }
+        throw e
+      }
       return
     }
 
-    const response = await updateNote(id.value, payload)
-    await syncTimestamps(id.value)
-    const updated = normalizeNote(response?.data)
-    const updatedId = updated?.id ? String(updated.id) : String(id.value)
-    const query = {
-      noteId: updatedId,
-      noteAction: 'updated'
+    if (shouldUseOfflineMemoryMode()) {
+      await offlineSave('updated')
+      return
     }
-    if (payload.video_id) query.videoId = String(payload.video_id)
-    await router.replace({ path: '/notes', query })
+
+    try {
+      if (!currentNoteServerId.value) {
+        const response = await createNote({
+          ...payload,
+          timestamps: timestamps.value.map((item) => toTimestampPayload(item))
+        })
+        const created = normalizeNote(response?.data)
+        const cached = await cacheOnlineNote({
+          ...created,
+          timestamps: created?.timestamps || timestamps.value.map((item) => toTimestampPayload(item)),
+          video_title: selectedVideoLabel.value
+        })
+        currentNoteLocalId.value = cached.local_id
+        currentNoteServerId.value = cached.server_id || created?.id || ''
+      } else {
+        const response = await updateNote(currentNoteServerId.value, payload)
+        await syncTimestamps(currentNoteServerId.value)
+        const updated = normalizeNote(response?.data)
+        const cached = await cacheOnlineNote({
+          ...updated,
+          timestamps: timestamps.value.map((item) => toTimestampPayload(item)),
+          video_title: selectedVideoLabel.value
+        })
+        currentNoteLocalId.value = cached.local_id
+        currentNoteServerId.value = cached.server_id || updated?.id || currentNoteServerId.value
+      }
+
+      const query = {
+        noteId: currentNoteServerId.value || currentNoteLocalId.value || String(id.value),
+        noteAction: 'updated'
+      }
+      if (payload.video_id) query.videoId = String(payload.video_id)
+      await router.replace({ path: '/notes', query })
+    } catch (e) {
+      if (shouldUseOfflineMemoryMode(e)) {
+        await offlineSave('updated')
+        return
+      }
+      throw e
+    }
   } catch (e) {
     error.value = e?.message || '保存失败'
   } finally {
