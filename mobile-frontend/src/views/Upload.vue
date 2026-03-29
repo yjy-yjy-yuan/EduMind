@@ -4,7 +4,27 @@
       <div class="topbar__copy">
         <h2>导入学习内容</h2>
       </div>
-      <button class="link" @click="resetAll" :disabled="busy">重置</button>
+      <div class="topbar__actions">
+        <button
+          class="preference-trigger"
+          :class="{ 'preference-trigger--active': showPreferenceCard }"
+          type="button"
+          @click="togglePreferenceCard"
+          :disabled="busy || nativeBusy"
+          :aria-expanded="showPreferenceCard ? 'true' : 'false'"
+          aria-controls="upload-preferences-card"
+        >
+          <span class="preference-trigger__gear" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="preference-trigger__icon">
+              <path d="M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.88 1h-3.76a.5.5 0 0 0-.49.42l-.36 2.54c-.58.22-1.13.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.73 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.05.31-.08.63-.08.94s.03.63.08.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.76a.5.5 0 0 0 .49-.42l.36-2.54c.58-.22 1.13-.53 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z" />
+            </svg>
+          </span>
+          <span class="preference-trigger__text">
+            <strong>偏好设置</strong>
+          </span>
+        </button>
+        <button class="link" @click="resetAll" :disabled="busy">重置</button>
+      </div>
     </header>
 
     <div v-if="hasRecommendationImport" class="card import-banner">
@@ -19,16 +39,6 @@
         <button class="btn btn--primary" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交当前推荐链接' }}</button>
         <button class="btn" @click="router.push('/recommendations')" :disabled="busy">返回推荐页</button>
       </div>
-    </div>
-
-    <div class="card" :class="{ 'card--active': submissionMode === 'file' }">
-      <WhisperModelPicker
-        title="Whisper 模型"
-        :model="processingSettings.model"
-        :options="whisperModelOptions"
-        :disabled="busy"
-        @select="selectProcessingModel"
-      />
     </div>
 
     <div class="mode-switch-wrap">
@@ -54,6 +64,77 @@
       </div>
     </div>
 
+    <div v-if="showPreferenceCard" id="upload-preferences-card" class="card preference-card">
+      <div class="preference-card__head">
+        <div class="card-title">偏好设置</div>
+        <button class="link link--small" type="button" @click="showPreferenceCard = false">收起</button>
+      </div>
+      <label class="field">
+        <span class="field-label">识别语言</span>
+        <select
+          class="input"
+          :value="processingSettings.language"
+          :disabled="busy || nativeBusy"
+          @change="selectProcessingLanguage($event.target.value)"
+        >
+          <option v-for="option in LANGUAGE_OPTIONS" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">本地识别语言/方言</span>
+        <select
+          class="input"
+          :value="processingSettings.nativeLocale"
+          :disabled="busy || nativeBusy"
+          @change="selectNativeLocale($event.target.value)"
+        >
+          <option v-for="option in NATIVE_LOCALE_OPTIONS" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
+      <WhisperModelPicker
+        title="Whisper 模型"
+        :model="processingSettings.model"
+        :options="whisperModelOptions"
+        :disabled="busy || nativeBusy"
+        @select="selectProcessingModel"
+      />
+      <label class="field">
+        <span class="field-label">摘要风格</span>
+        <select
+          class="input"
+          :value="processingSettings.summaryStyle"
+          :disabled="busy || nativeBusy"
+          @change="selectSummaryStyle($event.target.value)"
+        >
+          <option v-for="option in SUMMARY_STYLE_OPTIONS" :key="option.value" :value="option.value">
+            {{ option.label }}
+          </option>
+        </select>
+      </label>
+      <label class="toggle">
+        <input
+          :checked="processingSettings.autoGenerateSummary"
+          type="checkbox"
+          :disabled="busy || nativeBusy"
+          @change="setAutoGenerateSummary($event.target.checked)"
+        />
+        <span>处理完成后自动生成摘要</span>
+      </label>
+      <label class="toggle">
+        <input
+          :checked="processingSettings.autoGenerateTags"
+          type="checkbox"
+          :disabled="busy || nativeBusy"
+          @change="setAutoGenerateTags($event.target.checked)"
+        />
+        <span>处理完成后自动提取标签</span>
+      </label>
+    </div>
+
     <div v-if="submissionMode === 'file'" class="card" :class="{ 'card--active': submissionMode === 'file' }">
       <div class="card-title">本地视频</div>
       <input
@@ -76,19 +157,6 @@
       <button class="btn btn--primary" @click="uploadFile" :disabled="busy">
         {{ busy ? '上传中…' : (file ? '确认上传' : '开始上传') }}
       </button>
-      <label class="field field--native">
-        <span class="field-label">本地识别语言/方言</span>
-        <select
-          class="input"
-          :value="processingSettings.nativeLocale"
-          :disabled="busy || nativeBusy"
-          @change="selectNativeLocale($event.target.value)"
-        >
-          <option v-for="option in NATIVE_LOCALE_OPTIONS" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </option>
-        </select>
-      </label>
       <div class="muted">处理设置：{{ processingSettingsSummary }}</div>
 
       <div v-if="busy" class="progress">
@@ -289,12 +357,14 @@ import {
   buildProcessPayload,
   getProcessingSettings,
   getWhisperModelOptions,
+  LANGUAGE_OPTIONS,
   languageLabel,
   NATIVE_LOCALE_OPTIONS,
   nativeLocaleLabel,
   resolveNativeTranscriptionLocale,
   saveWhisperModelCatalog,
   saveProcessingSettings,
+  SUMMARY_STYLE_OPTIONS,
   summaryStyleLabel,
   whisperModelLabel
 } from '@/services/processingSettings'
@@ -340,6 +410,7 @@ let recentStatusTimer = null
 const processingSettings = ref(getProcessingSettings())
 const whisperModelOptions = ref(getWhisperModelOptions())
 const transcriptionOnlyMode = true
+const showPreferenceCard = ref(false)
 
 const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
 const ALLOWED_EXTENSIONS = new Set(['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'])
@@ -506,10 +577,18 @@ const openUploadRecommendation = (item) => {
 }
 
 const selectProcessingModel = (model) => {
-  if (busy.value) return
+  if (busy.value || nativeBusy.value) return
   processingSettings.value = saveProcessingSettings({
     ...processingSettings.value,
     model
+  })
+}
+
+const selectProcessingLanguage = (language) => {
+  if (busy.value || nativeBusy.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    language: String(language || '').trim() || processingSettings.value.language
   })
 }
 
@@ -524,6 +603,37 @@ const selectNativeLocale = (nativeLocale) => {
     ...processingSettings.value,
     nativeLocale: String(nativeLocale || '').trim()
   })
+}
+
+const selectSummaryStyle = (summaryStyle) => {
+  if (busy.value || nativeBusy.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    summaryStyle: String(summaryStyle || '').trim() || processingSettings.value.summaryStyle
+  })
+}
+
+const setAutoGenerateSummary = (enabled) => {
+  if (busy.value || nativeBusy.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    autoGenerateSummary: Boolean(enabled),
+    autoGenerateTags: enabled ? processingSettings.value.autoGenerateTags : false
+  })
+}
+
+const setAutoGenerateTags = (enabled) => {
+  if (busy.value || nativeBusy.value) return
+  processingSettings.value = saveProcessingSettings({
+    ...processingSettings.value,
+    autoGenerateTags: Boolean(enabled),
+    autoGenerateSummary: enabled ? true : processingSettings.value.autoGenerateSummary
+  })
+}
+
+const togglePreferenceCard = () => {
+  if (busy.value || nativeBusy.value) return
+  showPreferenceCard.value = !showPreferenceCard.value
 }
 
 const consumeUploadRouteIntent = async () => {
@@ -1621,7 +1731,7 @@ onUnmounted(() => {
   border-radius: 20px;
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
   background: rgba(242, 235, 248, 0.96);
@@ -1632,6 +1742,13 @@ onUnmounted(() => {
 .topbar__copy {
   display: grid;
   gap: 4px;
+}
+
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .topbar h2 {
@@ -1834,6 +1951,95 @@ onUnmounted(() => {
   background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(247, 241, 251, 0.98));
   box-shadow: 0 12px 24px rgba(95, 71, 126, 0.12);
   transform: translateY(-1px);
+}
+
+.preference-trigger {
+  width: auto;
+  border: 1px solid rgba(95, 71, 126, 0.12);
+  border-radius: 999px;
+  min-height: 38px;
+  padding: 3px 12px 3px 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  background: rgba(247, 241, 251, 0.98);
+  box-shadow: 0 8px 16px rgba(95, 71, 126, 0.08);
+  transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.preference-trigger:disabled {
+  opacity: 0.6;
+}
+
+.preference-trigger--active {
+  border-color: rgba(95, 71, 126, 0.22);
+  background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(247, 241, 251, 0.98));
+  box-shadow: 0 10px 18px rgba(95, 71, 126, 0.12);
+  transform: translateY(-1px);
+}
+
+.preference-trigger__gear {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  box-shadow: 0 6px 12px rgba(95, 71, 126, 0.18);
+}
+
+.preference-trigger__icon {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.preference-trigger__text {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+}
+
+.preference-trigger__text strong {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  color: #5f477e;
+  display: flex;
+  align-items: center;
+  min-height: 100%;
+}
+
+.preference-card {
+  gap: 14px;
+}
+
+.preference-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #221a30;
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
 }
 
 .filters {
@@ -2159,6 +2365,14 @@ onUnmounted(() => {
 
   .file-picker {
     grid-template-columns: 1fr;
+  }
+
+  .preference-trigger {
+    align-items: flex-start;
+  }
+
+  .topbar__actions {
+    gap: 8px;
   }
 
   .import-banner__actions {

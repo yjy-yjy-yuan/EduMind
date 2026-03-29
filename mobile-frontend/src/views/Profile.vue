@@ -75,51 +75,6 @@
     </div>
 
     <div class="card card--muted">
-      <div class="card-title">处理设置</div>
-      <p class="muted" style="margin: 0 0 8px; font-size: 12px;">这些设置会用于新上传视频、详情页重新处理，以及失败任务重试。</p>
-      <label class="field">
-        <span class="field-label">识别语言</span>
-        <select v-model="processingForm.language" class="input">
-          <option v-for="option in LANGUAGE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
-        </select>
-      </label>
-      <label class="field">
-        <span class="field-label">iOS 离线识别语言/方言</span>
-        <select v-model="processingForm.nativeLocale" class="input">
-          <option v-for="option in NATIVE_LOCALE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
-        </select>
-        <div class="field-help">仅用于 iPhone 本地离线转录，不影响后端在线 Whisper 处理。</div>
-      </label>
-      <label class="field">
-        <span class="field-label">Whisper 模型</span>
-        <select v-model="processingForm.model" class="input">
-          <option v-for="option in whisperModelOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-        </select>
-        <div class="field-help">当前优势：{{ currentModelHighlight }}</div>
-      </label>
-      <label class="field">
-        <span class="field-label">摘要风格</span>
-        <select v-model="processingForm.summaryStyle" class="input">
-          <option v-for="option in SUMMARY_STYLE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
-        </select>
-      </label>
-      <label class="toggle">
-        <input v-model="processingForm.autoGenerateSummary" type="checkbox" />
-        <span>处理完成后自动生成摘要</span>
-      </label>
-      <label class="toggle">
-        <input v-model="processingForm.autoGenerateTags" type="checkbox" />
-        <span>处理完成后自动提取标签</span>
-      </label>
-      <div class="row-actions">
-        <button class="btn btn--small" @click="saveProcessing" :disabled="savingProcessing">
-          {{ savingProcessing ? '已保存' : '保存处理设置' }}
-        </button>
-        <button class="btn btn--ghost btn--small" @click="resetProcessingDefaults">恢复默认</button>
-      </div>
-    </div>
-
-    <div class="card card--muted">
       <div class="card-title">开发设置</div>
       <p class="muted" style="margin: 0 0 8px; font-size: 12px;">真机默认会优先使用原生注入的后端地址。若你修改了后端地址或端口，可在此覆盖当前值（例如 {{ suggestedApiBase }}）。</p>
       <input v-model.trim="apiBaseInput" class="input" :placeholder="apiBasePlaceholder" style="margin-bottom: 8px;" />
@@ -132,21 +87,9 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getApiBaseUrl, setApiBaseUrl, withBase } from '@/config'
-import { getVideoProcessingOptions } from '@/api/video'
-import {
-  LANGUAGE_OPTIONS,
-  NATIVE_LOCALE_OPTIONS,
-  PROCESSING_DEFAULTS,
-  SUMMARY_STYLE_OPTIONS,
-  getProcessingSettings,
-  getWhisperModelOptions,
-  saveProcessingSettings,
-  saveWhisperModelCatalog,
-  whisperModelHighlight
-} from '@/services/processingSettings'
 import * as authStore from '@/store/auth'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024
@@ -156,11 +99,8 @@ const apiBaseInput = ref(getApiBaseUrl())
 const avatarInput = ref(null)
 const usernameInput = ref(null)
 const saving = ref(false)
-const savingProcessing = ref(false)
 const savingProfile = ref(false)
 const isEditingUsername = ref(false)
-const processingForm = ref(getProcessingSettings())
-const whisperModelOptions = ref(getWhisperModelOptions())
 const loading = ref(false)
 const error = ref('')
 const successMessage = ref('')
@@ -174,7 +114,6 @@ let avatarObjectUrl = ''
 const displayedUsername = computed(() => String(profileForm.value.username || state.value.user?.username || '用户').trim() || '用户')
 const avatarText = computed(() => displayedUsername.value.slice(0, 1).toUpperCase())
 const contactText = computed(() => state.value.user?.email || state.value.user?.phone || '—')
-const currentModelHighlight = computed(() => whisperModelHighlight(processingForm.value.model))
 const avatarUrl = computed(() => {
   const value = String(avatarPreviewUrl.value || state.value.user?.avatar || '').trim()
   if (!value) return ''
@@ -330,49 +269,9 @@ const saveApiBase = () => {
   setTimeout(() => { saving.value = false }, 1500)
 }
 
-const saveProcessing = () => {
-  processingForm.value = saveProcessingSettings(processingForm.value)
-  savingProcessing.value = true
-  setTimeout(() => { savingProcessing.value = false }, 1500)
-}
-
-const refreshWhisperModelOptions = async () => {
-  try {
-    const res = await getVideoProcessingOptions()
-    const catalog = saveWhisperModelCatalog(res?.data || {})
-    whisperModelOptions.value = catalog.options
-    processingForm.value = saveProcessingSettings(processingForm.value)
-  } catch {
-    whisperModelOptions.value = getWhisperModelOptions()
-    processingForm.value = saveProcessingSettings(processingForm.value)
-  }
-}
-
-const resetProcessingDefaults = () => {
-  processingForm.value = saveProcessingSettings(PROCESSING_DEFAULTS)
-  savingProcessing.value = true
-  setTimeout(() => { savingProcessing.value = false }, 1500)
-}
-
-watch(
-  () => processingForm.value.autoGenerateTags,
-  (enabled) => {
-    if (enabled) processingForm.value.autoGenerateSummary = true
-  }
-)
-
-watch(
-  () => processingForm.value.autoGenerateSummary,
-  (enabled) => {
-    if (!enabled) processingForm.value.autoGenerateTags = false
-  }
-)
-
 onMounted(() => {
   apiBaseInput.value = getApiBaseUrl()
-  processingForm.value = getProcessingSettings()
   syncProfileForm()
-  refreshWhisperModelOptions()
   refresh()
 })
 
