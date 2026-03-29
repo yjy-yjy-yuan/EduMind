@@ -3,7 +3,6 @@
     <header class="topbar">
       <div class="topbar__copy">
         <h2>导入学习内容</h2>
-        <p>本地上传和推荐导入都走同一条处理链路。</p>
       </div>
       <button class="link" @click="resetAll" :disabled="busy">重置</button>
     </header>
@@ -12,7 +11,6 @@
       <div class="import-banner__top">
         <div>
           <div class="card-title">推荐导入</div>
-          <div class="muted">你正在承接来自 {{ importSourceLabel }} 的推荐内容，提交后会进入现有下载与处理链路，不会直接当作已入库视频播放。</div>
         </div>
         <span class="import-badge">{{ importSourceLabel }}</span>
       </div>
@@ -33,7 +31,30 @@
       />
     </div>
 
-    <div class="card" :class="{ 'card--active': submissionMode === 'file' }">
+    <div class="mode-switch-wrap">
+      <div class="mode-switch">
+        <button
+          class="mode-switch__item"
+          :class="{ 'mode-switch__item--active': submissionMode === 'file' }"
+          type="button"
+          @click="selectSubmissionMode('file')"
+          :disabled="busy"
+        >
+          <strong>本地上传</strong>
+        </button>
+        <button
+          class="mode-switch__item"
+          :class="{ 'mode-switch__item--active': submissionMode === 'url' }"
+          type="button"
+          @click="selectSubmissionMode('url')"
+          :disabled="busy"
+        >
+          <strong>视频链接上传</strong>
+        </button>
+      </div>
+    </div>
+
+    <div v-if="submissionMode === 'file'" class="card" :class="{ 'card--active': submissionMode === 'file' }">
       <div class="card-title">本地视频</div>
       <input
         ref="fileInputRef"
@@ -44,16 +65,16 @@
         :disabled="busy"
       />
       <div class="file-picker" :class="{ 'file-picker--selected': hasVisibleFileMeta }">
-        <button class="file-picker__button" type="button" @click="openFilePicker" :disabled="busy">
-          {{ hasVisibleFileMeta ? '重新选择视频' : '选择本地视频' }}
-        </button>
         <div class="file-picker__meta">
           <strong class="file-picker__title">{{ currentFileDisplayName }}</strong>
           <span class="file-picker__desc">{{ currentFileDisplayHint }}</span>
         </div>
+        <button v-if="hasVisibleFileMeta" class="file-picker__button file-picker__button--secondary" type="button" @click="openFilePicker" :disabled="busy">
+          重新选择视频
+        </button>
       </div>
-      <button class="btn btn--primary" @click="uploadFile" :disabled="!file || busy">
-        {{ busy ? '上传中…' : '开始上传' }}
+      <button class="btn btn--primary" @click="uploadFile" :disabled="busy">
+        {{ busy ? '上传中…' : (file ? '确认上传' : '开始上传') }}
       </button>
       <label class="field field--native">
         <span class="field-label">本地识别语言/方言</span>
@@ -68,27 +89,22 @@
           </option>
         </select>
       </label>
-      <div class="muted">当前处理：{{ processingSettingsSummary }}</div>
-      <div class="muted">本地离线转录优先使用 iOS 原生识别能力，只处理当前设备上的本地视频，不依赖 FastAPI。</div>
-      <div class="muted">如果视频是粤语、吴语、繁体中文或明显口音内容，请先切换到更接近的本地识别语言/方言。</div>
+      <div class="muted">处理设置：{{ processingSettingsSummary }}</div>
 
       <div v-if="busy" class="progress">
         <div class="bar" :style="{ width: `${progress}%` }"></div>
       </div>
       <div v-if="busy" class="muted">进度：{{ progress }}%</div>
-      <div class="muted">离线补跑仅适用于已配置真实后端地址但暂时不可达；纯 UI ONLY 演示模式不会进入真实离线补跑。</div>
     </div>
 
-    <div class="card" :class="{ 'card--active': submissionMode === 'url', 'card--spotlight': hasRecommendationImport }">
+    <div v-if="submissionMode === 'url'" class="card" :class="{ 'card--active': submissionMode === 'url', 'card--spotlight': hasRecommendationImport }">
       <div class="card-title">视频链接</div>
       <div v-if="hasRecommendationImport" class="import-tip">
         <span class="import-badge import-badge--inline">{{ importSourceLabel }}</span>
-        <span class="muted">当前链接来自推荐系统，提交后不会直接播放，而是进入导入学习流程。</span>
       </div>
       <input class="input" v-model.trim="videoUrl" placeholder="请输入视频链接（B站/YouTube等）" :disabled="busy" />
       <button class="btn" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交链接' }}</button>
-      <div class="muted">支持：B站、YouTube、中国大学慕课（icourse163）</div>
-      <div class="muted">将沿用当前处理设置：{{ processingSettingsSummary }}</div>
+      <div class="muted">支持：B站、YouTube、中国大学慕课</div>
     </div>
 
     <div v-if="uploadRecommendationItems.length > 0" class="card upload-followup">
@@ -323,6 +339,7 @@ const statusFilter = ref('all')
 let recentStatusTimer = null
 const processingSettings = ref(getProcessingSettings())
 const whisperModelOptions = ref(getWhisperModelOptions())
+const transcriptionOnlyMode = true
 
 const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024
 const ALLOWED_EXTENSIONS = new Set(['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv'])
@@ -496,6 +513,11 @@ const selectProcessingModel = (model) => {
   })
 }
 
+const selectSubmissionMode = (mode) => {
+  if (busy.value) return
+  submissionMode.value = mode === 'url' ? 'url' : 'file'
+}
+
 const selectNativeLocale = (nativeLocale) => {
   if (busy.value || nativeBusy.value) return
   processingSettings.value = saveProcessingSettings({
@@ -521,7 +543,7 @@ const consumeUploadRouteIntent = async () => {
     submissionMode.value = 'url'
     consumed = true
   } else if (normalizedMode === 'native') {
-    submissionMode.value = 'native'
+    submissionMode.value = 'file'
     consumed = true
   } else if (normalizedMode === 'file') {
     submissionMode.value = 'file'
@@ -1263,6 +1285,7 @@ const onFileChange = (e) => {
   }
   file.value = selected
   savedFileMeta.value = { name: selected.name, size: Number(selected.size || 0) }
+  message.value = '已选择视频，确认无误后点击“确认上传”；如果选错了，可点击“重新选择视频”。'
 }
 
 const resetAll = () => {
@@ -1288,14 +1311,14 @@ const openFilePicker = () => {
 }
 
 const startNativeOfflineTranscriptionFlow = async () => {
-  if (busy.value || nativeBusy.value) return false
+  if (busy.value || nativeBusy.value) return
   processingSettings.value = getProcessingSettings()
   message.value = ''
   error.value = ''
 
   if (!hasNativeBridge()) {
     error.value = '当前环境不是 iOS 原生容器，无法进行本地离线转录'
-    return false
+    return
   }
 
   nativeBusy.value = true
@@ -1349,7 +1372,6 @@ const startNativeOfflineTranscriptionFlow = async () => {
   } finally {
     if (!started) nativeBusy.value = false
   }
-  return started
 }
 
 const handleNativeProgressEvent = async (detail = {}) => {
@@ -1393,6 +1415,10 @@ const handleNativeCompletedEvent = async (detail = {}) => {
     locale: detail.locale,
     engine: detail.engine
   })
+  if (transcriptionOnlyMode) {
+    message.value = 'iOS 本地离线转录完成'
+    return
+  }
   if (saved?.autoGenerateSummary) {
     message.value = 'iOS 本地离线转录完成，正在提取摘要'
     void generateOfflineTranscriptSummaryForTask(saved.taskId)
@@ -1423,26 +1449,13 @@ const handleNativeFailedEvent = async (detail = {}) => {
   error.value = detail.message || 'iOS 本地离线转录失败'
 }
 
-const fallbackToNativeOfflineTranscription = async (backendError) => {
-  if (!hasNativeBridge()) return false
-
-  const backendMessage = getVideoUploadQueueableMessage(backendError, '后端暂时不可达')
-  const selectedFileName = String(file.value?.name || savedFileMeta.value?.name || '当前文件').trim()
-  logOfflineFlow('backend-unavailable-fallback-native', {
-    fileName: selectedFileName,
-    reason: backendMessage
-  })
-  message.value = `${backendMessage}，已自动切换到 iPhone 本机离线转录，请在系统文件选择器中选择同一视频继续处理。`
-
-  try {
-    return await startNativeOfflineTranscriptionFlow()
-  } catch {
-    return false
-  }
-}
-
 const uploadFile = async () => {
-  if (!file.value || busy.value) return
+  if (busy.value) return
+  if (!file.value) {
+    submissionMode.value = 'file'
+    openFilePicker()
+    return
+  }
   busy.value = true
   progress.value = 0
   message.value = ''
@@ -1486,9 +1499,6 @@ const uploadFile = async () => {
     router.push(videoId ? { path: `/videos/${videoId}`, query: data?.duplicate ? undefined : { autostart: '1' } } : '/videos')
   } catch (e) {
     if (isVideoUploadQueueableError(e)) {
-      busy.value = false
-      const switched = await fallbackToNativeOfflineTranscription(e)
-      if (switched) return
       try {
         await queueOfflineLocalUpload(file.value)
       } catch (queueError) {
@@ -1604,15 +1614,19 @@ onUnmounted(() => {
 
 .topbar {
   position: sticky;
-  top: 0;
-  z-index: 5;
+  top: 6px;
+  z-index: 8;
   padding: 12px 14px;
+  margin-bottom: 14px;
   border-radius: 20px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 10px;
   flex-wrap: wrap;
+  background: rgba(242, 235, 248, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .topbar__copy {
@@ -1783,6 +1797,45 @@ onUnmounted(() => {
   color: #221a30;
 }
 
+.mode-switch-wrap {
+  margin-bottom: 14px;
+}
+
+.mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mode-switch__item {
+  border: 1px solid rgba(95, 71, 126, 0.12);
+  border-radius: 18px;
+  min-width: 0;
+  min-height: 72px;
+  padding: 12px 10px;
+  display: grid;
+  gap: 3px;
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  background: rgba(242, 235, 248, 0.78);
+  color: #55496a;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.mode-switch__item strong {
+  font-size: 13px;
+  color: #221a30;
+  line-height: 1.2;
+}
+
+.mode-switch__item--active {
+  border-color: var(--primary-soft-strong);
+  background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(247, 241, 251, 0.98));
+  box-shadow: 0 12px 24px rgba(95, 71, 126, 0.12);
+  transform: translateY(-1px);
+}
+
 .filters {
   display: flex;
   gap: 8px;
@@ -1892,7 +1945,7 @@ onUnmounted(() => {
 
 .file-picker {
   display: grid;
-  grid-template-columns: minmax(0, 132px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   border-radius: 18px;
@@ -1915,6 +1968,13 @@ onUnmounted(() => {
   color: #f9fafb;
   background: linear-gradient(135deg, #5f477e, #8f73ba);
   box-shadow: 0 12px 20px rgba(95, 71, 126, 0.2);
+}
+
+.file-picker__button--secondary {
+  color: var(--primary-deep);
+  background: rgba(247, 241, 251, 0.96);
+  border: 1px solid rgba(95, 71, 126, 0.14);
+  box-shadow: none;
 }
 
 .file-picker__button:disabled {
