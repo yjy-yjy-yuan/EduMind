@@ -46,6 +46,8 @@ def test_execute_agent_creates_note_and_timestamp(client, db, sample_video):
     assert note.video_id == sample_video.id
     assert "把这一段记成笔记并总结一下" not in (note.content or "")
     assert "这一段讲的是导数的几何意义" in (note.content or "")
+    assert note.title.startswith("视频")
+    assert "00:45" in note.title
     assert db.query(NoteTimestamp).filter(NoteTimestamp.note_id == note.id).count() == 1
     assert db.query(Question).count() == 0
 

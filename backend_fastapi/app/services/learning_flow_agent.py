@@ -63,13 +63,17 @@ def build_plan(intent: str, ctx: AgentContext) -> list[str]:
     return plan
 
 
-def _build_note_title(video: Optional[Video], user_input: str, summary_text: str) -> str:
+def _build_note_title(video: Optional[Video], category: str, current_time_seconds: Optional[float]) -> str:
     base = (video.title or "").strip() if video else ""
+    if current_time_seconds is not None:
+        minute = int(float(current_time_seconds) // 60)
+        second = int(float(current_time_seconds) % 60)
+        time_text = f"{minute:02d}:{second:02d}"
+    else:
+        time_text = "00:00"
     if base:
-        return f"{base} · 学习笔记"
-    if summary_text:
-        return summary_text.splitlines()[0][:40]
-    return normalize_user_input(user_input)[:40] or "学习笔记"
+        return f"{base} · {category} · {time_text}"
+    return f"{category} · {time_text}"
 
 
 def _subtitle_excerpt_for_time(video: Optional[Video], current_time_seconds: Optional[float]) -> str:
@@ -107,6 +111,19 @@ def _subtitle_excerpt_for_time(video: Optional[Video], current_time_seconds: Opt
     return "\n".join(excerpts).strip()
 
 
+def _infer_note_category(text: str) -> str:
+    normalized = normalize_user_input(text)
+    if any(keyword in normalized for keyword in ["例题", "例如", "举例", "算", "计算", "解题", "题目"]):
+        return "例题"
+    if any(keyword in normalized for keyword in ["思考", "为什么", "如何", "怎么", "原因", "讨论", "探究"]):
+        return "思考题"
+    if any(keyword in normalized for keyword in ["易错", "注意", "别忘", "常见错误", "容易"]):
+        return "易错点"
+    if any(keyword in normalized for keyword in ["结论", "总结", "归纳", "因此", "所以"]):
+        return "结论"
+    return "知识点"
+
+
 def _build_note_content(ctx: AgentContext, summary_text: str, subtitle_excerpt: str = "", qa_answer: str = "") -> str:
     parts = []
     if subtitle_excerpt.strip():
@@ -118,6 +135,30 @@ def _build_note_content(ctx: AgentContext, summary_text: str, subtitle_excerpt: 
     if qa_answer.strip():
         parts.append(f"问答补充：{qa_answer.strip()}")
     return "\n".join(parts).strip()
+
+
+def _build_thought_tags(ctx: AgentContext, subtitle_excerpt: str = "") -> list[str]:
+    source = " ".join(
+        [
+            subtitle_excerpt,
+            ctx.subtitle_text,
+            ctx.user_input,
+            " ".join(str(item.get("text") or item.get("content") or "") for item in ctx.recent_qa_messages[-3:]),
+        ]
+    )
+    tags = []
+    for tag, keywords in [
+        ("再思考", ["再看", "回看", "思考", "继续", "复习"]),
+        ("很重要", ["重要", "关键", "核心", "重点"]),
+        ("待复习", ["复习", "记住", "回顾"]),
+        ("需要查证", ["查证", "确认", "核对", "验证"]),
+        ("想再看一遍", ["再看", "回看", "重新看"]),
+    ]:
+        if any(keyword in source for keyword in keywords):
+            tags.append(tag)
+    if not tags:
+        tags.append("再思考")
+    return tags[:5]
 
 
 def execute_learning_flow_agent(db: Session, *, request) -> dict[str, Any]:
@@ -194,7 +235,10 @@ def execute_learning_flow_agent(db: Session, *, request) -> dict[str, Any]:
             logger.debug("agent summary generated | summary_len=%s", len(summary_text))
 
         if intent in {"create_note", "mixed"} or ctx.current_time_seconds is not None:
-            note_title = _build_note_title(video, ctx.user_input, summary_text)
+            category = _infer_note_category(
+                " ".join([subtitle_excerpt, ctx.subtitle_text, ctx.user_input, summary_text])
+            )
+            note_title = _build_note_title(video, category, ctx.current_time_seconds)
             note_content = _build_note_content(
                 ctx, summary_text, subtitle_excerpt=subtitle_excerpt, qa_answer=qa_answer
             )
@@ -211,7 +255,7 @@ def execute_learning_flow_agent(db: Session, *, request) -> dict[str, Any]:
                 content=note_content,
                 note_type="text",
                 video_id=video.id,
-                tags=",".join(fallback_tags(summary_text or note_content, title=note_title, max_tags=5)),
+                tags=",".join(_build_thought_tags(ctx, subtitle_excerpt)),
                 keywords=",".join(fallback_tags(note_content, title=note_title, max_tags=5)),
             )
             db.add(note)
