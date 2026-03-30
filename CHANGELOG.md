@@ -1,5 +1,13 @@
 # 变更日志
 
+## 2026-03-29
+
+### 学习流智能体接入视频详情、问答与笔记页
+- 新增 [`backend_fastapi/app/schemas/agent.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/agent.py)、[`backend_fastapi/app/services/learning_flow_agent.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/learning_flow_agent.py)、[`backend_fastapi/app/routers/agent.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/agent.py)：新增 `POST /api/agent/execute`，把“理解意图 -> 生成 plan -> 复用 QA / 笔记 / 时间戳 -> 写回现有表”的编排逻辑收口为独立后端服务，不新增业务表。
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)、[`backend_fastapi/tests/api/test_agent_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_agent_api.py)：挂载学习流智能体路由，并补充基础 API 测试骨架。
+- 更新 [`mobile-frontend/src/api/agent.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/agent.js)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)、[`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)、[`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)：在视频详情、问答、笔记与播放器页增加轻量学习助理入口，前端只负责收集上下文与展示结果，不承载真实业务逻辑。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步最新 iOS WebView 资源。
+
 ## 2026-03-28
 
 ### 新增分支提交日志文档

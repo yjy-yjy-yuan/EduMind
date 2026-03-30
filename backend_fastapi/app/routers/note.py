@@ -79,6 +79,26 @@ def generate_content_vector(text: str, db: Session) -> str:
         return json.dumps([0.0] * 10)
 
 
+def _debug_note_payload(
+    action: str,
+    *,
+    note_id: Optional[int] = None,
+    video_id: Optional[int] = None,
+    title: str = "",
+    content: str = "",
+    tags: Optional[str] = None,
+):
+    logger.debug(
+        "note %s | note_id=%s | video_id=%s | title=%s | content_len=%s | tags=%s",
+        action,
+        note_id,
+        video_id,
+        title,
+        len(str(content or "")),
+        tags or "",
+    )
+
+
 @router.get("/notes")
 async def get_notes(
     video_id: Optional[int] = None,
@@ -119,6 +139,13 @@ async def create_note(data: NoteCreate, db: Session = Depends(get_db)):
     """创建新笔记"""
     if not data.title:
         raise HTTPException(status_code=400, detail="标题不能为空")
+    logger.debug(
+        "note create request | video_id=%s | title=%s | note_type=%s | timestamps=%s",
+        data.video_id,
+        data.title,
+        data.note_type,
+        len(data.timestamps or []),
+    )
 
     if data.video_id:
         video = db.query(Video).filter(Video.id == data.video_id).first()
@@ -143,6 +170,9 @@ async def create_note(data: NoteCreate, db: Session = Depends(get_db)):
     db.add(note)
     db.commit()
     db.refresh(note)
+    _debug_note_payload(
+        "created", note_id=note.id, video_id=note.video_id, title=note.title, content=note.content, tags=note.tags
+    )
 
     # 添加时间戳
     if data.timestamps:
@@ -150,6 +180,7 @@ async def create_note(data: NoteCreate, db: Session = Depends(get_db)):
             timestamp = NoteTimestamp(note_id=note.id, time_seconds=ts.time_seconds, subtitle_text=ts.subtitle_text)
             db.add(timestamp)
         db.commit()
+        logger.debug("note timestamps attached | note_id=%s | count=%s", note.id, len(data.timestamps))
 
     return {"status": "success", "data": note.to_dict()}
 
@@ -160,6 +191,7 @@ async def update_note(note_id: int, data: NoteUpdate, db: Session = Depends(get_
     note = db.query(Note).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="笔记不存在")
+    logger.debug("note update request | note_id=%s | fields=%s", note_id, sorted(data.model_fields_set))
 
     updated_fields = data.model_fields_set
 
@@ -185,6 +217,9 @@ async def update_note(note_id: int, data: NoteUpdate, db: Session = Depends(get_
 
     db.commit()
     db.refresh(note)
+    _debug_note_payload(
+        "updated", note_id=note.id, video_id=note.video_id, title=note.title, content=note.content, tags=note.tags
+    )
     return {"status": "success", "data": note.to_dict()}
 
 
@@ -194,6 +229,7 @@ async def delete_note(note_id: int, db: Session = Depends(get_db)):
     note = db.query(Note).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="笔记不存在")
+    logger.debug("note delete request | note_id=%s | video_id=%s | title=%s", note_id, note.video_id, note.title)
 
     db.delete(note)
     db.commit()
@@ -208,11 +244,18 @@ async def add_timestamp(
     note = db.query(Note).filter(Note.id == note_id).first()
     if not note:
         raise HTTPException(status_code=404, detail="笔记不存在")
+    logger.debug(
+        "note timestamp request | note_id=%s | time_seconds=%s | subtitle_len=%s",
+        note_id,
+        time_seconds,
+        len(str(subtitle_text or "")),
+    )
 
     timestamp = NoteTimestamp(note_id=note.id, time_seconds=time_seconds, subtitle_text=subtitle_text)
     db.add(timestamp)
     db.commit()
     db.refresh(timestamp)
+    logger.debug("note timestamp persisted | note_id=%s | timestamp_id=%s", note_id, timestamp.id)
 
     return {"status": "success", "data": timestamp.to_dict()}
 
@@ -234,6 +277,7 @@ async def delete_timestamp(note_id: int, timestamp_id: int, db: Session = Depend
 @router.get("/tags")
 async def get_tags(db: Session = Depends(get_db)):
     """获取所有标签"""
+    logger.debug("note tags query request")
     notes = db.query(Note).filter(Note.tags.isnot(None)).all()
 
     all_tags = {}
@@ -255,8 +299,10 @@ async def get_similar_notes(content: str, limit: int = 5, db: Session = Depends(
     """获取相似笔记"""
     if not content or len(content) < 10:
         return {"status": "success", "data": []}
+    logger.debug("note similar request | content_len=%s | limit=%s", len(content), limit)
 
     keywords = extract_keywords(content)
+    logger.debug("note similar keywords | keywords=%s", keywords[:5] if keywords else [])
     similar_notes = []
 
     if keywords:
@@ -276,6 +322,7 @@ async def get_similar_notes(content: str, limit: int = 5, db: Session = Depends(
         if note.id not in note_ids and len(unique_notes) < limit:
             note_ids.add(note.id)
             unique_notes.append(note)
+    logger.debug("note similar result | hits=%s", len(unique_notes))
 
     return {"status": "success", "data": [note.to_dict() for note in unique_notes]}
 
@@ -390,6 +437,7 @@ async def export_single_note(note_id: int, db: Session = Depends(get_db)):
 async def sync_tags(db: Session = Depends(get_db)):
     """同步标签数据，清除不存在于任何笔记中的标签"""
     try:
+        logger.debug("note tags sync request")
         notes = db.query(Note).all()
 
         # 收集所有实际存在的标签
@@ -409,6 +457,7 @@ async def sync_tags(db: Session = Depends(get_db)):
                 note.tags = ",".join(filtered_tags) if filtered_tags else None
 
         db.commit()
+        logger.debug("note tags sync completed | valid_tags=%s", len(valid_tags))
         return {"status": "success", "message": "标签数据已同步", "valid_tags": list(valid_tags)}
     except Exception as e:
         db.rollback()

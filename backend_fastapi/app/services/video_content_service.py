@@ -646,17 +646,51 @@ def generate_video_summary(
     normalized_style = normalize_summary_style(style)
     source_text = clean_whitespace(transcript_text) or read_subtitle_text(subtitle_path)
     if not source_text:
+        logger.debug(
+            "视频摘要生成跳过 | video_id=%s | style=%s | subtitle_path=%s | transcript_len=%s",
+            video_id,
+            normalized_style,
+            subtitle_path,
+            len(clean_whitespace(transcript_text)),
+        )
         return {"success": False, "error": "无法提取字幕文本"}
 
+    logger.debug(
+        "视频摘要生成开始 | video_id=%s | style=%s | title=%s | source_len=%s | subtitle_path=%s",
+        video_id,
+        normalized_style,
+        title,
+        len(source_text),
+        subtitle_path,
+    )
     system_prompt, prompt = build_summary_prompt(source_text, title=title, style=normalized_style)
+    logger.debug(
+        "视频摘要 prompt prepared | video_id=%s | system_prompt_len=%s | prompt_len=%s",
+        video_id,
+        len(system_prompt),
+        len(prompt),
+    )
     summary = call_online_chat(prompt, system_prompt=system_prompt) or call_ollama(prompt, system_prompt=system_prompt)
     provider = "ai"
+    logger.debug(
+        "视频摘要模型返回 | video_id=%s | provider=%s | summary_len=%s",
+        video_id,
+        provider,
+        len(summary or ""),
+    )
     if not summary:
         summary = fallback_summary(source_text, title=title, style=normalized_style)
         provider = "fallback"
+        logger.debug(
+            "视频摘要回退到本地规则 | video_id=%s | style=%s | summary_len=%s",
+            video_id,
+            normalized_style,
+            len(summary or ""),
+        )
 
     summary = clean_multiline_text(summary)
     if not summary:
+        logger.debug("视频摘要结果为空 | video_id=%s | provider=%s", video_id, provider)
         return {"success": False, "error": "摘要内容为空"}
 
     logger.info("视频摘要生成完成 | video_id=%s | provider=%s | style=%s", video_id, provider, normalized_style)
@@ -666,19 +700,38 @@ def generate_video_summary(
 def generate_video_tags(video_id: int, summary: str, *, title: str = "", max_tags: int = DEFAULT_MAX_TAGS) -> dict:
     clean_summary = clean_whitespace(summary)
     if not clean_summary:
+        logger.debug("视频标签生成跳过 | video_id=%s | title=%s | reason=empty_summary", video_id, title)
         return {"success": False, "error": "摘要内容为空"}
 
+    logger.debug(
+        "视频标签生成开始 | video_id=%s | title=%s | summary_len=%s | max_tags=%s",
+        video_id,
+        title,
+        len(clean_summary),
+        max_tags,
+    )
     system_prompt, prompt = build_tag_prompt(clean_summary, title=title, max_tags=max_tags)
+    logger.debug(
+        "视频标签 prompt prepared | video_id=%s | system_prompt_len=%s | prompt_len=%s",
+        video_id,
+        len(system_prompt),
+        len(prompt),
+    )
     raw_tags = call_online_chat(prompt, system_prompt=system_prompt) or call_ollama(prompt, system_prompt=system_prompt)
     provider = "ai"
+    logger.debug(
+        "视频标签模型返回 | video_id=%s | provider=%s | raw_tags_len=%s", video_id, provider, len(raw_tags or "")
+    )
 
     tags = normalize_tags(parse_json_array(raw_tags), max_tags=max_tags) if raw_tags else []
     if not tags:
         tags = fallback_tags(clean_summary, title=title, max_tags=max_tags)
         provider = "fallback"
+        logger.debug("视频标签回退到本地规则 | video_id=%s | fallback_count=%s", video_id, len(tags))
     tags = build_subject_enriched_tags(tags, title=title, summary=clean_summary, max_tags=max_tags)
 
     if not tags:
+        logger.debug("视频标签结果为空 | video_id=%s", video_id)
         return {"success": False, "error": "标签生成失败"}
 
     logger.info("视频标签生成完成 | video_id=%s | provider=%s | count=%s", video_id, provider, len(tags))
@@ -695,11 +748,25 @@ def generate_primary_topic_name(
     clean_summary = clean_multiline_text(summary)
     normalized_tags = normalize_tags(tags, max_tags=6)
     if not clean_summary and not normalized_tags:
+        logger.debug("主标题生成跳过 | reason=empty_inputs | title=%s", title)
         return {"success": False, "error": "摘要和标签均为空"}
 
+    logger.debug(
+        "主标题生成开始 | title=%s | summary_len=%s | tags=%s | max_length=%s",
+        title,
+        len(clean_summary),
+        normalized_tags[:6],
+        max_length,
+    )
     system_prompt, prompt = build_primary_topic_name_prompt(clean_summary, tags=normalized_tags, title=title)
+    logger.debug(
+        "主标题 prompt prepared | system_prompt_len=%s | prompt_len=%s",
+        len(system_prompt),
+        len(prompt),
+    )
     raw_name = call_online_chat(prompt, system_prompt=system_prompt)
     provider = "ai"
+    logger.debug("主标题模型返回 | provider=%s | raw_name_len=%s", provider, len(raw_name or ""))
 
     primary_name = normalize_primary_topic_name(raw_name, max_length=max_length) if raw_name else ""
     if not primary_name:
@@ -710,8 +777,10 @@ def generate_primary_topic_name(
             max_length=max_length,
         )
         provider = "fallback"
+        logger.debug("主标题回退到本地规则 | provider=%s | title=%s", provider, primary_name)
 
     if not primary_name:
+        logger.debug("主标题结果为空 | title=%s", title)
         return {"success": False, "error": "无法生成主标题"}
 
     logger.info("视频主标题生成完成 | provider=%s | title=%s", provider, primary_name)
