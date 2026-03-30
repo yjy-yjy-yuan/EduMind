@@ -53,6 +53,35 @@
       </div>
 
       <div class="block">
+        <div class="block-head">
+          <div>
+            <div class="block-title">学习流智能体</div>
+            <div class="setting-hint">把当前片段直接变成笔记、摘要或可回看的学习动作。</div>
+          </div>
+          <button class="mini mini--primary" @click="runLearningAgent" :disabled="agentBusy || !canRunLearningAgent">
+            {{ agentBusy ? '执行中…' : '执行学习动作' }}
+          </button>
+        </div>
+        <textarea
+          v-model.trim="agentPrompt"
+          class="agent-input"
+          rows="3"
+          placeholder="例如：把这一段记成笔记并总结一下"
+        />
+        <div class="agent-hint">
+          将自动携带视频 ID、当前字幕片段和最近笔记上下文。当前时间优先使用最近字幕的开始时间。
+        </div>
+        <div v-if="agentResult" class="agent-result">
+          <div class="agent-result__title">执行结果</div>
+          <div class="agent-result__plan">计划：{{ agentResult.plan?.join(' · ') || '暂无' }}</div>
+          <div class="agent-result__actions">动作：{{ agentResult.actions?.join(' · ') || '暂无' }}</div>
+          <div v-if="agentResult.result?.title" class="agent-result__summary">标题：{{ agentResult.result.title }}</div>
+          <div v-if="agentResult.result?.summary" class="agent-result__summary">{{ agentResult.result.summary }}</div>
+          <button v-if="agentResult.result?.note_id" class="mini" @click="openNote(agentResult.result.note_id)">打开刚生成的笔记</button>
+        </div>
+      </div>
+
+      <div class="block">
         <WhisperModelPicker
           title="Whisper 模型"
           :model="processingSettings.model"
@@ -138,6 +167,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi } from '@/config'
+import { executeLearningFlowAgent } from '@/api/agent'
 import { createNote, getNotes, updateNote } from '@/api/note'
 import { getSubtitleContext } from '@/api/subtitle'
 import { deleteVideo, generateVideoSummary, generateVideoTags, getVideo, getVideoProcessingOptions, getVideoStatus, processVideo } from '@/api/video'
@@ -180,6 +210,10 @@ const tagGenerating = ref(false)
 const summaryImporting = ref(false)
 const notesLoading = ref(false)
 const videoNotes = ref([])
+const subtitleFragments = ref([])
+const agentPrompt = ref('把这一段记成笔记并总结一下')
+const agentBusy = ref(false)
+const agentResult = ref(null)
 const processingSettings = ref(getProcessingSettings())
 const whisperModelOptions = ref(getWhisperModelOptions())
 
@@ -216,6 +250,7 @@ const canGenerateTags = computed(() => normalizeVideoStatus(statusValue.value) =
 const canImportSummary = computed(
   () => Boolean(normalizeText(video.value?.summary)) && !summaryGenerating.value && !tagGenerating.value && !summaryImporting.value
 )
+const canRunLearningAgent = computed(() => Boolean(video.value?.id) && Boolean(normalizeText(agentPrompt.value)) && !agentBusy.value)
 const summaryStyleText = computed(() => `${summaryStyleLabel(processingSettings.value.summaryStyle)}风格`)
 const processDisabled = computed(
   () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(normalizeVideoStatus(statusValue.value))
@@ -369,9 +404,10 @@ const reloadOfflineTaskCount = async () => {
 const normalizeVideo = (payload) => {
   const current = payload?.video || payload?.data || payload || null
   if (!current) return null
+  const resolvedId = Number(current.id || current.server_id || current.video_id || current.local_id || 0)
   return {
     ...current,
-    id: current.id || Number(current.server_id || current.video_id || 0) || current.local_id,
+    id: Number.isFinite(resolvedId) && resolvedId > 0 ? resolvedId : (current.local_id || current.server_id || current.video_id || ''),
     tags: Array.isArray(current.tags) ? current.tags : [],
     filepath: current.filepath || current?.metadata?.filepath || '',
     requested_model: String(current.requested_model || '').trim().toLowerCase(),
@@ -391,6 +427,15 @@ const normalizeNote = (payload) => payload?.note || payload?.data || payload || 
 const normalizeSubtitleContext = (payload) => {
   const list = payload?.data?.subtitles || payload?.data || payload?.subtitles || payload || []
   return Array.isArray(list) ? list : []
+}
+
+const pickSubtitleForAgent = () => {
+  const list = subtitleFragments.value
+  const first = Array.isArray(list) && list.length > 0 ? list[0] : null
+  return {
+    text: String(first?.text || video.value?.summary || '').trim(),
+    time: Number(first?.start_time || 0) || null
+  }
 }
 
 const hydrateOfflineVideoContext = async (videoId, fallbackMessage = '当前展示的是本地离线缓存') => {
@@ -425,9 +470,10 @@ const refreshOfflineMemoryContext = async (currentVideo) => {
   })
   try {
     const subtitleResponse = await getSubtitleContext(normalizedVideo.id, { preferMerged: true })
-    const subtitleFragments = normalizeSubtitleContext(subtitleResponse)
-    if (subtitleFragments.length > 0) {
-      await cacheVideoSubtitles(normalizedVideo.id, subtitleFragments)
+    const fragments = normalizeSubtitleContext(subtitleResponse)
+    subtitleFragments.value = fragments.slice(0, 8)
+    if (fragments.length > 0) {
+      await cacheVideoSubtitles(normalizedVideo.id, fragments)
     }
   } catch {
     // ignore subtitle cache refresh failures
@@ -466,6 +512,12 @@ const reload = async () => {
       return
     }
     await loadVideoNotes()
+    try {
+      const subtitleResponse = await getSubtitleContext(Number(id.value), { preferMerged: true })
+      subtitleFragments.value = normalizeSubtitleContext(subtitleResponse).slice(0, 8)
+    } catch {
+      subtitleFragments.value = []
+    }
     try {
       await fetchStatus()
     } catch (statusError) {
@@ -626,6 +678,31 @@ const takeNote = () => {
       videoTitle: String(video.value?.title || '')
     }
   })
+}
+
+const runLearningAgent = async () => {
+  if (!canRunLearningAgent.value) return
+  agentBusy.value = true
+  error.value = ''
+  try {
+    const subtitle = pickSubtitleForAgent()
+    const response = await executeLearningFlowAgent({
+      video_id: Number(id.value),
+      page_context: 'video_detail',
+      current_time_seconds: subtitle.time,
+      subtitle_text: subtitle.text,
+      recent_qa_messages: [],
+      user_input: agentPrompt.value
+    })
+    agentResult.value = response?.data || response
+    if (agentResult.value?.result?.note_id) {
+      await loadVideoNotes()
+    }
+  } catch (e) {
+    error.value = extractErrorMessage(e, '学习流智能体执行失败')
+  } finally {
+    agentBusy.value = false
+  }
 }
 
 const buildNoteExcerpt = (content) => {
@@ -972,6 +1049,44 @@ onUnmounted(() => {
 .setting-hint {
   font-size: 12px;
   color: var(--muted);
+}
+
+.agent-input {
+  width: 100%;
+  border: 1px solid rgba(32, 42, 55, 0.14);
+  border-radius: 16px;
+  padding: 12px;
+  min-height: 84px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.agent-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.agent-result {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(242, 235, 248, 0.98);
+  border: 1px solid rgba(32, 42, 55, 0.08);
+}
+
+.agent-result__title {
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.agent-result__plan,
+.agent-result__actions,
+.agent-result__summary {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #334155;
 }
 
 .tag-list {

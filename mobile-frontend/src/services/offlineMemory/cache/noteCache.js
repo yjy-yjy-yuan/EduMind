@@ -26,23 +26,24 @@ const normalizeTimestamps = (timestamps = []) =>
     }))
     .sort((left, right) => left.time_seconds - right.time_seconds)
 
-const buildNoteRecord = (input = {}, existing = {}) => {
-  const serverId = input.server_id || input.id || existing.server_id || null
-  const updatedAt = input.updated_at || input.created_at || existing.updated_at || nowIso()
+const buildNoteRecord = (input = {}, existing = null) => {
+  const prior = existing ?? {}
+  const serverId = input.server_id || input.id || prior.server_id || null
+  const updatedAt = input.updated_at || input.created_at || prior.updated_at || nowIso()
   return createBaseRecord({
-    local_id: existing.local_id || input.local_id || createLocalId('offline-note'),
+    local_id: prior.local_id || input.local_id || createLocalId('offline-note'),
     server_id: serverId,
     updated_at: updatedAt,
-    sync_status: input.sync_status || existing.sync_status || OFFLINE_SYNC_STATUS.SYNCED,
-    lastAccessedAt: input.lastAccessedAt || existing.lastAccessedAt || updatedAt,
+    sync_status: input.sync_status || prior.sync_status || OFFLINE_SYNC_STATUS.SYNCED,
+    lastAccessedAt: input.lastAccessedAt || prior.lastAccessedAt || updatedAt,
     entity_type: OFFLINE_ENTITY_TYPE.NOTE,
-    video_id: normalizeIntegerId(input.video_id ?? existing.video_id),
-    title: normalizeString(input.title ?? existing.title, 255),
-    content: normalizeString(input.content ?? existing.content, 12000),
-    note_type: normalizeString(input.note_type ?? existing.note_type ?? 'text', 32) || 'text',
-    tags: uniqueTextList(input.tags ?? existing.tags),
-    timestamps: normalizeTimestamps(input.timestamps ?? existing.timestamps),
-    video_title: normalizeString(input.video_title ?? existing.video_title, 255)
+    video_id: normalizeIntegerId(input.video_id ?? prior.video_id),
+    title: normalizeString(input.title ?? prior.title, 255),
+    content: normalizeString(input.content ?? prior.content, 12000),
+    note_type: normalizeString(input.note_type ?? prior.note_type ?? 'text', 32) || 'text',
+    tags: uniqueTextList(input.tags ?? prior.tags),
+    timestamps: normalizeTimestamps(input.timestamps ?? prior.timestamps),
+    video_title: normalizeString(input.video_title ?? prior.video_title, 255)
   })
 }
 
@@ -79,6 +80,7 @@ export const cacheNoteRecord = async (noteInput, { syncStatus = OFFLINE_SYNC_STA
 export const cacheNotes = async (notes = [], { syncStatus = OFFLINE_SYNC_STATUS.SYNCED } = {}) => {
   const saved = []
   for (const note of notes) {
+    if (!note) continue
     saved.push(await cacheNoteRecord(note, { syncStatus }))
   }
   return saved
@@ -110,6 +112,7 @@ export const getOfflineNotes = async ({ videoId = null, search = '', tag = '' } 
     rows = rows.filter((row) => Array.isArray(row.tags) && row.tags.includes(tag))
   }
   return rows
+    .filter(Boolean)
     .sort((left, right) => new Date(right.updated_at || 0) - new Date(left.updated_at || 0))
     .map((row) => mapNoteForUi(row))
 }
@@ -117,7 +120,7 @@ export const getOfflineNotes = async ({ videoId = null, search = '', tag = '' } 
 export const getOfflineNoteTags = async () => {
   const rows = await getTable('offline_notes').toArray()
   const buckets = new Map()
-  rows.forEach((row) => {
+  rows.filter(Boolean).forEach((row) => {
     ;(Array.isArray(row.tags) ? row.tags : []).forEach((tagName) => {
       buckets.set(tagName, (buckets.get(tagName) || 0) + 1)
     })

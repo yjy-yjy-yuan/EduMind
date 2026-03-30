@@ -62,6 +62,7 @@ const mapQuestionToMessagePair = (item) => ([
 ])
 
 export const cacheQuestionRecord = async (questionInput, { syncStatus = OFFLINE_SYNC_STATUS.SYNCED } = {}) => {
+  if (!questionInput) return null
   const existing = await findExistingRecord('offline_questions', {
     localId: questionInput?.local_id,
     serverId: questionInput?.server_id || questionInput?.id
@@ -105,6 +106,7 @@ export const getOfflineQuestions = async ({
     rows = rows.filter((row) => Number(row.user_id || 0) === Number(userId))
   }
   return rows
+    .filter(Boolean)
     .sort((left, right) => new Date(right.lastAccessedAt || right.updated_at || 0) - new Date(left.lastAccessedAt || left.updated_at || 0))
     .slice(0, limit)
 }

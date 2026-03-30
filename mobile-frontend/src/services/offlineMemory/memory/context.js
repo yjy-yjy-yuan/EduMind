@@ -80,8 +80,8 @@ export const buildVideoMemoryContext = async (videoId = null) => {
     await touchVideoAccess(numericVideoId)
   }
 
-  const orderedNotes = sortRecent(notes).slice(0, 12)
-  const orderedQuestions = sortRecent(questions).slice(0, 10)
+  const orderedNotes = sortRecent(notes.filter(Boolean)).slice(0, 12)
+  const orderedQuestions = sortRecent(questions.filter(Boolean)).slice(0, 10)
   const orderedSubtitles = buildSubtitleOrdering(subtitles, learningState)
 
   return {

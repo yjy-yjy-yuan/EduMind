@@ -47,6 +47,7 @@
           @loadedmetadata="handleLoadedMetadata"
           @canplay="handleCanPlay"
           @playing="handlePlaying"
+          @timeupdate="handleTimeUpdate"
           @waiting="handleWaiting"
           @error="handleVideoError"
         >
@@ -59,6 +60,25 @@
       {{ tipText }}
     </div>
 
+    <section class="assistant-card">
+      <div class="assistant-head">
+        <div>
+          <div class="assistant-title">学习流智能体</div>
+          <div class="assistant-tip">把当前播放位置直接记成笔记并绑定时间戳。</div>
+        </div>
+        <button class="btn btn--primary" @click="runAgent" :disabled="agentBusy || !canRunAgent">
+          {{ agentBusy ? '执行中…' : '记下这一段' }}
+        </button>
+      </div>
+      <textarea v-model.trim="agentPrompt" class="assistant-input" rows="3" placeholder="例如：把这一段记成笔记并总结一下"></textarea>
+      <div class="assistant-meta">当前播放位置：{{ currentTimeText || '00:00' }}</div>
+      <div v-if="agentResult" class="assistant-result">
+        <div class="assistant-result__title">执行结果</div>
+        <div class="assistant-result__text">{{ agentResult.result?.summary || agentResult.result?.preview || '已完成' }}</div>
+        <button v-if="agentResult.result?.note_id" class="btn" @click="router.push(`/notes/${agentResult.result.note_id}`)">打开笔记</button>
+      </div>
+    </section>
+
     <div v-if="!useMockPlayer" class="actions">
       <button class="btn btn--primary" @click="reloadPlayer">重新加载</button>
       <button class="btn" @click="router.replace(`/videos/${id}`)">返回详情</button>
@@ -70,6 +90,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi, withBase } from '@/config'
+import { executeLearningFlowAgent } from '@/api/agent'
 import { getVideo } from '@/api/video'
 
 const route = useRoute()
@@ -79,8 +100,12 @@ const videoTitle = ref(`视频 ${id.value}`)
 const pageError = ref('')
 const playerState = ref('准备中')
 const durationSeconds = ref(0)
+const currentTimeSeconds = ref(0)
 const videoRef = ref(null)
 const videoMeta = ref(null)
+const agentPrompt = ref('把这一段记成笔记并总结一下')
+const agentBusy = ref(false)
+const agentResult = ref(null)
 
 const useMockPlayer = computed(() => shouldUseMockApi())
 const streamUrl = computed(() => withBase(`/api/videos/${id.value}/stream`))
@@ -110,6 +135,16 @@ const durationText = computed(() => {
     ? `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
     : `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
 })
+const currentTimeText = computed(() => {
+  const total = Math.max(0, Math.round(Number(currentTimeSeconds.value || 0)))
+  const hh = Math.floor(total / 3600)
+  const mm = Math.floor((total % 3600) / 60)
+  const ss = total % 60
+  return hh > 0
+    ? `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+    : `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+})
+const canRunAgent = computed(() => Boolean(String(agentPrompt.value || '').trim()) && !agentBusy.value)
 const tipText = computed(() => {
   if (useMockPlayer.value) {
     return '当前未连接后端。到“我的”页面填写 FastAPI 地址，或使用 iOS 原生注入的固定地址后，播放器会立即切到真实视频流。'
@@ -179,6 +214,10 @@ const handlePlaying = () => {
   playerState.value = '播放中'
 }
 
+const handleTimeUpdate = (event) => {
+  currentTimeSeconds.value = Number(event?.target?.currentTime || 0)
+}
+
 const handleWaiting = () => {
   playerState.value = '缓冲中'
 }
@@ -186,6 +225,26 @@ const handleWaiting = () => {
 const handleVideoError = () => {
   playerState.value = '播放失败'
   pageError.value = '视频流加载失败。请确认后端服务在线、手机与 Mac 在同一网络，并且该视频文件仍存在。'
+}
+
+const runAgent = async () => {
+  if (!canRunAgent.value) return
+  agentBusy.value = true
+  try {
+    const response = await executeLearningFlowAgent({
+      video_id: Number(id.value),
+      page_context: 'video_detail',
+      current_time_seconds: currentTimeSeconds.value || null,
+      subtitle_text: '',
+      recent_qa_messages: [],
+      user_input: agentPrompt.value
+    })
+    agentResult.value = response?.data || response
+  } catch (err) {
+    pageError.value = extractErrorMessage(err, '学习流智能体执行失败')
+  } finally {
+    agentBusy.value = false
+  }
 }
 
 onMounted(loadVideoMeta)
@@ -397,6 +456,64 @@ onMounted(loadVideoMeta)
   border-radius: 12px;
   background: rgba(139, 121, 157, 0.08);
   color: var(--primary-deep);
+}
+
+.assistant-card {
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.96));
+  display: grid;
+  gap: 10px;
+}
+
+.assistant-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.assistant-title {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.assistant-tip,
+.assistant-meta {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.assistant-input {
+  width: 100%;
+  border: 1px solid rgba(32, 42, 55, 0.14);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.assistant-result {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.assistant-result__title {
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.assistant-result__text {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #334155;
 }
 
 .actions {

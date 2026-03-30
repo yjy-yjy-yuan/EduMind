@@ -38,28 +38,29 @@ const splitSubtitlePages = (segments = [], pageSize = OFFLINE_MEMORY_LIMITS.SUBT
   return pages
 }
 
-const normalizeVideoRecord = (input = {}, existing = {}) => {
-  const videoId = normalizeIntegerId(input.video_id ?? input.id ?? existing.video_id)
-  const summary = normalizeString(input.summary ?? existing.summary, OFFLINE_MEMORY_LIMITS.MAX_SUMMARY_CHARS)
+const normalizeVideoRecord = (input = {}, existing = null) => {
+  const prior = existing ?? {}
+  const videoId = normalizeIntegerId(input.video_id ?? input.id ?? prior.video_id)
+  const summary = normalizeString(input.summary ?? prior.summary, OFFLINE_MEMORY_LIMITS.MAX_SUMMARY_CHARS)
   return createBaseRecord({
-    local_id: existing.local_id || input.local_id || createLocalId('offline-video'),
-    server_id: input.server_id || input.id || existing.server_id || (videoId ? String(videoId) : null),
-    updated_at: input.updated_at || input.created_at || existing.updated_at || nowIso(),
-    sync_status: input.sync_status || existing.sync_status || OFFLINE_SYNC_STATUS.SYNCED,
-    lastAccessedAt: input.lastAccessedAt || existing.lastAccessedAt || nowIso(),
+    local_id: prior.local_id || input.local_id || createLocalId('offline-video'),
+    server_id: input.server_id || input.id || prior.server_id || (videoId ? String(videoId) : null),
+    updated_at: input.updated_at || input.created_at || prior.updated_at || nowIso(),
+    sync_status: input.sync_status || prior.sync_status || OFFLINE_SYNC_STATUS.SYNCED,
+    lastAccessedAt: input.lastAccessedAt || prior.lastAccessedAt || nowIso(),
     entity_type: OFFLINE_ENTITY_TYPE.VIDEO,
     video_id: videoId,
-    title: normalizeString(input.title ?? existing.title, 255),
-    status: normalizeString(input.status ?? existing.status, 64),
+    title: normalizeString(input.title ?? prior.title, 255),
+    status: normalizeString(input.status ?? prior.status, 64),
     summary,
-    tags: uniqueTextList(input.tags ?? existing.tags).slice(0, OFFLINE_MEMORY_LIMITS.MAX_TAGS),
-    subtitle_page_count: Number(existing.subtitle_page_count || input.subtitle_page_count || 0),
-    subtitle_segment_count: Number(existing.subtitle_segment_count || input.subtitle_segment_count || 0),
+    tags: uniqueTextList(input.tags ?? prior.tags).slice(0, OFFLINE_MEMORY_LIMITS.MAX_TAGS),
+    subtitle_page_count: Number(prior.subtitle_page_count || input.subtitle_page_count || 0),
+    subtitle_segment_count: Number(prior.subtitle_segment_count || input.subtitle_segment_count || 0),
     metadata: {
-      processing_origin: normalizeString(input.processing_origin ?? existing?.metadata?.processing_origin, 64),
-      requested_model: normalizeString(input.requested_model ?? existing?.metadata?.requested_model, 64),
-      effective_model: normalizeString(input.effective_model ?? existing?.metadata?.effective_model, 64),
-      filepath: normalizeString(input.filepath ?? existing?.metadata?.filepath, 512)
+      processing_origin: normalizeString(input.processing_origin ?? prior.metadata?.processing_origin, 64),
+      requested_model: normalizeString(input.requested_model ?? prior.metadata?.requested_model, 64),
+      effective_model: normalizeString(input.effective_model ?? prior.metadata?.effective_model, 64),
+      filepath: normalizeString(input.filepath ?? prior.metadata?.filepath, 512)
     }
   })
 }
