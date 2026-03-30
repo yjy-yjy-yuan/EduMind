@@ -112,6 +112,13 @@
 ## 0329-feature/notes-video-enhancemen
 
 - 分支创建：`2026-03-29`
+- 创建基线：`fa02f96` `fix(agent): stabilize note metadata`
+
+### 2026-03-30
+- `6c4fe40` `fix(note-edit): compact timestamp card layout`
+- 继续收缩单个笔记编辑页，压平重点时间点为轻量单行结构，保留删除笔记卡片。
+
+- 分支创建：`2026-03-29`
 - 创建基线：`089a234` `style(mobile-frontend): refine upload and tab bar chrome`
 
 ### 2026-03-29
