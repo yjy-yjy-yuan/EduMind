@@ -72,21 +72,51 @@ def _build_note_title(video: Optional[Video], user_input: str, summary_text: str
     return normalize_user_input(user_input)[:40] or "学习笔记"
 
 
-def _build_note_content(ctx: AgentContext, summary_text: str, qa_answer: str = "") -> str:
+def _subtitle_excerpt_for_time(video: Optional[Video], current_time_seconds: Optional[float]) -> str:
+    if video is None or current_time_seconds is None:
+        return ""
+
+    subtitles = list(getattr(video, "subtitles", []) or [])
+    if not subtitles:
+        return ""
+
+    ordered = sorted(subtitles, key=lambda item: float(getattr(item, "start_time", 0) or 0))
+    target = float(current_time_seconds)
+    best_index = 0
+    best_distance = None
+    for index, item in enumerate(ordered):
+        start_time = float(getattr(item, "start_time", 0) or 0)
+        end_time = float(getattr(item, "end_time", start_time) or start_time)
+        midpoint = (start_time + end_time) / 2
+        distance = abs(midpoint - target)
+        if best_distance is None or distance < best_distance:
+            best_distance = distance
+            best_index = index
+
+    fragment_indexes = range(max(0, best_index - 1), min(len(ordered), best_index + 2))
+    excerpts = []
+    for index in fragment_indexes:
+        fragment = ordered[index]
+        text = str(getattr(fragment, "text", "") or "").strip()
+        if not text:
+            continue
+        start_time = float(getattr(fragment, "start_time", 0) or 0)
+        end_time = float(getattr(fragment, "end_time", start_time) or start_time)
+        excerpts.append(f"[{start_time:.1f}-{end_time:.1f}] {text}")
+
+    return "\n".join(excerpts).strip()
+
+
+def _build_note_content(ctx: AgentContext, summary_text: str, subtitle_excerpt: str = "", qa_answer: str = "") -> str:
     parts = []
-    if ctx.subtitle_text.strip():
+    if subtitle_excerpt.strip():
+        parts.append(f"字幕片段：\n{subtitle_excerpt.strip()}")
+    elif ctx.subtitle_text.strip():
         parts.append(f"字幕片段：{ctx.subtitle_text.strip()}")
     if summary_text.strip():
         parts.append(f"摘要：{summary_text.strip()}")
     if qa_answer.strip():
         parts.append(f"问答补充：{qa_answer.strip()}")
-    if ctx.recent_qa_messages:
-        parts.append("最近问答：")
-        for item in ctx.recent_qa_messages[-3:]:
-            role = str(item.get("role") or "user")
-            content = str(item.get("content") or "").strip()
-            if content:
-                parts.append(f"- {role}: {content}")
     return "\n".join(parts).strip()
 
 
@@ -135,6 +165,7 @@ def execute_learning_flow_agent(db: Session, *, request) -> dict[str, Any]:
     if video is not None:
         qa_system = QASystem(video=video)
         qa_answer = ""
+        subtitle_excerpt = _subtitle_excerpt_for_time(video, ctx.current_time_seconds)
         if intent == "qa" and qa_system.has_context():
             logger.debug(
                 "agent qa dispatch | mode=video | provider=qwen | history_messages=%s", len(ctx.recent_qa_messages)
@@ -152,9 +183,9 @@ def execute_learning_flow_agent(db: Session, *, request) -> dict[str, Any]:
             logger.debug("agent qa answered | answer_len=%s", len(qa_answer))
 
         summary_text = ""
-        if ctx.subtitle_text.strip():
+        if subtitle_excerpt.strip() or ctx.subtitle_text.strip():
             summary_text = fallback_summary(
-                ctx.subtitle_text,
+                subtitle_excerpt or ctx.subtitle_text,
                 title=video.title or "",
                 style=normalize_summary_style("study"),
             )
@@ -164,9 +195,11 @@ def execute_learning_flow_agent(db: Session, *, request) -> dict[str, Any]:
 
         if intent in {"create_note", "mixed"} or ctx.current_time_seconds is not None:
             note_title = _build_note_title(video, ctx.user_input, summary_text)
-            note_content = _build_note_content(ctx, summary_text, qa_answer=qa_answer)
+            note_content = _build_note_content(
+                ctx, summary_text, subtitle_excerpt=subtitle_excerpt, qa_answer=qa_answer
+            )
             if not note_content:
-                note_content = ctx.user_input
+                note_content = summary_text or subtitle_excerpt or video.summary or video.title or "学习笔记"
             logger.debug(
                 "agent create note | title=%s | content_len=%s | has_timestamp=%s",
                 note_title,

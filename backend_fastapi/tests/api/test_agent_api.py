@@ -1,7 +1,6 @@
-"""学习流智能体 API 测试。"""
-
 import pytest
 from app.models.note import Note
+from app.models.note import NoteTimestamp
 from app.models.qa import Question
 from app.models.subtitle import Subtitle
 from app.models.video import VideoStatus
@@ -39,11 +38,15 @@ def test_execute_agent_creates_note_and_timestamp(client, db, sample_video):
     payload = response.json()
     assert payload["intent"] in {"create_note", "mixed"}
     assert "note_created" in payload["actions"]
+    assert "timestamp_attached" in payload["actions"]
     assert payload["result"]["note_id"]
 
     note = db.query(Note).filter(Note.id == payload["result"]["note_id"]).first()
     assert note is not None
     assert note.video_id == sample_video.id
+    assert "把这一段记成笔记并总结一下" not in (note.content or "")
+    assert "这一段讲的是导数的几何意义" in (note.content or "")
+    assert db.query(NoteTimestamp).filter(NoteTimestamp.note_id == note.id).count() == 1
     assert db.query(Question).count() == 0
 
 
