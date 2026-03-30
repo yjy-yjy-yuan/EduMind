@@ -76,8 +76,12 @@
         <div class="timestamp-preview__text">{{ subtitlePreview || '当前时间点附近还没有可用字幕。' }}</div>
       </div>
       <label class="assistant-field">
+        <span class="assistant-label">笔记分类</span>
+        <div class="assistant-hint">系统会根据当前字幕与时间点自动判断分类，不需要手动选择。</div>
+      </label>
+      <label class="assistant-field">
         <span class="assistant-label">笔记标题</span>
-        <input v-model.trim="noteTitle" class="assistant-input" type="text" placeholder="例如：导数的几何意义" />
+        <input v-model.trim="noteTitle" class="assistant-input" type="text" placeholder="可留空，系统会自动生成" />
       </label>
       <label class="assistant-field">
         <span class="assistant-label">这一段的笔记</span>
@@ -90,13 +94,35 @@
       </label>
       <label class="assistant-field">
         <span class="assistant-label">我还想继续思考</span>
-        <textarea
-          v-model.trim="noteThought"
+        <div class="tag-picks">
+          <button
+            v-for="thought in thoughtOptions"
+            :key="thought"
+            class="tag-chip"
+            :class="{ 'tag-chip--active': selectedThoughts.includes(thought) }"
+            @click="toggleThought(thought)"
+          >
+            {{ thought }}
+          </button>
+        </div>
+        <input
+          v-model.trim="customThought"
           class="assistant-input"
-          rows="2"
-          placeholder="例如：后面要再看一遍这个推导"
+          type="text"
+          placeholder="其他想法（可选），例如：这里要回去再看一遍"
         />
       </label>
+      <div class="tag-picks">
+        <button
+          v-for="tag in noteTagOptions"
+          :key="tag"
+          class="tag-chip"
+          :class="{ 'tag-chip--active': selectedNoteTags.includes(tag) }"
+          @click="toggleNoteTag(tag)"
+        >
+          {{ tag }}
+        </button>
+      </div>
       <div v-if="noteResult" class="assistant-result">
         <div class="assistant-result__title">已保存</div>
         <div class="assistant-result__text">{{ noteResult.summary }}</div>
@@ -115,7 +141,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi, withBase } from '@/config'
-import { addNoteTimestamp, createNote } from '@/api/note'
+import { createNote } from '@/api/note'
 import { getVideo } from '@/api/video'
 import { getSubtitleContext } from '@/api/subtitle'
 
@@ -132,9 +158,13 @@ const videoMeta = ref(null)
 const subtitleFragments = ref([])
 const noteTitle = ref('')
 const noteBody = ref('')
-const noteThought = ref('')
+const customThought = ref('')
+const selectedNoteTags = ref(['再思考'])
+const selectedThoughts = ref(['需要回看'])
 const noteBusy = ref(false)
 const noteResult = ref(null)
+const noteTagOptions = ['再思考', '很重要', '待复习', '需要查证', '想再看一遍']
+const thoughtOptions = ['需要回看', '需要查证', '要补充例子', '容易忘', '和前面有关']
 
 const useMockPlayer = computed(() => shouldUseMockApi())
 const streamUrl = computed(() => withBase(`/api/videos/${id.value}/stream`))
@@ -174,7 +204,7 @@ const currentTimeText = computed(() => {
     ? `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
     : `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
 })
-const canSaveTimestampNote = computed(() => !noteBusy.value && Boolean(noteTitle.value.trim() || noteBody.value.trim() || noteThought.value.trim()))
+const canSaveTimestampNote = computed(() => !noteBusy.value)
 const tipText = computed(() => {
   if (useMockPlayer.value) {
     return '当前未连接后端。到“我的”页面填写 FastAPI 地址，或使用 iOS 原生注入的固定地址后，播放器会立即切到真实视频流。'
@@ -304,22 +334,54 @@ const buildSubtitleExcerpt = () => {
     .join('\n')
 }
 
+const deriveAutoTitle = () => {
+  const manualTitle = String(noteTitle.value || '').trim()
+  if (manualTitle) return manualTitle
+  const category = inferNoteCategory()
+  return `${category} · ${currentTimeText.value || '00:00'}`
+}
+
+const inferNoteCategory = () => {
+  const text = `${buildSubtitleExcerpt()} ${noteBody.value} ${customThought.value} ${[...selectedThoughts.value].join(' ')}`.toLowerCase()
+  if (/例题|例如|举例|算|计算|解题|题目/.test(text)) return '例题'
+  if (/思考|为什么|如何|怎么|原因|讨论|探究/.test(text)) return '思考题'
+  if (/易错|注意|别忘|常见错误|容易/.test(text)) return '易错点'
+  if (/结论|总结|归纳|因此|所以/.test(text)) return '结论'
+  return '知识点'
+}
+
+const toggleNoteTag = (tag) => {
+  const current = new Set(selectedNoteTags.value)
+  if (current.has(tag)) current.delete(tag)
+  else current.add(tag)
+  selectedNoteTags.value = [...current]
+}
+
+const toggleThought = (thought) => {
+  const current = new Set(selectedThoughts.value)
+  if (current.has(thought)) current.delete(thought)
+  else current.add(thought)
+  selectedThoughts.value = [...current]
+}
+
 const saveTimestampNote = async () => {
   if (!canSaveTimestampNote.value) return
   noteBusy.value = true
   try {
     const subtitleExcerpt = buildSubtitleExcerpt()
+    const thoughtText = [...selectedThoughts.value, customThought.value.trim()].filter(Boolean).join('；')
     const contentParts = []
     if (subtitleExcerpt) contentParts.push(`字幕片段：\n${subtitleExcerpt}`)
     if (noteBody.value.trim()) contentParts.push(`笔记：\n${noteBody.value.trim()}`)
-    if (noteThought.value.trim()) contentParts.push(`待思考：\n${noteThought.value.trim()}`)
-    const noteContent = contentParts.join('\n\n').trim() || `视频 ${videoTitle.value} 的时间点记录`
+    if (thoughtText) contentParts.push(`待思考：\n${thoughtText}`)
+    const noteContent = contentParts.join('\n\n').trim() || subtitleExcerpt || noteBody.value.trim() || thoughtText || `${videoTitle.value} 的时间点记录`
+    const noteTitleValue = deriveAutoTitle()
     const response = await createNote({
-      title: noteTitle.value.trim() || `${videoTitle.value} · ${currentTimeText.value}`,
+      title: noteTitleValue,
       content: noteContent,
       note_type: 'text',
       video_id: Number(id.value),
-      tags: '',
+      tags: selectedNoteTags.value.join(','),
       timestamps: [
         {
           time_seconds: Number(currentTimeSeconds.value || 0),
@@ -332,10 +394,13 @@ const saveTimestampNote = async () => {
     if (noteId) {
       noteResult.value = {
         noteId,
-        summary: `已保存 ${currentTimeText.value} 的时间点笔记`
+        summary: `已保存 ${currentTimeText.value} 的时间点笔记：${noteTitleValue}`
       }
       noteBody.value = ''
-      noteThought.value = ''
+      customThought.value = ''
+      noteTitle.value = ''
+      selectedNoteTags.value = ['再思考']
+      selectedThoughts.value = ['需要回看']
     } else {
       noteResult.value = {
         noteId: null,
@@ -608,6 +673,28 @@ onMounted(loadVideoMeta)
   padding: 10px 12px;
   font-size: 14px;
   background: rgba(255, 255, 255, 0.9);
+}
+
+.tag-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag-chip {
+  border: 1px solid rgba(32, 42, 55, 0.12);
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--primary-deep);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.tag-chip--active {
+  background: linear-gradient(135deg, #8b799d, #6f5d7d);
+  color: #fff;
+  border-color: transparent;
 }
 
 .timestamp-preview {
