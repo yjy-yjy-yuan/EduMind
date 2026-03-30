@@ -52,7 +52,8 @@
         后台处理中仍可进入播放器，当前播放原始视频文件。
       </div>
 
-      <div class="block">
+      <div class="card-sections">
+        <div class="block video-detail__section video-detail__section--whisper">
         <WhisperModelPicker
           title="Whisper 模型"
           :model="processingSettings.model"
@@ -60,76 +61,75 @@
           :disabled="processDisabled"
           @select="selectProcessingModel"
         />
-      </div>
-
-      <div v-if="canShowAnalysisBlock" class="block">
-        <div class="block-head">
-          <div class="block-title">智能摘要</div>
-          <div class="block-actions">
-            <button class="mini" @click="createSummary" :disabled="!canGenerateSummary || summaryGenerating || tagGenerating || summaryImporting">
-              {{ summaryGenerating ? '生成中…' : (video.summary ? '重生成摘要' : '生成摘要') }}
-            </button>
-            <button class="mini" @click="createTags" :disabled="!canGenerateTags || summaryGenerating || tagGenerating || summaryImporting">
-              {{ tagGenerating ? '提取中…' : (tagList.length > 0 ? '重提标签' : '提取标签') }}
-            </button>
-            <button class="mini mini--primary" @click="importSummaryToNote" :disabled="!canImportSummary">
-              {{ summaryImporting ? '导入中…' : '导入到笔记' }}
-            </button>
-          </div>
-        </div>
-        <div class="setting-hint">当前摘要设置：{{ summaryStyleText }}</div>
-        <div v-if="video.summary" class="block-body block-body--prewrap">{{ video.summary }}</div>
-        <div v-else class="block-placeholder">处理完成后可在此生成课程摘要。</div>
-        <div v-if="tagList.length > 0" class="tag-list">
-          <span v-for="tag in tagList" :key="tag" class="tag-pill">{{ tag }}</span>
-        </div>
-      </div>
-
-      <div class="block">
-        <div class="block-head">
-          <div>
-            <div class="block-title">本视频笔记</div>
-            <div class="setting-hint">把视频里的关键结论沉淀到笔记页，形成稳定回看入口。</div>
-          </div>
-          <div class="block-actions">
-            <button class="mini" @click="openVideoNotes">查看全部</button>
-            <button class="mini" @click="takeNote">继续记笔记</button>
-          </div>
         </div>
 
-        <div v-if="notesLoading" class="setting-hint">正在加载本视频笔记…</div>
-        <div v-else-if="videoNotes.length === 0" class="block-placeholder">当前视频还没有笔记，建议从关键知识点开始记录。</div>
-        <div v-else class="note-preview-list">
-          <button
-            v-for="note in videoNotes"
-            :key="note.id"
-            class="note-preview-card"
-            @click="openNote(note.id)"
-          >
-            <div class="note-preview-card__title">{{ note.title || '未命名笔记' }}</div>
-            <div class="note-preview-card__excerpt">{{ buildNoteExcerpt(note.content) }}</div>
-            <div class="note-preview-card__meta">
-              <span v-if="Array.isArray(note.timestamps) && note.timestamps.length > 0">
-                {{ formatNoteTimestampSummary(note.timestamps) }}
-              </span>
-              <span>{{ formatMetaTime(note.updated_at || note.created_at) }}</span>
+        <div v-if="canShowAnalysisBlock" class="block video-detail__section video-detail__section--analysis">
+          <div class="block-head">
+            <div class="block-title">智能摘要</div>
+            <div class="block-actions">
+              <button class="mini" @click="createSummary" :disabled="!canGenerateSummary || summaryGenerating || tagGenerating || summaryImporting">
+                {{ summaryGenerating ? '生成中…' : (video.summary ? '重生成摘要' : '生成摘要') }}
+              </button>
+              <button class="mini" @click="createTags" :disabled="!canGenerateTags || summaryGenerating || tagGenerating || summaryImporting">
+                {{ tagGenerating ? '提取中…' : (tagList.length > 0 ? '重提标签' : '提取标签') }}
+              </button>
+              <button class="mini mini--primary" @click="importSummaryToNote" :disabled="!canImportSummary">
+                {{ summaryImporting ? '导入中…' : '导入到笔记' }}
+              </button>
             </div>
-          </button>
+          </div>
+          <div class="setting-hint">当前摘要设置：{{ summaryStyleText }}</div>
+          <div v-if="video.summary" class="block-body block-body--prewrap">{{ video.summary }}</div>
+          <div v-else class="block-placeholder">处理完成后可在此生成课程摘要。</div>
+          <div v-if="tagList.length > 0" class="tag-list">
+            <span v-for="tag in tagList" :key="tag" class="tag-pill">{{ tag }}</span>
+          </div>
         </div>
+
+        <div class="block video-detail__section video-detail__section--notes">
+          <div class="block-head">
+            <div>
+              <div class="block-title">本视频笔记</div>
+              <div class="setting-hint">把视频里的关键结论沉淀到笔记页，形成稳定回看入口。</div>
+            </div>
+            <div class="block-actions">
+              <button class="mini" @click="openVideoNotes">查看全部</button>
+            </div>
+          </div>
+
+          <div v-if="notesLoading" class="setting-hint">正在加载本视频笔记…</div>
+          <div v-else-if="videoNotes.length === 0" class="block-placeholder">当前视频还没有笔记，建议从关键知识点开始记录。</div>
+          <div v-else class="note-preview-list">
+            <button
+              v-for="note in videoNotes"
+              :key="note.id"
+              class="note-preview-card"
+              @click="openNote(note.id)"
+            >
+              <div class="note-preview-card__title">{{ note.title || '未命名笔记' }}</div>
+              <div class="note-preview-card__excerpt">{{ buildNoteExcerpt(note.content) }}</div>
+              <div class="note-preview-card__meta">
+                <span v-if="Array.isArray(note.timestamps) && note.timestamps.length > 0">
+                  {{ formatNoteTimestampSummary(note.timestamps) }}
+                </span>
+                <span>{{ formatMetaTime(note.updated_at || note.created_at) }}</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <div class="actions video-detail__section video-detail__section--actions">
+          <button class="btn" @click="startProcess" :disabled="processDisabled">开始处理</button>
+          <button class="btn btn--primary" @click="play" :disabled="!canOpenPlayerWhileProcessing">{{ playLabel }}</button>
+          <button class="btn" @click="qa">问答</button>
+        </div>
+
+        <button v-if="canRetry" class="retry video-detail__section video-detail__section--retry" @click="retryProcess" :disabled="retrying || autoStarting">
+          {{ retrying ? '重试中…' : '失败后一键重试' }}
+        </button>
+
+        <button class="danger video-detail__section video-detail__section--delete" @click="remove" :disabled="deleteDisabled">删除视频</button>
       </div>
-
-      <div class="actions">
-        <button class="btn" @click="startProcess" :disabled="processDisabled">开始处理</button>
-        <button class="btn btn--primary" @click="play" :disabled="!canOpenPlayerWhileProcessing">{{ playLabel }}</button>
-        <button class="btn" @click="qa">问答</button>
-        <button class="btn" @click="takeNote">记笔记</button>
-      </div>
-
-      <button v-if="canRetry" class="retry" @click="retryProcess" :disabled="retrying || autoStarting">
-        {{ retrying ? '重试中…' : '失败后一键重试' }}
-      </button>
-
-      <button class="danger" @click="remove" :disabled="deleteDisabled">删除视频</button>
     </div>
   </div>
 </template>
@@ -180,6 +180,7 @@ const tagGenerating = ref(false)
 const summaryImporting = ref(false)
 const notesLoading = ref(false)
 const videoNotes = ref([])
+const subtitleFragments = ref([])
 const processingSettings = ref(getProcessingSettings())
 const whisperModelOptions = ref(getWhisperModelOptions())
 
@@ -369,9 +370,10 @@ const reloadOfflineTaskCount = async () => {
 const normalizeVideo = (payload) => {
   const current = payload?.video || payload?.data || payload || null
   if (!current) return null
+  const resolvedId = Number(current.id || current.server_id || current.video_id || current.local_id || 0)
   return {
     ...current,
-    id: current.id || Number(current.server_id || current.video_id || 0) || current.local_id,
+    id: Number.isFinite(resolvedId) && resolvedId > 0 ? resolvedId : (current.local_id || current.server_id || current.video_id || ''),
     tags: Array.isArray(current.tags) ? current.tags : [],
     filepath: current.filepath || current?.metadata?.filepath || '',
     requested_model: String(current.requested_model || '').trim().toLowerCase(),
@@ -391,6 +393,15 @@ const normalizeNote = (payload) => payload?.note || payload?.data || payload || 
 const normalizeSubtitleContext = (payload) => {
   const list = payload?.data?.subtitles || payload?.data || payload?.subtitles || payload || []
   return Array.isArray(list) ? list : []
+}
+
+const pickSubtitleForAgent = () => {
+  const list = subtitleFragments.value
+  const first = Array.isArray(list) && list.length > 0 ? list[0] : null
+  return {
+    text: String(first?.text || video.value?.summary || '').trim(),
+    time: Number(first?.start_time || 0) || null
+  }
 }
 
 const hydrateOfflineVideoContext = async (videoId, fallbackMessage = '当前展示的是本地离线缓存') => {
@@ -425,9 +436,10 @@ const refreshOfflineMemoryContext = async (currentVideo) => {
   })
   try {
     const subtitleResponse = await getSubtitleContext(normalizedVideo.id, { preferMerged: true })
-    const subtitleFragments = normalizeSubtitleContext(subtitleResponse)
-    if (subtitleFragments.length > 0) {
-      await cacheVideoSubtitles(normalizedVideo.id, subtitleFragments)
+    const fragments = normalizeSubtitleContext(subtitleResponse)
+    subtitleFragments.value = fragments.slice(0, 8)
+    if (fragments.length > 0) {
+      await cacheVideoSubtitles(normalizedVideo.id, fragments)
     }
   } catch {
     // ignore subtitle cache refresh failures
@@ -466,6 +478,12 @@ const reload = async () => {
       return
     }
     await loadVideoNotes()
+    try {
+      const subtitleResponse = await getSubtitleContext(Number(id.value), { preferMerged: true })
+      subtitleFragments.value = normalizeSubtitleContext(subtitleResponse).slice(0, 8)
+    } catch {
+      subtitleFragments.value = []
+    }
     try {
       await fetchStatus()
     } catch (statusError) {
@@ -618,16 +636,6 @@ const qa = () => router.push({ path: '/qa', query: { videoId: String(id.value) }
 const openVideoNotes = () => router.push({ path: '/notes', query: { videoId: String(id.value) } })
 
 const openNote = (noteId) => router.push(`/notes/${noteId}`)
-const takeNote = () => {
-  router.push({
-    path: '/notes/new',
-    query: {
-      videoId: String(id.value),
-      videoTitle: String(video.value?.title || '')
-    }
-  })
-}
-
 const buildNoteExcerpt = (content) => {
   const text = String(content || '').replace(/\s+/g, ' ').trim()
   if (!text) return '暂无笔记正文。'
@@ -974,6 +982,44 @@ onUnmounted(() => {
   color: var(--muted);
 }
 
+.agent-input {
+  width: 100%;
+  border: 1px solid rgba(32, 42, 55, 0.14);
+  border-radius: 16px;
+  padding: 12px;
+  min-height: 84px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.agent-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.agent-result {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(242, 235, 248, 0.98);
+  border: 1px solid rgba(32, 42, 55, 0.08);
+}
+
+.agent-result__title {
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.agent-result__plan,
+.agent-result__actions,
+.agent-result__summary {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #334155;
+}
+
 .tag-list {
   display: flex;
   flex-wrap: wrap;
@@ -1044,6 +1090,35 @@ onUnmounted(() => {
 .mini--primary {
   background: linear-gradient(135deg, #5f477e, #8f73ba);
   color: #fff;
+}
+
+.card-sections {
+  display: flex;
+  flex-direction: column;
+}
+
+.video-detail__section--whisper {
+  order: 10;
+}
+
+.video-detail__section--actions {
+  order: 20;
+}
+
+.video-detail__section--analysis {
+  order: 30;
+}
+
+.video-detail__section--notes {
+  order: 40;
+}
+
+.video-detail__section--retry {
+  order: 50;
+}
+
+.video-detail__section--delete {
+  order: 60;
 }
 
 .actions {

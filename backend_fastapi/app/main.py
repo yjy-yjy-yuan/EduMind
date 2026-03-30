@@ -3,6 +3,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from time import perf_counter
 
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -16,11 +17,36 @@ from app.services.whisper_runtime import shutdown_whisper_runtime
 from app.services.whisper_runtime import start_whisper_background_preload
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # 配置日志
 LOG_LEVEL = logging.DEBUG if settings.DEBUG else logging.INFO
-logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    force=True,
+)
+logging.getLogger("uvicorn").setLevel(LOG_LEVEL)
+logging.getLogger("uvicorn.error").setLevel(LOG_LEVEL)
+logging.getLogger("uvicorn.access").setLevel(LOG_LEVEL)
 logger = logging.getLogger(__name__)
+
+
+class RequestTimingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        start = perf_counter()
+        response = await call_next(request)
+        elapsed_ms = (perf_counter() - start) * 1000
+        status_code = int(getattr(response, "status_code", 0) or 0)
+        log_message = "request completed | method=%s | path=%s | status=%s | elapsed_ms=%.2f"
+        log_args = (request.method, request.url.path, status_code, elapsed_ms)
+        if status_code >= 500:
+            logger.error(log_message, *log_args)
+        elif status_code >= 400:
+            logger.warning(log_message, *log_args)
+        else:
+            logger.info(log_message, *log_args)
+        return response
 
 
 def recover_interrupted_video_tasks():
@@ -98,9 +124,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestTimingMiddleware)
 
 
 # 注册路由
+from app.routers import agent
 from app.routers import auth
 from app.routers import chat
 from app.routers import design
@@ -118,6 +146,7 @@ app.include_router(chat.router, prefix="/api/chat", tags=["聊天系统"])
 app.include_router(design.router, prefix="/api/design", tags=["设计助手"])
 app.include_router(auth.router, prefix="/api/auth", tags=["用户认证"])
 app.include_router(recommendation.router, prefix="/api/recommendations", tags=["视频推荐"])
+app.include_router(agent.router, prefix="/api/agent", tags=["学习流智能体"])
 
 
 # 根路由

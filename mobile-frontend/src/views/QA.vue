@@ -79,6 +79,7 @@
       />
       <button class="send" @click="send" :disabled="asking || !question">{{ asking ? '…' : '发送' }}</button>
     </div>
+
   </div>
 </template>
 
@@ -238,7 +239,6 @@ const messages = computed({
 })
 
 const shouldRenderChat = computed(() => messages.value.length > 0)
-
 const scrollToBottom = async () => {
   await nextTick()
   const el = chatRef.value

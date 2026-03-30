@@ -4,15 +4,15 @@ import json
 import logging
 from typing import Optional
 
-from app.core.database import get_db
 from app.core.database import SessionLocal
+from app.core.database import get_db
 from app.models.qa import Question
 from app.models.video import Video
 from app.schemas.qa import AskRequest
+from app.utils.qa_utils import SUPPORTED_QA_PROVIDERS
 from app.utils.qa_utils import QAConfigError
 from app.utils.qa_utils import QAProviderError
 from app.utils.qa_utils import QASystem
-from app.utils.qa_utils import SUPPORTED_QA_PROVIDERS
 from app.utils.qa_utils import resolve_provider_label
 from fastapi import APIRouter
 from fastapi import Depends
@@ -39,6 +39,22 @@ def validate_provider(provider: str) -> str:
     return normalized_provider
 
 
+def _debug_qa_context(
+    prefix: str, *, video: Optional[Video], request: AskRequest, normalized_mode: str, normalized_provider: str
+):
+    logger.debug(
+        "%s | mode=%s | provider=%s | video_id=%s | question_len=%s | history_messages=%s | subtitle_count=%s | has_summary=%s",
+        prefix,
+        normalized_mode,
+        normalized_provider,
+        request.video_id,
+        len(str(request.question or "")),
+        len(request.history or []),
+        len(getattr(video, "subtitles", []) or []) if video is not None else 0,
+        bool(getattr(video, "summary", "") or ""),
+    )
+
+
 def persist_question_record(
     db: Session,
     *,
@@ -54,6 +70,12 @@ def persist_question_record(
     db.add(question)
     db.commit()
     db.refresh(question)
+    logger.debug(
+        "qa question persisted | question_id=%s | video_id=%s | answer_len=%s",
+        question.id,
+        video_id,
+        len(str(answer or "")),
+    )
     return question.to_dict()
 
 
@@ -77,6 +99,13 @@ async def ask_question(request: AskRequest, db: Session = Depends(get_db)):
             if not video:
                 raise HTTPException(status_code=404, detail="视频不存在")
         qa_system = QASystem(video=video)
+        _debug_qa_context(
+            "qa request accepted",
+            video=video,
+            request=request,
+            normalized_mode=normalized_mode,
+            normalized_provider=normalized_provider,
+        )
         if normalized_mode == "video" and not qa_system.has_context():
             raise HTTPException(status_code=400, detail="该视频暂无可用于问答的字幕或摘要内容")
 
@@ -84,6 +113,7 @@ async def ask_question(request: AskRequest, db: Session = Depends(get_db)):
 
         # 流式响应
         if request.stream:
+
             def generate():
                 stream_db = SessionLocal()
                 try:
@@ -103,6 +133,12 @@ async def ask_question(request: AskRequest, db: Session = Depends(get_db)):
                             return
 
                     stream_qa_system = QASystem(video=stream_video)
+                    logger.debug(
+                        "qa stream context ready | video_id=%s | subtitle_count=%s | has_summary=%s",
+                        request.video_id,
+                        len(getattr(stream_video, "subtitles", []) or []),
+                        bool(getattr(stream_video, "summary", "") or ""),
+                    )
                     if normalized_mode == "video" and not stream_qa_system.has_context():
                         yield serialize_stream_event(
                             {
@@ -127,6 +163,12 @@ async def ask_question(request: AskRequest, db: Session = Depends(get_db)):
                     )
 
                     stream_history = request.history
+                    logger.debug(
+                        "qa stream start | history_messages=%s | provider=%s | model=%s",
+                        len(stream_history or []),
+                        normalized_provider,
+                        request.model or "",
+                    )
 
                     for event in stream_qa_system.answer_stream(
                         request.question,
@@ -137,6 +179,12 @@ async def ask_question(request: AskRequest, db: Session = Depends(get_db)):
                         history=stream_history,
                     ):
                         if event.get("type") == "answer":
+                            logger.debug(
+                                "qa stream answer event | video_id=%s | answer_len=%s | references=%s",
+                                request.video_id,
+                                len(str(event.get("answer") or "")),
+                                len(event.get("references") or []),
+                            )
                             stored_question = persist_question_record(
                                 stream_db,
                                 video_id=request.video_id if normalized_mode == "video" else None,
@@ -208,6 +256,14 @@ async def ask_question(request: AskRequest, db: Session = Depends(get_db)):
             deep_thinking=request.deep_thinking,
             mode=normalized_mode,
             history=effective_history,
+        )
+        logger.debug(
+            "qa answer completed | video_id=%s | provider=%s | model=%s | answer_len=%s | references=%s",
+            request.video_id,
+            result.get("provider"),
+            result.get("model"),
+            len(str(result.get("answer") or "")),
+            len(result.get("references") or []),
         )
         stored_question = persist_question_record(
             db,

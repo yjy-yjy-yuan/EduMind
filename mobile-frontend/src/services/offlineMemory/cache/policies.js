@@ -12,6 +12,8 @@ const sortByLeastRecentlyUsed = (rows = []) =>
     return leftTime - rightTime
   })
 
+const getRowLocalId = (row) => row?.local_id || null
+
 const collectPendingVideoIds = async () => {
   const [notes, questions] = await Promise.all([
     getTable('offline_notes').where('sync_status').equals(OFFLINE_SYNC_STATUS.PENDING).toArray(),
@@ -33,7 +35,7 @@ const pruneRowsPerVideo = async (tableName, videoId, limit) => {
   const removableRows = sortByLeastRecentlyUsed(rows.filter((row) => row.sync_status !== OFFLINE_SYNC_STATUS.PENDING))
   const keepCount = Math.max(0, limit - protectedRows.length)
   const toDelete = removableRows.slice(0, Math.max(0, removableRows.length - keepCount))
-  await bulkDeleteByPrimaryKeys(tableName, toDelete.map((row) => row.local_id))
+  await bulkDeleteByPrimaryKeys(tableName, toDelete.map(getRowLocalId))
 }
 
 const cleanupFreeModeRows = async (tableName, cutoffIso, { preservePending = true } = {}) => {
@@ -46,7 +48,7 @@ const cleanupFreeModeRows = async (tableName, cutoffIso, { preservePending = tru
       const timestamp = new Date(row?.lastAccessedAt || row?.updated_at || 0).getTime()
       return Number.isFinite(timestamp) && timestamp > 0 && timestamp < cutoff
     })
-    .map((row) => row.local_id)
+    .map(getRowLocalId)
   await bulkDeleteByPrimaryKeys(tableName, toDelete)
 }
 
@@ -61,14 +63,14 @@ export const deleteCacheByVideoId = async (videoId, { preserveNotes = false, pre
   const questionRows = await getTable('offline_questions').where('video_id').equals(numericVideoId).toArray()
   const questionDeleteKeys = questionRows
     .filter((row) => !preservePending || row.sync_status !== OFFLINE_SYNC_STATUS.PENDING)
-    .map((row) => row.local_id)
+    .map(getRowLocalId)
   await bulkDeleteByPrimaryKeys('offline_questions', questionDeleteKeys)
 
   if (!preserveNotes) {
     const noteRows = await getTable('offline_notes').where('video_id').equals(numericVideoId).toArray()
     const noteDeleteKeys = noteRows
       .filter((row) => !preservePending || row.sync_status !== OFFLINE_SYNC_STATUS.PENDING)
-      .map((row) => row.local_id)
+      .map(getRowLocalId)
     await bulkDeleteByPrimaryKeys('offline_notes', noteDeleteKeys)
   }
 }
@@ -155,7 +157,7 @@ export const cleanupByCacheSize = async ({ maxBytes = OFFLINE_MEMORY_LIMITS.MAX_
   )
   for (const row of freeModeQuestions) {
     if (!cacheState.exceeded) break
-    await bulkDeleteByPrimaryKeys('offline_questions', [row.local_id])
+    await bulkDeleteByPrimaryKeys('offline_questions', [getRowLocalId(row)])
     cacheState = await getCacheSize({ maxBytes })
   }
 
@@ -189,7 +191,7 @@ export const touchRowsByVideoId = async (tableName, videoId, accessTime = nowIso
   const rows = await getTable(tableName).where('video_id').equals(numericVideoId).toArray()
   await Promise.all(
     rows.map((row) =>
-      getTable(tableName).update(row.local_id, {
+      getTable(tableName).update(getRowLocalId(row), {
         lastAccessedAt: normalizeIsoTime(accessTime, nowIso())
       })
     )

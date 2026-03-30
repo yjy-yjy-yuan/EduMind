@@ -71,7 +71,7 @@
     </div>
     <div v-else-if="notes.length === 0" class="empty">
       <div class="empty__title">当前没有符合条件的笔记。</div>
-      <div class="empty__tip">可以从这里新建普通笔记，也可以从视频详情页带着上下文进入记笔记。</div>
+      <div class="empty__tip">可以直接新建普通笔记，也可以通过筛选找到已有内容继续编辑。</div>
     </div>
 
     <div v-else class="content">
@@ -141,7 +141,6 @@ const error = ref('')
 const notes = ref([])
 const tagOptions = ref([])
 const videoOptions = ref([])
-
 const filters = reactive({
   search: String(route.query.search || ''),
   videoId: route.query.videoId ? String(route.query.videoId) : '',
@@ -320,6 +319,7 @@ const clearFocusState = async () => {
   delete query.noteAction
   await router.replace({ path: route.path, query })
 }
+
 const buildExcerpt = (content) => {
   const text = String(content || '').replace(/\s+/g, ' ').trim()
   if (!text) return '暂无内容摘要。'
@@ -437,6 +437,40 @@ onMounted(reload)
   font-size: 12px;
   color: #64748b;
   line-height: 1.5;
+}
+
+.assistant-input {
+  width: 100%;
+  border: 1px solid rgba(32, 42, 55, 0.14);
+  border-radius: 14px;
+  padding: 11px 12px;
+  font-size: 14px;
+  background: rgba(242, 235, 248, 0.98);
+}
+
+.assistant-hint {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.assistant-result {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.assistant-result__title {
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.assistant-result__text {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #334155;
 }
 
 .ghost {

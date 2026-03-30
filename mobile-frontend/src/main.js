@@ -25,6 +25,11 @@ const pushBootTrace = (label, details = '') => {
 const pushBootInfo = (scope, label, details = '') => emitBootLog('info', scope, label, details)
 const pushBootDebug = (scope, label, details = '') => emitBootLog('debug', scope, label, details)
 const pushBootError = (scope, label, details = '') => emitBootLog('error', scope, label, details)
+const isAbortError = (error) => {
+  const name = String(error?.name || '')
+  const message = String(error?.message || error || '')
+  return name === 'AbortError' || message.includes('The operation was aborted')
+}
 
 const renderBootError = (title, details) => {
   const root = document.getElementById('app') || document.body
@@ -116,6 +121,10 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
   const reason = event?.reason
   const msg = reason?.stack || String(reason || 'Unknown rejection')
+  if (isAbortError(reason)) {
+    pushBootTrace('window:unhandledrejection:ignored', msg)
+    return
+  }
   pushBootTrace('window:unhandledrejection', msg)
   pushBootError('Bootstrap', 'unhandledrejection', msg)
   renderBootError('页面启动异常（Promise）', msg)
