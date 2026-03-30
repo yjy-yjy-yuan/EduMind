@@ -122,3 +122,4 @@
 ### 2026-03-30
 - `bb7c5f6` `feat(player): simplify auto note titles`
 - `cd15a84` `fix(agent): simplify note title fallback`
+- `c79f30e` `fix(frontend): ignore abort bootstrap errors`
