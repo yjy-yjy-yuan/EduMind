@@ -62,26 +62,27 @@
 
     <section class="assistant-card">
       <div class="assistant-head">
-        <div>
+        <div class="assistant-head__copy">
           <div class="assistant-title">这一段记笔记</div>
-          <div class="assistant-tip">围绕当前播放时间点自动带出字幕片段，顺手记录要点和待思考内容。</div>
+          <div class="assistant-tip">系统已按当前时间点整理成学习卡片，标题会自动按“分类 · 时间点”生成。</div>
         </div>
         <button class="btn btn--primary" @click="saveTimestampNote" :disabled="noteBusy || !canSaveTimestampNote">
           {{ noteBusy ? '保存中…' : '记下这一段' }}
         </button>
       </div>
-      <div class="assistant-meta">当前播放位置：{{ currentTimeText || '00:00' }}</div>
+      <div class="note-summary">
+        <span class="note-summary__chip">系统分类 · {{ inferredNoteCategory }}</span>
+        <span class="note-summary__chip note-summary__chip--ghost">自动标题 · {{ autoTitlePreview }}</span>
+        <span class="note-summary__time">当前播放位置：{{ currentTimeText || '00:00' }}</span>
+      </div>
       <div class="timestamp-preview">
         <div class="timestamp-preview__title">字幕片段</div>
         <div class="timestamp-preview__text">{{ subtitlePreview || '当前时间点附近还没有可用字幕。' }}</div>
       </div>
-      <label class="assistant-field">
-        <span class="assistant-label">笔记分类</span>
-        <div class="assistant-hint">系统会根据当前字幕与时间点自动判断分类，不需要手动选择。</div>
-      </label>
-      <label class="assistant-field">
-        <span class="assistant-label">笔记标题</span>
+      <label class="assistant-field assistant-field--compact">
+        <span class="assistant-label">短标题（可选）</span>
         <input v-model.trim="noteTitle" class="assistant-input" type="text" placeholder="可留空，系统会自动生成" />
+        <div class="assistant-hint">留空时使用自动标题；填写后会覆盖自动标题。</div>
       </label>
       <label class="assistant-field">
         <span class="assistant-label">这一段的笔记</span>
@@ -195,6 +196,8 @@ const durationText = computed(() => {
     : `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
 })
 const subtitlePreview = computed(() => buildSubtitleExcerpt())
+const inferredNoteCategory = computed(() => inferNoteCategory())
+const autoTitlePreview = computed(() => `${inferredNoteCategory.value} · ${currentTimeText.value || '00:00'}`)
 const currentTimeText = computed(() => {
   const total = Math.max(0, Math.round(Number(currentTimeSeconds.value || 0)))
   const hh = Math.floor(total / 3600)
@@ -342,7 +345,7 @@ const deriveAutoTitle = () => {
 }
 
 const inferNoteCategory = () => {
-  const text = `${buildSubtitleExcerpt()} ${noteBody.value} ${customThought.value} ${[...selectedThoughts.value].join(' ')}`.toLowerCase()
+  const text = `${buildSubtitleExcerpt()} ${noteBody.value} ${customThought.value}`.toLowerCase()
   if (/例题|例如|举例|算|计算|解题|题目/.test(text)) return '例题'
   if (/思考|为什么|如何|怎么|原因|讨论|探究/.test(text)) return '思考题'
   if (/易错|注意|别忘|常见错误|容易/.test(text)) return '易错点'
@@ -385,7 +388,7 @@ const saveTimestampNote = async () => {
       timestamps: [
         {
           time_seconds: Number(currentTimeSeconds.value || 0),
-          subtitle_text: subtitleExcerpt || noteBody.value.trim() || noteThought.value.trim() || ''
+          subtitle_text: subtitleExcerpt || ''
         }
       ]
     })
@@ -643,16 +646,45 @@ onMounted(loadVideoMeta)
   flex-wrap: wrap;
 }
 
+.assistant-head__copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
 .assistant-title {
   font-size: 13px;
   font-weight: 900;
 }
 
 .assistant-tip,
-.assistant-meta {
+.note-summary__time {
   font-size: 12px;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.note-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.note-summary__chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(139, 121, 157, 0.12);
+  color: var(--primary-deep);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.note-summary__chip--ghost {
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .assistant-field {
@@ -660,10 +692,20 @@ onMounted(loadVideoMeta)
   gap: 6px;
 }
 
+.assistant-field--compact {
+  gap: 5px;
+}
+
 .assistant-label {
   font-size: 12px;
   font-weight: 900;
   color: var(--primary-deep);
+}
+
+.assistant-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .assistant-input {

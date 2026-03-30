@@ -33,15 +33,30 @@ const handleVisibilityChange = async () => {
   }
   if (!wasHidden) return
   wasHidden = false
-  await flushAllOfflineWork()
+  await runStartupWork(flushAllOfflineWork)
 }
 
 const handleOnline = async () => {
-  await flushAllOfflineWork()
+  await runStartupWork(flushAllOfflineWork)
+}
+
+const isAbortError = (error) => {
+  const name = String(error?.name || '')
+  const message = String(error?.message || error || '')
+  return name === 'AbortError' || message.includes('The operation was aborted')
+}
+
+const runStartupWork = async (task) => {
+  try {
+    await task()
+  } catch (error) {
+    if (isAbortError(error)) return
+    throw error
+  }
 }
 
 onMounted(async () => {
-  await flushAllOfflineWork()
+  await runStartupWork(flushAllOfflineWork)
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', handleVisibilityChange)
   }

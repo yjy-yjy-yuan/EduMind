@@ -80,26 +80,12 @@
       <button class="send" @click="send" :disabled="asking || !question">{{ asking ? '…' : '发送' }}</button>
     </div>
 
-    <div class="agent-row">
-      <button class="agent-btn" @click="saveAnswerAsNote" :disabled="asking || agentBusy || !canSaveAnswerAsNote">
-        将最近回答保存为笔记
-      </button>
-    </div>
-
-    <div v-if="agentResult" class="agent-result">
-      <div class="agent-result__title">学习流结果</div>
-      <div class="agent-result__text">{{ agentResult.result?.summary || agentResult.result?.preview || '已执行完成' }}</div>
-      <button v-if="agentResult.result?.note_id" class="agent-btn agent-btn--secondary" @click="goNotes(agentResult.result.note_id)">
-        打开生成的笔记
-      </button>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { executeLearningFlowAgent } from '@/api/agent'
 import { askQuestionStream, getQuestionHistory } from '@/api/qa'
 import {
   answerOfflineFromContext,
@@ -225,8 +211,6 @@ const isDeepSeekProvider = computed(() => provider.value === 'deepseek')
 const deepThinkingEnabled = computed(() => isDeepSeekProvider.value && deepSeekAnswerMode.value === 'reasoning')
 const messageSpaces = ref({})
 const remoteHydratedSpaces = ref({})
-const agentBusy = ref(false)
-const agentResult = ref(null)
 let historyRestoreSequence = 0
 
 const currentSpaceKey = computed(() =>
@@ -255,14 +239,6 @@ const messages = computed({
 })
 
 const shouldRenderChat = computed(() => messages.value.length > 0)
-const canSaveAnswerAsNote = computed(() => {
-  for (let index = messages.value.length - 1; index >= 0; index -= 1) {
-    const item = messages.value[index]
-    if (item?.role === 'ai' && String(item.text || '').trim()) return true
-  }
-  return false
-})
-
 const scrollToBottom = async () => {
   await nextTick()
   const el = chatRef.value
@@ -400,14 +376,6 @@ const selectDeepSeekAnswerMode = (value) => {
   } catch {
     // ignore storage errors in restricted WebView contexts
   }
-}
-
-const getLatestAnswerMessage = () => {
-  for (let index = messages.value.length - 1; index >= 0; index -= 1) {
-    const item = messages.value[index]
-    if (item?.role === 'ai' && String(item.text || '').trim()) return item
-  }
-  return null
 }
 
 const buildPendingAiMessage = () => ({
@@ -567,32 +535,6 @@ const clear = () => {
   if (asking.value) return
   messages.value = []
   storageRemove(currentSpaceKey.value)
-}
-
-const goNotes = (noteId) => router.push(`/notes/${noteId}`)
-
-const saveAnswerAsNote = async () => {
-  if (asking.value || agentBusy.value) return
-  const latestAnswer = getLatestAnswerMessage()
-  if (!latestAnswer) return
-  agentBusy.value = true
-  try {
-    const latestQuestion = [...messages.value].reverse().find((item) => item?.role === 'user' && String(item.text || '').trim())
-    const response = await executeLearningFlowAgent({
-      video_id: normalizedVideoId.value ?? null,
-      page_context: 'qa',
-      current_time_seconds: null,
-      subtitle_text: latestAnswer.text,
-      recent_qa_messages: buildHistoryPayload(),
-      user_input: `把这条回答保存成笔记：${String(latestQuestion?.text || question.value || '最近回答')}`
-    })
-    agentResult.value = response?.data || response
-    await scrollToBottom()
-  } catch {
-    // 这里保持轻量失败处理，复用页面已有错误表达
-  } finally {
-    agentBusy.value = false
-  }
 }
 
 const goBack = () => {

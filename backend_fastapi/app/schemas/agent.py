@@ -40,7 +40,6 @@ class AgentPlanResponse(BaseModel):
     actions: List[str]
     result: dict[str, Any] = Field(default_factory=dict)
     note_id: Optional[int] = None
-    question_id: Optional[int] = None
     video_id: Optional[int] = None
     created_at: datetime
     action_records: List[AgentActionRecord] = Field(default_factory=list)

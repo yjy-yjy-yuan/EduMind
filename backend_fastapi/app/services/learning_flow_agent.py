@@ -1,11 +1,10 @@
 """学习流智能体编排服务。
 
-第一版仅负责把用户意图映射为现有能力的顺序执行，不引入新的业务表。
+第一版仅负责把用户意图收敛成时间戳笔记，不引入新的业务表。
 """
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,12 +13,10 @@ from typing import Optional
 
 from app.models.note import Note
 from app.models.note import NoteTimestamp
-from app.models.qa import Question
 from app.models.video import Video
 from app.services.video_content_service import fallback_summary
 from app.services.video_content_service import fallback_tags
 from app.services.video_content_service import normalize_summary_style
-from app.utils.qa_utils import QASystem
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -40,39 +37,24 @@ def normalize_user_input(text: str) -> str:
 
 
 def infer_intent(user_input: str) -> str:
-    normalized = normalize_user_input(user_input)
-    if any(keyword in normalized for keyword in ["记成笔记", "做成笔记", "保存为笔记", "生成笔记", "记笔记"]):
-        return "create_note"
-    if any(keyword in normalized for keyword in ["总结", "概括", "摘要"]):
-        return "summarize"
-    if any(keyword in normalized for keyword in ["问", "解释", "什么意思", "怎么理解"]):
-        return "qa"
-    return "mixed"
+    _ = normalize_user_input(user_input)
+    return "timestamp_note"
 
 
 def build_plan(intent: str, ctx: AgentContext) -> list[str]:
-    plan = ["读取视频上下文", "整理字幕与最近问答"]
-    if intent in {"create_note", "mixed"}:
-        plan.append("生成学习笔记草稿")
-    if intent in {"summarize", "mixed"}:
-        plan.append("提炼片段摘要")
+    plan = ["读取视频上下文", "定位当前字幕片段", "自动判断笔记分类", "生成学习笔记"]
     if ctx.current_time_seconds is not None:
         plan.append("绑定时间戳")
-    if ctx.video is not None:
-        plan.append("写回视频关联记录")
     return plan
 
 
 def _build_note_title(video: Optional[Video], category: str, current_time_seconds: Optional[float]) -> str:
-    base = (video.title or "").strip() if video else ""
     if current_time_seconds is not None:
         minute = int(float(current_time_seconds) // 60)
         second = int(float(current_time_seconds) % 60)
         time_text = f"{minute:02d}:{second:02d}"
     else:
         time_text = "00:00"
-    if base:
-        return f"{base} · {category} · {time_text}"
     return f"{category} · {time_text}"
 
 
@@ -124,7 +106,7 @@ def _infer_note_category(text: str) -> str:
     return "知识点"
 
 
-def _build_note_content(ctx: AgentContext, summary_text: str, subtitle_excerpt: str = "", qa_answer: str = "") -> str:
+def _build_note_content(ctx: AgentContext, summary_text: str, subtitle_excerpt: str = "") -> str:
     parts = []
     if subtitle_excerpt.strip():
         parts.append(f"字幕片段：\n{subtitle_excerpt.strip()}")
@@ -132,20 +114,11 @@ def _build_note_content(ctx: AgentContext, summary_text: str, subtitle_excerpt: 
         parts.append(f"字幕片段：{ctx.subtitle_text.strip()}")
     if summary_text.strip():
         parts.append(f"摘要：{summary_text.strip()}")
-    if qa_answer.strip():
-        parts.append(f"问答补充：{qa_answer.strip()}")
     return "\n".join(parts).strip()
 
 
 def _build_thought_tags(ctx: AgentContext, subtitle_excerpt: str = "") -> list[str]:
-    source = " ".join(
-        [
-            subtitle_excerpt,
-            ctx.subtitle_text,
-            ctx.user_input,
-            " ".join(str(item.get("text") or item.get("content") or "") for item in ctx.recent_qa_messages[-3:]),
-        ]
-    )
+    source = " ".join([subtitle_excerpt, ctx.subtitle_text])
     tags = []
     for tag, keywords in [
         ("再思考", ["再看", "回看", "思考", "继续", "复习"]),
@@ -203,133 +176,106 @@ def execute_learning_flow_agent(db: Session, *, request) -> dict[str, Any]:
     action_records: list[dict[str, Any]] = []
     result: dict[str, Any] = {}
 
-    if video is not None:
-        qa_system = QASystem(video=video)
-        qa_answer = ""
-        subtitle_excerpt = _subtitle_excerpt_for_time(video, ctx.current_time_seconds)
-        if intent == "qa" and qa_system.has_context():
-            logger.debug(
-                "agent qa dispatch | mode=video | provider=qwen | history_messages=%s", len(ctx.recent_qa_messages)
-            )
-            qa_answer = qa_system.ask(
-                ctx.user_input,
-                provider="qwen",
-                model="",
-                deep_thinking=False,
-                mode="video",
-                history=ctx.recent_qa_messages,
-            )["answer"]
-            actions.append("qa_answered")
-            action_records.append({"type": "qa_answered", "message": "已基于视频上下文回答", "data": {}})
-            logger.debug("agent qa answered | answer_len=%s", len(qa_answer))
-
-        summary_text = ""
-        if subtitle_excerpt.strip() or ctx.subtitle_text.strip():
-            summary_text = fallback_summary(
-                subtitle_excerpt or ctx.subtitle_text,
-                title=video.title or "",
-                style=normalize_summary_style("study"),
-            )
-            actions.append("summary_generated")
-            action_records.append({"type": "summary_generated", "message": "已生成片段摘要", "data": {}})
-            logger.debug("agent summary generated | summary_len=%s", len(summary_text))
-
-        if intent in {"create_note", "mixed"} or ctx.current_time_seconds is not None:
-            category = _infer_note_category(
-                " ".join([subtitle_excerpt, ctx.subtitle_text, ctx.user_input, summary_text])
-            )
-            note_title = _build_note_title(video, category, ctx.current_time_seconds)
-            note_content = _build_note_content(
-                ctx, summary_text, subtitle_excerpt=subtitle_excerpt, qa_answer=qa_answer
-            )
-            if not note_content:
-                note_content = summary_text or subtitle_excerpt or video.summary or video.title or "学习笔记"
-            logger.debug(
-                "agent create note | title=%s | content_len=%s | has_timestamp=%s",
-                note_title,
-                len(note_content),
-                ctx.current_time_seconds is not None,
-            )
-            note = Note(
-                title=note_title,
-                content=note_content,
-                note_type="text",
-                video_id=video.id,
-                tags=",".join(_build_thought_tags(ctx, subtitle_excerpt)),
-                keywords=",".join(fallback_tags(note_content, title=note_title, max_tags=5)),
-            )
-            db.add(note)
-            db.commit()
-            db.refresh(note)
-            actions.append("note_created")
-            action_records.append({"type": "note_created", "message": "已创建笔记", "data": {"note_id": note.id}})
-            logger.debug("agent note persisted | note_id=%s | video_id=%s", note.id, video.id)
-
-            if ctx.current_time_seconds is not None:
-                timestamp = NoteTimestamp(
-                    note_id=note.id,
-                    time_seconds=float(ctx.current_time_seconds),
-                    subtitle_text=ctx.subtitle_text.strip() or None,
-                )
-                db.add(timestamp)
-                db.commit()
-                db.refresh(timestamp)
-                actions.append("timestamp_attached")
-                action_records.append(
-                    {
-                        "type": "timestamp_attached",
-                        "message": "已绑定时间戳",
-                        "data": {"timestamp_id": timestamp.id, "time_seconds": timestamp.time_seconds},
-                    }
-                )
-                logger.debug(
-                    "agent timestamp persisted | note_id=%s | timestamp_id=%s | time_seconds=%s",
-                    note.id,
-                    timestamp.id,
-                    timestamp.time_seconds,
-                )
-
-            result = {
-                "note_id": note.id,
-                "title": note.title,
-                "summary": summary_text,
-                "video_id": video.id,
-            }
-
-        if qa_answer:
-            question = Question(video_id=video.id, content=ctx.user_input, answer=qa_answer)
-            db.add(question)
-            db.commit()
-            db.refresh(question)
-            actions.append("qa_recorded")
-            action_records.append(
-                {"type": "qa_recorded", "message": "已写回问答记录", "data": {"question_id": question.id}}
-            )
-            logger.debug("agent qa record persisted | question_id=%s | video_id=%s", question.id, video.id)
-            result.setdefault("question_id", question.id)
-            result.setdefault("answer", qa_answer)
-
-        if not result:
-            result = {
-                "video_id": video.id,
-                "preview": ctx.subtitle_text[:200],
-            }
-
-    else:
+    if video is None:
         result = {
             "video_id": None,
             "preview": ctx.user_input[:200],
         }
+        logger.debug(
+            "agent completed | intent=%s | actions=%s | note_id=%s | result_keys=%s",
+            intent,
+            actions,
+            result.get("note_id"),
+            sorted(result.keys()),
+        )
+        return {
+            "intent": intent,
+            "plan": plan,
+            "actions": actions,
+            "result": result,
+            "note_id": None,
+            "video_id": None,
+            "created_at": datetime.utcnow(),
+            "action_records": action_records,
+        }
 
-    if "summary_generated" not in actions and ctx.subtitle_text.strip():
+    subtitle_excerpt = _subtitle_excerpt_for_time(video, ctx.current_time_seconds)
+    summary_text = ""
+    summary_seed = subtitle_excerpt or ctx.subtitle_text.strip() or video.summary or video.title or ""
+    if summary_seed.strip():
+        summary_text = fallback_summary(
+            summary_seed,
+            title=video.title or "",
+            style=normalize_summary_style("study"),
+        )
         actions.append("summary_generated")
+        action_records.append({"type": "summary_generated", "message": "已生成片段摘要", "data": {}})
+        logger.debug("agent summary generated | summary_len=%s", len(summary_text))
+
+    category = _infer_note_category(" ".join([subtitle_excerpt, ctx.subtitle_text, summary_text]))
+    note_title = _build_note_title(video, category, ctx.current_time_seconds)
+    note_content = _build_note_content(ctx, summary_text, subtitle_excerpt=subtitle_excerpt)
+    if not note_content:
+        note_content = summary_text or subtitle_excerpt or video.summary or video.title or "学习笔记"
+    logger.debug(
+        "agent create note | title=%s | content_len=%s | has_timestamp=%s",
+        note_title,
+        len(note_content),
+        ctx.current_time_seconds is not None,
+    )
+
+    note = Note(
+        title=note_title,
+        content=note_content,
+        note_type="text",
+        video_id=video.id,
+        tags=",".join(_build_thought_tags(ctx, subtitle_excerpt)),
+        keywords=",".join(fallback_tags(note_content, title=note_title, max_tags=5)),
+    )
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    actions.append("note_created")
+    action_records.append({"type": "note_created", "message": "已创建笔记", "data": {"note_id": note.id}})
+    logger.debug("agent note persisted | note_id=%s | video_id=%s", note.id, video.id)
+
+    if ctx.current_time_seconds is not None:
+        timestamp = NoteTimestamp(
+            note_id=note.id,
+            time_seconds=float(ctx.current_time_seconds),
+            subtitle_text=subtitle_excerpt.strip() or ctx.subtitle_text.strip() or None,
+        )
+        db.add(timestamp)
+        db.commit()
+        db.refresh(timestamp)
+        actions.append("timestamp_attached")
+        action_records.append(
+            {
+                "type": "timestamp_attached",
+                "message": "已绑定时间戳",
+                "data": {"timestamp_id": timestamp.id, "time_seconds": timestamp.time_seconds},
+            }
+        )
+        logger.debug(
+            "agent timestamp persisted | note_id=%s | timestamp_id=%s | time_seconds=%s",
+            note.id,
+            timestamp.id,
+            timestamp.time_seconds,
+        )
+
+    result = {
+        "note_id": note.id,
+        "title": note.title,
+        "summary": summary_text,
+        "video_id": video.id,
+        "category": category,
+    }
 
     logger.debug(
-        "agent completed | intent=%s | actions=%s | note_id=%s | question_id=%s | result_keys=%s",
+        "agent completed | intent=%s | actions=%s | note_id=%s | result_keys=%s",
         intent,
         actions,
         result.get("note_id"),
-        result.get("question_id"),
         sorted(result.keys()),
     )
     return {
@@ -338,7 +284,6 @@ def execute_learning_flow_agent(db: Session, *, request) -> dict[str, Any]:
         "actions": actions,
         "result": result,
         "note_id": result.get("note_id"),
-        "question_id": result.get("question_id"),
         "video_id": result.get("video_id"),
         "created_at": datetime.utcnow(),
         "action_records": action_records,

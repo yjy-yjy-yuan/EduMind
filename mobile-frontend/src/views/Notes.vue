@@ -18,27 +18,6 @@
       <button class="link" @click="clearFocusState">知道了</button>
     </div>
 
-    <section class="assistant-card">
-      <div class="section-head">
-        <div>
-          <div class="section-title">学习流智能体</div>
-          <div class="section-tip">从当前视频或问答上下文直接生成并保存一条笔记。</div>
-        </div>
-        <button class="btn btn--primary" @click="runAgent" :disabled="agentBusy || !canRunAgent">
-          {{ agentBusy ? '执行中…' : '生成并保存' }}
-        </button>
-      </div>
-      <textarea v-model.trim="agentPrompt" class="assistant-input" rows="3" placeholder="例如：把这段内容整理成笔记并补充标签"></textarea>
-      <div class="assistant-hint">
-        如果你先选中“关联视频”，系统会优先使用该视频的上下文。
-      </div>
-      <div v-if="agentResult" class="assistant-result">
-        <div class="assistant-result__title">执行结果</div>
-        <div class="assistant-result__text">{{ agentResult.result?.summary || agentResult.result?.preview || '已完成' }}</div>
-        <button v-if="agentResult.result?.note_id" class="ghost" @click="go(`/notes/${agentResult.result.note_id}`)">打开笔记</button>
-      </div>
-    </section>
-
     <section class="filter-card">
       <div class="filter-head">
         <div>
@@ -92,7 +71,7 @@
     </div>
     <div v-else-if="notes.length === 0" class="empty">
       <div class="empty__title">当前没有符合条件的笔记。</div>
-      <div class="empty__tip">可以从这里新建普通笔记，也可以从视频详情页带着上下文进入记笔记。</div>
+      <div class="empty__tip">可以直接新建普通笔记，也可以通过筛选找到已有内容继续编辑。</div>
     </div>
 
     <div v-else class="content">
@@ -141,7 +120,6 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { executeLearningFlowAgent } from '@/api/agent'
 import { getNote, getNoteTags, getNotes } from '@/api/note'
 import { getVideoList } from '@/api/video'
 import {
@@ -163,10 +141,6 @@ const error = ref('')
 const notes = ref([])
 const tagOptions = ref([])
 const videoOptions = ref([])
-const agentPrompt = ref('把这段内容整理成笔记并补充标签')
-const agentBusy = ref(false)
-const agentResult = ref(null)
-
 const filters = reactive({
   search: String(route.query.search || ''),
   videoId: route.query.videoId ? String(route.query.videoId) : '',
@@ -174,7 +148,6 @@ const filters = reactive({
 })
 
 const hasActiveFilters = computed(() => Boolean(filters.search || filters.videoId || filters.tag))
-const canRunAgent = computed(() => Boolean(String(agentPrompt.value || '').trim()) && !agentBusy.value)
 const focusedNoteKey = computed(() => String(route.query.noteId || '').trim())
 const focusMessage = computed(() => {
   if (!focusedNoteKey.value) return ''
@@ -347,27 +320,6 @@ const clearFocusState = async () => {
   await router.replace({ path: route.path, query })
 }
 
-const runAgent = async () => {
-  if (!canRunAgent.value) return
-  agentBusy.value = true
-  try {
-    const videoId = filters.videoId ? Number(filters.videoId) : null
-    const response = await executeLearningFlowAgent({
-      video_id: videoId,
-      page_context: 'notes',
-      current_time_seconds: null,
-      subtitle_text: selectedVideoTitle.value || '',
-      recent_qa_messages: [],
-      user_input: agentPrompt.value
-    })
-    agentResult.value = response?.data || response
-    if (agentResult.value?.result?.note_id) {
-      await reload()
-    }
-  } finally {
-    agentBusy.value = false
-  }
-}
 const buildExcerpt = (content) => {
   const text = String(content || '').replace(/\s+/g, ' ').trim()
   if (!text) return '暂无内容摘要。'
@@ -457,17 +409,6 @@ onMounted(reload)
   border: 1px solid rgba(32, 42, 55, 0.08);
   background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.96));
   box-shadow: 0 16px 30px rgba(101, 87, 117, 0.08);
-}
-
-.assistant-card {
-  margin-bottom: 12px;
-  padding: 16px;
-  border-radius: 22px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: linear-gradient(180deg, rgba(248, 243, 252, 0.98), rgba(242, 235, 248, 0.96));
-  box-shadow: 0 16px 30px rgba(101, 87, 117, 0.08);
-  display: grid;
-  gap: 12px;
 }
 
 .filter-card {

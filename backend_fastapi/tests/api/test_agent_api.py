@@ -36,18 +36,19 @@ def test_execute_agent_creates_note_and_timestamp(client, db, sample_video):
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["intent"] in {"create_note", "mixed"}
+    assert payload["intent"] == "timestamp_note"
     assert "note_created" in payload["actions"]
     assert "timestamp_attached" in payload["actions"]
     assert payload["result"]["note_id"]
+    assert payload["result"]["category"] in {"知识点", "例题", "思考题", "易错点", "结论"}
 
     note = db.query(Note).filter(Note.id == payload["result"]["note_id"]).first()
     assert note is not None
     assert note.video_id == sample_video.id
     assert "把这一段记成笔记并总结一下" not in (note.content or "")
     assert "这一段讲的是导数的几何意义" in (note.content or "")
-    assert note.title.startswith("视频")
-    assert "00:45" in note.title
+    assert note.title.endswith(" · 04:05")
+    assert note.title.split(" · ")[0] in {"知识点", "例题", "思考题", "易错点", "结论"}
     assert db.query(NoteTimestamp).filter(NoteTimestamp.note_id == note.id).count() == 1
     assert db.query(Question).count() == 0
 

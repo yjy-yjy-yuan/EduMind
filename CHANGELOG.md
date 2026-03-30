@@ -1,5 +1,16 @@
 # 变更日志
 
+## 2026-03-30
+
+### 播放器时间戳记笔记收口
+- 更新 [`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)：将播放器页收为唯一主入口，继续保留时间戳记笔记流程，但标题固定为分类 + 时间点，分类由系统自动判断，学习想法改为快捷标签输入。
+- 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)、[`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：移除视频详情、问答与笔记页里的学习流智能体入口，避免用户在多个页面间被分流。
+- 更新 [`backend_fastapi/app/services/learning_flow_agent.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/learning_flow_agent.py)、[`backend_fastapi/app/schemas/agent.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/agent.py)、[`backend_fastapi/tests/api/test_agent_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_agent_api.py)：将后端 agent 收敛为时间戳笔记编排器，不再做问答回写，响应结构也同步去掉问答字段。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步最新 iOS WebView 资源。
+
+### 播放器学习卡片头部压缩
+- 更新 [`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)：把标题/分类区压成更像学习卡片的头部信息，先展示系统分类和自动标题，再把短标题降级为可选输入，减少表单感和重复填写感。
+
 ## 2026-03-29
 
 ### 学习流智能体接入视频详情、问答与笔记页

@@ -53,35 +53,6 @@
       </div>
 
       <div class="block">
-        <div class="block-head">
-          <div>
-            <div class="block-title">学习流智能体</div>
-            <div class="setting-hint">把当前片段直接变成笔记、摘要或可回看的学习动作。</div>
-          </div>
-          <button class="mini mini--primary" @click="runLearningAgent" :disabled="agentBusy || !canRunLearningAgent">
-            {{ agentBusy ? '执行中…' : '执行学习动作' }}
-          </button>
-        </div>
-        <textarea
-          v-model.trim="agentPrompt"
-          class="agent-input"
-          rows="3"
-          placeholder="例如：把这一段记成笔记并总结一下"
-        />
-        <div class="agent-hint">
-          将自动携带视频 ID、当前字幕片段和最近笔记上下文。当前时间优先使用最近字幕的开始时间。
-        </div>
-        <div v-if="agentResult" class="agent-result">
-          <div class="agent-result__title">执行结果</div>
-          <div class="agent-result__plan">计划：{{ agentResult.plan?.join(' · ') || '暂无' }}</div>
-          <div class="agent-result__actions">动作：{{ agentResult.actions?.join(' · ') || '暂无' }}</div>
-          <div v-if="agentResult.result?.title" class="agent-result__summary">标题：{{ agentResult.result.title }}</div>
-          <div v-if="agentResult.result?.summary" class="agent-result__summary">{{ agentResult.result.summary }}</div>
-          <button v-if="agentResult.result?.note_id" class="mini" @click="openNote(agentResult.result.note_id)">打开刚生成的笔记</button>
-        </div>
-      </div>
-
-      <div class="block">
         <WhisperModelPicker
           title="Whisper 模型"
           :model="processingSettings.model"
@@ -122,7 +93,6 @@
           </div>
           <div class="block-actions">
             <button class="mini" @click="openVideoNotes">查看全部</button>
-            <button class="mini" @click="takeNote">继续记笔记</button>
           </div>
         </div>
 
@@ -151,7 +121,6 @@
         <button class="btn" @click="startProcess" :disabled="processDisabled">开始处理</button>
         <button class="btn btn--primary" @click="play" :disabled="!canOpenPlayerWhileProcessing">{{ playLabel }}</button>
         <button class="btn" @click="qa">问答</button>
-        <button class="btn" @click="takeNote">记笔记</button>
       </div>
 
       <button v-if="canRetry" class="retry" @click="retryProcess" :disabled="retrying || autoStarting">
@@ -167,7 +136,6 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi } from '@/config'
-import { executeLearningFlowAgent } from '@/api/agent'
 import { createNote, getNotes, updateNote } from '@/api/note'
 import { getSubtitleContext } from '@/api/subtitle'
 import { deleteVideo, generateVideoSummary, generateVideoTags, getVideo, getVideoProcessingOptions, getVideoStatus, processVideo } from '@/api/video'
@@ -211,9 +179,6 @@ const summaryImporting = ref(false)
 const notesLoading = ref(false)
 const videoNotes = ref([])
 const subtitleFragments = ref([])
-const agentPrompt = ref('把这一段记成笔记并总结一下')
-const agentBusy = ref(false)
-const agentResult = ref(null)
 const processingSettings = ref(getProcessingSettings())
 const whisperModelOptions = ref(getWhisperModelOptions())
 
@@ -250,7 +215,6 @@ const canGenerateTags = computed(() => normalizeVideoStatus(statusValue.value) =
 const canImportSummary = computed(
   () => Boolean(normalizeText(video.value?.summary)) && !summaryGenerating.value && !tagGenerating.value && !summaryImporting.value
 )
-const canRunLearningAgent = computed(() => Boolean(video.value?.id) && Boolean(normalizeText(agentPrompt.value)) && !agentBusy.value)
 const summaryStyleText = computed(() => `${summaryStyleLabel(processingSettings.value.summaryStyle)}风格`)
 const processDisabled = computed(
   () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(normalizeVideoStatus(statusValue.value))
@@ -670,41 +634,6 @@ const qa = () => router.push({ path: '/qa', query: { videoId: String(id.value) }
 const openVideoNotes = () => router.push({ path: '/notes', query: { videoId: String(id.value) } })
 
 const openNote = (noteId) => router.push(`/notes/${noteId}`)
-const takeNote = () => {
-  router.push({
-    path: '/notes/new',
-    query: {
-      videoId: String(id.value),
-      videoTitle: String(video.value?.title || '')
-    }
-  })
-}
-
-const runLearningAgent = async () => {
-  if (!canRunLearningAgent.value) return
-  agentBusy.value = true
-  error.value = ''
-  try {
-    const subtitle = pickSubtitleForAgent()
-    const response = await executeLearningFlowAgent({
-      video_id: Number(id.value),
-      page_context: 'video_detail',
-      current_time_seconds: subtitle.time,
-      subtitle_text: subtitle.text,
-      recent_qa_messages: [],
-      user_input: agentPrompt.value
-    })
-    agentResult.value = response?.data || response
-    if (agentResult.value?.result?.note_id) {
-      await loadVideoNotes()
-    }
-  } catch (e) {
-    error.value = extractErrorMessage(e, '学习流智能体执行失败')
-  } finally {
-    agentBusy.value = false
-  }
-}
-
 const buildNoteExcerpt = (content) => {
   const text = String(content || '').replace(/\s+/g, ' ').trim()
   if (!text) return '暂无笔记正文。'
