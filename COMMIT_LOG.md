@@ -117,6 +117,7 @@
 ### 2026-03-30
 - `6c4fe40` `fix(note-edit): compact timestamp card layout`
 - 继续收缩单个笔记编辑页，压平重点时间点为轻量单行结构，保留删除笔记卡片。
+- 调整视频详情页，将“开始处理/播放/问答”卡片移动到“Whisper 模型”下方，保持“删除视频”位置不变。
 
 - 分支创建：`2026-03-29`
 - 创建基线：`089a234` `style(mobile-frontend): refine upload and tab bar chrome`
