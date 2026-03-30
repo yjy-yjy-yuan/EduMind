@@ -63,19 +63,44 @@
     <section class="assistant-card">
       <div class="assistant-head">
         <div>
-          <div class="assistant-title">学习流智能体</div>
-          <div class="assistant-tip">把当前播放位置直接记成笔记并绑定时间戳。</div>
+          <div class="assistant-title">这一段记笔记</div>
+          <div class="assistant-tip">围绕当前播放时间点自动带出字幕片段，顺手记录要点和待思考内容。</div>
         </div>
-        <button class="btn btn--primary" @click="runAgent" :disabled="agentBusy || !canRunAgent">
-          {{ agentBusy ? '执行中…' : '记下这一段' }}
+        <button class="btn btn--primary" @click="saveTimestampNote" :disabled="noteBusy || !canSaveTimestampNote">
+          {{ noteBusy ? '保存中…' : '记下这一段' }}
         </button>
       </div>
-      <textarea v-model.trim="agentPrompt" class="assistant-input" rows="3" placeholder="例如：把这一段记成笔记并总结一下"></textarea>
       <div class="assistant-meta">当前播放位置：{{ currentTimeText || '00:00' }}</div>
-      <div v-if="agentResult" class="assistant-result">
-        <div class="assistant-result__title">执行结果</div>
-        <div class="assistant-result__text">{{ agentResult.result?.summary || agentResult.result?.preview || '已完成' }}</div>
-        <button v-if="agentResult.result?.note_id" class="btn" @click="router.push(`/notes/${agentResult.result.note_id}`)">打开笔记</button>
+      <div class="timestamp-preview">
+        <div class="timestamp-preview__title">字幕片段</div>
+        <div class="timestamp-preview__text">{{ subtitlePreview || '当前时间点附近还没有可用字幕。' }}</div>
+      </div>
+      <label class="assistant-field">
+        <span class="assistant-label">笔记标题</span>
+        <input v-model.trim="noteTitle" class="assistant-input" type="text" placeholder="例如：导数的几何意义" />
+      </label>
+      <label class="assistant-field">
+        <span class="assistant-label">这一段的笔记</span>
+        <textarea
+          v-model.trim="noteBody"
+          class="assistant-input"
+          rows="3"
+          placeholder="把你真正想记住的内容写在这里，系统会自动附上当前时间点。"
+        />
+      </label>
+      <label class="assistant-field">
+        <span class="assistant-label">我还想继续思考</span>
+        <textarea
+          v-model.trim="noteThought"
+          class="assistant-input"
+          rows="2"
+          placeholder="例如：后面要再看一遍这个推导"
+        />
+      </label>
+      <div v-if="noteResult" class="assistant-result">
+        <div class="assistant-result__title">已保存</div>
+        <div class="assistant-result__text">{{ noteResult.summary }}</div>
+        <button v-if="noteResult.noteId" class="btn" @click="router.push(`/notes/${noteResult.noteId}`)">打开笔记</button>
       </div>
     </section>
 
@@ -90,8 +115,9 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi, withBase } from '@/config'
-import { executeLearningFlowAgent } from '@/api/agent'
+import { addNoteTimestamp, createNote } from '@/api/note'
 import { getVideo } from '@/api/video'
+import { getSubtitleContext } from '@/api/subtitle'
 
 const route = useRoute()
 const router = useRouter()
@@ -103,9 +129,12 @@ const durationSeconds = ref(0)
 const currentTimeSeconds = ref(0)
 const videoRef = ref(null)
 const videoMeta = ref(null)
-const agentPrompt = ref('把这一段记成笔记并总结一下')
-const agentBusy = ref(false)
-const agentResult = ref(null)
+const subtitleFragments = ref([])
+const noteTitle = ref('')
+const noteBody = ref('')
+const noteThought = ref('')
+const noteBusy = ref(false)
+const noteResult = ref(null)
 
 const useMockPlayer = computed(() => shouldUseMockApi())
 const streamUrl = computed(() => withBase(`/api/videos/${id.value}/stream`))
@@ -135,6 +164,7 @@ const durationText = computed(() => {
     ? `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
     : `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
 })
+const subtitlePreview = computed(() => buildSubtitleExcerpt())
 const currentTimeText = computed(() => {
   const total = Math.max(0, Math.round(Number(currentTimeSeconds.value || 0)))
   const hh = Math.floor(total / 3600)
@@ -144,7 +174,7 @@ const currentTimeText = computed(() => {
     ? `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
     : `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
 })
-const canRunAgent = computed(() => Boolean(String(agentPrompt.value || '').trim()) && !agentBusy.value)
+const canSaveTimestampNote = computed(() => !noteBusy.value && Boolean(noteTitle.value.trim() || noteBody.value.trim() || noteThought.value.trim()))
 const tipText = computed(() => {
   if (useMockPlayer.value) {
     return '当前未连接后端。到“我的”页面填写 FastAPI 地址，或使用 iOS 原生注入的固定地址后，播放器会立即切到真实视频流。'
@@ -180,11 +210,22 @@ const loadVideoMeta = async () => {
     if (title) videoTitle.value = String(title)
     videoMeta.value = payload?.video || payload?.data || payload || null
     playerState.value = useMockPlayer.value ? '等待接入真实后端' : '等待播放器加载'
+    await loadSubtitleContext()
   } catch (err) {
     if (!useMockPlayer.value) {
       pageError.value = extractErrorMessage(err, '视频信息加载失败，请检查后端地址和视频是否存在。')
       playerState.value = '视频信息加载失败'
     }
+  }
+}
+
+const loadSubtitleContext = async () => {
+  try {
+    const res = await getSubtitleContext(Number(id.value), { preferMerged: true })
+    const list = res?.data?.subtitles || res?.data || res?.subtitles || res || []
+    subtitleFragments.value = Array.isArray(list) ? list : []
+  } catch {
+    subtitleFragments.value = []
   }
 }
 
@@ -227,23 +268,84 @@ const handleVideoError = () => {
   pageError.value = '视频流加载失败。请确认后端服务在线、手机与 Mac 在同一网络，并且该视频文件仍存在。'
 }
 
-const runAgent = async () => {
-  if (!canRunAgent.value) return
-  agentBusy.value = true
-  try {
-    const response = await executeLearningFlowAgent({
-      video_id: Number(id.value),
-      page_context: 'video_detail',
-      current_time_seconds: currentTimeSeconds.value || null,
-      subtitle_text: '',
-      recent_qa_messages: [],
-      user_input: agentPrompt.value
+const formatSeconds = (seconds) => {
+  const total = Math.max(0, Math.round(Number(seconds || 0)))
+  const mm = Math.floor((total % 3600) / 60)
+  const ss = total % 60
+  return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
+}
+
+const buildSubtitleExcerpt = () => {
+  const list = Array.isArray(subtitleFragments.value) ? subtitleFragments.value : []
+  if (list.length === 0) return ''
+  const target = Number(currentTimeSeconds.value || 0)
+  const ordered = [...list].sort((a, b) => Number(a?.start_time || 0) - Number(b?.start_time || 0))
+  let bestIndex = 0
+  let bestDistance = Number.POSITIVE_INFINITY
+  ordered.forEach((item, index) => {
+    const start = Number(item?.start_time || 0)
+    const end = Number(item?.end_time || start)
+    const midpoint = (start + end) / 2
+    const distance = Math.abs(midpoint - target)
+    if (distance < bestDistance) {
+      bestDistance = distance
+      bestIndex = index
+    }
+  })
+  const scope = ordered.slice(Math.max(0, bestIndex - 1), Math.min(ordered.length, bestIndex + 2))
+  return scope
+    .map((item) => {
+      const start = Number(item?.start_time || 0)
+      const end = Number(item?.end_time || start)
+      const text = String(item?.text || '').trim()
+      return text ? `[${formatSeconds(start)}-${formatSeconds(end)}] ${text}` : ''
     })
-    agentResult.value = response?.data || response
+    .filter(Boolean)
+    .join('\n')
+}
+
+const saveTimestampNote = async () => {
+  if (!canSaveTimestampNote.value) return
+  noteBusy.value = true
+  try {
+    const subtitleExcerpt = buildSubtitleExcerpt()
+    const contentParts = []
+    if (subtitleExcerpt) contentParts.push(`字幕片段：\n${subtitleExcerpt}`)
+    if (noteBody.value.trim()) contentParts.push(`笔记：\n${noteBody.value.trim()}`)
+    if (noteThought.value.trim()) contentParts.push(`待思考：\n${noteThought.value.trim()}`)
+    const noteContent = contentParts.join('\n\n').trim() || `视频 ${videoTitle.value} 的时间点记录`
+    const response = await createNote({
+      title: noteTitle.value.trim() || `${videoTitle.value} · ${currentTimeText.value}`,
+      content: noteContent,
+      note_type: 'text',
+      video_id: Number(id.value),
+      tags: '',
+      timestamps: [
+        {
+          time_seconds: Number(currentTimeSeconds.value || 0),
+          subtitle_text: subtitleExcerpt || noteBody.value.trim() || noteThought.value.trim() || ''
+        }
+      ]
+    })
+    const created = response?.data?.data || response?.data?.note || response?.data || null
+    const noteId = created?.id || created?.note_id || created?.data?.id || null
+    if (noteId) {
+      noteResult.value = {
+        noteId,
+        summary: `已保存 ${currentTimeText.value} 的时间点笔记`
+      }
+      noteBody.value = ''
+      noteThought.value = ''
+    } else {
+      noteResult.value = {
+        noteId: null,
+        summary: '已保存笔记'
+      }
+    }
   } catch (err) {
-    pageError.value = extractErrorMessage(err, '学习流智能体执行失败')
+    pageError.value = extractErrorMessage(err, '时间戳笔记保存失败')
   } finally {
-    agentBusy.value = false
+    noteBusy.value = false
   }
 }
 
@@ -488,6 +590,17 @@ onMounted(loadVideoMeta)
   line-height: 1.5;
 }
 
+.assistant-field {
+  display: grid;
+  gap: 6px;
+}
+
+.assistant-label {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--primary-deep);
+}
+
 .assistant-input {
   width: 100%;
   border: 1px solid rgba(32, 42, 55, 0.14);
@@ -495,6 +608,27 @@ onMounted(loadVideoMeta)
   padding: 10px 12px;
   font-size: 14px;
   background: rgba(255, 255, 255, 0.9);
+}
+
+.timestamp-preview {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(32, 42, 55, 0.08);
+}
+
+.timestamp-preview__title {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.timestamp-preview__text {
+  white-space: pre-wrap;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #334155;
 }
 
 .assistant-result {
