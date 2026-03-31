@@ -17,6 +17,15 @@ const fromStorage = (() => {
   }
 })()
 
+const fromOverrideStorage = (() => {
+  try {
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('m_api_base_url_override') : null
+    return raw ? String(raw).trim() : ''
+  } catch {
+    return ''
+  }
+})()
+
 const fromNative = (() => {
   try {
     const value = window.__edumindNativeConfig?.apiBaseUrl
@@ -48,6 +57,7 @@ const normalizeApiBaseUrl = (value) => String(value || '').trim().replace(/\/+$/
 
 const resolveApiBaseConfig = ({
   queryValue = '',
+  overrideValue = '',
   storageValue = '',
   nativeValue = '',
   envValue = ''
@@ -60,11 +70,11 @@ const resolveApiBaseConfig = ({
     }
   }
 
-  const normalizedStorage = normalizeApiBaseUrl(storageValue)
-  if (normalizedStorage) {
+  const normalizedOverride = normalizeApiBaseUrl(overrideValue)
+  if (normalizedOverride) {
     return {
-      apiBaseUrl: normalizedStorage,
-      source: 'storage'
+      apiBaseUrl: normalizedOverride,
+      source: 'override'
     }
   }
 
@@ -73,6 +83,14 @@ const resolveApiBaseConfig = ({
     return {
       apiBaseUrl: normalizedNative,
       source: 'native'
+    }
+  }
+
+  const normalizedStorage = normalizeApiBaseUrl(storageValue)
+  if (normalizedStorage) {
+    return {
+      apiBaseUrl: normalizedStorage,
+      source: 'storage'
     }
   }
 
@@ -95,12 +113,16 @@ const getRuntimeApiBaseConfig = () => {
     const queryValue = typeof window !== 'undefined' && window.location?.search
       ? new URLSearchParams(window.location.search).get('apiBase') || ''
       : ''
+    const overrideValue = typeof localStorage !== 'undefined'
+      ? localStorage.getItem('m_api_base_url_override') || ''
+      : ''
     const storageValue = typeof localStorage !== 'undefined'
       ? localStorage.getItem('m_api_base_url') || ''
       : ''
     const nativeValue = window.__edumindNativeConfig?.apiBaseUrl || ''
     return resolveApiBaseConfig({
       queryValue,
+      overrideValue,
       storageValue,
       nativeValue,
       envValue: import.meta.env.VITE_MOBILE_API_BASE_URL || ''
@@ -112,6 +134,7 @@ const getRuntimeApiBaseConfig = () => {
 
 const initialApiBaseConfig = resolveApiBaseConfig({
   queryValue: fromQuery,
+  overrideValue: fromOverrideStorage,
   storageValue: fromStorage,
   nativeValue: fromNative,
   envValue: import.meta.env.VITE_MOBILE_API_BASE_URL || ''
@@ -123,7 +146,7 @@ console.info(
   `[INFO][Config] api base=${API_BASE_URL || '<empty>'} source=${initialApiBaseConfig.source}`
 )
 
-if (!fromStorage && fromNative) {
+if (fromNative && fromNative !== fromStorage && !fromOverrideStorage) {
   try {
     localStorage.setItem('m_api_base_url', normalizeApiBaseUrl(fromNative))
   } catch {
@@ -136,8 +159,8 @@ export function setApiBaseUrl(url) {
   try {
     const value = normalizeApiBaseUrl(url)
     if (typeof localStorage !== 'undefined') {
-      if (value) localStorage.setItem('m_api_base_url', value)
-      else localStorage.removeItem('m_api_base_url')
+      if (value) localStorage.setItem('m_api_base_url_override', value)
+      else localStorage.removeItem('m_api_base_url_override')
     }
     const runtimeConfig = getRuntimeApiBaseConfig()
     console.info(
@@ -167,7 +190,13 @@ export const UI_ONLY_MODE = toBool(
   false
 )
 
-export const shouldUseMockApi = () => UI_ONLY_MODE && !getApiBaseUrl()
+const ALLOW_UI_ONLY_IN_PROD = toBool(import.meta.env.VITE_ALLOW_UI_ONLY_IN_PROD, false)
+
+export const shouldUseMockApi = () => {
+  if (!UI_ONLY_MODE || getApiBaseUrl()) return false
+  if (!import.meta.env.PROD) return true
+  return ALLOW_UI_ONLY_IN_PROD
+}
 
 export const withBase = (path) => {
   const p = String(path || '')

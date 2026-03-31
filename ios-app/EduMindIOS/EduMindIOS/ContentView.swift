@@ -136,6 +136,7 @@ private struct H5WebView: UIViewRepresentable {
         configuration.allowsAirPlayForMediaPlayback = true
         configuration.allowsPictureInPictureMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
+        configuration.websiteDataStore = .nonPersistent()
         configuration.setURLSchemeHandler(context.coordinator, forURLScheme: Coordinator.offlineVideoScheme)
         configuration.userContentController.add(context.coordinator, name: Coordinator.logHandlerName)
         configuration.userContentController.add(context.coordinator, name: Coordinator.nativeBridgeHandlerName)
@@ -167,6 +168,9 @@ private struct H5WebView: UIViewRepresentable {
         ))
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { cookies in
+            cookies.forEach { webView.configuration.websiteDataStore.httpCookieStore.delete($0) }
+        }
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.scrollView.bounces = false
         webView.backgroundColor = .systemBackground

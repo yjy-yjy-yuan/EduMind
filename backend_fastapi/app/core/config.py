@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 2004  # FastAPI 端口
     SECRET_KEY: str = "dev-secret-key-change-in-production"
+    AUTH_TOKEN_TTL_SECONDS: int = 7 * 24 * 60 * 60
+    AUTH_TOKEN_CLOCK_SKEW_SECONDS: int = 60
     AUTO_CREATE_TABLES: bool = False
     BACKGROUND_TASK_EXECUTOR: str = "auto"
     BACKGROUND_TASK_WORKERS: int = 2

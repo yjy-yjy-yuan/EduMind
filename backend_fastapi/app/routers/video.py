@@ -62,6 +62,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 ALLOWED_EXTENSIONS = {ext.lower() for ext in settings.ALLOWED_EXTENSIONS}
+ALLOWED_VIDEO_CONTENT_TYPES = {"application/octet-stream"}
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 STREAM_CHUNK_SIZE = 1024 * 1024
 BYTE_RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
@@ -70,6 +71,21 @@ BYTE_RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
 def allowed_file(filename: str) -> bool:
     """检查文件扩展名是否允许"""
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def allowed_video_content_type(filename: str, content_type: Optional[str]) -> bool:
+    """检查上传内容类型是否为视频，兼容部分客户端默认八位流。"""
+    normalized = str(content_type or "").split(";", 1)[0].strip().lower()
+    if normalized in ALLOWED_VIDEO_CONTENT_TYPES:
+        return True
+    if normalized.startswith("video/"):
+        return True
+
+    guessed_media_type, _ = mimetypes.guess_type(filename or "")
+    guessed_media_type = str(guessed_media_type or "").lower()
+    if guessed_media_type.startswith("video/") and not normalized:
+        return True
+    return False
 
 
 def secure_filename_with_chinese(filename: str) -> str:
@@ -388,6 +404,8 @@ async def upload_video(
 
     if not file.filename or not allowed_file(file.filename):
         raise HTTPException(status_code=400, detail="不支持的文件类型")
+    if not allowed_video_content_type(file.filename, file.content_type):
+        raise HTTPException(status_code=400, detail="文件内容类型无效，请上传视频文件")
 
     temp_path = None
     try:

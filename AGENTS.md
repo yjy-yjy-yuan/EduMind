@@ -200,3 +200,5 @@ Set up or improve Git hooks following industry best practices.
 ## Removal Policy
 - Files unrelated to the iOS mobile chain should not be restored.
 - Do not add back legacy desktop-web modules, Flask compatibility branches, or Android app code unless explicitly requested.
+
+## The use of pytest to test the modified program is prohibited.

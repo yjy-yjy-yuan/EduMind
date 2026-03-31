@@ -2,6 +2,10 @@
 
 ## 2026-03-30
 
+### iOS WebView 强制切换最新前端资源
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：将 `WKWebView` 切换为无持久缓存数据仓库，并在启动时清理 Cookie，修复 `fix(note-edit): compact timestamp card layout`、`fix(mobile-frontend): align video detail action cards under whisper model` 等前端改动已经进入包内但容器仍可能显示旧版页面的问题。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.html`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.html)：重新同步当前 iOS 构建产物，确保容器实际加载的是包含紧凑时间点卡片、播放器时间戳记笔记和视频详情动作卡片调整后的版本。
+
 ### 播放器时间戳记笔记收口
 - 更新 [`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)：将播放器页收为唯一主入口，继续保留时间戳记笔记流程，但标题固定为分类 + 时间点，分类由系统自动判断，学习想法改为快捷标签输入。
 - 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)、[`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：移除视频详情、问答与笔记页里的学习流智能体入口，避免用户在多个页面间被分流。
@@ -1004,3 +1008,20 @@
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/OnDeviceWhisperRuntime.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/OnDeviceWhisperRuntime.swift)、[`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：为 iOS 工程接入本机 `whisper.spm` 依赖，并新增本地 Whisper 运行时，支持模型缓存、首次下载、多语种参数映射和本机分段转录。
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：将原生离线主链路改为“本机 Whisper 优先，Apple Speech 兜底”，并在 Xcode 日志与桥接事件里持续输出当前引擎和处理进度，避免再因为后端未启动而阻断本地转录。
 - 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/LocalTranscripts.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscripts.vue)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)：新增 `Whisper 本机离线转录` 引擎展示，方便区分本机 Whisper、Apple Speech 与旧的后端 Whisper。
+
+## 2026-03-31 12:55 (Asia/Shanghai) 安全与架构基线加固迁移
+
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)：新增 `SecurityHeadersMiddleware`，统一附加 `X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy` 等安全响应头，并在 `production` 环境附加 `Strict-Transport-Security`，降低 MIME 嗅探、点击劫持与跨站上下文泄露风险。
+- 更新 [`mobile-frontend/src/config/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/config/index.js)：将 mock 开关改为“生产默认不可开启”，仅在显式设置 `VITE_ALLOW_UI_ONLY_IN_PROD=true` 时允许生产环境走 `UI_ONLY_MODE`，避免线上误入 UI-only 假链路造成功能假成功与数据不一致。
+- 审计说明：目标参考仓库 `yjy-yjy-yuan/claude-code` 当前为 `size=0` 空仓库，未发现可迁移代码结构；本次迁移按现有 EduMind iOS-only 架构完成安全基线强化。
+
+### 深度安全迁移第一步：认证 token 增加过期控制
+
+- 更新 [`backend_fastapi/app/utils/auth_token.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/auth_token.py)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：登录签发 token 升级为 `userId.expiresAt.signature`，新增 `AUTH_TOKEN_TTL_SECONDS`（默认 7 天）和 `AUTH_TOKEN_CLOCK_SKEW_SECONDS` 配置，服务端校验时强制检查过期时间；同时保持旧格式 `userId.signature` 的兼容解析，避免升级期间现有会话瞬时失效。
+- 更新 [`mobile-frontend/src/store/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/store/auth.js)：前端本地 token 格式识别同步兼容新旧两种签名结构，防止升级后误清理合法登录态。
+- 新增 [`backend_fastapi/tests/unit/test_auth_token.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_auth_token.py)：覆盖新 token 生成/解析、过期拒绝、旧 token 兼容三类关键路径。
+
+### 深度安全迁移第二步：上传文件类型双重校验
+
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：在本地视频上传接口中新增 MIME 校验，形成“扩展名 + `content-type`”双重防护；仅允许 `video/*` 或兼容 `application/octet-stream`，拦截伪装为 `.mp4` 的文本/脚本类上传。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：新增“伪装 MIME 拒绝”和“octet-stream 兼容通过”测试用例，确保 iOS/WebView 上传链路兼容且安全边界明确。
