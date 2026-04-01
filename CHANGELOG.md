@@ -11,6 +11,10 @@
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步当前 `npm run build:ios` 产物，供 WKWebView 加载。
 - 更新 [`AGENTS.md`](AGENTS.md)、新增根目录 [`index.md`](index.md)：约定 `CHANGELOG.md` 与变更日志工作流索引的关系。
 
+### 分支提交日志（COMMIT_LOG）补全与纠错
+- 更新 [`COMMIT_LOG.md`](COMMIT_LOG.md)：为 `0331-refactor/recommendation-flow` 追加 `2026-04-01` 提交条目（`a007418`、`67bc068`）；修正 `0329-feature/notes-video-enhancemen` 小节中误粘贴的重复「分支创建」段落，并将 `6c4fe40` 的补充说明改为嵌套列表。
+- 更新 [`index.md`](index.md)：补充与 [`COMMIT_LOG.md`](COMMIT_LOG.md) 的分工说明。
+
 ### 视频推荐链路重构（性能/契约/站外）
 - 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)：新增 `RECOMMENDATION_MAX_CANDIDATES_SCAN`、`RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT`、`RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS`、`RECOMMENDATION_EXTERNAL_FETCH_PARALLEL`、`RECOMMENDATION_EXTERNAL_FETCH_RETRIES`。
 - 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：站内推荐改为按配置上限加载候选，避免全表扫描；可选 `coach` 查询参数返回模板化 `coach_summary`。
