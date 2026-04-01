@@ -131,3 +131,11 @@
 - `bb7c5f6` `feat(player): simplify auto note titles`
 - `cd15a84` `fix(agent): simplify note title fallback`
 - `c79f30e` `fix(frontend): ignore abort bootstrap errors`
+
+## 0331-refactor/recommendation-flow
+
+- 分支创建：`2026-03-31`
+- 创建基线：`8d4542a` `feat(learning): converge note workflow into player-first timestamp capture (#17)`
+
+### 2026-03-31
+- `dae4292` `fix(auth): enforce expiring auth tokens across mobile and ios flows`
