@@ -9,6 +9,7 @@
 | **EduMind 主仓库** | `/Users/yuan/final-work/EduMind` |
 | 后端（FastAPI） | `/Users/yuan/final-work/EduMind/backend_fastapi` |
 | 移动端 H5 | `/Users/yuan/final-work/EduMind/mobile-frontend` |
+| 新手使用指南页面（`#/guide`） | `/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Guide.vue` |
 | iOS 容器 | `/Users/yuan/final-work/EduMind/ios-app` |
 | 文档与提示词 | `/Users/yuan/final-work/EduMind/docs` |
 | 仓库级规范 | `/Users/yuan/final-work/EduMind/AGENTS.md` |

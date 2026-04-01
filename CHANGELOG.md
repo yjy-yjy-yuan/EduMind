@@ -2,6 +2,15 @@
 
 ## 2026-04-01
 
+### 新手使用指南与首页信息架构（Guide / Home / iOS WebAssets）
+- 更新 [`mobile-frontend/src/views/Home.vue`](mobile-frontend/src/views/Home.vue)：移除「辅助入口」整卡及相关脚本与样式，避免首页冗余入口。
+- 更新 [`mobile-frontend/src/views/Guide.vue`](mobile-frontend/src/views/Guide.vue)：
+  - 「使用流程」仅保留有序说明，去掉流程 pill；
+  - 「详细教程」中「偏好设置」补充 Whisper 模型档位与摘要风格（简洁/学习/详细）的可见说明；
+  - 「详细教程」与「常见问题」内全部 `<details>` 共用单一展开状态，实现全局手风琴（同时仅一项展开），并加轻量过渡样式；
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步当前 `npm run build:ios` 产物，供 WKWebView 加载。
+- 更新 [`AGENTS.md`](AGENTS.md)、新增根目录 [`index.md`](index.md)：约定 `CHANGELOG.md` 与变更日志工作流索引的关系。
+
 ### 视频推荐链路重构（性能/契约/站外）
 - 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)：新增 `RECOMMENDATION_MAX_CANDIDATES_SCAN`、`RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT`、`RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS`、`RECOMMENDATION_EXTERNAL_FETCH_PARALLEL`、`RECOMMENDATION_EXTERNAL_FETCH_RETRIES`。
 - 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：站内推荐改为按配置上限加载候选，避免全表扫描；可选 `coach` 查询参数返回模板化 `coach_summary`。

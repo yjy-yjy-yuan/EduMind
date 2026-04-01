@@ -14,7 +14,7 @@ Do not reintroduce `frontend/`, `backend/`, Android modules, or desktop-web-spec
 - `mobile-frontend/`: the only frontend codebase. It provides the H5 UI loaded by iOS `WKWebView`.
 - `ios-app/`: the iOS container project, native bridge layer, on-device media/file access, on-device audio extraction/transcription execution, and Web asset sync script.
 - `docs/`: only keep documents that directly support the iOS mobile chain, Mac development, backend deployment, database setup, or video-processing workflow.
-- `CHANGELOG.md`, `README.md`, `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`: root-level control documents that must stay aligned with the current iOS-only architecture.
+- `CHANGELOG.md`, `index.md`, `README.md`, `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`: root-level control documents; `index.md` describes the changelog workflow paired with `CHANGELOG.md`.
 
 ## Architecture Rules
 - UI is frontend, real functionality is backend.
@@ -93,6 +93,8 @@ bash ios-app/validate_ios_build.sh
 
 - 所有变更只在 `CHANGELOG.md` 中追加新条目，不修改或删除历史记录。
 - 如果需要更正历史说明，在最新条目中写“对某某日期记录的更正说明”。
+- 每次完成实质修改并 **commit** 时，将对应说明**同步追加**到 `CHANGELOG.md`（与代码同一提交或紧邻的提交中包含 changelog 更新）；无用户可见或行为变化的纯内部调整可按惯例省略，但若记录须保持追加原则。
+- 人类与自动化助手（Agent）均遵循上述规则；流程说明见根目录 [`index.md`](index.md)。
 
 ## Git Hooks Guidance
 When a task involves Git hooks, first thoroughly analyze the current project to determine:

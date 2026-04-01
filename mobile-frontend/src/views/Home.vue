@@ -130,27 +130,6 @@
       </div>
     </section>
 
-    <section class="support-strip ios-card">
-      <div class="section-head section-head--compact">
-        <div>
-          <h2>辅助入口</h2>
-          <p>保留高频学习动作，其余入口用轻量方式承接，不打断主页面节奏。</p>
-        </div>
-      </div>
-      <div class="support-strip__list">
-        <button
-          v-for="item in supportActions"
-          :key="item.route"
-          class="support-link"
-          @click="go(item.route)"
-        >
-          <span class="quick-card__tag" :class="item.tagClass">{{ item.tag }}</span>
-          <span class="support-link__label">{{ item.title }}</span>
-          <span class="support-link__arrow">›</span>
-        </button>
-      </div>
-    </section>
-
     <section class="recommend-panel ios-card">
       <div class="section-head">
         <div>
@@ -260,14 +239,6 @@ import { getVideoList } from '@/api/video'
 import { listNativeOfflineTranscripts } from '@/services/nativeOfflineTranscripts'
 import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
-const quickActions = [
-  { route: '/local-transcripts', tag: '本地', tagClass: 'tag--mint', title: '本地转录', desc: '查看 iOS 离线转录结果' },
-  { route: '/notes', tag: '笔记', tagClass: 'tag--leaf', title: '学习笔记', desc: '把结论沉淀成稳定回看入口' },
-  { route: '/qa', tag: '问答', tagClass: 'tag--lilac', title: 'AI 问答', desc: '围绕课程内容继续追问' },
-  { route: '/recommendations', tag: '推荐', tagClass: 'tag--cobalt', title: '推荐学习', desc: '集中查看继续学习、复盘与相关推荐' },
-  { route: '/learning-path', tag: '路径', tagClass: 'tag--teal', title: '学习路径', desc: '后续承接推荐学习顺序' }
-]
-
 const router = useRouter()
 const loading = ref(false)
 const recommendationLoading = ref(false)
@@ -285,8 +256,6 @@ const recommendationMeta = ref({
   externalFailedProviderCount: 0,
   externalFetchFailed: false
 })
-
-const supportActions = computed(() => quickActions)
 
 const normalizeList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
@@ -603,8 +572,7 @@ onMounted(reloadDashboard)
 
 .welcome,
 .overview,
-.recommend-panel,
-.support-strip {
+.recommend-panel {
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(17, 24, 39, 0.08);
@@ -861,8 +829,7 @@ onMounted(reloadDashboard)
 .summary-card,
 .focus-card,
 .recommend-card,
-.video-item,
-.support-link {
+.video-item {
   border: 1px solid rgba(17, 24, 39, 0.08);
   background: rgba(247, 241, 251, 0.96);
 }
@@ -947,8 +914,7 @@ onMounted(reloadDashboard)
 }
 
 .overview,
-.recommend-panel,
-.support-strip {
+.recommend-panel {
   display: grid;
   gap: 16px;
   padding: 20px;
@@ -1156,77 +1122,10 @@ onMounted(reloadDashboard)
   color: var(--info-text);
 }
 
-.video-item__arrow,
-.support-card__arrow {
+.video-item__arrow {
   color: #8b7da3;
   font-size: 20px;
   line-height: 1;
-}
-
-.quick-card__tag {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 4px 9px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.tag--mint {
-  background: rgba(234, 225, 246, 0.92);
-  color: var(--ok-text);
-}
-
-.tag--leaf {
-  background: rgba(233, 224, 243, 0.92);
-  color: #6b5b84;
-}
-
-.tag--lilac {
-  background: var(--lilac-bg);
-  color: var(--lilac-text);
-}
-
-.tag--teal {
-  background: rgba(231, 220, 243, 0.94);
-  color: #6e5d7f;
-}
-
-.tag--cobalt {
-  background: var(--info-bg);
-  color: var(--info-text);
-}
-
-.section-head--compact {
-  align-items: flex-start;
-}
-
-.support-strip__list {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.support-link {
-  width: 100%;
-  border-radius: 18px;
-  padding: 14px 15px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-align: left;
-}
-
-.support-link__label {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 700;
-  color: #111827;
-}
-
-.support-link__arrow {
-  color: #8b7da3;
-  font-size: 18px;
 }
 
 .recommend-list {
@@ -1338,8 +1237,7 @@ onMounted(reloadDashboard)
   .hero-actions,
   .summary-grid,
   .recommend-summary,
-  .recommend-list,
-  .support-strip__list {
+  .recommend-list {
     grid-template-columns: 1fr;
   }
 
