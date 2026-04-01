@@ -38,6 +38,7 @@ from app.services.video_content_service import normalize_summary_style
 from app.services.video_content_service import read_subtitle_text
 from app.services.video_processing_registry import forget_video_processing_request
 from app.services.video_processing_registry import remember_video_processing_request
+from app.services.video_recommendation_service import load_candidate_videos_for_recommendation
 from app.services.video_recommendation_service import recommend_videos
 from app.services.video_url_import_service import import_remote_video_from_url
 from app.services.whisper_runtime import get_supported_whisper_models
@@ -211,11 +212,12 @@ def should_use_related_scene_for_upload(video: Video) -> bool:
 def build_upload_recommendations(db: Session, *, video: Video, limit: int = 4) -> Optional[dict]:
     """上传后自动获取推荐结果，默认仅返回站内结果以减少上传链路抖动。"""
     try:
-        videos = db.query(Video).order_by(Video.updated_at.desc(), Video.upload_time.desc()).all()
-        if not videos:
-            return None
         scene = "related" if should_use_related_scene_for_upload(video) else "home"
         seed_video = video if scene == "related" else None
+        max_scan = int(settings.RECOMMENDATION_MAX_CANDIDATES_SCAN)
+        videos = load_candidate_videos_for_recommendation(db, seed_video, max_scan)
+        if not videos:
+            return None
         return recommend_videos(
             videos=videos,
             scene=scene,

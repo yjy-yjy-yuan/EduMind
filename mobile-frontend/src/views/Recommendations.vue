@@ -74,6 +74,9 @@
           <span class="scene-tab__desc">{{ scene.description }}</span>
         </button>
       </div>
+      <div v-if="activeExternalFetchBanner" class="message message--warn">
+        <span>{{ activeExternalFetchBanner }}</span>
+      </div>
     </section>
 
     <section class="panel ios-card">
@@ -273,6 +276,9 @@
           <strong class="seed-card__title">{{ relatedSeed.title }}</strong>
           <span class="seed-card__meta">{{ relatedSeed.reasonLabel }}</span>
         </div>
+        <div v-if="!relatedLoading && !relatedError && relatedExternalFetchFailed" class="message message--warn">
+          部分站外来源未返回结果，站内相关推荐仍可使用。可检查网络后重试，或通过环境变量关闭默认站外拉取。
+        </div>
         <div v-if="relatedLoading" class="skeleton-list">
           <div v-for="index in 2" :key="`related-skeleton-${index}`" class="skeleton-card skeleton-card--short"></div>
         </div>
@@ -356,6 +362,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getRecommendationScenes, getVideoRecommendations } from '@/api/recommendation'
+import { shouldIncludeExternalRecommendationsByDefault } from '@/config'
 import { videoStatusText } from '@/services/videoStatus'
 
 const FALLBACK_SCENES = [
@@ -384,6 +391,7 @@ const relatedSeed = ref(null)
 const relatedItems = ref([])
 const relatedLoading = ref(false)
 const relatedError = ref('')
+const relatedExternalFetchFailed = ref(false)
 
 const go = (path) => router.push(path)
 const normalizeSceneOptions = (payload) => Array.isArray(payload?.scenes) ? payload.scenes : Array.isArray(payload?.data?.scenes) ? payload.data.scenes : []
@@ -575,8 +583,14 @@ const providerStatusText = (provider) => {
   if (provider?.status === 'empty') return '暂无候选'
   return `${Number(provider?.candidate_count || 0)} 条候选`
 }
+const activeExternalFetchBanner = computed(() => {
+  if (!activeSceneMeta.value.externalFetchFailed) return ''
+  return '部分站外来源未返回结果，站内推荐仍可使用。可检查网络后刷新，或通过环境变量 VITE_RECOMMENDATION_INCLUDE_EXTERNAL 控制是否默认拉取站外。'
+})
+
 const providerStatusDetail = (provider) => {
-  if (provider?.status === 'failed') return String(provider?.error_message || '当前 provider 抓取失败，请稍后刷新重试。')
+  if (provider?.status === 'failed')
+    return String(provider?.error_message || '当前来源抓取失败，请检查网络或稍后刷新。')
   if (provider?.status === 'empty') return `当前已检索，但没有返回可用候选。耗时 ${Number(provider?.latency_ms || 0)} ms`
   return `本轮抓取耗时 ${Number(provider?.latency_ms || 0)} ms，可继续导入该来源内容。`
 }
@@ -613,7 +627,11 @@ const loadScene = async (scene, { force = false } = {}) => {
   setSceneLoading(scene, true)
   setSceneError(scene, '')
   try {
-    const res = await getVideoRecommendations({ scene, limit: 6, include_external: true })
+    const res = await getVideoRecommendations({
+      scene,
+      limit: 6,
+      include_external: shouldIncludeExternalRecommendationsByDefault()
+    })
     const payload = res?.data || {}
     const items = normalizeRecommendationItems(payload)
     setSceneItems(scene, items)
@@ -640,11 +658,18 @@ const loadRelatedByItem = async (item) => {
   relatedLoading.value = true
   relatedError.value = ''
   try {
-    const res = await getVideoRecommendations({ scene: 'related', seed_video_id: item.id, limit: 4, include_external: true })
+    const res = await getVideoRecommendations({
+      scene: 'related',
+      seed_video_id: item.id,
+      limit: 4,
+      include_external: shouldIncludeExternalRecommendationsByDefault()
+    })
     const payload = res?.data || {}
+    relatedExternalFetchFailed.value = Boolean(payload?.external_fetch_failed)
     relatedItems.value = normalizeRecommendationItems(payload)
   } catch (error) {
     relatedItems.value = []
+    relatedExternalFetchFailed.value = false
     relatedError.value = error?.message || '相关推荐加载失败'
   } finally {
     relatedLoading.value = false
@@ -659,6 +684,7 @@ const clearRelated = () => {
   relatedSeed.value = null
   relatedItems.value = []
   relatedError.value = ''
+  relatedExternalFetchFailed.value = false
 }
 
 const refreshActiveScene = async () => { await loadScene(activeScene.value, { force: true }) }
@@ -1184,6 +1210,14 @@ onMounted(reloadAll)
   background: var(--surface-lilac);
   border-style: solid;
   border-color: var(--primary-soft);
+}
+
+.message--warn {
+  justify-content: flex-start;
+  color: rgba(120, 53, 15, 0.95);
+  background: rgba(254, 243, 199, 0.95);
+  border-style: solid;
+  border-color: rgba(251, 191, 36, 0.45);
 }
 
 .skeleton-card {

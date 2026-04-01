@@ -10,6 +10,11 @@
       {{ videoId ? `当前为视频上下文问答 · videoId=${videoId}` : '当前为通用问答' }}
     </div>
 
+    <div v-if="normalizedVideoId" class="note-entry">
+      <button type="button" class="note-entry__btn" @click="openVideoNoteEditor">记笔记（带当前视频）</button>
+      <span class="note-entry__tip">会把 videoId 传入笔记编辑页，便于与问答同一上下文整理结论。</span>
+    </div>
+
     <div class="provider-row">
       <button
         v-for="item in PROVIDER_OPTIONS"
@@ -195,10 +200,18 @@ const route = useRoute()
 const router = useRouter()
 const rawVideoId = computed(() => route.query.videoId || '')
 const videoId = computed(() => rawVideoId.value)
+const rawVideoTitle = computed(() => String(route.query.videoTitle || '').trim())
 const normalizedVideoId = computed(() => {
   const numericId = Number(rawVideoId.value)
   return Number.isInteger(numericId) && numericId > 0 ? numericId : null
 })
+
+const openVideoNoteEditor = () => {
+  if (!normalizedVideoId.value) return
+  const query = { videoId: String(normalizedVideoId.value) }
+  if (rawVideoTitle.value) query.videoTitle = rawVideoTitle.value
+  router.push({ path: '/notes/new', query })
+}
 const currentMode = computed(() => (normalizedVideoId.value ? 'video' : 'free'))
 const currentUserId = computed(() => resolveCurrentUserId())
 
@@ -846,6 +859,32 @@ watch(
 .send {
   border-radius: 16px;
   background: linear-gradient(135deg, #8b799d, #a48eb5);
+}
+
+.note-entry {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(95, 71, 126, 0.16);
+  background: rgba(242, 235, 248, 0.65);
+}
+
+.note-entry__btn {
+  justify-self: start;
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, #6b5a7d, #8b799d);
+}
+
+.note-entry__tip {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted, rgba(32, 42, 55, 0.62));
 }
 
 @media (max-width: 390px) {

@@ -1,5 +1,28 @@
 # 变更日志
 
+## 2026-04-01
+
+### 视频推荐链路重构（性能/契约/站外）
+- 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)：新增 `RECOMMENDATION_MAX_CANDIDATES_SCAN`、`RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT`、`RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS`、`RECOMMENDATION_EXTERNAL_FETCH_PARALLEL`、`RECOMMENDATION_EXTERNAL_FETCH_RETRIES`。
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：站内推荐改为按配置上限加载候选，避免全表扫描；可选 `coach` 查询参数返回模板化 `coach_summary`。
+- 更新 [`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)：站外抓取使用可配置超时、有限重试、可选并行抓取与总等待预算；补充缓存键说明文档。
+- 更新 [`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)：响应增加可选 `coach_summary`。
+- 更新 [`mobile-frontend/src/config/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/config/index.js)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)：首页与推荐页默认 `include_external` 由 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 控制；站外失败时展示可操作提示样式。
+- 更新 [`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)、[`mobile-frontend/.env.example`](/Users/yuan/final-work/EduMind/mobile-frontend/.env.example)：补充推荐相关环境变量说明。
+
+### 根路径与页面标题统一为 EduMind
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)：根路由 `message` 与启动/关闭日志改为使用 `settings.APP_NAME`（EduMind），去除遗留的 AI-EdVision 文案。
+- 更新 [`mobile-frontend/index.html`](/Users/yuan/final-work/EduMind/mobile-frontend/index.html)、[`mobile-frontend/dist/index.html`](/Users/yuan/final-work/EduMind/mobile-frontend/dist/index.html)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.html`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.html)：页面标题改为 EduMind Mobile。
+
+### 认证配置补全（修复登录 500）
+- 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：补充 `AUTH_TOKEN_TTL_SECONDS` 与 `AUTH_TOKEN_CLOCK_SKEW_SECONDS`，与 [`app/utils/auth_token.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/auth_token.py) 对齐，避免 `POST /api/auth/login` 在签发 token 时因缺少配置字段报错。
+
+### 笔记系统学习链路补全（对齐 NOTE_SYSTEM 提示词缺口）
+- 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：本视频笔记区增加「新建笔记」；跳转问答时附带 `videoTitle` 查询参数。
+- 更新 [`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：在视频上下文下增加「记笔记」入口，跳转 `/notes/new` 并传递 `videoId` / `videoTitle`。
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：时间戳行「移除」、保存时与后端同步（删除已移除、新增无 id、变更先删后加）、「添加时间点」按钮。
+- 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：笔记列表顶栏与筛选区增加「问答 / 去问答」入口；在筛选了关联视频时跳转 `/qa` 并附带 `videoId`、`videoTitle`。
+
 ## 2026-03-30
 
 ### iOS WebView 强制切换最新前端资源

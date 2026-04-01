@@ -21,6 +21,7 @@ from app.services.external_candidate_service import serialize_provider_summary
 from app.services.video_content_service import build_subject_enriched_tags
 from app.services.video_content_service import fallback_primary_topic_name
 from app.services.video_content_service import infer_subject_from_text
+from sqlalchemy.orm import Session
 
 SCENE_OPTIONS = [
     {
@@ -123,6 +124,25 @@ class RankedExternalRecommendationBundle:
 def list_recommendation_scenes() -> list[dict]:
     """返回支持的推荐场景。"""
     return [dict(item) for item in SCENE_OPTIONS]
+
+
+def load_candidate_videos_for_recommendation(db: Session, seed_video: Optional[Video], max_scan: int) -> list[Video]:
+    """加载推荐用站内候选：按更新时间倒序截断，related 场景保证包含 seed。"""
+    if max_scan < 1:
+        return []
+    order_cols = (Video.updated_at.desc(), Video.upload_time.desc())
+    if seed_video is None:
+        return db.query(Video).order_by(*order_cols).limit(max_scan).all()
+    others = db.query(Video).filter(Video.id != seed_video.id).order_by(*order_cols).limit(max(0, max_scan - 1)).all()
+    merged: list[Video] = [seed_video, *others]
+    seen: set[int] = set()
+    deduped: list[Video] = []
+    for video in merged:
+        if video.id in seen:
+            continue
+        seen.add(video.id)
+        deduped.append(video)
+    return deduped[:max_scan]
 
 
 def normalize_scene(scene: Optional[str]) -> str:
@@ -844,6 +864,25 @@ def select_combined_items(
     return [item[2] for item in selected[:limit]]
 
 
+def build_template_coach_summary(
+    *,
+    scene: str,
+    item_count: int,
+    include_external: bool,
+    external_fetch_failed: bool,
+    external_failed_provider_count: int,
+) -> str:
+    """单次模板文案，不调用 LLM；用于可选 coach 字段。"""
+    if not include_external:
+        return f"当前为「{scene}」场景，已基于站内视频库生成 {item_count} 条推荐。" "可在推荐页开启站外检索以扩展来源。"
+    if external_fetch_failed:
+        return (
+            f"站外检索中有 {external_failed_provider_count} 个来源未成功返回，"
+            "站内推荐仍可使用。请检查网络或稍后再试；也可在首页关闭站外以加快加载。"
+        )
+    return f"本轮「{scene}」推荐含站外增强，共 {item_count} 条。" "若加载偏慢，可将站外检索留到推荐页单独刷新。"
+
+
 def recommend_videos(
     *,
     videos: list[Video],
@@ -853,6 +892,7 @@ def recommend_videos(
     user: Optional[User] = None,
     exclude_ids: Optional[set[int]] = None,
     include_external: bool = False,
+    coach: bool = False,
 ) -> dict:
     """生成推荐视频列表。"""
     normalized_scene = normalize_scene(scene)
@@ -930,6 +970,18 @@ def recommend_videos(
     internal_item_count = count_internal_items(items)
     external_item_count = count_external_items(items)
     external_failed_provider_count = count_failed_external_providers(external_provider_summaries)
+    external_fetch_failed = external_failed_provider_count > 0
+    coach_summary = (
+        build_template_coach_summary(
+            scene=normalized_scene,
+            item_count=len(items),
+            include_external=include_external,
+            external_fetch_failed=external_fetch_failed,
+            external_failed_provider_count=external_failed_provider_count,
+        )
+        if coach
+        else None
+    )
     return {
         "scene": normalized_scene,
         "strategy": "video_status_interest_external_v2" if include_external else "video_status_interest_v1",
@@ -940,9 +992,10 @@ def recommend_videos(
         "internal_item_count": internal_item_count,
         "external_item_count": external_item_count,
         "external_failed_provider_count": external_failed_provider_count,
-        "external_fetch_failed": external_failed_provider_count > 0,
+        "external_fetch_failed": external_fetch_failed,
         "sources": summarize_recommendation_sources(items),
         "external_query": external_query_summary,
         "external_providers": summarize_external_providers(external_provider_summaries),
         "items": items,
+        "coach_summary": coach_summary,
     }

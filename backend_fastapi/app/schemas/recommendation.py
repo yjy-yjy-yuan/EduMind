@@ -105,6 +105,7 @@ class VideoRecommendationResponse(BaseModel):
     external_item_count: int = 0
     external_failed_provider_count: int = 0
     external_fetch_failed: bool = False
+    coach_summary: Optional[str] = Field(default=None, description="可选：模板或 LLM 一句话说明，默认不返回")
     sources: List[RecommendationSourceItem] = Field(default_factory=list)
     external_query: Optional[RecommendationExternalQuery] = None
     external_providers: List[RecommendationExternalProviderItem] = Field(default_factory=list)

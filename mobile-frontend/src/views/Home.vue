@@ -184,6 +184,11 @@
         <span>本轮站外检索围绕：{{ recommendationQuerySummary }}</span>
       </div>
 
+      <div v-if="recommendationExternalFetchBanner" class="message message--warn">
+        <span>{{ recommendationExternalFetchBanner }}</span>
+        <button type="button" class="overview-link" @click="go('/recommendations')">去推荐页</button>
+      </div>
+
       <div v-if="recommendationProviderReports.length > 0" class="recommend-provider-list">
         <article
           v-for="provider in recommendationProviderReports"
@@ -250,6 +255,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BrandLogo from '@/components/BrandLogo.vue'
 import { getVideoRecommendations } from '@/api/recommendation'
+import { shouldIncludeExternalRecommendationsByDefault } from '@/config'
 import { getVideoList } from '@/api/video'
 import { listNativeOfflineTranscripts } from '@/services/nativeOfflineTranscripts'
 import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
@@ -420,7 +426,11 @@ const reloadRecommendations = async () => {
   recommendationLoading.value = true
   recommendationError.value = ''
   try {
-    const res = await getVideoRecommendations({ scene: 'home', limit: 4, include_external: true })
+    const res = await getVideoRecommendations({
+      scene: 'home',
+      limit: 4,
+      include_external: shouldIncludeExternalRecommendationsByDefault()
+    })
     const payload = res?.data || {}
     const items = normalizeRecommendationItems(payload)
     recommendations.value = items.length > 0 ? items : fallbackRecommendations(allVideos.value)
@@ -496,8 +506,17 @@ const providerStatusText = (provider) => {
   if (provider?.status === 'empty') return '暂无候选'
   return `${Number(provider?.candidate_count || 0)} 条候选`
 }
+const recommendationExternalFetchBanner = computed(() => {
+  if (!recommendationMeta.value.externalFetchFailed) return ''
+  return '部分站外来源未返回结果，站内推荐仍可使用。可检查网络后刷新本页，或前往推荐页重试；若需加快首屏，请保持关闭站外（环境变量 VITE_RECOMMENDATION_INCLUDE_EXTERNAL）。'
+})
+
 const providerStatusDetail = (provider) => {
-  if (provider?.status === 'failed') return String(provider?.error_message || '当前 provider 抓取失败，请到推荐页查看详情。')
+  if (provider?.status === 'failed')
+    return String(
+      provider?.error_message ||
+        '当前来源抓取失败。可检查网络、稍后再试，或在环境变量中关闭站外默认加载。'
+    )
   if (provider?.status === 'empty') return `当前已检索但没有返回可用候选，耗时 ${Number(provider?.latency_ms || 0)} ms`
   return `本轮抓取耗时 ${Number(provider?.latency_ms || 0)} ms，可在推荐页继续导入。`
 }
@@ -1278,6 +1297,14 @@ onMounted(reloadDashboard)
   background: var(--surface-lilac);
   border-style: solid;
   border-color: var(--primary-soft);
+}
+
+.message--warn {
+  justify-content: flex-start;
+  color: rgba(120, 53, 15, 0.95);
+  background: rgba(254, 243, 199, 0.95);
+  border-style: solid;
+  border-color: rgba(251, 191, 36, 0.45);
 }
 
 .skeleton-item {

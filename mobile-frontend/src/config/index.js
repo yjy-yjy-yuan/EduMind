@@ -198,6 +198,10 @@ export const shouldUseMockApi = () => {
   return ALLOW_UI_ONLY_IN_PROD
 }
 
+/** 推荐接口是否默认附带站外检索（首页/推荐页共用，false 可避免弱网下首屏长时间等待） */
+export const shouldIncludeExternalRecommendationsByDefault = () =>
+  toBool(import.meta.env.VITE_RECOMMENDATION_INCLUDE_EXTERNAL, false)
+
 export const withBase = (path) => {
   const p = String(path || '')
   const base = getApiBaseUrl()

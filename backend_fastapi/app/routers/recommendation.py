@@ -2,6 +2,7 @@
 
 from typing import Optional
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User
 from app.models.video import Video
@@ -13,6 +14,7 @@ from app.services.video_api_service import build_processing_options
 from app.services.video_api_service import serialize_video
 from app.services.video_recommendation_service import SCENE_MAP
 from app.services.video_recommendation_service import list_recommendation_scenes
+from app.services.video_recommendation_service import load_candidate_videos_for_recommendation
 from app.services.video_recommendation_service import normalize_scene
 from app.services.video_recommendation_service import recommend_videos
 from app.services.video_url_import_service import import_remote_video_from_url
@@ -57,7 +59,11 @@ async def get_recommendation_scenes():
 async def get_video_recommendations(
     scene: str = Query(default="home", description="推荐场景：home/continue/review/related"),
     limit: int = Query(default=4, ge=1, le=12, description="返回条数"),
-    include_external: bool = Query(default=False, description="是否附带站外候选元数据"),
+    include_external: bool = Query(
+        default=settings.RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT,
+        description="是否附带站外候选；服务端默认由 RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT 控制",
+    ),
+    coach: bool = Query(default=False, description="是否返回 coach_summary 模板说明"),
     seed_video_id: Optional[int] = Query(default=None, description="相关推荐的种子视频 ID"),
     exclude_video_ids: Optional[str] = Query(default=None, description="排除的视频 ID，逗号分隔"),
     user_id: Optional[int] = Query(default=None, description="兼容旧链路的用户 ID"),
@@ -78,7 +84,8 @@ async def get_video_recommendations(
             raise HTTPException(status_code=404, detail="seed 视频不存在")
 
     user = resolve_user_from_request(db, user_id, authorization)
-    videos = db.query(Video).order_by(Video.updated_at.desc(), Video.upload_time.desc()).all()
+    max_scan = int(settings.RECOMMENDATION_MAX_CANDIDATES_SCAN)
+    videos = load_candidate_videos_for_recommendation(db, seed_video, max_scan)
     payload = recommend_videos(
         videos=videos,
         scene=normalized_scene,
@@ -87,6 +94,7 @@ async def get_video_recommendations(
         user=user,
         exclude_ids=parse_exclude_ids(exclude_video_ids),
         include_external=include_external,
+        coach=coach,
     )
     payload["message"] = "获取推荐视频成功"
     return payload
