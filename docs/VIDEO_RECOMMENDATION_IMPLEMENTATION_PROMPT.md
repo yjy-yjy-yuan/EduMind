@@ -30,6 +30,7 @@
   - `tags` 当前以 JSON 字符串形式保存在 `videos.tags`。
 - `backend_fastapi/app/services/video_recommendation_service.py`
   - 已实现基于标题、摘要、标签、状态和用户画像的轻量推荐。
+  - 当前已按 `RECOMMENDATION_MAX_CANDIDATES_SCAN` 对站内候选做有上限扫描，不再默认全表加载。
   - 当前支持 `home / continue / review / related` 四个场景。
 - `backend_fastapi/app/routers/recommendation.py`
   - 已提供 `/api/recommendations/scenes` 和 `/api/recommendations/videos`。
@@ -43,7 +44,10 @@
 - `mobile-frontend/src/api/recommendation.js`
   - 已有推荐接口封装。
 - `mobile-frontend/src/views/Home.vue`
-  - 已有首页“推荐视频”区域，并接入当前推荐接口。
+  - 已有首页“推荐视频”区域，并接入当前推荐接口；是否默认带站外检索由 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 控制。
+- `mobile-frontend/src/views/Recommendations.vue`
+  - 已有推荐页、相关推荐区域和“看同主题”交互。
+  - “看同主题”应保持为完整闭环：可点击、可见 loading、可在当前页渲染结果，并在接口空结果或失败时允许前端基于当前已加载站内结果做兜底。
 - `mobile-frontend/src/views/Upload.vue`
   - 已支持链接导入，且链接校验已覆盖 B 站 / YouTube / 中国大学慕课。
 
@@ -79,7 +83,9 @@
    - 保持与站内视频相同或兼容的标签标准，方便统一排序。
 4. 前端交互：
    - 站内视频继续走现有详情页。
-   - 外部候选点击后应进入现有“链接导入”流程，例如跳到上传页并预填 URL，或调用既有 URL 上传接口。
+   - 外部候选点击后应根据动作类型分流：
+     - 可直接导入：进入现有“链接导入”流程，例如跳到上传页并预填 URL，或调用既有 URL 上传接口。
+     - 暂不可直接导入：打开原始来源页。
    - UI 必须清晰区分“站内视频”和“外部推荐”。
 5. 数据持久化：
    - 第一版默认不要新增外部推荐持久化表。
@@ -163,6 +169,7 @@
    - 外部项必须明确展示来源平台与“导入学习链路”动作
    - 不要把外部候选伪装成已经导入成功的视频
    - 如果选择跳到上传页，优先复用现有链接导入能力并传递 URL
+   - “看同主题”按钮必须形成完整闭环：能点、点击后有 loading、能在当前页看到同主题推荐、失败时有明确 fallback 或错误提示
 
 实现时必须遵守这些硬约束：
 

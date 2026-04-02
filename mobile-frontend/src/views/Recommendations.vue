@@ -253,15 +253,21 @@
             >
               {{ item.primaryActionLabel }}
             </button>
-            <button type="button" class="action-btn" @click="loadRelatedByItem(item)" :disabled="!item.canLoadRelated">
-              看同主题
+            <button
+              type="button"
+              class="action-btn"
+              :class="{ 'action-btn--active': item.isRelatedSeed }"
+              @click.stop="loadRelatedByItem(item)"
+              :disabled="!item.canLoadRelated || item.relatedButtonLoading"
+            >
+              {{ item.relatedButtonLabel }}
             </button>
           </div>
         </article>
       </div>
     </section>
 
-    <section class="panel ios-card">
+    <section ref="relatedSectionRef" class="panel ios-card">
       <div class="section-head">
         <div>
           <h2>相关推荐</h2>
@@ -275,6 +281,9 @@
           <span class="seed-card__label">当前种子视频</span>
           <strong class="seed-card__title">{{ relatedSeed.title }}</strong>
           <span class="seed-card__meta">{{ relatedSeed.reasonLabel }}</span>
+        </div>
+        <div v-if="relatedStatusMessage" class="message message--hint">
+          {{ relatedStatusMessage }}
         </div>
         <div v-if="!relatedLoading && !relatedError && relatedExternalFetchFailed" class="message message--warn">
           部分站外来源未返回结果，站内相关推荐仍可使用。可检查网络后重试，或通过环境变量关闭默认站外拉取。
@@ -359,10 +368,16 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getRecommendationScenes, getVideoRecommendations } from '@/api/recommendation'
 import { shouldIncludeExternalRecommendationsByDefault } from '@/config'
+import {
+  isRecommendationPrimaryActionDisabled,
+  parseRecommendationActionTarget,
+  resolveRecommendationUrl,
+  shouldOpenRecommendationExternalSource
+} from '@/services/recommendationActions'
 import { videoStatusText } from '@/services/videoStatus'
 
 const FALLBACK_SCENES = [
@@ -392,6 +407,9 @@ const relatedItems = ref([])
 const relatedLoading = ref(false)
 const relatedError = ref('')
 const relatedExternalFetchFailed = ref(false)
+const relatedStatusMode = ref('')
+const relatedLoadingItemKey = ref('')
+const relatedSectionRef = ref(null)
 
 const go = (path) => router.push(path)
 const normalizeSceneOptions = (payload) => Array.isArray(payload?.scenes) ? payload.scenes : Array.isArray(payload?.data?.scenes) ? payload.data.scenes : []
@@ -429,20 +447,8 @@ const formatTimeText = (rawValue) => {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleString()
 }
 
-const resolvePrimaryUrl = (item) => String(item?.external_url || item?.target_url || item?.source_url || item?.link || item?.url || '').trim()
+const resolvePrimaryUrl = (item) => resolveRecommendationUrl(item)
 const resolveItemKey = (item, index = 0) => String(item?.id || item?.video_id || resolvePrimaryUrl(item) || `item-${index}`)
-const parseActionTarget = (target) => {
-  const text = String(target || '').trim()
-  if (!text || !text.startsWith('/')) return null
-  const [path, search = ''] = text.split('?')
-  if (!search) return { path }
-  const params = new URLSearchParams(search)
-  const query = {}
-  params.forEach((value, key) => {
-    query[key] = value
-  })
-  return { path, query }
-}
 
 const isExternalItem = (item) => {
   const itemType = String(item?.item_type || item?.content_type || item?.origin_type || '').trim().toLowerCase()
@@ -478,15 +484,23 @@ const decorateItem = (item, index = 0) => {
     sourceLabel,
     sourceBadgeClass: isExternal ? 'badge--external' : item?.processing_origin === 'ios_offline' ? 'badge--mint' : 'badge--soft',
     primaryActionLabel: actionLabel || (isExternal ? '导入学习' : item?.processing_origin === 'ios_offline' ? '打开本地结果' : '打开详情'),
-    primaryActionDisabled: isExternal ? !Boolean(item?.can_import ?? resolvePrimaryUrl(item)) : false,
-    canLoadRelated: Boolean(item?.id),
+    primaryActionDisabled: isRecommendationPrimaryActionDisabled(item, isExternal),
+    canLoadRelated: !isExternal && Boolean(item?.id),
     canImport: Boolean(item?.can_import ?? false),
     importHint,
     actionTarget: String(item?.action_target || '').trim(),
     actionApi: String(item?.action_api || '').trim(),
     actionMethod: String(item?.action_method || '').trim().toUpperCase(),
     subjectText: subjectText ? `科目 · ${subjectText}` : '',
-    clusterKey: String(item?.cluster_key || '').trim()
+    clusterKey: String(item?.cluster_key || '').trim(),
+    isRelatedSeed: resolveItemKey(item, index) === relatedLoadingItemKey.value || resolveItemKey(item, index) === relatedSeed.value?.key,
+    relatedButtonLoading: resolveItemKey(item, index) === relatedLoadingItemKey.value && relatedLoading.value,
+    relatedButtonLabel:
+      resolveItemKey(item, index) === relatedLoadingItemKey.value && relatedLoading.value
+        ? '加载中…'
+        : resolveItemKey(item, index) === relatedSeed.value?.key
+          ? '已显示同主题'
+          : '看同主题'
   }
 }
 
@@ -557,6 +571,13 @@ const relatedSeedSummary = computed(() => {
   if (!relatedSeed.value?.title) return '点一次“看同主题”后，这里会固定当前种子。'
   return String(relatedSeed.value.title)
 })
+const relatedStatusMessage = computed(() => {
+  if (!relatedSeed.value?.title) return ''
+  if (relatedLoading.value) return `正在围绕《${relatedSeed.value.title}》加载同主题视频…`
+  if (relatedStatusMode.value === 'local') return `已显示《${relatedSeed.value.title}》的同主题推荐；当前使用的是本地兜底结果。`
+  if (filteredRelatedItems.value.length > 0) return `已为《${relatedSeed.value.title}》加载 ${filteredRelatedItems.value.length} 条同主题推荐。`
+  return ''
+})
 const sceneMixSummary = computed(() => {
   if (filteredSceneItems.value.length === 0) return '等待当前场景返回推荐结果。'
   if (filteredSceneExternalCount.value === 0) return `当前结果以 ${filteredSceneInternalCount.value} 条站内内容为主。`
@@ -594,10 +615,40 @@ const providerStatusDetail = (provider) => {
   if (provider?.status === 'empty') return `当前已检索，但没有返回可用候选。耗时 ${Number(provider?.latency_ms || 0)} ms`
   return `本轮抓取耗时 ${Number(provider?.latency_ms || 0)} ms，可继续导入该来源内容。`
 }
+
+const scoreRelatedFallbackCandidate = (seedItem, candidate) => {
+  if (!seedItem || !candidate || !candidate.id || candidate.id === seedItem.id) return -1
+  if (isExternalItem(candidate)) return -1
+  let score = 0
+  const seedTags = new Set(seedItem.tags || [])
+  const candidateTags = Array.isArray(candidate.tags) ? candidate.tags : []
+  candidateTags.forEach((tag) => {
+    if (seedTags.has(tag)) score += 6
+  })
+  if (seedItem.clusterKey && candidate.clusterKey && seedItem.clusterKey === candidate.clusterKey) score += 10
+  if (seedItem.subjectText && candidate.subjectText && seedItem.subjectText === candidate.subjectText) score += 4
+  if (score <= 0) return -1
+  return score
+}
+
+const buildFallbackRelatedItems = (seedItem) => {
+  return allLoadedItems.value
+    .map((candidate) => ({ candidate, score: scoreRelatedFallbackCandidate(seedItem, candidate) }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4)
+    .map((entry) => entry.candidate)
+}
+
+const scrollToRelatedSection = async () => {
+  await nextTick()
+  relatedSectionRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+}
+
 const resolveRecommendationRoute = (item) => {
-  const actionLocation = parseActionTarget(item?.actionTarget || item?.action_target)
+  const actionLocation = parseRecommendationActionTarget(item?.actionTarget || item?.action_target)
   if (actionLocation) return actionLocation
-  if (isExternalItem(item)) {
+  if (isExternalItem(item) && !shouldOpenRecommendationExternalSource(item)) {
     const url = resolvePrimaryUrl(item)
     if (!url) return null
     return { path: '/upload', query: { mode: 'url', url, source: item.sourceLabel || '站外推荐' } }
@@ -616,6 +667,13 @@ const openRecommendation = (item) => {
   }
   const location = resolveRecommendationRoute(item)
   if (!location) {
+    if (shouldOpenRecommendationExternalSource(item)) {
+      const externalTarget = String(item?.actionTarget || item?.action_target || '').trim() || resolvePrimaryUrl(item)
+      if (externalTarget && typeof window !== 'undefined') {
+        window.location.assign(externalTarget)
+        return
+      }
+    }
     pageError.value = '当前推荐项缺少可用的跳转动作。'
     return
   }
@@ -653,10 +711,13 @@ const activateScene = async (scene) => {
 }
 
 const loadRelatedByItem = async (item) => {
-  if (!item?.id) return
+  if (!item?.id || isExternalItem(item)) return
   relatedSeed.value = item
   relatedLoading.value = true
   relatedError.value = ''
+  relatedStatusMode.value = 'api'
+  relatedLoadingItemKey.value = item.key || String(item.id)
+  await scrollToRelatedSection()
   try {
     const res = await getVideoRecommendations({
       scene: 'related',
@@ -666,13 +727,22 @@ const loadRelatedByItem = async (item) => {
     })
     const payload = res?.data || {}
     relatedExternalFetchFailed.value = Boolean(payload?.external_fetch_failed)
-    relatedItems.value = normalizeRecommendationItems(payload)
+    const apiItems = normalizeRecommendationItems(payload)
+    if (apiItems.length > 0) {
+      relatedItems.value = apiItems
+      relatedStatusMode.value = 'api'
+    } else {
+      relatedItems.value = buildFallbackRelatedItems(item)
+      relatedStatusMode.value = relatedItems.value.length > 0 ? 'local' : 'api'
+    }
   } catch (error) {
-    relatedItems.value = []
+    relatedItems.value = buildFallbackRelatedItems(item)
     relatedExternalFetchFailed.value = false
-    relatedError.value = error?.message || '相关推荐加载失败'
+    relatedStatusMode.value = relatedItems.value.length > 0 ? 'local' : 'error'
+    relatedError.value = relatedItems.value.length > 0 ? '' : error?.message || '相关推荐加载失败'
   } finally {
     relatedLoading.value = false
+    relatedLoadingItemKey.value = ''
   }
 }
 
@@ -685,6 +755,8 @@ const clearRelated = () => {
   relatedItems.value = []
   relatedError.value = ''
   relatedExternalFetchFailed.value = false
+  relatedStatusMode.value = ''
+  relatedLoadingItemKey.value = ''
 }
 
 const refreshActiveScene = async () => { await loadScene(activeScene.value, { force: true }) }
@@ -896,6 +968,12 @@ onMounted(reloadAll)
   color: #f9fafb;
   background: linear-gradient(135deg, #5f477e, #8f73ba);
   box-shadow: 0 16px 24px rgba(95, 71, 126, 0.24);
+}
+
+.action-btn--active {
+  border-color: rgba(143, 115, 186, 0.42);
+  background: rgba(232, 221, 244, 0.98);
+  color: var(--primary-deep);
 }
 
 .hero-btn--ghost,

@@ -1061,3 +1061,16 @@
 
 - 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：在本地视频上传接口中新增 MIME 校验，形成“扩展名 + `content-type`”双重防护；仅允许 `video/*` 或兼容 `application/octet-stream`，拦截伪装为 `.mp4` 的文本/脚本类上传。
 - 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：新增“伪装 MIME 拒绝”和“octet-stream 兼容通过”测试用例，确保 iOS/WebView 上传链路兼容且安全边界明确。
+
+## 2026-04-02 20:58 (Asia/Shanghai) 推荐交互与文档同步
+
+- 新增 [`mobile-frontend/src/services/recommendationActions.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/recommendationActions.js)，并更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：统一推荐卡片动作解析，修复站外候选 `can_import=false` 时仍被误判为“不可导入”或错误跳到上传页的问题；现在可导入候选继续走现有 URL 导入链路，不可直接导入的候选会按后端动作打开原始来源页。
+- 更新 [`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)：修复“看同主题”按钮不可点击的问题，并补全完整交互闭环。按钮现在只对站内视频开放，点击后会进入 loading、自动滚动到“相关推荐”区域、优先请求 `scene=related`，并在接口空结果或失败时使用当前页已加载的站内推荐做同主题兜底渲染。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`mobile-frontend/README.md`](/Users/yuan/final-work/EduMind/mobile-frontend/README.md)、[`docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md)、[`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md)：同步当前推荐链路现状，修正“全表加载视频”等过时说明，并补充站外动作分流、环境变量控制与“看同主题”当前行为。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步最新前端构建产物到 iOS `WKWebView` 资源目录。
+- 验证与 hooked checks：
+  - `cd /Users/yuan/final-work/EduMind/mobile-frontend && npm run build:ios`
+  - `cd /Users/yuan/final-work/EduMind && bash ios-app/sync_ios_web_assets.sh`
+  - `cd /Users/yuan/final-work/EduMind && pre-commit run --files README.md mobile-frontend/README.md docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md mobile-frontend/src/services/recommendationActions.js mobile-frontend/src/views/Home.vue mobile-frontend/src/views/Recommendations.vue mobile-frontend/src/views/Upload.vue`
+  - `cd /Users/yuan/final-work/EduMind && MYPYPATH=backend_fastapi ./.venv/bin/python -m mypy --config-file pyproject.toml backend_fastapi/app/models backend_fastapi/app/schemas backend_fastapi/scripts/init_db.py scripts/hooks`
+  - `cd /Users/yuan/final-work/EduMind && ./.venv/bin/python -m pytest backend_fastapi/tests/unit backend_fastapi/tests/api backend_fastapi/tests/smoke -q`

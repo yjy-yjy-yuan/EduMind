@@ -385,6 +385,12 @@ import {
   listNativeOfflineTranscripts,
   saveNativeOfflineTranscript
 } from '@/services/nativeOfflineTranscripts'
+import {
+  isRecommendationPrimaryActionDisabled,
+  parseRecommendationActionTarget,
+  resolveRecommendationUrl,
+  shouldOpenRecommendationExternalSource
+} from '@/services/recommendationActions'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
 const router = useRouter()
@@ -472,24 +478,10 @@ const normalizeRecommendationItems = (payload) => Array.isArray(payload?.items) 
 const normalizeRecommendationQuery = (payload) => payload?.external_query || null
 const resolveRecommendationItemKey = (item, index = 0) =>
   String(item?.id || item?.video_id || item?.external_url || item?.url || `upload-recommendation-${index}`)
-const resolveRecommendationUrl = (item) =>
-  String(item?.external_url || item?.target_url || item?.source_url || item?.url || item?.link || '').trim()
 const isExternalRecommendationItem = (item) => {
   const itemType = String(item?.item_type || item?.content_type || '').trim().toLowerCase()
   if (item?.is_external === true) return true
   return ['external', 'external_candidate', 'candidate'].includes(itemType) || (!item?.id && Boolean(resolveRecommendationUrl(item)))
-}
-const parseRecommendationActionTarget = (target) => {
-  const text = String(target || '').trim()
-  if (!text || !text.startsWith('/')) return null
-  const [path, search = ''] = text.split('?')
-  if (!search) return { path }
-  const params = new URLSearchParams(search)
-  const query = {}
-  params.forEach((value, key) => {
-    query[key] = value
-  })
-  return { path, query }
 }
 const formatRecommendationTime = (rawValue) => {
   if (!rawValue) return ''
@@ -513,7 +505,7 @@ const decorateUploadRecommendationItem = (item, index = 0) => {
     subjectText: String(item?.subject || '').trim() ? `科目 · ${String(item.subject).trim()}` : '',
     importHint: String(item?.import_hint || '').trim(),
     primaryActionLabel: String(item?.action_label || '').trim() || (isExternal ? '导入学习' : '打开详情'),
-    primaryActionDisabled: isExternal ? !Boolean(item?.can_import ?? resolveRecommendationUrl(item)) : false,
+    primaryActionDisabled: isRecommendationPrimaryActionDisabled(item, isExternal),
     actionTarget: String(item?.action_target || '').trim()
   }
 }
@@ -556,12 +548,20 @@ const openUploadRecommendation = (item) => {
     error.value = item.importHint || '当前站外候选暂不可直接导入。'
     return
   }
-  const actionLocation = parseRecommendationActionTarget(item.actionTarget || item?.action_target)
+  const actionTarget = String(item?.actionTarget || item?.action_target || '').trim()
+  const actionLocation = parseRecommendationActionTarget(actionTarget)
   if (actionLocation) {
     router.push(actionLocation)
     return
   }
   if (isExternalRecommendationItem(item)) {
+    if (shouldOpenRecommendationExternalSource(item)) {
+      const externalTarget = actionTarget || resolveRecommendationUrl(item)
+      if (externalTarget && typeof window !== 'undefined') {
+        window.location.assign(externalTarget)
+        return
+      }
+    }
     const url = resolveRecommendationUrl(item)
     if (!url) return
     router.push({ path: '/upload', query: { mode: 'url', url, source: item.sourceLabel || '站外推荐' } })

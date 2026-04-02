@@ -100,6 +100,43 @@ pytest backend_fastapi/tests/ -v
 
 更具体的测试放置规则见 [backend_fastapi/tests/README.md](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)。
 
+## Git Hooks 与本地质量门
+
+当前仓库使用 `pre-commit` 框架，而不是 Husky。默认本地质量门如下：
+
+1. `pre-commit`
+   - 基础文本/配置检查
+   - Python `black` / `isort` / `flake8`
+   - `mobile-frontend/src/` 下调试语句守卫
+2. `commit-msg`
+   - Conventional Commits 校验
+3. `pre-push`
+   - `mypy`
+   - `pytest backend_fastapi/tests/unit backend_fastapi/tests/api backend_fastapi/tests/smoke -q`
+   - `cd mobile-frontend && npm run build:ios`
+
+如需本地安装 hooks：
+
+```bash
+bash scripts/install_git_hooks.sh
+pre-commit install
+pre-commit install --hook-type commit-msg
+pre-commit install --hook-type pre-push
+```
+
+如需提前手动跑与 `pre-push` 一致的检查，优先执行：
+
+```bash
+MYPYPATH=backend_fastapi ./.venv/bin/python -m mypy --config-file pyproject.toml backend_fastapi/app/models backend_fastapi/app/schemas backend_fastapi/scripts/init_db.py scripts/hooks
+./.venv/bin/python -m pytest backend_fastapi/tests/unit backend_fastapi/tests/api backend_fastapi/tests/smoke -q
+cd mobile-frontend && npm run build:ios
+```
+
+说明：
+
+- `ios-app/EduMindIOS/EduMindIOS/WebAssets/` 已在 `pre-commit` 排除列表中，因为它们由 `bash ios-app/sync_ios_web_assets.sh` 同步生成。
+- 如确需跳过 hook，使用 `--no-verify`，但默认不建议这样做。
+
 ## Blitz / Codex CLI 开发工作流
 
 面向 Blitz、Codex CLI、Claude Code 等本地代码代理，当前仓库新增了 4 个统一脚本：
@@ -168,6 +205,18 @@ bash scripts/blitz_build_ios.sh
 POST /api/videos/{video_id}/generate-summary
 POST /api/videos/{video_id}/generate-tags
 ```
+
+## 视频推荐当前行为
+
+当前推荐链路已经不是“只按最近时间排序”的早期占位态，默认行为如下：
+
+1. 后端按受限候选集扫描站内视频，不再无上限全表加载。
+2. 推荐接口支持 `home / continue / review / related` 四种场景。
+3. 首页与推荐页默认通过 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 控制是否带站外候选，避免弱网下首屏被站外抓取拖慢。
+4. 站外候选会明确区分两类动作：
+   - 可直接导入：进入现有 URL 导入链路
+   - 暂不可直接导入：打开原始来源页，而不是伪装成已入库视频
+5. 推荐页里的“看同主题”会围绕当前站内视频加载 `related` 推荐；若接口暂无结果或请求失败，前端会用当前页已加载的站内内容做同主题兜底，并在当前页“相关推荐”区域内展示结果。
 
 ## 视频上下文问答
 

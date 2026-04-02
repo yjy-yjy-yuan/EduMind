@@ -235,6 +235,12 @@ import { useRouter } from 'vue-router'
 import BrandLogo from '@/components/BrandLogo.vue'
 import { getVideoRecommendations } from '@/api/recommendation'
 import { shouldIncludeExternalRecommendationsByDefault } from '@/config'
+import {
+  isRecommendationPrimaryActionDisabled,
+  parseRecommendationActionTarget,
+  resolveRecommendationUrl,
+  shouldOpenRecommendationExternalSource
+} from '@/services/recommendationActions'
 import { getVideoList } from '@/api/video'
 import { listNativeOfflineTranscripts } from '@/services/nativeOfflineTranscripts'
 import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
@@ -438,9 +444,7 @@ const decorateRecommendationItem = (item) => ({
   subjectText: String(item?.subject || '').trim() ? `科目 · ${String(item.subject).trim()}` : '',
   importHint: String(item?.import_hint || '').trim(),
   actionTarget: String(item?.action_target || '').trim(),
-  primaryActionDisabled: isExternalRecommendation(item)
-    ? !Boolean(item?.can_import ?? resolveRecommendationUrl(item))
-    : false
+  primaryActionDisabled: isRecommendationPrimaryActionDisabled(item, isExternalRecommendation(item))
 })
 const recommendationCards = computed(() => recommendations.value.map((item) => decorateRecommendationItem(item)))
 const externalRecommendationCount = computed(() => recommendationCards.value.filter((item) => isExternalRecommendation(item)).length)
@@ -493,20 +497,6 @@ const providerStatusDetail = (provider) => {
 const recommendationKey = (item) =>
   String(item?.id || item?.external_url || item?.target_url || item?.source_url || item?.link || item?.title || 'recommendation')
 
-const resolveRecommendationUrl = (item) =>
-  String(item?.external_url || item?.target_url || item?.source_url || item?.link || '').trim()
-const parseRecommendationActionTarget = (target) => {
-  const text = String(target || '').trim()
-  if (!text || !text.startsWith('/')) return null
-  const [path, search = ''] = text.split('?')
-  if (!search) return { path }
-  const query = {}
-  new URLSearchParams(search).forEach((value, key) => {
-    query[key] = value
-  })
-  return { path, query }
-}
-
 const isExternalRecommendation = (item) => {
   const itemType = String(item?.item_type || item?.content_type || item?.origin_type || '').trim().toLowerCase()
   if (item?.is_external === true) return true
@@ -534,12 +524,20 @@ const openRecommendation = (item) => {
     recommendationError.value = item.importHint || '当前站外候选暂不可直接导入。'
     return
   }
-  const actionLocation = parseRecommendationActionTarget(item?.actionTarget || item?.action_target)
+  const actionTarget = String(item?.actionTarget || item?.action_target || '').trim()
+  const actionLocation = parseRecommendationActionTarget(actionTarget)
   if (actionLocation) {
     router.push(actionLocation)
     return
   }
   if (isExternalRecommendation(item)) {
+    if (shouldOpenRecommendationExternalSource(item)) {
+      const externalTarget = actionTarget || resolveRecommendationUrl(item)
+      if (externalTarget && typeof window !== 'undefined') {
+        window.location.assign(externalTarget)
+        return
+      }
+    }
     const url = resolveRecommendationUrl(item)
     if (!url) return
     router.push({

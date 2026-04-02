@@ -22,8 +22,10 @@
 
 ### 2. 当前推荐链路在做什么（基线）
 
-- **站内**：从数据库加载全部 `Video`，为每条构建 `RecommendationProfile`（科目、标签、token、聚类），按场景 `home/continue/review/related` 打分排序，合并 `exclude_ids`、seed 相关推荐。
-- **站外（`include_external=true`）**：根据 `build_external_query_context` 生成查询文本，调用 `fetch_external_candidates_report`（多 provider HTML/搜索抓取），再与站内混合 `select_combined_items`。
+- **站内**：从数据库按更新时间倒序加载**受限候选集**（由 `RECOMMENDATION_MAX_CANDIDATES_SCAN` 控制），为每条构建 `RecommendationProfile`（科目、标签、token、聚类），按场景 `home/continue/review/related` 打分排序，合并 `exclude_ids`、seed 相关推荐。
+- **站外（`include_external=true`）**：根据 `build_external_query_context` 生成查询文本，调用 `fetch_external_candidates_report`（多 provider HTML/搜索抓取，支持缓存、超时预算与失败摘要），再与站内混合 `select_combined_items`。
+- **前端交互**：首页与推荐页默认可通过 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 控制是否首屏带站外抓取；推荐页“看同主题”会请求 `scene=related`，并在接口空结果或失败时用当前已加载的站内推荐做同主题兜底。
+- **动作分流**：站外候选根据 `can_import` / `action_type` 区分为“进入上传导入链路”或“打开原始来源页”，不会再把不可直接导入的候选伪装成已入库视频。
 - **兜底**：若无任何结果，按最近更新时间回退若干条并标记 `fallback_used`。
 
 ### 3. 「推荐出问题」的常见根因（需在重构前实测确认）
@@ -34,7 +36,7 @@
 | 站外一直失败 | B 站/YouTube/DuckDuckGo 页面结构变化、风控、缓存键命中旧失败 | **先修 external_candidate** |
 | 结果为空或离谱 | 库内视频极少、标签/摘要空导致 token 弱；`related` 未传 `seed_video_id`（422） | **规则与参数** |
 | 首页与推荐页不一致 | 参数不同（`scene/limit/include_external`）、是否带 token 用户画像 | **前端与 API 契约** |
-| 全表扫描性能 | `videos = db.query(Video).order_by(...).all()` 随视频量线性增长 | **查询与分页** |
+| 受限候选集仍不够稳 | `RECOMMENDATION_MAX_CANDIDATES_SCAN` 过小导致相关推荐弱，或过大导致排序开销抬高 | **查询与配置** |
 
 **Agent 不能自动修复上述「抓取失败、全表扫描、422」**；必须先做 **服务层与前端契约** 修复。Agent 只适合在**稳定排序之后**增加「解释、下一步建议、诊断文案」等**薄层能力**。
 
@@ -106,7 +108,9 @@
 
 1. 首屏 **默认 `include_external: false`** 或环境变量控制，避免白屏等待。
 2. 推荐页「刷新」与首页参数一致；`related` 场景必须传 `seed_video_id`。
-3. 展示 `external_fetch_failed` 与 provider 失败时，给用户明确可操作提示（去推荐页、关闭站外、检查网络）。
+3. “看同主题”按钮必须有明确反馈：点击即进入 loading、固定当前 seed，并在当前页“相关推荐”区域渲染结果。
+4. 若 `related` 接口暂无结果或失败，前端可使用当前页已加载的站内卡片做同主题兜底，但必须明确这是前端 fallback，而不是伪造后端成功。
+5. 展示 `external_fetch_failed` 与 provider 失败时，给用户明确可操作提示（去推荐页、关闭站外、检查网络）。
 
 ### 2.7 验收（手工）
 
