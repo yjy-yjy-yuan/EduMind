@@ -140,6 +140,43 @@ cd mobile-frontend && npm run build:ios
 - `ios-app/EduMindIOS/EduMindIOS/WebAssets/` 已在 `pre-commit` 排除列表中，因为它们由 `bash ios-app/sync_ios_web_assets.sh` 同步生成。
 - 如确需跳过 hook，使用 `--no-verify`，但默认不建议这样做。
 
+## Git Hooks 与本地质量门
+
+当前仓库使用 `pre-commit` 框架，而不是 Husky。默认本地质量门如下：
+
+1. `pre-commit`
+   - 基础文本/配置检查
+   - Python `black` / `isort` / `flake8`
+   - `mobile-frontend/src/` 下调试语句守卫
+2. `commit-msg`
+   - Conventional Commits 校验
+3. `pre-push`
+   - `mypy`
+   - `pytest backend_fastapi/tests/unit backend_fastapi/tests/api backend_fastapi/tests/smoke -q`
+   - `cd mobile-frontend && npm run build:ios`
+
+如需本地安装 hooks：
+
+```bash
+bash scripts/install_git_hooks.sh
+pre-commit install
+pre-commit install --hook-type commit-msg
+pre-commit install --hook-type pre-push
+```
+
+如需提前手动跑与 `pre-push` 一致的检查，优先执行：
+
+```bash
+MYPYPATH=backend_fastapi ./.venv/bin/python -m mypy --config-file pyproject.toml backend_fastapi/app/models backend_fastapi/app/schemas backend_fastapi/scripts/init_db.py scripts/hooks
+./.venv/bin/python -m pytest backend_fastapi/tests/unit backend_fastapi/tests/api backend_fastapi/tests/smoke -q
+cd mobile-frontend && npm run build:ios
+```
+
+说明：
+
+- `ios-app/EduMindIOS/EduMindIOS/WebAssets/` 已在 `pre-commit` 排除列表中，因为它们由 `bash ios-app/sync_ios_web_assets.sh` 同步生成。
+- 如确需跳过 hook，使用 `--no-verify`，但默认不建议这样做。
+
 ## Blitz / Codex CLI 开发工作流
 
 面向 Blitz、Codex CLI、Claude Code 等本地代码代理，当前仓库新增了 4 个统一脚本：
