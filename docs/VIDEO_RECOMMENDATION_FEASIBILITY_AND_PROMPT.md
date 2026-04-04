@@ -24,6 +24,7 @@
 
 - **站内**：从数据库按更新时间倒序加载**受限候选集**（由 `RECOMMENDATION_MAX_CANDIDATES_SCAN` 控制），为每条构建 `RecommendationProfile`（科目、标签、token、聚类），按场景 `home/continue/review/related` 打分排序，合并 `exclude_ids`、seed 相关推荐。
 - **站外（`include_external=true`）**：根据 `build_external_query_context` 生成查询文本，调用 `fetch_external_candidates_report`（多 provider HTML/搜索抓取，支持缓存、超时预算与失败摘要），再与站内混合 `select_combined_items`。
+- **同主题来源一致性**：`related` 场景除了主题/科目匹配，还应尽量继承 seed 视频的原始来源平台语境；若当前视频来自 B站/YouTube/慕课，站外候选排序与抓取顺序应优先同来源 provider，避免只“同主题”但链接风格失真。
 - **前端交互**：首页与推荐页默认可通过 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 控制是否首屏带站外抓取；推荐页“看同主题”会请求 `scene=related`，并在接口空结果或失败时用当前已加载的站内推荐做同主题兜底。
 - **动作分流**：站外候选根据 `can_import` / `action_type` 区分为“进入上传导入链路”或“打开原始来源页”，不会再把不可直接导入的候选伪装成已入库视频。
 - **兜底**：若无任何结果，按最近更新时间回退若干条并标记 `fallback_used`。
@@ -95,8 +96,9 @@
 
 1. **查询**：避免无条件 `query(Video).all()`；改为按场景 **限制候选集**（例如最近更新 N 条 + 状态过滤 + 可选 subject 预筛），或分页/游标；保留 `related` seed 逻辑正确性。
 2. **站外**：`include_external` 为 true 时，**并行或超时预算**明确；失败时站内结果仍返回；`external_providers` 必含可诊断信息。
-3. **配置**：在 `config.py` 增加例如 `RECOMMENDATION_MAX_CANDIDATES_SCAN`、`RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT`、`RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS`（命名可调整）。
-4. **契约**：`VideoRecommendationResponse` 与前端 `normalizeRecommendationItems` 字段一致（`items`、`external_query`、`external_providers`）。
+3. **同来源偏好**：`related` 场景若 seed 视频带外部 URL，应把来源平台纳入站外检索上下文与排序依据；至少保证同来源 provider 不会因固定顺序被提前截断。
+4. **配置**：在 `config.py` 增加例如 `RECOMMENDATION_MAX_CANDIDATES_SCAN`、`RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT`、`RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS`（命名可调整）。
+5. **契约**：`VideoRecommendationResponse` 与前端 `normalizeRecommendationItems` 字段一致（`items`、`external_query`、`external_providers`）；若已有来源偏好，还应把 `preferred_provider` 与 `preferred_provider_label` 一并返回给前端摘要区。
 
 ### 2.5 可选「推荐解释 Agent」
 

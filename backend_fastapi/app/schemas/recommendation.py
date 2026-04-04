@@ -78,6 +78,8 @@ class RecommendationExternalQuery(BaseModel):
     subject: str = Field(default="", description="本次检索聚焦科目")
     primary_topic: str = Field(default="", description="本次检索主主题")
     preferred_tags: List[str] = Field(default_factory=list, description="优先标签")
+    preferred_provider: str = Field(default="", description="相关推荐优先来源 provider")
+    preferred_provider_label: str = Field(default="", description="相关推荐优先来源展示名称")
 
 
 class RecommendationExternalProviderItem(BaseModel):

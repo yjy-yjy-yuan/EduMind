@@ -522,6 +522,9 @@ const uploadRecommendationQuerySummary = computed(() => {
   const query = normalizeRecommendationQuery(uploadRecommendationPayload.value)
   if (!query) return ''
   const parts = [query.subject, query.primary_topic].filter(Boolean)
+  if (query.preferred_provider_label) {
+    parts.push(`优先来源：${query.preferred_provider_label}`)
+  }
   if (Array.isArray(query.preferred_tags) && query.preferred_tags.length > 0) {
     parts.push(`优先标签：${query.preferred_tags.join('、')}`)
   }

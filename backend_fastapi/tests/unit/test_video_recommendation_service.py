@@ -48,6 +48,54 @@ def fake_fetch_external_candidates_report(*args, **kwargs):
     )
 
 
+def fake_fetch_external_candidates_report_with_provider_mix(*args, **kwargs):
+    """返回不同 provider 的同主题候选，便于验证来源偏好。"""
+    return ExternalCandidateFetchReport(
+        candidates=[
+            ExternalCandidate(
+                id="bilibili:BV1math",
+                provider="bilibili",
+                source_label="B站",
+                title="B站·导数与极限综合串讲",
+                external_url="https://www.bilibili.com/video/BV1math",
+                summary="同主题数学讲解，但来源不同。",
+                tags=["数学", "导数", "极限"],
+                subject="数学",
+                primary_topic="导数",
+                cluster_key="数学::导数",
+            ),
+            ExternalCandidate(
+                id="youtube:math123",
+                provider="youtube",
+                source_label="YouTube",
+                title="YouTube · Derivatives Review",
+                external_url="https://www.youtube.com/watch?v=math123",
+                summary="与当前微积分主题一致，并保持相同内容来源。",
+                tags=["数学", "导数", "微积分"],
+                subject="数学",
+                primary_topic="导数",
+                cluster_key="数学::导数",
+            ),
+        ],
+        providers=[
+            ExternalProviderFetchSummary(
+                provider="bilibili",
+                source_label="B站",
+                status="success",
+                candidate_count=1,
+                latency_ms=120,
+            ),
+            ExternalProviderFetchSummary(
+                provider="youtube",
+                source_label="YouTube",
+                status="success",
+                candidate_count=1,
+                latency_ms=140,
+            ),
+        ],
+    )
+
+
 def test_build_normalized_video_tags_prepends_subject_and_aliases():
     """归一化标签时应补上科目，并收敛常见别名。"""
     video = Video(
@@ -192,6 +240,40 @@ def test_recommend_videos_include_external_candidates(monkeypatch):
     assert any(item["provider"] == "bilibili" for item in payload["sources"])
     assert any(item["provider"] == "youtube" and item["status"] == "failed" for item in payload["external_providers"])
     assert payload["strategy"] == "video_status_interest_external_v2"
+
+
+def test_recommend_videos_related_prefers_same_provider_external_candidate(monkeypatch):
+    """相关推荐在主题接近时，也应优先保留与 seed 同来源的平台候选。"""
+    seed_video = Video(
+        id=24,
+        title="Derivatives Crash Course",
+        filename="derivatives.mp4",
+        filepath="/tmp/derivatives.mp4",
+        url="https://www.youtube.com/watch?v=seed999",
+        status=VideoStatus.COMPLETED,
+        summary="Review derivatives and limits for calculus.",
+        tags='["导数","极限","微积分"]',
+    )
+
+    monkeypatch.setattr(
+        recommendation_service,
+        "fetch_external_candidates_report",
+        fake_fetch_external_candidates_report_with_provider_mix,
+    )
+
+    payload = recommend_videos(
+        videos=[seed_video],
+        scene="related",
+        limit=2,
+        seed_video=seed_video,
+        include_external=True,
+    )
+
+    external_items = [item for item in payload["items"] if item.get("is_external") is True]
+    assert external_items[0]["provider"] == "youtube"
+    assert external_items[0]["reason_code"] == "external_source_match"
+    assert payload["external_query"]["preferred_provider"] == "youtube"
+    assert payload["external_query"]["preferred_provider_label"] == "YouTube"
 
 
 def test_recommend_videos_internal_items_include_open_detail_action():

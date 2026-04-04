@@ -1,5 +1,19 @@
 # 变更日志
 
+## 2026-04-04
+
+### 推荐同主题来源偏好与推荐页收口
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)、[`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)：`related` 场景会从 seed 视频 URL 推断优先来源 provider，并把该来源写入站外抓取缓存键、provider 抓取顺序、候选排序和 `external_query` 响应，避免同主题扩展时被异来源结果抢前。
+- 更新 [`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)：补充“同主题相关推荐优先同来源 provider” 的历史回归用例说明，固定当前推荐排序预期。
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)：首页/上传页会展示推荐查询中的“优先来源”；推荐页移除冗余路线/来源说明区，收口为“场景 -> 当前推荐 -> 同主题扩展”主流程，并在相关推荐卡片上直接展示来源徽标。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步当前 `build:ios` 产物，供 iOS `WKWebView` 加载最新推荐页结构。
+- 更新 [`docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：补充“相关推荐优先同来源 provider” 的当前行为说明，避免推荐文档仍停留在仅同主题、不含来源语境的旧描述。
+
+### Hook 与验证文档纠错（修正过时 pytest 说明）
+- 更新 [`scripts/hooks/pre_push.sh`](/Users/yuan/final-work/EduMind/scripts/hooks/pre_push.sh)、新增 [`scripts/validate_backend_smoke.py`](/Users/yuan/final-work/EduMind/scripts/validate_backend_smoke.py)：将推送前后端校验从 `pytest` 收敛为 `mypy + compileall + backend smoke validation + mobile build:ios`，与仓库“修改程序时禁止使用 pytest 验证”的现行规则保持一致。
+- 更新 [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)、[`backend_fastapi/README_RUN.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README_RUN.md)、[`backend_fastapi/tests/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)、[`backend_fastapi/CLAUDE.md`](/Users/yuan/final-work/EduMind/backend_fastapi/CLAUDE.md)：修正文档中仍把 `pytest` 写成当前默认验证命令的过时内容，统一改为现行 smoke/build/static-check 流程。
+- 对 2026-03-17 记录的更正说明：此前 `CHANGELOG.md` 与 `README.md` 中关于 `pre-push` 会运行 `pytest` 的描述已经过时；当前规则应以 `pre-push` 中实际执行的非-`pytest` 验证链路为准。
+
 ## 2026-04-01
 
 ### 新手使用指南与首页信息架构（Guide / Home / iOS WebAssets）

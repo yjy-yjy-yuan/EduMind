@@ -4,7 +4,7 @@
       <div class="hero__copy">
         <p class="hero__eyebrow">Recommendation Hub</p>
         <h1 class="hero__title">推荐学习中枢</h1>
-        <p class="hero__desc">先看站内主题，再扩到相近内容，最后把站外候选送回导入链路，让推荐动作本身也保持清晰和克制。</p>
+        <p class="hero__desc">先选学习场景，再直接决定下一步看什么；如果需要延展，就从当前卡片继续展开同主题内容。</p>
       </div>
       <div class="hero__actions">
         <button type="button" class="hero-btn hero-btn--ghost" @click="go('/upload')">去上传</button>
@@ -14,40 +14,14 @@
       </div>
       <div class="hero__stats">
         <div class="hero-stat"><span>场景</span><strong>{{ displayScenes.length }}</strong></div>
-        <div class="hero-stat"><span>主题</span><strong>{{ tagClusters.length }}</strong></div>
-        <div class="hero-stat"><span>入口</span><strong>{{ providerShortcuts.length }}</strong></div>
+        <div class="hero-stat"><span>结果</span><strong>{{ filteredSceneItems.length }}</strong></div>
+        <div class="hero-stat"><span>同主题</span><strong>{{ filteredRelatedItems.length }}</strong></div>
       </div>
       <div class="hero__notice">
-        <strong>这一页先帮你决定下一步学什么。</strong>
-        <span>站内内容会直接打开详情，站外候选只做元数据推荐，点击后会带着链接进入导入学习链路。</span>
+        <strong>这一页只保留推荐决策本身。</strong>
+        <span>站内内容可直接打开详情；站外候选会继续走导入学习链路，不再单独拆成说明卡片。</span>
       </div>
     </header>
-
-    <section class="panel panel--compact ios-card">
-      <div class="section-head">
-        <div>
-          <h2>推荐路线</h2>
-          <p>先看当前场景，再按标签收窄，最后把站外候选导回学习系统，避免推荐和学习流程脱节。</p>
-        </div>
-      </div>
-      <div class="journey-grid">
-        <article class="journey-card">
-          <span class="journey-card__step">01</span>
-          <strong class="journey-card__title">选当前场景</strong>
-          <span class="journey-card__desc">先决定是继续学习、复盘，还是围绕某条内容扩相关推荐。</span>
-        </article>
-        <article class="journey-card">
-          <span class="journey-card__step">02</span>
-          <strong class="journey-card__title">收窄主题</strong>
-          <span class="journey-card__desc">用标签把当前推荐范围收紧，避免在多个主题之间反复跳。</span>
-        </article>
-        <article class="journey-card">
-          <span class="journey-card__step">03</span>
-          <strong class="journey-card__title">导入站外候选</strong>
-          <span class="journey-card__desc">看准站外内容后直接导入，不把它误当成已入库视频。</span>
-        </article>
-      </div>
-    </section>
 
     <section class="panel ios-card">
       <div class="section-head">
@@ -82,123 +56,6 @@
     <section class="panel ios-card">
       <div class="section-head">
         <div>
-          <h2>标签主题</h2>
-          <p>先把当前推荐里已经浮现的学习主题收口，后续站外候选也会落在这里。</p>
-        </div>
-        <button v-if="selectedTag" type="button" class="panel-link" @click="selectedTag = ''">清除筛选</button>
-      </div>
-      <div v-if="tagClusters.length === 0" class="message">当前推荐里还没有足够的标签信号。</div>
-      <div v-else class="tag-grid">
-        <button
-          v-for="tag in tagClusters"
-          :key="tag.name"
-          type="button"
-          class="tag-card"
-          :class="{ 'tag-card--active': selectedTag === tag.name }"
-          @click="toggleTag(tag.name)"
-        >
-          <span class="tag-card__name">{{ tag.name }}</span>
-          <strong class="tag-card__count">{{ tag.count }}</strong>
-          <span class="tag-card__sample">{{ tag.sample }}</span>
-        </button>
-      </div>
-    </section>
-
-    <section class="panel panel--compact ios-card">
-      <div class="section-head">
-        <div>
-          <h2>当前推荐上下文</h2>
-          <p>切场景、筛主题和扩展相关推荐前，先确认你现在正在看的推荐范围。</p>
-        </div>
-        <span class="pill">{{ filteredSceneCountLabel }}</span>
-      </div>
-      <div class="context-grid">
-        <article class="context-card">
-          <span class="context-card__label">当前场景</span>
-          <strong class="context-card__value">{{ activeSceneOption.label }}</strong>
-          <span class="context-card__desc">{{ selectedTagSummary }}</span>
-        </article>
-        <article class="context-card">
-          <span class="context-card__label">相关推荐种子</span>
-          <strong class="context-card__value">{{ relatedSeed ? '已选种子' : '等待选择' }}</strong>
-          <span class="context-card__desc">{{ relatedSeedSummary }}</span>
-        </article>
-        <article class="context-card">
-          <span class="context-card__label">结果构成</span>
-          <strong class="context-card__value">{{ filteredSceneCountLabel }}</strong>
-          <span class="context-card__desc">{{ sceneMixSummary }}</span>
-        </article>
-      </div>
-      <div class="context-actions">
-        <button
-          v-if="selectedTag"
-          type="button"
-          class="context-action"
-          @click="selectedTag = ''"
-        >
-          清除主题
-        </button>
-        <button
-          v-if="relatedSeed"
-          type="button"
-          class="context-action"
-          @click="clearRelated"
-        >
-          清除相关推荐
-        </button>
-        <button type="button" class="context-action context-action--primary" @click="go('/upload')">导入新链接</button>
-      </div>
-    </section>
-
-    <section class="panel panel--compact ios-card">
-      <div class="section-head">
-        <div>
-          <h2>来源总览</h2>
-          <p>先确认这一屏推荐主要来自哪里，再决定是继续看站内内容还是导入站外候选。</p>
-        </div>
-      </div>
-      <div class="source-grid">
-        <article class="source-card">
-          <span class="source-card__label">站内内容</span>
-          <strong class="source-card__value">{{ internalItemCount }}</strong>
-          <span class="source-card__desc">已进入视频库，可直接打开详情继续学习。</span>
-        </article>
-        <article class="source-card source-card--soft">
-          <span class="source-card__label">站外候选</span>
-          <strong class="source-card__value">{{ externalItems.length }}</strong>
-          <span class="source-card__desc">点击后会带着链接进入导入学习链路。</span>
-        </article>
-        <article class="source-card">
-          <span class="source-card__label">来源平台</span>
-          <strong class="source-card__value">{{ externalSourceCount }}</strong>
-          <span class="source-card__desc">{{ externalSourceSummary }}</span>
-        </article>
-      </div>
-      <div v-if="activeExternalQuerySummary" class="message message--hint">
-        本轮站外检索围绕：{{ activeExternalQuerySummary }}
-      </div>
-      <div v-if="activeProviderReports.length > 0" class="provider-status-list">
-        <article
-          v-for="provider in activeProviderReports"
-          :key="`${activeScene}-${provider.provider}`"
-          class="provider-status-card"
-          :class="{
-            'provider-status-card--failed': provider.status === 'failed',
-            'provider-status-card--empty': provider.status === 'empty'
-          }"
-        >
-          <div class="provider-status-card__top">
-            <strong>{{ provider.source_label }}</strong>
-            <span>{{ providerStatusText(provider) }}</span>
-          </div>
-          <p>{{ providerStatusDetail(provider) }}</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="panel ios-card">
-      <div class="section-head">
-        <div>
           <h2>{{ activeSceneOption.label }}</h2>
           <p>{{ sceneDescriptionText }}</p>
         </div>
@@ -206,8 +63,24 @@
           {{ activeSceneLoading ? '刷新中…' : '刷新本场景' }}
         </button>
       </div>
+      <div class="scene-toolbar">
+        <span class="pill">{{ filteredSceneCountLabel }}</span>
+        <button v-if="selectedTag" type="button" class="panel-link" @click="selectedTag = ''">清除筛选：{{ selectedTag }}</button>
+      </div>
+      <div v-if="tagClusters.length > 0" class="mini-tags mini-tags--filter">
+        <button
+          v-for="tag in tagClusters"
+          :key="tag.name"
+          type="button"
+          class="mini-tag"
+          :class="{ 'mini-tag--active': selectedTag === tag.name }"
+          @click="toggleTag(tag.name)"
+        >
+          {{ tag.name }} · {{ tag.count }}
+        </button>
+      </div>
       <div v-if="filteredSceneExternalCount > 0" class="message message--hint">
-        当前场景里已混入 {{ filteredSceneExternalCount }} 条站外候选，点击后会先进入导入学习，不会直接当作站内视频播放。
+        当前场景里含 {{ filteredSceneExternalCount }} 条站外候选。点击后会继续走导入学习，不会直接当作站内视频播放。
       </div>
       <div v-if="activeSceneError" class="message message--error">
         <span>{{ activeSceneError }}</span>
@@ -302,6 +175,7 @@
           <article v-for="item in filteredRelatedItems" :key="item.key" class="related-card">
             <div class="related-card__copy">
               <span class="badge badge--reason">{{ item.reasonLabel }}</span>
+              <span class="badge" :class="item.sourceBadgeClass">{{ item.sourceLabel }}</span>
               <strong class="related-card__title">{{ item.title }}</strong>
               <p class="related-card__desc">{{ item.summaryText }}</p>
             </div>
@@ -311,58 +185,6 @@
           </article>
         </div>
       </template>
-    </section>
-
-    <section class="panel ios-card">
-      <div class="section-head">
-        <div>
-          <h2>站外候选入口</h2>
-          <p>这里不是直接播放区，而是把外部内容清晰地带回现有导入学习链路。</p>
-        </div>
-      </div>
-      <div class="message message--hint">
-        站外候选只展示推荐元数据。点“导入学习”后，会把链接带到上传页，再走现有下载、处理和复盘流程。
-      </div>
-      <div v-if="externalItems.length > 0" class="card-list">
-        <article v-for="item in externalItems" :key="item.key" class="external-card">
-          <div class="recommend-card__top">
-            <span class="badge badge--external">{{ item.sourceLabel }}</span>
-            <span class="badge badge--reason">{{ item.reasonLabel }}</span>
-          </div>
-          <strong class="related-card__title">{{ item.title }}</strong>
-          <p class="related-card__desc">{{ item.summaryText }}</p>
-          <div v-if="item.tags.length > 0" class="mini-tags">
-            <span v-for="tag in item.tags.slice(0, 3)" :key="`${item.key}-external-${tag}`" class="mini-tag">{{ tag }}</span>
-          </div>
-          <div class="recommend-card__meta">
-            <span>{{ item.sourceLabel }}</span>
-            <span v-if="item.timeText">{{ item.timeText }}</span>
-            <span v-if="item.subjectText">{{ item.subjectText }}</span>
-          </div>
-          <div v-if="item.importHint" class="recommend-card__hint">{{ item.importHint }}</div>
-          <button
-            type="button"
-            class="action-btn action-btn--primary"
-            :disabled="item.primaryActionDisabled"
-            @click="openRecommendation(item)"
-          >
-            {{ item.primaryActionLabel }}
-          </button>
-        </article>
-      </div>
-      <div v-else class="provider-grid">
-        <button
-          v-for="provider in providerShortcuts"
-          :key="provider.value"
-          type="button"
-          class="provider-card"
-          @click="openProviderUpload(provider)"
-        >
-          <span class="provider-card__name">{{ provider.label }}</span>
-          <span class="provider-card__desc">{{ provider.description }}</span>
-          <span class="provider-card__cta">去导入</span>
-        </button>
-      </div>
     </section>
   </div>
 </template>
@@ -384,12 +206,6 @@ const FALLBACK_SCENES = [
   { value: 'home', label: '首页推荐', description: '适合首页首屏，优先返回当前最值得继续处理或复盘的内容。', requires_seed: false },
   { value: 'continue', label: '继续学习', description: '优先返回处理中、失败待补跑和最近进入的视频。', requires_seed: false },
   { value: 'review', label: '复盘推荐', description: '优先返回已完成且更适合整理笔记的视频。', requires_seed: false }
-]
-
-const providerShortcuts = [
-  { value: 'bilibili', label: 'B站', description: '把课程或知识区链接直接送进现有导入链路。' },
-  { value: 'youtube', label: 'YouTube', description: '适合导入英文课程、公开讲座和频道内容。' },
-  { value: 'mooc', label: '中国大学慕课', description: '把课程页链接直接交给后端下载与处理。' }
 ]
 
 const router = useRouter()
@@ -552,25 +368,11 @@ const filteredRelatedItems = computed(() => {
   return !selectedTag.value ? items : items.filter((item) => item.tags.includes(selectedTag.value))
 })
 const activeSceneMeta = computed(() => sceneMetaMap.value[activeScene.value] || createRecommendationMeta())
-const externalItems = computed(() => allLoadedItems.value.filter((item) => isExternalItem(item)))
 const filteredSceneExternalCount = computed(() => filteredSceneItems.value.filter((item) => isExternalItem(item)).length)
-const filteredSceneInternalCount = computed(() => filteredSceneItems.value.length - filteredSceneExternalCount.value)
-const internalItemCount = computed(() => Math.max(allLoadedItems.value.length - externalItems.value.length, 0))
-const externalSourceLabels = computed(() => Array.from(new Set(externalItems.value.map((item) => item.sourceLabel).filter(Boolean))))
-const externalSourceCount = computed(() => externalSourceLabels.value.length)
-const externalSourceSummary = computed(() => {
-  if (externalSourceLabels.value.length === 0) return '当前还没有外部候选来源。'
-  return externalSourceLabels.value.join(' / ')
-})
 const activeSceneLoading = computed(() => Boolean(sceneLoadingMap.value[activeScene.value]))
 const activeSceneError = computed(() => String(sceneErrorMap.value[activeScene.value] || '').trim())
 const sceneDescriptionText = computed(() => selectedTag.value ? `当前已按“${selectedTag.value}”筛选 ${activeSceneOption.value.label}。` : activeSceneOption.value.description)
 const filteredSceneCountLabel = computed(() => `${filteredSceneItems.value.length} 条结果`)
-const selectedTagSummary = computed(() => selectedTag.value ? `已按“${selectedTag.value}”收窄当前推荐。` : '当前未加主题筛选。')
-const relatedSeedSummary = computed(() => {
-  if (!relatedSeed.value?.title) return '点一次“看同主题”后，这里会固定当前种子。'
-  return String(relatedSeed.value.title)
-})
 const relatedStatusMessage = computed(() => {
   if (!relatedSeed.value?.title) return ''
   if (relatedLoading.value) return `正在围绕《${relatedSeed.value.title}》加载同主题视频…`
@@ -578,43 +380,16 @@ const relatedStatusMessage = computed(() => {
   if (filteredRelatedItems.value.length > 0) return `已为《${relatedSeed.value.title}》加载 ${filteredRelatedItems.value.length} 条同主题推荐。`
   return ''
 })
-const sceneMixSummary = computed(() => {
-  if (filteredSceneItems.value.length === 0) return '等待当前场景返回推荐结果。'
-  if (filteredSceneExternalCount.value === 0) return `当前结果以 ${filteredSceneInternalCount.value} 条站内内容为主。`
-  if (filteredSceneInternalCount.value === 0) return `当前结果以 ${filteredSceneExternalCount.value} 条站外候选为主。`
-  return `站内 ${filteredSceneInternalCount.value} 条，站外 ${filteredSceneExternalCount.value} 条。`
-})
-const activeProviderReports = computed(() => activeSceneMeta.value.externalProviders || [])
-const activeExternalQuerySummary = computed(() => {
-  const query = activeSceneMeta.value.externalQuery
-  if (!query) return ''
-  const parts = [query.subject, query.primary_topic].filter(Boolean)
-  const tagText = Array.isArray(query.preferred_tags) && query.preferred_tags.length > 0 ? `优先标签：${query.preferred_tags.join('、')}` : ''
-  if (tagText) parts.push(tagText)
-  return parts.join(' · ')
-})
 
 const setSceneLoading = (scene, value) => { sceneLoadingMap.value = { ...sceneLoadingMap.value, [scene]: value } }
 const setSceneError = (scene, value) => { sceneErrorMap.value = { ...sceneErrorMap.value, [scene]: value } }
 const setSceneItems = (scene, items) => { sceneItemsMap.value = { ...sceneItemsMap.value, [scene]: items } }
 const setSceneMeta = (scene, payload) => { sceneMetaMap.value = { ...sceneMetaMap.value, [scene]: buildRecommendationMeta(payload) } }
 const toggleTag = (tag) => { selectedTag.value = selectedTag.value === tag ? '' : tag }
-const providerStatusText = (provider) => {
-  if (provider?.status === 'failed') return '抓取失败'
-  if (provider?.status === 'empty') return '暂无候选'
-  return `${Number(provider?.candidate_count || 0)} 条候选`
-}
 const activeExternalFetchBanner = computed(() => {
   if (!activeSceneMeta.value.externalFetchFailed) return ''
   return '部分站外来源未返回结果，站内推荐仍可使用。可检查网络后刷新，或通过环境变量 VITE_RECOMMENDATION_INCLUDE_EXTERNAL 控制是否默认拉取站外。'
 })
-
-const providerStatusDetail = (provider) => {
-  if (provider?.status === 'failed')
-    return String(provider?.error_message || '当前来源抓取失败，请检查网络或稍后刷新。')
-  if (provider?.status === 'empty') return `当前已检索，但没有返回可用候选。耗时 ${Number(provider?.latency_ms || 0)} ms`
-  return `本轮抓取耗时 ${Number(provider?.latency_ms || 0)} ms，可继续导入该来源内容。`
-}
 
 const scoreRelatedFallbackCandidate = (seedItem, candidate) => {
   if (!seedItem || !candidate || !candidate.id || candidate.id === seedItem.id) return -1
@@ -760,7 +535,6 @@ const clearRelated = () => {
 }
 
 const refreshActiveScene = async () => { await loadScene(activeScene.value, { force: true }) }
-const openProviderUpload = (provider) => router.push({ path: '/upload', query: { mode: 'url', source: provider.label } })
 
 const reloadAll = async () => {
   pageLoading.value = true
@@ -1099,6 +873,14 @@ onMounted(reloadAll)
   flex-wrap: wrap;
 }
 
+.scene-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .section-head h2 {
   margin: 0;
   font-size: 18px;
@@ -1202,6 +984,16 @@ onMounted(reloadAll)
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.mini-tags--filter .mini-tag {
+  border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+.mini-tag--active {
+  background: linear-gradient(135deg, rgba(95, 71, 126, 0.18), rgba(143, 115, 186, 0.24));
+  color: #4b3665;
+  border-color: rgba(143, 115, 186, 0.34);
 }
 
 .recommend-card__meta {

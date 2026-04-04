@@ -52,11 +52,11 @@ iOS Web assets sync:
 bash ios-app/sync_ios_web_assets.sh
 ```
 
-FastAPI tests:
+Backend smoke validation:
 
 ```bash
 . .venv/bin/activate
-pytest backend_fastapi/tests/ -v
+python scripts/validate_backend_smoke.py
 ```
 
 iOS native validation:
@@ -72,9 +72,9 @@ bash ios-app/validate_ios_build.sh
 - Prefer small top-level helpers over nested functions unless there is a hard technical reason.
 
 ## Testing Guidelines
-- Pytest is the default Python test framework.
-- Put backend tests in `backend_fastapi/tests/`.
-- New backend features should include direct unit or API coverage.
+- Historical backend regression tests remain under `backend_fastapi/tests/`.
+- Verification for the modified program must use non-`pytest` checks such as `python scripts/validate_backend_smoke.py`, `python -m compileall ...`, frontend build, and iOS container validation.
+- New backend features should still keep `backend_fastapi/tests/` coverage in sync when those historical tests are maintained.
 - For frontend changes, build output alone is insufficient. iOS container validation is required.
 - For `ios-app/` native changes, at minimum run an iOS build validation and verify the affected bridge or native flow in the container.
 

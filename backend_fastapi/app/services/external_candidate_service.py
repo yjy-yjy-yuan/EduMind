@@ -49,7 +49,7 @@ DUCKDUCKGO_RESULT_RE = re.compile(
     re.S,
 )
 EXTERNAL_CANDIDATE_REPORT_CACHE: dict[
-    tuple[str, str, tuple[str, ...], int], tuple[float, "ExternalCandidateFetchReport"]
+    tuple[str, str, tuple[str, ...], str, int], tuple[float, "ExternalCandidateFetchReport"]
 ] = {}
 
 
@@ -106,14 +106,16 @@ def build_external_cache_key(
     *,
     subject_hint: str = "",
     preferred_tags: Optional[list[str]] = None,
+    preferred_provider: str = "",
     limit: int = 3,
-) -> tuple[str, str, tuple[str, ...], int]:
+) -> tuple[str, str, tuple[str, ...], str, int]:
     """构建站外候选抓取缓存键。"""
     normalized_query = clean_text(query_text)
     normalized_subject = clean_text(subject_hint)
     normalized_tags = tuple(dedupe_keep_order(list(preferred_tags or [])))
+    normalized_provider = clean_text(preferred_provider).lower()
     normalized_limit = max(1, int(limit))
-    return normalized_query, normalized_subject, normalized_tags, normalized_limit
+    return normalized_query, normalized_subject, normalized_tags, normalized_provider, normalized_limit
 
 
 def clone_external_candidate(candidate: ExternalCandidate) -> ExternalCandidate:
@@ -166,6 +168,7 @@ def get_cached_external_candidate_report(
     *,
     subject_hint: str = "",
     preferred_tags: Optional[list[str]] = None,
+    preferred_provider: str = "",
     limit: int = 3,
 ) -> Optional[ExternalCandidateFetchReport]:
     """读取有效的站外候选抓取缓存。"""
@@ -173,6 +176,7 @@ def get_cached_external_candidate_report(
         query_text,
         subject_hint=subject_hint,
         preferred_tags=preferred_tags,
+        preferred_provider=preferred_provider,
         limit=limit,
     )
     cached = EXTERNAL_CANDIDATE_REPORT_CACHE.get(cache_key)
@@ -191,6 +195,7 @@ def set_cached_external_candidate_report(
     *,
     subject_hint: str = "",
     preferred_tags: Optional[list[str]] = None,
+    preferred_provider: str = "",
     limit: int = 3,
     report: ExternalCandidateFetchReport,
 ) -> None:
@@ -199,6 +204,7 @@ def set_cached_external_candidate_report(
         query_text,
         subject_hint=subject_hint,
         preferred_tags=preferred_tags,
+        preferred_provider=preferred_provider,
         limit=limit,
     )
     EXTERNAL_CANDIDATE_REPORT_CACHE[cache_key] = (monotonic(), clone_external_candidate_fetch_report(report))
@@ -656,6 +662,16 @@ EXTERNAL_CANDIDATE_ADAPTERS: tuple[ExternalCandidateAdapter, ...] = (
 )
 
 
+def get_ordered_external_candidate_adapters(preferred_provider: str = "") -> list[ExternalCandidateAdapter]:
+    """按期望平台排序 provider，优先把更贴近 seed 来源的平台提前。"""
+    normalized_provider = clean_text(preferred_provider).lower()
+    adapters = list(EXTERNAL_CANDIDATE_ADAPTERS)
+    if not normalized_provider:
+        return adapters
+    adapters.sort(key=lambda adapter: (0 if adapter.provider == normalized_provider else 1, adapter.provider))
+    return adapters
+
+
 def _run_adapter_search(
     adapter: ExternalCandidateAdapter,
     normalized_query: str,
@@ -714,14 +730,16 @@ def _fetch_report_parallel(
     *,
     subject_hint: str,
     preferred_tags: Optional[list[str]],
+    preferred_provider: str,
     limit: int,
 ) -> ExternalCandidateFetchReport:
     """并行抓取各 provider，总等待时间有上限。"""
     per_provider_limit = 1 if limit <= 3 else 2
     wall_timeout = float(getattr(settings, "RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS", 8.0)) + 0.5
+    ordered_adapters = get_ordered_external_candidate_adapters(preferred_provider)
     results_by_provider: dict[str, tuple[ExternalProviderFetchSummary, list[ExternalCandidate]]] = {}
 
-    with ThreadPoolExecutor(max_workers=len(EXTERNAL_CANDIDATE_ADAPTERS)) as executor:
+    with ThreadPoolExecutor(max_workers=len(ordered_adapters)) as executor:
         future_to_adapter = {
             executor.submit(
                 _run_adapter_search,
@@ -731,7 +749,7 @@ def _fetch_report_parallel(
                 preferred_tags=preferred_tags,
                 per_provider_limit=per_provider_limit,
             ): adapter
-            for adapter in EXTERNAL_CANDIDATE_ADAPTERS
+            for adapter in ordered_adapters
         }
         done, not_done = wait(future_to_adapter.keys(), timeout=wall_timeout)
         for future in done:
@@ -758,7 +776,7 @@ def _fetch_report_parallel(
     provider_summaries: list[ExternalProviderFetchSummary] = []
     candidates: list[ExternalCandidate] = []
     seen_urls: set[str] = set()
-    for adapter in EXTERNAL_CANDIDATE_ADAPTERS:
+    for adapter in ordered_adapters:
         summary, provider_items = results_by_provider.get(
             adapter.provider,
             (
@@ -785,6 +803,7 @@ def _fetch_report_sequential(
     *,
     subject_hint: str,
     preferred_tags: Optional[list[str]],
+    preferred_provider: str,
     limit: int,
 ) -> ExternalCandidateFetchReport:
     """串行抓取（与旧行为一致，便于对照）。"""
@@ -792,7 +811,7 @@ def _fetch_report_sequential(
     provider_summaries: list[ExternalProviderFetchSummary] = []
     seen_urls: set[str] = set()
     per_provider_limit = 1 if limit <= 3 else 2
-    for adapter in EXTERNAL_CANDIDATE_ADAPTERS:
+    for adapter in get_ordered_external_candidate_adapters(preferred_provider):
         summary, provider_items = _run_adapter_search(
             adapter,
             normalized_query,
@@ -831,6 +850,7 @@ def fetch_external_candidates_report(
     *,
     subject_hint: str = "",
     preferred_tags: Optional[list[str]] = None,
+    preferred_provider: str = "",
     limit: int = 3,
 ) -> ExternalCandidateFetchReport:
     """按统一接口抓取站外候选元数据并返回 provider 摘要。"""
@@ -841,6 +861,7 @@ def fetch_external_candidates_report(
         normalized_query,
         subject_hint=subject_hint,
         preferred_tags=preferred_tags,
+        preferred_provider=preferred_provider,
         limit=limit,
     )
     if cached_report is not None:
@@ -851,6 +872,7 @@ def fetch_external_candidates_report(
             normalized_query,
             subject_hint=subject_hint,
             preferred_tags=preferred_tags,
+            preferred_provider=preferred_provider,
             limit=limit,
         )
     else:
@@ -858,12 +880,14 @@ def fetch_external_candidates_report(
             normalized_query,
             subject_hint=subject_hint,
             preferred_tags=preferred_tags,
+            preferred_provider=preferred_provider,
             limit=limit,
         )
     set_cached_external_candidate_report(
         normalized_query,
         subject_hint=subject_hint,
         preferred_tags=preferred_tags,
+        preferred_provider=preferred_provider,
         limit=limit,
         report=report,
     )

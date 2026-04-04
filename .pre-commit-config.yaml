@@ -2,12 +2,14 @@ minimum_pre_commit_version: "3.6.0"
 default_stages: [pre-commit]
 exclude: |
   (?x)^(
+    \.agents/|
     \.git/|
     \.venv/|
     \.xcode-derived/|
     backend_fastapi/uploads/|
     ios-app/EduMindIOS/EduMindIOS/WebAssets/|
     mobile-frontend/dist/|
+    mobile-frontend/\.idea/|
     mobile-frontend/node_modules/
   )
 

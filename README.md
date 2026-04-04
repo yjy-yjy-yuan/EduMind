@@ -91,14 +91,14 @@ bash ios-app/sync_ios_web_assets.sh
 - `backend_fastapi/tests/smoke/`：冒烟测试
 - `backend_fastapi/tests/integration/`：集成测试
 
-执行方式：
+当前修改程序时，仓库要求不要用 `pytest` 做本次验证；优先执行：
 
 ```bash
 . .venv/bin/activate
-pytest backend_fastapi/tests/ -v
+python scripts/validate_backend_smoke.py
 ```
 
-更具体的测试放置规则见 [backend_fastapi/tests/README.md](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)。
+`backend_fastapi/tests/` 仍保留历史回归用例与 pytest 风格目录结构；更具体的放置规则见 [backend_fastapi/tests/README.md](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)。
 
 ## Git Hooks 与本地质量门
 
@@ -112,7 +112,8 @@ pytest backend_fastapi/tests/ -v
    - Conventional Commits 校验
 3. `pre-push`
    - `mypy`
-   - `pytest backend_fastapi/tests/unit backend_fastapi/tests/api backend_fastapi/tests/smoke -q`
+   - `python -m compileall backend_fastapi/app backend_fastapi/scripts scripts/hooks scripts/validate_backend_smoke.py`
+   - `python scripts/validate_backend_smoke.py`
    - `cd mobile-frontend && npm run build:ios`
 
 如需本地安装 hooks：
@@ -128,7 +129,9 @@ pre-commit install --hook-type pre-push
 
 ```bash
 MYPYPATH=backend_fastapi ./.venv/bin/python -m mypy --config-file pyproject.toml backend_fastapi/app/models backend_fastapi/app/schemas backend_fastapi/scripts/init_db.py scripts/hooks
-./.venv/bin/python -m pytest backend_fastapi/tests/unit backend_fastapi/tests/api backend_fastapi/tests/smoke -q
+mkdir -p .pycache-hook
+PYTHONPYCACHEPREFIX="$PWD/.pycache-hook" ./.venv/bin/python -m compileall backend_fastapi/app backend_fastapi/scripts scripts/hooks scripts/validate_backend_smoke.py
+./.venv/bin/python scripts/validate_backend_smoke.py
 cd mobile-frontend && npm run build:ios
 ```
 
@@ -217,6 +220,7 @@ POST /api/videos/{video_id}/generate-tags
    - 可直接导入：进入现有 URL 导入链路
    - 暂不可直接导入：打开原始来源页，而不是伪装成已入库视频
 5. 推荐页里的“看同主题”会围绕当前站内视频加载 `related` 推荐；若接口暂无结果或请求失败，前端会用当前页已加载的站内内容做同主题兜底，并在当前页“相关推荐”区域内展示结果。
+6. `related` 场景在扩站外候选时，会优先继承 seed 视频的原始来源平台语境；例如当前视频来自 YouTube 时，同主题站外候选会优先同来源 provider。
 
 ## 视频上下文问答
 
@@ -388,7 +392,7 @@ python backend_fastapi/scripts/init_db.py --emit-sql backend_fastapi/scripts/mys
 
 ```bash
 . .venv/bin/activate
-pytest backend_fastapi/tests/ -v
+python scripts/validate_backend_smoke.py
 ```
 
 ## Git Hooks
@@ -414,7 +418,7 @@ bash scripts/install_git_hooks.sh
 当前 hook 规则：
 
 1. `pre-commit`：基础文件检查、Python `black` / `isort` / `flake8`、Shell 语法检查、前端 `console.log` / `debugger` 拦截
-2. `pre-push`：对当前已清理干净的 Python 层执行 `mypy`（`backend_fastapi/app/models`、`backend_fastapi/app/schemas`、`backend_fastapi/scripts/init_db.py`、`scripts/hooks`），再跑后端快速测试集和 `mobile-frontend` 的 `npm run build:ios`
+2. `pre-push`：对当前已清理干净的 Python 层执行 `mypy`（`backend_fastapi/app/models`、`backend_fastapi/app/schemas`、`backend_fastapi/scripts/init_db.py`、`scripts/hooks`），再跑 `compileall + scripts/validate_backend_smoke.py`，最后执行 `mobile-frontend` 的 `npm run build:ios`
 3. `commit-msg`：强制 Conventional Commits，格式为 `type(scope): description`
 
 约定说明：

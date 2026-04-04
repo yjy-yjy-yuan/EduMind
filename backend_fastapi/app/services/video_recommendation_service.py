@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Iterable
 from typing import Optional
 from urllib.parse import urlencode
+from urllib.parse import urlparse
 
 from app.models.user import User
 from app.models.video import Video
@@ -70,6 +71,16 @@ STOP_TOKENS = {
     "精讲",
     "总结",
 }
+PROVIDER_HOST_KEYWORDS = {
+    "bilibili": ("bilibili.com", "b23.tv"),
+    "youtube": ("youtube.com", "youtu.be"),
+    "icourse163": ("icourse163.org",),
+}
+PROVIDER_SOURCE_LABELS = {
+    "bilibili": "B站",
+    "youtube": "YouTube",
+    "icourse163": "中国大学慕课",
+}
 
 
 @dataclass
@@ -91,6 +102,7 @@ class ExternalQueryContext:
     subject: str
     primary_topic: str
     preferred_tags: list[str]
+    preferred_provider: str
 
 
 @dataclass
@@ -101,6 +113,7 @@ class RecommendationQuerySummary:
     subject: str
     primary_topic: str
     preferred_tags: list[str]
+    preferred_provider: str
 
 
 @dataclass
@@ -239,6 +252,18 @@ def extract_user_subject(user: Optional[User]) -> str:
     )
 
 
+def infer_preferred_provider_from_url(url: Optional[str]) -> str:
+    """从原始视频链接推断更贴近当前内容语境的站外平台。"""
+    parsed = urlparse(str(url or "").strip())
+    hostname = parsed.netloc.lower()
+    if not hostname:
+        return ""
+    for provider, host_keywords in PROVIDER_HOST_KEYWORDS.items():
+        if any(keyword in hostname for keyword in host_keywords):
+            return provider
+    return ""
+
+
 def build_recommendation_profile(video: Video) -> RecommendationProfile:
     """构建推荐排序使用的视频画像。"""
     normalized_tags = build_normalized_video_tags(video)
@@ -323,8 +348,16 @@ def build_external_reason(
     same_subject: bool,
     seed_overlap: list[str],
     interest_overlap: list[str],
+    same_provider: bool,
 ) -> tuple[str, str, str]:
     """构建站外候选推荐理由。"""
+    if scene == "related" and seed_video is not None and same_provider:
+        return (
+            "external_source_match",
+            "同来源延伸",
+            f"与《{seed_video.title or '当前视频'}》来自同一内容来源，延续当前频道语境更自然。",
+        )
+
     if scene == "related" and seed_video is not None and seed_overlap:
         topic_text = "、".join(seed_overlap[:2])
         return (
@@ -450,12 +483,14 @@ def score_external_candidate(
     user_subject: str,
     focus_subject: str,
     focus_tags: list[str],
+    preferred_provider: str,
 ) -> tuple[float, str, str, str]:
     """对站外候选打分。"""
     candidate_tokens = unique_tokens([candidate.title, candidate.summary, candidate.author, *candidate.tags])
     interest_overlap = [token for token in user_tokens if token in candidate_tokens]
     seed_overlap = []
     same_subject = False
+    same_provider = bool(preferred_provider and candidate.provider == preferred_provider)
     if seed_profile is not None:
         seed_tokens = set(seed_profile.tokens)
         seed_overlap = [token for token in candidate_tokens if token in seed_tokens]
@@ -470,10 +505,18 @@ def score_external_candidate(
         score += len(seed_overlap) * 18
         if same_subject:
             score += 20
+        if same_provider:
+            score += 28
+        elif preferred_provider:
+            score -= 8
     elif scene == "review":
         score = 62
+        if same_provider:
+            score += 8
     elif scene == "continue":
         score = 58
+        if same_provider:
+            score += 10
 
     score += len(tag_overlap) * 10
     score += len(interest_overlap) * 12
@@ -493,6 +536,7 @@ def score_external_candidate(
         same_subject=same_subject,
         seed_overlap=seed_overlap,
         interest_overlap=interest_overlap,
+        same_provider=same_provider,
     )
     return score, reason_code, reason_label, reason_text
 
@@ -605,12 +649,14 @@ def build_external_query_context(
 ) -> ExternalQueryContext:
     """为站外候选推导搜索上下文。"""
     if seed_video is not None and seed_profile is not None:
+        preferred_provider = infer_preferred_provider_from_url(seed_video.url)
         query_text = " ".join(part for part in [seed_profile.subject, seed_profile.primary_topic] if part).strip()
         return ExternalQueryContext(
             query_text=query_text or (seed_video.title or "学习课程"),
             subject=seed_profile.subject,
             primary_topic=seed_profile.primary_topic,
             preferred_tags=seed_profile.tags[:4],
+            preferred_provider=preferred_provider,
         )
 
     ordered_profiles = [profiles[video.id] for video in videos if video.id in profiles]
@@ -640,6 +686,7 @@ def build_external_query_context(
         subject=focus_subject,
         primary_topic=primary_topic,
         preferred_tags=preferred_tags,
+        preferred_provider="",
     )
 
 
@@ -650,12 +697,15 @@ def serialize_query_summary(query_context: ExternalQueryContext) -> dict:
         subject=query_context.subject,
         primary_topic=query_context.primary_topic,
         preferred_tags=list(query_context.preferred_tags),
+        preferred_provider=query_context.preferred_provider,
     )
     return {
         "query_text": summary.query_text,
         "subject": summary.subject,
         "primary_topic": summary.primary_topic,
         "preferred_tags": summary.preferred_tags,
+        "preferred_provider": summary.preferred_provider,
+        "preferred_provider_label": PROVIDER_SOURCE_LABELS.get(summary.preferred_provider, ""),
     }
 
 
@@ -794,6 +844,7 @@ def build_ranked_external_items(
         query_context.query_text,
         subject_hint=query_context.subject,
         preferred_tags=query_context.preferred_tags,
+        preferred_provider=query_context.preferred_provider,
         limit=max(1, limit),
     )
     ranked_items = []
@@ -807,6 +858,7 @@ def build_ranked_external_items(
             user_subject=user_subject,
             focus_subject=query_context.subject,
             focus_tags=query_context.preferred_tags,
+            preferred_provider=query_context.preferred_provider,
         )
         ranked_items.append(
             (
