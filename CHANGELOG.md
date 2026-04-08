@@ -2,6 +2,13 @@
 
 ## 2026-04-08 (续续续续续续续续续续续续)
 
+### 语义搜索 query key 与「已索引」文案收口
+- **mobile-frontend**：`Search.vue` 使用 `route.query[SEARCH_ROUTE_SCOPE_QUERY]` 读取 scope，与首页 `router.push` 的 query key 一致；移除 `SEARCH_ROUTE_SCOPE_ALL`，与 `scope=` 取值统一为 `DEFAULT_SEARCH_SCOPE`；`SEARCH_COPY_ALL_SCOPE_HINT` 与首页说明同源，跨视频表述统一为「已索引」语义；搜索页输入框占位、锁定角标、通用空态、搜索/加载/重试文案迁入 `searchDefaults.js`。
+- **（续）**：`Search.vue` 的搜索结果标题、无结果提示、当前视频标签、预览兜底与“点击播放此片段”提示继续收口到 `searchDefaults.js` 与计算属性；`Home.vue` 搜索按钮文案复用 `SEARCH_COPY_SEARCH_BUTTON`，保证首页与搜索页一致。
+
+### 语义搜索文案与默认范围常量
+- **mobile-frontend**：首页跨视频搜索区块标题、说明与占位符迁入 `src/config/searchDefaults.js`（`SEARCH_COPY_HOME_*`），与搜索页「在我的全部视频中搜索」表述对齐；`Search.vue` 中 `scope=all` 与 `v-model` 取值统一使用 `DEFAULT_SEARCH_SCOPE`（`all`），避免魔法字符串散落。
+
 ### 首页跨视频语义搜索入口
 - **mobile-frontend**：`Home.vue` 增加「跨视频语义搜索」入口，跳转 `/search?scope=all`；`Search.vue` 识别 `scope=all` 默认全视频范围，范围选项文案为「在我的全部视频中搜索」；集中默认 `limit`/`threshold`（`src/config/searchDefaults.js`）；当后端返回 `message` 且结果为空时展示「去上传 / 视频库 / 当前视频详情」引导；`503`（未启用语义搜索）展示可读说明；`api/search.js` 默认参数与上述常量一致。
 - **（续）**：首页改为内嵌搜索框（说明为在「我的全部视频」范围内搜索），支持带关键词跳转 `/search?scope=all&q=…`；`scope=all` 时搜索页锁定为「全部视频」、隐藏「当前视频」切换并展示固定范围条；`q` 与本地缓存恢复顺序已处理。

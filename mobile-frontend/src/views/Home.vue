@@ -40,8 +40,8 @@
       </div>
 
       <div class="home-semantic-search">
-        <label class="home-semantic-search__label" for="home-semantic-search-input">跨视频语义搜索</label>
-        <p class="home-semantic-search__scope">在「我的全部视频」范围内按含义查找（已索引内容）</p>
+        <label class="home-semantic-search__label" for="home-semantic-search-input">{{ SEARCH_COPY_HOME_SEMANTIC_TITLE }}</label>
+        <p class="home-semantic-search__scope">{{ SEARCH_COPY_HOME_SEMANTIC_DESCRIPTION }}</p>
         <div class="home-semantic-search__row">
           <input
             id="home-semantic-search-input"
@@ -50,10 +50,12 @@
             type="search"
             enterkeyhint="search"
             autocomplete="off"
-            placeholder="输入关键词，在全部视频中搜索…"
+            :placeholder="SEARCH_COPY_HOME_INPUT_PLACEHOLDER"
             @keyup.enter="submitHomeSemanticSearch"
           />
-          <button type="button" class="home-semantic-search__btn" @click="submitHomeSemanticSearch">搜索</button>
+          <button type="button" class="home-semantic-search__btn" @click="submitHomeSemanticSearch">
+            {{ SEARCH_COPY_SEARCH_BUTTON }}
+          </button>
         </div>
       </div>
 
@@ -254,8 +256,12 @@ import BrandLogo from '@/components/BrandLogo.vue'
 import { getVideoRecommendations } from '@/api/recommendation'
 import { shouldIncludeExternalRecommendationsByDefault } from '@/config'
 import {
+  DEFAULT_SEARCH_SCOPE,
+  SEARCH_COPY_HOME_INPUT_PLACEHOLDER,
+  SEARCH_COPY_HOME_SEMANTIC_DESCRIPTION,
+  SEARCH_COPY_HOME_SEMANTIC_TITLE,
+  SEARCH_COPY_SEARCH_BUTTON,
   SEARCH_ROUTE_PREFILL_QUERY,
-  SEARCH_ROUTE_SCOPE_ALL,
   SEARCH_ROUTE_SCOPE_QUERY
 } from '@/config/searchDefaults'
 import {
@@ -449,7 +455,7 @@ const submitHomeSemanticSearch = () => {
   router.push({
     path: '/search',
     query: {
-      [SEARCH_ROUTE_SCOPE_QUERY]: SEARCH_ROUTE_SCOPE_ALL,
+      [SEARCH_ROUTE_SCOPE_QUERY]: DEFAULT_SEARCH_SCOPE,
       ...(q ? { [SEARCH_ROUTE_PREFILL_QUERY]: q } : {})
     }
   })

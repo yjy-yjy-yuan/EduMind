@@ -6,7 +6,7 @@
           v-model="query"
           type="text"
           class="search-input"
-          placeholder="输入搜索关键词..."
+          :placeholder="searchInputPlaceholder"
           :disabled="isSearching"
           @keyup.enter="handleSearch"
         />
@@ -14,7 +14,7 @@
           ✕
         </button>
         <button class="search-btn" :disabled="!query.trim() || isSearching" @click="handleSearch">
-          {{ isSearching ? '搜索中...' : '搜索' }}
+          {{ isSearching ? searchCopySearching : searchCopySearchButton }}
         </button>
       </div>
 
@@ -30,31 +30,31 @@
           <span>{{ currentVideoLabel }}</span>
         </label>
         <label class="scope-option">
-          <input v-model="searchScope" type="radio" value="all" name="scope" />
+          <input v-model="searchScope" type="radio" :value="defaultSearchScope" name="scope" />
           <span>{{ searchCopyAllScopeHint }}</span>
         </label>
       </div>
       <div v-else class="search-scope-locked">
         <span class="search-scope-locked__text">{{ searchCopyAllScopeHint }}</span>
-        <span class="search-scope-locked__badge">全部视频</span>
+        <span class="search-scope-locked__badge">{{ searchCopyScopeLockedBadge }}</span>
       </div>
     </div>
 
     <div class="search-results-container">
       <div v-if="!hasSearched" class="search-state empty-state">
         <div class="empty-icon">🔍</div>
-        <p>{{ isLockedToAllScope ? searchCopyEmptyStateScopeAll : '输入关键词开始搜索' }}</p>
+        <p>{{ isLockedToAllScope ? searchCopyEmptyStateScopeAll : searchCopyEmptyStateGeneric }}</p>
       </div>
 
       <div v-else-if="isSearching" class="search-state loading-state">
         <div class="spinner"></div>
-        <p>搜索中...</p>
+        <p>{{ searchCopySearching }}</p>
       </div>
 
       <div v-else-if="error" class="search-state error-state">
         <div class="error-icon">⚠️</div>
         <p>{{ error }}</p>
-        <button class="retry-btn" @click="handleSearch">重试</button>
+        <button class="retry-btn" @click="handleSearch">{{ searchCopyRetry }}</button>
       </div>
 
       <div v-else-if="results.length === 0" class="search-state empty-result">
@@ -72,16 +72,16 @@
         </template>
         <template v-else>
           <div class="empty-icon">😕</div>
-          <p>未找到与“{{ query }}”相关的内容</p>
+          <p>{{ noResultsText }}</p>
         </template>
       </div>
 
       <div v-else class="results-list">
         <div class="results-header">
-          <p>{{ searchScope === 'current' ? `搜索结果（${results.length} 条）` : `跨视频搜索结果（${results.length} 条）` }}</p>
+          <p>{{ resultsHeaderText }}</p>
         </div>
 
-        <template v-if="searchScope === 'all'">
+        <template v-if="searchScope === defaultSearchScope">
           <div v-for="group in groupedResults" :key="group.videoId" class="result-group">
             <div class="result-group-title">{{ group.videoTitle }}</div>
             <button
@@ -119,7 +119,7 @@
               </div>
 
               <div class="result-cta">
-                <span class="play-hint">👉 点击播放此片段</span>
+                <span class="play-hint">👉 {{ searchCopyPlayHint }}</span>
               </div>
             </button>
           </div>
@@ -161,7 +161,7 @@
             </div>
 
             <div class="result-cta">
-              <span class="play-hint">👉 点击播放此片段</span>
+              <span class="play-hint">👉 {{ searchCopyPlayHint }}</span>
             </div>
           </button>
         </template>
@@ -176,11 +176,28 @@ import { useRoute, useRouter } from 'vue-router'
 import { semanticSearch } from '@/api/search'
 import {
   DEFAULT_SEARCH_LIMIT,
+  DEFAULT_SEARCH_SCOPE,
   DEFAULT_SEARCH_THRESHOLD,
   SEARCH_COPY_ALL_SCOPE_HINT,
+  SEARCH_COPY_CURRENT_VIDEO_LABEL_FALLBACK,
+  SEARCH_COPY_CURRENT_VIDEO_LABEL_NO_CONTEXT,
+  SEARCH_COPY_CURRENT_VIDEO_LABEL_PREFIX,
+  SEARCH_COPY_EMPTY_STATE_GENERIC,
   SEARCH_COPY_EMPTY_STATE_SCOPE_ALL,
   SEARCH_COPY_NO_INDEX_GUIDE,
-  SEARCH_ROUTE_PREFILL_QUERY
+  SEARCH_COPY_NO_RESULTS_TEMPLATE,
+  SEARCH_COPY_PAGE_INPUT_PLACEHOLDER_ALL,
+  SEARCH_COPY_PAGE_INPUT_PLACEHOLDER_CURRENT,
+  SEARCH_COPY_PLAY_HINT,
+  SEARCH_COPY_PREVIEW_FALLBACK,
+  SEARCH_COPY_RETRY,
+  SEARCH_COPY_RESULTS_HEADER_ALL,
+  SEARCH_COPY_RESULTS_HEADER_CURRENT,
+  SEARCH_COPY_SCOPE_LOCKED_BADGE,
+  SEARCH_COPY_SEARCHING,
+  SEARCH_COPY_SEARCH_BUTTON,
+  SEARCH_ROUTE_PREFILL_QUERY,
+  SEARCH_ROUTE_SCOPE_QUERY
 } from '@/config/searchDefaults'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
@@ -212,18 +229,22 @@ export default {
       const parsed = Number.parseInt(String(raw), 10)
       return Number.isFinite(parsed) ? parsed : null
     })
-    const scopeQuery = computed(() => String(route.query.scope || '').toLowerCase())
-    const isLockedToAllScope = computed(() => scopeQuery.value === 'all')
+    const scopeQuery = computed(() =>
+      String(route.query[SEARCH_ROUTE_SCOPE_QUERY] ?? '').toLowerCase()
+    )
+    const isLockedToAllScope = computed(() => scopeQuery.value === DEFAULT_SEARCH_SCOPE)
     const currentVideoTitle = computed(() => String(route.query.videoTitle || '').trim())
     const hasCurrentVideoContext = computed(() => currentVideoId.value !== null)
     const currentVideoLabel = computed(() => {
-      if (!hasCurrentVideoContext.value) return '当前视频（需从详情页进入）'
-      return currentVideoTitle.value ? `当前视频：${currentVideoTitle.value}` : '当前视频'
+      if (!hasCurrentVideoContext.value) return SEARCH_COPY_CURRENT_VIDEO_LABEL_NO_CONTEXT
+      return currentVideoTitle.value
+        ? `${SEARCH_COPY_CURRENT_VIDEO_LABEL_PREFIX}${currentVideoTitle.value}`
+        : SEARCH_COPY_CURRENT_VIDEO_LABEL_FALLBACK
     })
     const initialSearchScope = () => {
-      if (scopeQuery.value === 'all') return 'all'
+      if (scopeQuery.value === DEFAULT_SEARCH_SCOPE) return DEFAULT_SEARCH_SCOPE
       if (scopeQuery.value === 'current' && hasCurrentVideoContext.value) return 'current'
-      return hasCurrentVideoContext.value ? 'current' : 'all'
+      return hasCurrentVideoContext.value ? 'current' : DEFAULT_SEARCH_SCOPE
     }
     const searchScope = ref(initialSearchScope())
     const indexEmptyHint = ref('')
@@ -254,6 +275,19 @@ export default {
         return { videoId, videoTitle, items }
       })
     })
+    const searchInputPlaceholder = computed(() =>
+      searchScope.value === DEFAULT_SEARCH_SCOPE
+        ? SEARCH_COPY_PAGE_INPUT_PLACEHOLDER_ALL
+        : SEARCH_COPY_PAGE_INPUT_PLACEHOLDER_CURRENT
+    )
+    const resultsHeaderText = computed(() => {
+      const label =
+        searchScope.value === 'current' ? SEARCH_COPY_RESULTS_HEADER_CURRENT : SEARCH_COPY_RESULTS_HEADER_ALL
+      return `${label}（${results.value.length} 条）`
+    })
+    const noResultsText = computed(() =>
+      SEARCH_COPY_NO_RESULTS_TEMPLATE.replace('{query}', query.value)
+    )
 
     const formatTime = (seconds) => {
       const total = Math.max(0, Math.round(Number(seconds || 0)))
@@ -276,7 +310,7 @@ export default {
       if (result.preview_text && result.preview_text.trim()) {
         return result.preview_text
       }
-      return '（暂无文本预览）'
+      return SEARCH_COPY_PREVIEW_FALLBACK
     }
 
     const persistSearchState = () => {
@@ -309,10 +343,11 @@ export default {
       error.value = typeof cached.error === 'string' ? cached.error : ''
       hasSearched.value = Boolean(cached.hasSearched)
 
-      if (scopeQuery.value === 'all') {
-        searchScope.value = 'all'
+      if (scopeQuery.value === DEFAULT_SEARCH_SCOPE) {
+        searchScope.value = DEFAULT_SEARCH_SCOPE
       } else {
-        const nextScope = cached.searchScope === 'current' && hasCurrentVideoContext.value ? 'current' : 'all'
+        const nextScope =
+          cached.searchScope === 'current' && hasCurrentVideoContext.value ? 'current' : DEFAULT_SEARCH_SCOPE
         searchScope.value = nextScope
       }
       applyRoutePrefill()
@@ -400,34 +435,44 @@ export default {
     watch(
       () => scopeQuery.value,
       (s) => {
-        if (s === 'all') {
-          searchScope.value = 'all'
+        if (s === DEFAULT_SEARCH_SCOPE) {
+          searchScope.value = DEFAULT_SEARCH_SCOPE
         }
       },
       { immediate: true }
     )
 
     watch(searchScope, (next) => {
-      if (isLockedToAllScope.value && next !== 'all') {
-        searchScope.value = 'all'
+      if (isLockedToAllScope.value && next !== DEFAULT_SEARCH_SCOPE) {
+        searchScope.value = DEFAULT_SEARCH_SCOPE
         return
       }
       if (next === 'current' && !hasCurrentVideoContext.value) {
-        searchScope.value = 'all'
+        searchScope.value = DEFAULT_SEARCH_SCOPE
         return
       }
       persistSearchState()
     })
 
     return {
+      defaultSearchScope: DEFAULT_SEARCH_SCOPE,
       currentVideoLabel,
       goCurrentVideo,
       indexEmptyHint,
       isLockedToAllScope,
       router,
       searchCopyAllScopeHint: SEARCH_COPY_ALL_SCOPE_HINT,
+      searchCopyEmptyStateGeneric: SEARCH_COPY_EMPTY_STATE_GENERIC,
       searchCopyEmptyStateScopeAll: SEARCH_COPY_EMPTY_STATE_SCOPE_ALL,
       searchCopyNoIndexGuide: SEARCH_COPY_NO_INDEX_GUIDE,
+      searchCopyPlayHint: SEARCH_COPY_PLAY_HINT,
+      searchCopyRetry: SEARCH_COPY_RETRY,
+      searchCopyScopeLockedBadge: SEARCH_COPY_SCOPE_LOCKED_BADGE,
+      searchCopySearching: SEARCH_COPY_SEARCHING,
+      searchCopySearchButton: SEARCH_COPY_SEARCH_BUTTON,
+      searchInputPlaceholder,
+      noResultsText,
+      resultsHeaderText,
       error,
       formatTime,
       getPreviewText,
