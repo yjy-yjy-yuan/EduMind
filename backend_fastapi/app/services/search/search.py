@@ -12,6 +12,7 @@ from app.schemas.search import SearchResultChunk
 from app.services.search.chunker import chunk_video
 from app.services.search.chunker import get_video_duration
 from app.services.search.embedder import get_embedder
+from app.services.search.search_logging import SearchEventLogger
 from app.services.search.store import EduMindStore
 from app.services.search.store import make_chunk_id
 from sqlalchemy.orm import Session
@@ -96,11 +97,17 @@ def build_video_index_internal(
         video_duration = get_video_duration(video_path)
         chunk_duration, overlap = get_adaptive_chunk_params(video_duration)
 
+        # 记录自适应切片参数选择
+        SearchEventLogger.log_adaptive_chunking_selected(
+            video_id=video_id, video_duration_seconds=video_duration, chunk_duration=chunk_duration, overlap=overlap
+        )
+
         # 切片视频
         logger.info(
             f"Chunking video {video_id}: duration={video_duration:.0f}s, "
             f"chunk={chunk_duration}s, overlap={overlap}s"
         )
+        chunk_start_time = time.time()
         chunks = chunk_video(
             video_path,
             chunk_duration=chunk_duration,
@@ -110,12 +117,18 @@ def build_video_index_internal(
             target_fps=settings.SEARCH_PREPROCESS_FPS,
         )
 
+        chunk_time_ms = (time.time() - chunk_start_time) * 1000
+        SearchEventLogger.log_video_chunking_completed(
+            video_id=video_id, chunk_count=len(chunks), duration_ms=chunk_time_ms
+        )
+
         if not chunks:
             logger.warning(f"No chunks created for video {video_id}")
             return 0
 
         # 嵌入分片
         logger.info(f"Embedding {len(chunks)} chunks")
+        embedding_start_time = time.time()
         for chunk in chunks:
             try:
                 embedding = embedder.embed_video_chunk(chunk["chunk_path"])
@@ -123,6 +136,10 @@ def build_video_index_internal(
             except Exception as e:
                 logger.error(f"Failed to embed chunk: {e}")
                 raise
+        embedding_time_ms = (time.time() - embedding_start_time) * 1000
+        SearchEventLogger.log_embedding_batch_completed(
+            video_id=video_id, batch_size=len(chunks), duration_ms=embedding_time_ms
+        )
 
         # 批量存储
         logger.info(f"Storing {len(chunks)} chunks")
@@ -138,10 +155,31 @@ def build_video_index_internal(
                 logger.warning(f"Failed to cleanup chunk file: {e}")
 
         logger.info(f"Successfully indexed video {video_id} with {len(chunks)} chunks")
+
+        # 记录索引完成
+        SearchEventLogger.log_indexing_completed(
+            video_id=video_id,
+            chunk_count=len(chunks),
+            backend=backend,
+            duration_ms=0,  # TODO: 计算总耗时
+            user_id=user_id,
+        )
+
         return len(chunks)
 
     except Exception as e:
-        logger.error(f"Failed to index video {video_id}: {e}", exc_info=True)
+        error_stage = "unknown"
+        if "chunking" in str(e).lower() or "chunk_video" in str(e).lower():
+            error_stage = "chunking"
+        elif "embedding" in str(e).lower() or "embedder" in str(e).lower():
+            error_stage = "embedding"
+        elif "storage" in str(e).lower() or "chroma" in str(e).lower() or "add_chunks" in str(e).lower():
+            error_stage = "storage"
+
+        SearchEventLogger.log_indexing_failed(
+            video_id=video_id, error_stage=error_stage, error_message=str(e), user_id=user_id
+        )
+        logger.error(f"Failed to index video {video_id} at {error_stage}: {e}", exc_info=True)
         raise
 
 
@@ -168,6 +206,11 @@ def semantic_search_videos(
         搜索结果列表
     """
     logger.info(f"Starting semantic search: query='{query[:50]}', videos={video_ids}")
+
+    # 记录搜索请求
+    SearchEventLogger.log_search_request(
+        user_id=user_id, query_text=query, video_ids=video_ids, threshold=threshold, limit=limit
+    )
 
     if not video_ids:
         logger.warning("No videos to search")
@@ -219,15 +262,27 @@ def semantic_search_videos(
 
             except Exception as e:
                 logger.warning(f"Failed to search video {video_id}: {e}")
+                SearchEventLogger.log_search_failed(user_id=user_id, error_message=str(e))
                 continue
 
         # 按相似度排序并限制结果数
         all_results.sort(key=lambda x: x.similarity_score, reverse=True)
         all_results = all_results[:limit]
 
+        max_similarity = all_results[0].similarity_score if all_results else None
+        SearchEventLogger.log_search_completed(
+            user_id=user_id,
+            query_text=query,
+            video_count=len(video_ids),
+            result_count=len(all_results),
+            duration_ms=0,  # TODO: 计算总耗时
+            max_similarity=max_similarity,
+        )
+
         logger.info(f"Found {len(all_results)} results")
         return all_results
 
     except Exception as e:
         logger.error(f"Search failed: {e}", exc_info=True)
+        SearchEventLogger.log_search_failed(user_id=user_id, error_message=str(e))
         raise
