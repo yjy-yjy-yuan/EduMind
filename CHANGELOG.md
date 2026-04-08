@@ -1,5 +1,12 @@
 # 变更日志
 
+## 2026-04-08 (续续续)
+
+### 语义搜索前端落地与文档纠偏
+- 新增 [`mobile-frontend/src/views/Search.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Search.vue)、[`mobile-frontend/src/api/search.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/search.js)，并更新 [`mobile-frontend/src/router/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/router/index.js)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)：补齐 `/search` 搜索页、视频详情页进入当前视频搜索的入口，以及搜索结果跳转播放器并读取 `start` 时间点的链路。
+- 更新 [`docs/SEARCH_FRONTEND_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_FRONTEND_PROMPT.md)、[`docs/SEARCH_TESTING_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_TESTING_PROMPT.md)、[`docs/SEARCH_PRODUCTION_MONITORING_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_PRODUCTION_MONITORING_PROMPT.md)、[`docs/SEARCH_IMPLEMENTATION_SUMMARY.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_IMPLEMENTATION_SUMMARY.md)：同步当前真实接口、前端落地方式和生产监控阶段边界，移除把未来规划或错误字段写成已完成能力的旧描述。
+- 删除 [`scripts/validate_search_module.py`](/Users/yuan/final-work/EduMind/scripts/validate_search_module.py) 与 [`backend_fastapi/app/services/search/search_logging.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search_logging.py)：前者未与当前代码保持一致且会给出错误验证结论，后者尚未接入主流程；本次先移除不准确或未落地的辅助文件，避免继续误导后续实现。
+
 ## 2026-04-08 (续续)
 
 ### 语义搜索自适应切片 - 边界问题修复
