@@ -315,6 +315,15 @@ def semantic_search_videos(
         return []
 
     try:
+        # 获取视频标题映射（用于补充每条搜索结果）
+        video_title_map = {}
+        if db:
+            from app.models.video import Video
+
+            videos = db.query(Video).filter(Video.id.in_(video_ids)).all()
+            video_title_map = {v.id: v.title for v in videos}
+            logger.info(f"Loaded titles for {len(video_title_map)} videos")
+
         # 获取嵌入器（使用配置的后端）
         backend = settings.SEARCH_BACKEND
         model = settings.SEARCH_LOCAL_MODEL if backend == "local" else None
@@ -351,6 +360,7 @@ def semantic_search_videos(
                 for result in results:
                     chunk = SearchResultChunk(
                         video_id=video_id,
+                        video_title=video_title_map.get(video_id),
                         chunk_id=result["chunk_id"],
                         start_time=result["start_time"],
                         end_time=result["end_time"],

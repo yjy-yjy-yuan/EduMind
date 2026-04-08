@@ -21,6 +21,7 @@ class SearchResultChunk(BaseModel):
     """搜索结果中的单个片段"""
 
     video_id: int
+    video_title: Optional[str] = Field(None, description="视频标题")
     chunk_id: str
     start_time: float = Field(..., description="片段在原视频中的起始时间（秒）")
     end_time: float = Field(..., description="片段在原视频中的结束时间（秒）")

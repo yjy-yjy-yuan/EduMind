@@ -65,7 +65,7 @@
 
         <template v-if="searchScope === 'all'">
           <div v-for="group in groupedResults" :key="group.videoId" class="result-group">
-            <div class="result-group-title">视频 ID: {{ group.videoId }}</div>
+            <div class="result-group-title">{{ group.videoTitle }}</div>
             <ResultCard
               v-for="result in group.items"
               :key="result.chunk_id"
@@ -111,19 +111,48 @@ const ResultCard = defineComponent({
       return '#FF6B6B'
     }
 
+    const getSimilarityPercentage = (similarity) => {
+      return Math.round(similarity * 100)
+    }
+
+    const getVideoTitle = (result) => {
+      return result.video_title || `视频 ID: ${result.video_id}`
+    }
+
+    const getPreviewText = (result) => {
+      if (result.preview_text && result.preview_text.trim()) {
+        return result.preview_text
+      }
+      return '（暂无文本预览）'
+    }
+
     const open = () => emit('open', props.result)
 
     return {
       formatTime,
       getSimilarityColor,
+      getSimilarityPercentage,
+      getVideoTitle,
+      getPreviewText,
       open
     }
   },
   template: `
     <div class="result-item" @click="open">
-      <div class="result-time">
-        {{ formatTime(result.start_time) }} - {{ formatTime(result.end_time) }}
+      <div class="result-header">
+        <div class="result-video-title">{{ getVideoTitle(result) }}</div>
+        <div class="result-similarity-percentage">
+          <span class="percentage-text">{{ getSimilarityPercentage(result.similarity_score) }}% 相关</span>
+        </div>
       </div>
+
+      <div class="result-meta">
+        <div class="result-time">
+          <span class="time-label">⏱️</span>
+          <span class="time-range">{{ formatTime(result.start_time) }} - {{ formatTime(result.end_time) }}</span>
+        </div>
+      </div>
+
       <div class="result-similarity">
         <div class="similarity-bar">
           <div
@@ -131,13 +160,14 @@ const ResultCard = defineComponent({
             :style="{ width: (result.similarity_score * 100) + '%', backgroundColor: getSimilarityColor(result.similarity_score) }"
           ></div>
         </div>
-        <span class="similarity-text">{{ (result.similarity_score * 100).toFixed(0) }}%</span>
       </div>
-      <div v-if="result.preview_text" class="result-preview">
-        {{ result.preview_text }}
+
+      <div :class="['result-preview', { placeholder: !result.preview_text || !result.preview_text.trim() }]">
+        {{ getPreviewText(result) }}
       </div>
-      <div v-else class="result-preview placeholder">
-        暂无文本预览
+
+      <div class="result-cta">
+        <span class="play-hint">👉 点击播放此片段</span>
       </div>
     </div>
   `
@@ -179,11 +209,15 @@ export default {
     const groupedResults = computed(() => {
       const groups = new Map()
       for (const result of results.value) {
-        const list = groups.get(result.video_id) || []
+        const videoId = result.video_id
+        const list = groups.get(videoId) || []
         list.push(result)
-        groups.set(result.video_id, list)
+        groups.set(videoId, list)
       }
-      return Array.from(groups.entries()).map(([videoId, items]) => ({ videoId, items }))
+      return Array.from(groups.entries()).map(([videoId, items]) => {
+        const videoTitle = items[0]?.video_title || `视频 ID: ${videoId}`
+        return { videoId, videoTitle, items }
+      })
     })
 
     const clearSearch = () => {
@@ -369,22 +403,30 @@ export default {
 
 .results-header,
 .result-group-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: #666;
 }
 
 .results-header {
+  color: #666;
   padding: 12px 0;
   border-bottom: 1px solid #e0e0e0;
   margin-bottom: 12px;
 }
 
+.result-group-title {
+  color: #1976d2;
+  padding-left: 4px;
+  word-break: break-word;
+}
+
 .result-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .result-item {
@@ -392,13 +434,66 @@ export default {
   padding: 12px;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: box-shadow 0.2s ease;
+}
+
+.result-item:active {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.result-video-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1976d2;
+  word-break: break-word;
+}
+
+.result-similarity-percentage {
+  flex-shrink: 0;
+  min-width: 60px;
+  text-align: right;
+}
+
+.percentage-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4CAF50;
+}
+
+.result-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
 }
 
 .result-time {
-  font-size: 14px;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #666;
+}
+
+.time-label {
+  font-size: 13px;
+}
+
+.time-range {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 500;
   color: #2196f3;
-  margin-bottom: 8px;
 }
 
 .result-similarity {
@@ -421,22 +516,32 @@ export default {
   transition: width 0.3s ease;
 }
 
-.similarity-text {
-  min-width: 40px;
-  text-align: right;
-  font-size: 12px;
-  color: #666;
-}
-
 .result-preview {
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.5;
   color: #555;
+  margin-bottom: 8px;
+  max-height: 60px;
+  overflow-y: auto;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .result-preview.placeholder {
   color: #aaa;
   font-style: italic;
+}
+
+.result-cta {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.play-hint {
+  font-size: 12px;
+  color: #2196f3;
+  font-weight: 500;
 }
 
 @keyframes spin {
