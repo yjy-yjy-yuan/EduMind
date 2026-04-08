@@ -75,6 +75,7 @@ def build_video_index_internal(
         构建的分片总数
     """
     logger.info(f"Starting semantic indexing for video {video_id}")
+    total_start_time = time.time()
 
     try:
         # 初始化存储
@@ -161,7 +162,7 @@ def build_video_index_internal(
             video_id=video_id,
             chunk_count=len(chunks),
             backend=backend,
-            duration_ms=0,  # TODO: 计算总耗时
+            duration_ms=(time.time() - total_start_time) * 1000,
             user_id=user_id,
         )
 
@@ -206,6 +207,7 @@ def semantic_search_videos(
         搜索结果列表
     """
     logger.info(f"Starting semantic search: query='{query[:50]}', videos={video_ids}")
+    total_start_time = time.time()
 
     # 记录搜索请求
     SearchEventLogger.log_search_request(
@@ -228,6 +230,7 @@ def semantic_search_videos(
 
         # 搜索所有视频的索引
         all_results = []
+        chromadb_start_time = time.time()
         for video_id in video_ids:
             try:
                 # 构建集合名
@@ -265,6 +268,12 @@ def semantic_search_videos(
                 SearchEventLogger.log_search_failed(user_id=user_id, error_message=str(e))
                 continue
 
+        SearchEventLogger.log_chromadb_search_executed(
+            videos_searched=len(video_ids),
+            results_found=len(all_results),
+            duration_ms=(time.time() - chromadb_start_time) * 1000,
+        )
+
         # 按相似度排序并限制结果数
         all_results.sort(key=lambda x: x.similarity_score, reverse=True)
         all_results = all_results[:limit]
@@ -275,7 +284,7 @@ def semantic_search_videos(
             query_text=query,
             video_count=len(video_ids),
             result_count=len(all_results),
-            duration_ms=0,  # TODO: 计算总耗时
+            duration_ms=(time.time() - total_start_time) * 1000,
             max_similarity=max_similarity,
         )
 

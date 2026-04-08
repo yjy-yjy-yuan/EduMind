@@ -165,7 +165,13 @@ cd mobile-frontend && npm run build:ios
 - `LocalEmbedder` 仍是占位实现
 - 搜索结果 `preview_text` 还没有从字幕回填
 - 搜索路由尚未接入完整认证体系，当前优先取 `X-User-ID` 请求头，否则回退默认用户
-- iOS / H5 搜索界面不在这次提交范围内
+- iOS / H5 搜索界面已经有基础页面与播放器跳转链路，但当前仍属于轻量版本，结果摘要与完整认证联动尚未补齐
+
+如需单独验证这条搜索链路，可补跑：
+
+```bash
+./.venv/bin/python scripts/validate_search_integration.py
+```
 
 部署与当前限制的详细说明见 [backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md](/Users/yuan/final-work/EduMind/backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)。
 

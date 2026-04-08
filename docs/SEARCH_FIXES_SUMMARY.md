@@ -1,7 +1,6 @@
 # 语义搜索系统 - 问题修复总结
 
-**日期**：2026-04-08  
-**提交**：61878a48
+**日期**：2026-04-08
 
 ---
 
@@ -30,7 +29,7 @@ indexing_completed             // 索引成功
 indexing_failed                // 索引失败
 search_completed               // 搜索完成
 search_failed                  // 搜索失败
-chromadb_search_executed       // ChromaDB 搜索
+chromadb_search_executed       // ChromaDB 搜索统计
 ```
 
 ---
@@ -46,14 +45,15 @@ chromadb_search_executed       // ChromaDB 搜索
 
 **修复内容**：
 - ✅ 删除有问题的验证脚本
-- ✅ 创建新的 `validate_search_integration.py`（正确的导入路径）
+- ✅ 创建新的 `validate_search_integration.py`
+- ✅ 脚本会在需要时自动切换到项目 `.venv`，避免系统 Python 缺依赖导致的假失败
 - ✅ 包含 4 个验证项：
   1. 后端模块导入（正确类名和路径）
   2. 自适应切片边界（9 个浮点测试）
-  3. 生产监控集成（日志方法检查）
+  3. 生产监控集成（日志方法 + 主流程调用点检查）
   4. 前端编译
 
-**验证结果**：✅ 全部通过
+**验证结果**：✅ 在项目 `.venv` 环境中通过
 
 ---
 
@@ -80,33 +80,32 @@ chromadb_search_executed       // ChromaDB 搜索
 |------|------|------|
 | 后端模块导入 | ✅ | search.py、chunker.py、store.py、embedder.py、vector_index.py、schema 类名全部正确 |
 | 自适应切片边界 | ✅ | 9 个浮点边界测试全部通过 (179.9-3600.5) |
-| 生产监控集成 | ✅ | SearchEventLogger 已集成到 semantic_search_videos 和 build_video_index_internal |
+| 生产监控集成 | ✅ | SearchEventLogger 已集成到 semantic_search_videos 和 build_video_index_internal，并补齐 ChromaDB 搜索统计与真实耗时 |
 | JSON 日志格式 | ✅ | 所有事件均输出结构化 JSON 格式 |
-| 前端编译 | ✅ | npm run build:ios 成功 (766ms) |
+| 前端编译 | ✅ | npm run build:ios 成功 |
 | 验证脚本 | ✅ | validate_search_integration.py 所有检查通过 |
-| 提交状态 | ✅ | 已提交到 0408-feature/semantic-search-backend (commit 61878a48) |
+| 提交状态 | ✅ | 已提交到 0408-feature/semantic-search-backend |
 
 ---
 
 ## 提交内容
 
 ```
-commit 61878a48
-
 fix(search): integrate production logging and fix verification scripts
 
 Changes:
 - Add SearchEventLogger to search.py for comprehensive event logging
 - Implement JSON-formatted structured logging for all key events
-- Fix import paths and schema class names in verification  
+- Fix import paths and schema class names in verification
 - Create new validate_search_integration.py with correct validation logic
+- Re-exec into .venv for consistent dependency loading
 - Verify all 9 floating-point boundary cases pass
 - Confirm logging integration into main search workflows
 
 Files modified:
 - backend_fastapi/app/services/search/search.py (导入 + 日志集成)
-- backend_fastapi/app/services/search/search_logging.py (新建，日志类)
-- scripts/validate_search_integration.py (新建，正确的验证)
+- backend_fastapi/app/services/search/search_logging.py (日志类)
+- scripts/validate_search_integration.py (验证脚本)
 ```
 
 ---
@@ -136,7 +135,7 @@ npm run build:ios
 
 ✅ **功能验证**
 ```bash
-python scripts/validate_search_integration.py
+./.venv/bin/python scripts/validate_search_integration.py
 # 结果：✅ 所有验证通过!
 ```
 
@@ -154,4 +153,4 @@ python scripts/validate_search_integration.py
 
 ---
 
-**Status**: ✅ **完全修复** | **验证**: ✅ **全部通过** | **提交**: 61878a48
+**Status**: ✅ **完全修复** | **验证**: ✅ **全部通过**
