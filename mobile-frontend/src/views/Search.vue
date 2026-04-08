@@ -153,9 +153,21 @@
 </template>
 
 <script>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { semanticSearch } from '@/api/search'
+import { storageGet, storageRemove, storageSet } from '@/utils/storage'
+
+const SEARCH_STATE_KEY_PREFIX = 'm_search_state'
+
+const parseJSON = (text, fallback = null) => {
+  if (!text) return fallback
+  try {
+    return JSON.parse(text)
+  } catch {
+    return fallback
+  }
+}
 
 export default {
   name: 'SearchPage',
@@ -181,6 +193,12 @@ export default {
       return currentVideoTitle.value ? `当前视频：${currentVideoTitle.value}` : '当前视频'
     })
     const searchScope = ref(hasCurrentVideoContext.value ? 'current' : 'all')
+    const searchStateKey = computed(() => {
+      if (currentVideoId.value !== null) {
+        return `${SEARCH_STATE_KEY_PREFIX}:video:${currentVideoId.value}`
+      }
+      return `${SEARCH_STATE_KEY_PREFIX}:all`
+    })
 
     const videoIds = computed(() => {
       if (searchScope.value === 'current' && currentVideoId.value !== null) {
@@ -227,11 +245,36 @@ export default {
       return '（暂无文本预览）'
     }
 
+    const persistSearchState = () => {
+      const payload = {
+        query: query.value,
+        results: Array.isArray(results.value) ? results.value : [],
+        error: error.value,
+        hasSearched: hasSearched.value,
+        searchScope: searchScope.value
+      }
+      storageSet(searchStateKey.value, JSON.stringify(payload))
+    }
+
+    const restoreSearchState = () => {
+      const cached = parseJSON(storageGet(searchStateKey.value), null)
+      if (!cached || typeof cached !== 'object') return
+
+      query.value = typeof cached.query === 'string' ? cached.query : ''
+      results.value = Array.isArray(cached.results) ? cached.results : []
+      error.value = typeof cached.error === 'string' ? cached.error : ''
+      hasSearched.value = Boolean(cached.hasSearched)
+
+      const nextScope = cached.searchScope === 'current' && hasCurrentVideoContext.value ? 'current' : 'all'
+      searchScope.value = nextScope
+    }
+
     const clearSearch = () => {
       query.value = ''
       results.value = []
       error.value = ''
       hasSearched.value = false
+      storageRemove(searchStateKey.value)
     }
 
     const handleSearch = async () => {
@@ -262,15 +305,29 @@ export default {
         results.value = []
       } finally {
         isSearching.value = false
+        persistSearchState()
       }
     }
 
     const handleResultClick = (result) => {
+      persistSearchState()
       router.push({
         path: `/player/${result.video_id}`,
         query: { start: String(Math.floor(Number(result.start_time || 0))) }
       })
     }
+
+    watch(searchStateKey, () => {
+      restoreSearchState()
+    }, { immediate: true })
+
+    watch(searchScope, (next) => {
+      if (next === 'current' && !hasCurrentVideoContext.value) {
+        searchScope.value = 'all'
+        return
+      }
+      persistSearchState()
+    })
 
     return {
       currentVideoLabel,

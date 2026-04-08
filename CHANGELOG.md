@@ -1,5 +1,20 @@
 # 变更日志
 
+## 2026-04-08 (续续续续续续续续续续续)
+
+### 搜索页返回保留关键词与结果 - 状态记忆补齐
+- 更新 [`mobile-frontend/src/views/Search.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Search.vue)：为搜索页新增按上下文持久化的状态记忆，保存搜索关键词、搜索范围、结果列表、错误信息与已搜索状态；点击搜索结果进入播放器前会先落盘，再回到搜索页时自动恢复。
+- 状态隔离规则：
+  - 当前视频搜索按 `videoId` 独立记忆，避免不同视频上下文互相覆盖
+  - 所有视频搜索使用独立的全局搜索缓存
+- 清空行为同步修正：点击“清空”会同时删除对应搜索缓存，避免旧结果误恢复。
+- 文档同步：更新 [`docs/SEARCH_RESULTS_DISPLAY_ENHANCEMENT.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_RESULTS_DISPLAY_ENHANCEMENT.md)，补充“返回保留状态”能力与实现方式说明。
+- 验证结果：
+  - ✅ `./.venv/bin/pre-commit run --files mobile-frontend/src/views/Search.vue`
+  - ✅ `npm run build:ios`
+  - ✅ `bash ios-app/sync_ios_web_assets.sh`
+  - ✅ `bash ios-app/validate_ios_build.sh`
+
 ## 2026-04-08 (续续续续续续续续续续)
 
 ### 搜索结果在 iOS 真机页不显示 - 渲染链路修复

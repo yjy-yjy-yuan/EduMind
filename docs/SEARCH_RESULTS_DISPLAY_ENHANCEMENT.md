@@ -1,8 +1,8 @@
 # 搜索结果详细内容显示 - 功能增强实现
 
 **日期**: 2026-04-08
-**版本**: 功能增强 v1
-**范围**: 后端数据结构扩展 + 前端显示优化
+**版本**: 功能增强 v1.1
+**范围**: 后端数据结构扩展 + 前端显示优化 + 搜索状态记忆
 
 ---
 
@@ -19,6 +19,7 @@
 | **字幕内容** | 显示简短预览 | 显示截断预览文本（最多 240 字），最高 60px 高度可滚动 |
 | **分组显示** | 分组标题为"视频 ID: xxx" | 分组标题优先显示 `video_title`（⚠️ 暂未补充时长、上传时间等视频元信息） |
 | **交互提示** | 无 | "👉 点击播放此片段" 清晰提示 |
+| **返回保留状态** | 返回后需重新搜索 | 返回搜索页后自动恢复关键词、范围与结果 |
 
 ---
 
@@ -285,6 +286,91 @@ const groupedResults = computed(() => {
   word-break: break-word;  /* 长标题换行 */
 }
 ```
+
+---
+
+### 4. 搜索状态记忆
+
+**目标**:
+
+- 用户点击搜索结果进入播放器后，再返回搜索页时，仍能看到刚才的关键词和匹配结果
+- 当前视频搜索与全局搜索分开记忆，避免不同搜索上下文互相覆盖
+
+**实现方式**:
+
+在 `mobile-frontend/src/views/Search.vue` 中新增搜索状态持久化逻辑，基于 `@/utils/storage` 保存以下内容：
+
+- `query`
+- `results`
+- `error`
+- `hasSearched`
+- `searchScope`
+
+#### (1) 按上下文生成缓存 key
+
+```javascript
+const SEARCH_STATE_KEY_PREFIX = 'm_search_state'
+
+const searchStateKey = computed(() => {
+  if (currentVideoId.value !== null) {
+    return `${SEARCH_STATE_KEY_PREFIX}:video:${currentVideoId.value}`
+  }
+  return `${SEARCH_STATE_KEY_PREFIX}:all`
+})
+```
+
+#### (2) 搜索完成后落盘
+
+```javascript
+const persistSearchState = () => {
+  const payload = {
+    query: query.value,
+    results: Array.isArray(results.value) ? results.value : [],
+    error: error.value,
+    hasSearched: hasSearched.value,
+    searchScope: searchScope.value
+  }
+  storageSet(searchStateKey.value, JSON.stringify(payload))
+}
+```
+
+#### (3) 页面重新进入时恢复
+
+```javascript
+watch(searchStateKey, () => {
+  restoreSearchState()
+}, { immediate: true })
+```
+
+#### (4) 点击结果跳转前先保存状态
+
+```javascript
+const handleResultClick = (result) => {
+  persistSearchState()
+  router.push({
+    path: `/player/${result.video_id}`,
+    query: { start: String(Math.floor(Number(result.start_time || 0))) }
+  })
+}
+```
+
+#### (5) 清空搜索时同步删除缓存
+
+```javascript
+const clearSearch = () => {
+  query.value = ''
+  results.value = []
+  error.value = ''
+  hasSearched.value = false
+  storageRemove(searchStateKey.value)
+}
+```
+
+**效果**:
+
+- 从播放器返回搜索页时，关键词不会丢失
+- 搜索结果列表会直接恢复，不需要再次请求
+- 当前视频搜索和所有视频搜索各自保持独立记忆
 
 ---
 
