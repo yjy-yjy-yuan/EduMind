@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import { DEFAULT_SEARCH_LIMIT, DEFAULT_SEARCH_THRESHOLD } from '@/config/searchDefaults'
 
 /**
  * 语义搜索
@@ -16,8 +17,8 @@ export function semanticSearch(params) {
     data: {
       query: params.query,
       video_ids: params.video_ids ?? null,
-      limit: params.limit ?? 20,
-      threshold: params.threshold ?? 0.5
+      limit: params.limit ?? DEFAULT_SEARCH_LIMIT,
+      threshold: params.threshold ?? DEFAULT_SEARCH_THRESHOLD
     },
     timeout: 30000 // 搜索可能耗时较长
   })

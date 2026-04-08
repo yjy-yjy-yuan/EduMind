@@ -39,6 +39,24 @@
         <button class="hero-btn hero-btn--secondary" @click="go('/videos')">浏览视频库</button>
       </div>
 
+      <div class="home-semantic-search">
+        <label class="home-semantic-search__label" for="home-semantic-search-input">跨视频语义搜索</label>
+        <p class="home-semantic-search__scope">在「我的全部视频」范围内按含义查找（已索引内容）</p>
+        <div class="home-semantic-search__row">
+          <input
+            id="home-semantic-search-input"
+            v-model.trim="semanticSearchDraft"
+            class="home-semantic-search__input"
+            type="search"
+            enterkeyhint="search"
+            autocomplete="off"
+            placeholder="输入关键词，在全部视频中搜索…"
+            @keyup.enter="submitHomeSemanticSearch"
+          />
+          <button type="button" class="home-semantic-search__btn" @click="submitHomeSemanticSearch">搜索</button>
+        </div>
+      </div>
+
       <div class="welcome__subnote">
         <span>推荐页会继续承接站内学习与站外导入，首页只保留最重要的下一步。</span>
       </div>
@@ -236,6 +254,11 @@ import BrandLogo from '@/components/BrandLogo.vue'
 import { getVideoRecommendations } from '@/api/recommendation'
 import { shouldIncludeExternalRecommendationsByDefault } from '@/config'
 import {
+  SEARCH_ROUTE_PREFILL_QUERY,
+  SEARCH_ROUTE_SCOPE_ALL,
+  SEARCH_ROUTE_SCOPE_QUERY
+} from '@/config/searchDefaults'
+import {
   isRecommendationPrimaryActionDisabled,
   parseRecommendationActionTarget,
   resolveRecommendationUrl,
@@ -246,6 +269,7 @@ import { listNativeOfflineTranscripts } from '@/services/nativeOfflineTranscript
 import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
 const router = useRouter()
+const semanticSearchDraft = ref('')
 const loading = ref(false)
 const recommendationLoading = ref(false)
 const error = ref('')
@@ -420,6 +444,16 @@ const reloadRecommendations = async () => {
 }
 
 const go = (path) => router.push(path)
+const submitHomeSemanticSearch = () => {
+  const q = String(semanticSearchDraft.value || '').trim()
+  router.push({
+    path: '/search',
+    query: {
+      [SEARCH_ROUTE_SCOPE_QUERY]: SEARCH_ROUTE_SCOPE_ALL,
+      ...(q ? { [SEARCH_ROUTE_PREFILL_QUERY]: q } : {})
+    }
+  })
+}
 const goStat = (scope) => {
   console.info(`[INFO][Home] stat-card-click scope=${scope}`)
   router.push({ path: '/videos', query: { scope } })
@@ -823,6 +857,81 @@ onMounted(reloadDashboard)
 .hero-actions {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 14px;
+}
+
+.home-semantic-search {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(239, 231, 247, 0.75));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 10px 22px rgba(95, 71, 126, 0.08);
+}
+
+.home-semantic-search__label {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #221a30;
+}
+
+.home-semantic-search__scope {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #6b7280;
+}
+
+.home-semantic-search__row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.home-semantic-search__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 15px;
+  color: #111827;
+}
+
+.home-semantic-search__input::placeholder {
+  color: #9ca3af;
+}
+
+.home-semantic-search__input:focus {
+  outline: none;
+  border-color: rgba(95, 71, 126, 0.35);
+  box-shadow: 0 0 0 3px rgba(143, 115, 186, 0.18);
+}
+
+.home-semantic-search__btn {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #f9fafb;
+  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  box-shadow: 0 8px 18px rgba(95, 71, 126, 0.22);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.home-semantic-search__btn:active {
+  transform: scale(0.98);
 }
 
 .hero-btn,
