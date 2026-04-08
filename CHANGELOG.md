@@ -1,8 +1,28 @@
 # 变更日志
 
-## 2026-04-08 (续续续续续续)
+## 2026-04-08 (续续续续续续续)
 
-### 语义搜索主链路真实打通（本地字幕语义搜索）
+### 搜索结果详细内容显示 - 功能增强
+- **后端改动**：
+  - 扩展 [`app/schemas/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/search.py) 中 `SearchResultChunk` 的 schema，新增 `video_title` 字段
+  - 修改 [`app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py) 中 `semantic_search_videos()` 函数，在搜索前从数据库获取视频标题映射，并在返回结果时补齐每条结果的 `video_title`
+  - 确保 `video_title` 为 `null` 时前端能优雅降级处理
+- **前端改动**：
+  - 重构 [`mobile-frontend/src/views/Search.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Search.vue) 中 `ResultCard` 组件，增强结果卡片内容展示：
+    - 顶部：视频标题（缺失时回退为"视频 ID: xxx"）+ 相似度百分比
+    - 中部：时间范围（⏱️ MM:SS 格式）+ 相似度条
+    - 主体：较完整的 preview_text（最高 60px 可滚动）
+    - 底部：交互提示"👉 点击播放此片段"
+  - 改进分组逻辑：`groupedResults` 中补齐 `videoTitle`，模板显示时优先用标题替代"视频 ID"
+  - 优化样式：结果卡片按压反馈、时间范围 monospace 字体、分组标题颜色、预览文本换行保留等
+- **验证结果**：
+  - ✅ 后端编译通过（`python -m compileall`）
+  - ✅ 前端编译成功（730ms）
+  - ✅ 搜索集成验证通过（5 大项全通）
+  - ✅ Pre-commit hooks 通过
+- **实现文档**：详见 [`docs/SEARCH_RESULTS_DISPLAY_ENHANCEMENT.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_RESULTS_DISPLAY_ENHANCEMENT.md)
+
+## 2026-04-08 (续续续续续续)
 - 更新 [`backend_fastapi/app/services/search/local_embedder.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/local_embedder.py)：将原本的占位 `LocalEmbedder` 改为可运行的本地文本向量实现，使用稳定的哈希向量方案支撑中文字幕语义搜索。
 - 更新 [`backend_fastapi/app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py)：新增字幕时间窗聚合分块逻辑，索引时优先使用字幕文本而不是强依赖视频视觉分片；同时修正 `0s` 起始分块被 `or` 误判的问题，并在重建索引前清理旧分块。
 - 更新 [`backend_fastapi/app/services/search/store.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/store.py)：存储与检索阶段保留 `preview_text`，修正相似度换算，并将 chunk ID 生成规则扩展到 `source_file + start_time + end_time + preview_text`，避免字幕分块出现重复 ID。
