@@ -1,5 +1,11 @@
 # 变更日志
 
+## 2026-04-08 (续续续续续续续续)
+
+### 对 2026-04-08 搜索结果显示增强记录的更正说明
+- 更正 [`docs/IMPLEMENTATION_SUMMARY_SEARCH_DISPLAY.txt`](/Users/yuan/final-work/EduMind/docs/IMPLEMENTATION_SUMMARY_SEARCH_DISPLAY.txt)：此前摘要文档把当前实现写成“完整预览/完整文本”，与真实代码不一致。当前搜索结果展示的仍是移动端友好的 `preview_text` 预览，而不是全文；后端在 [`backend_fastapi/app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py) 中会将该预览截断为最多 `240` 字。
+- 更正后续规划表述：视频分组补充 `duration`、`uploaded_at` 等元信息属于下一阶段增强项，不属于当前已交付能力；当前已完成的是视频标题、时间范围、相似度展示、预览文本展示与播放器时间点跳转。
+
 ## 2026-04-08 (续续续续续续续)
 
 ### 搜索结果详细内容显示 - 功能增强
