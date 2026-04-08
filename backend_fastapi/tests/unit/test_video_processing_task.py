@@ -4,14 +4,13 @@ import json
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from app.models.base import Base
 from app.models.subtitle import Subtitle
 from app.models.video import Video
 from app.models.video import VideoStatus
 from app.tasks.video_processing import process_video_task
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 
 @pytest.mark.unit
@@ -73,14 +72,16 @@ def test_process_video_task_updates_video_and_subtitles(tmp_path, monkeypatch):
         srt = Path(srt_path)
         txt = Path(txt_path)
         srt.parent.mkdir(parents=True, exist_ok=True)
-        srt.write_text("1\n00:00:00,000 --> 00:00:01,200\n第一句\n\n2\n00:00:01,200 --> 00:00:02,800\n第二句\n", encoding="utf-8")
+        srt.write_text(
+            "1\n00:00:00,000 --> 00:00:01,200\n第一句\n\n2\n00:00:01,200 --> 00:00:02,800\n第二句\n", encoding="utf-8"
+        )
         txt.write_text("第一句\n第二句\n", encoding="utf-8")
         return True
 
     def fake_generate_summary(_video_id, _subtitle_path="", **_kwargs):
         return {
             "success": True,
-            "summary": "主题：牛顿第二定律与受力分析\n学习重点：\n1. 受力分析步骤。\n2. 合力与加速度关系。"
+            "summary": "主题：牛顿第二定律与受力分析\n学习重点：\n1. 受力分析步骤。\n2. 合力与加速度关系。",
         }
 
     def fake_generate_tags(_video_id, _summary, **_kwargs):

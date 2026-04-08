@@ -140,6 +140,34 @@ cd mobile-frontend && npm run build:ios
 - `ios-app/EduMindIOS/EduMindIOS/WebAssets/` 已在 `pre-commit` 排除列表中，因为它们由 `bash ios-app/sync_ios_web_assets.sh` 同步生成。
 - 如确需跳过 hook，使用 `--no-verify`，但默认不建议这样做。
 
+## 语义搜索后端状态
+
+当前仓库已经落下语义搜索后端的第一版骨架和主链路，范围集中在 `backend_fastapi/`：
+
+1. 视频切片：`backend_fastapi/app/services/search/chunker.py`
+2. 向量嵌入：`backend_fastapi/app/services/search/embedder.py`、`backend_fastapi/app/services/search/gemini_embedder.py`
+3. 向量存储：`backend_fastapi/app/services/search/store.py`
+4. 搜索编排：`backend_fastapi/app/services/search/search.py`
+5. 搜索接口：`backend_fastapi/app/routers/search.py`
+6. 后台索引：`backend_fastapi/app/tasks/vector_indexing.py`
+
+当前已经支持：
+
+- `mp4` / `mov` 切片
+- ChromaDB 持久化
+- 手动索引接口和索引状态接口
+- 视频处理完成后按配置自动提交索引任务
+- 多视频查询和按相似度排序返回
+
+当前仍是“后端实验性能力”，还不能把整条链路视为完全闭环：
+
+- `LocalEmbedder` 仍是占位实现
+- 搜索结果 `preview_text` 还没有从字幕回填
+- 搜索路由尚未接入完整认证体系，当前优先取 `X-User-ID` 请求头，否则回退默认用户
+- iOS / H5 搜索界面不在这次提交范围内
+
+部署与当前限制的详细说明见 [backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md](/Users/yuan/final-work/EduMind/backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)。
+
 ## Blitz / Codex CLI 开发工作流
 
 面向 Blitz、Codex CLI、Claude Code 等本地代码代理，当前仓库新增了 4 个统一脚本：

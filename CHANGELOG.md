@@ -2,6 +2,12 @@
 
 ## 2026-04-08
 
+### 语义搜索后端文档同步与纠错
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)：补充当前语义搜索后端的真实落地范围、当前限制和文档入口，避免把实验性后端链路误写成前后端都已闭环。
+- 重写 [`backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md`](/Users/yuan/final-work/EduMind/backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)：移除把计划项当成“已完成”的旧描述，改为当前代码入口、最小部署步骤、已知限制和验收建议，并补充 `videos.user_id` 迁移依赖说明。
+- 重写 [`SENTRYSEARCH_INTEGRATION_PROMPT.md`](/Users/yuan/final-work/EduMind/SENTRYSEARCH_INTEGRATION_PROMPT.md)：从冗长的规划提示词改为当前集成记录，明确已吸收的模块、未完成部分和后续维护约束。
+- 对 2026-04-08 同日搜索实现记录的更正说明：当前不应再把 `LocalEmbedder`、字幕预览文本、视频片段裁剪导出和完整认证接入描述为已完成能力。
+
 ### 认证示例配置补全
 - 更新 [`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：将 `AUTH_TOKEN_TTL_SECONDS` 与 `AUTH_TOKEN_CLOCK_SKEW_SECONDS` 从注释示例改为默认可见配置，避免开发者按示例复制环境文件时遗漏认证过期相关参数。
 

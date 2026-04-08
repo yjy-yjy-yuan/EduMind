@@ -1,7 +1,6 @@
 """问答 API 测试。"""
 
 import pytest
-
 from app.models.qa import Question
 from app.models.subtitle import Subtitle
 

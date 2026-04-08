@@ -146,7 +146,6 @@ def download_video_from_url_task(
     """下载远程视频到本地上传目录"""
     try:
         import yt_dlp
-
         from app.tasks.video_processing import process_video_task
 
         update_video_status(video_id, VideoStatus.DOWNLOADING, DOWNLOAD_PREPARE_PROGRESS, "准备下载")
@@ -179,7 +178,9 @@ def download_video_from_url_task(
             md5=md5,
             model=model or settings.WHISPER_MODEL,
         )
-        update_video_status(video_id, VideoStatus.PENDING, 0.0, f"下载完成，准备处理（{model or settings.WHISPER_MODEL}）")
+        update_video_status(
+            video_id, VideoStatus.PENDING, 0.0, f"下载完成，准备处理（{model or settings.WHISPER_MODEL}）"
+        )
         process_video_task(
             video_id,
             language,
