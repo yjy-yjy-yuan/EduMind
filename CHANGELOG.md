@@ -1,5 +1,10 @@
 # 变更日志
 
+## 2026-04-08
+
+### 认证示例配置补全
+- 更新 [`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：将 `AUTH_TOKEN_TTL_SECONDS` 与 `AUTH_TOKEN_CLOCK_SKEW_SECONDS` 从注释示例改为默认可见配置，避免开发者按示例复制环境文件时遗漏认证过期相关参数。
+
 ## 2026-04-04
 
 ### 推荐同主题来源偏好与推荐页收口
