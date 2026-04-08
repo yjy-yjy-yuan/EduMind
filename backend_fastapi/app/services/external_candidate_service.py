@@ -1,10 +1,18 @@
-"""站外候选轻量元数据服务。"""
+"""站外候选轻量元数据服务。
+
+站外结果缓存键由 build_external_cache_key 生成，结构为
+(normalized_query, normalized_subject, tuple(归一化标签), limit)；
+归一化规则与 clean_text / dedupe_keep_order 一致，内存 TTL 见 EXTERNAL_CANDIDATE_CACHE_TTL_SECONDS。
+"""
 
 from __future__ import annotations
 
 import json
 import logging
 import re
+import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import wait
 from dataclasses import dataclass
 from datetime import datetime
 from html import unescape
@@ -17,13 +25,13 @@ from urllib.parse import unquote
 from urllib.parse import urlparse
 
 import requests
+from app.core.config import settings
 from app.services.video_content_service import build_subject_enriched_tags
 from app.services.video_content_service import fallback_primary_topic_name
 from app.services.video_content_service import infer_subject_from_text
 
 logger = logging.getLogger(__name__)
 
-REQUEST_TIMEOUT_SECONDS = 8
 EXTERNAL_CANDIDATE_CACHE_TTL_SECONDS = 120
 COMMON_HEADERS = {
     "User-Agent": (
@@ -41,8 +49,13 @@ DUCKDUCKGO_RESULT_RE = re.compile(
     re.S,
 )
 EXTERNAL_CANDIDATE_REPORT_CACHE: dict[
-    tuple[str, str, tuple[str, ...], int], tuple[float, "ExternalCandidateFetchReport"]
+    tuple[str, str, tuple[str, ...], str, int], tuple[float, "ExternalCandidateFetchReport"]
 ] = {}
+
+
+def http_timeout_seconds() -> float:
+    """单次 HTTP 请求超时（秒），与并行抓取总等待预算配合使用。"""
+    return float(getattr(settings, "RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS", 8.0))
 
 
 @dataclass
@@ -93,14 +106,16 @@ def build_external_cache_key(
     *,
     subject_hint: str = "",
     preferred_tags: Optional[list[str]] = None,
+    preferred_provider: str = "",
     limit: int = 3,
-) -> tuple[str, str, tuple[str, ...], int]:
+) -> tuple[str, str, tuple[str, ...], str, int]:
     """构建站外候选抓取缓存键。"""
     normalized_query = clean_text(query_text)
     normalized_subject = clean_text(subject_hint)
     normalized_tags = tuple(dedupe_keep_order(list(preferred_tags or [])))
+    normalized_provider = clean_text(preferred_provider).lower()
     normalized_limit = max(1, int(limit))
-    return normalized_query, normalized_subject, normalized_tags, normalized_limit
+    return normalized_query, normalized_subject, normalized_tags, normalized_provider, normalized_limit
 
 
 def clone_external_candidate(candidate: ExternalCandidate) -> ExternalCandidate:
@@ -153,6 +168,7 @@ def get_cached_external_candidate_report(
     *,
     subject_hint: str = "",
     preferred_tags: Optional[list[str]] = None,
+    preferred_provider: str = "",
     limit: int = 3,
 ) -> Optional[ExternalCandidateFetchReport]:
     """读取有效的站外候选抓取缓存。"""
@@ -160,6 +176,7 @@ def get_cached_external_candidate_report(
         query_text,
         subject_hint=subject_hint,
         preferred_tags=preferred_tags,
+        preferred_provider=preferred_provider,
         limit=limit,
     )
     cached = EXTERNAL_CANDIDATE_REPORT_CACHE.get(cache_key)
@@ -178,6 +195,7 @@ def set_cached_external_candidate_report(
     *,
     subject_hint: str = "",
     preferred_tags: Optional[list[str]] = None,
+    preferred_provider: str = "",
     limit: int = 3,
     report: ExternalCandidateFetchReport,
 ) -> None:
@@ -186,6 +204,7 @@ def set_cached_external_candidate_report(
         query_text,
         subject_hint=subject_hint,
         preferred_tags=preferred_tags,
+        preferred_provider=preferred_provider,
         limit=limit,
     )
     EXTERNAL_CANDIDATE_REPORT_CACHE[cache_key] = (monotonic(), clone_external_candidate_fetch_report(report))
@@ -434,7 +453,7 @@ class BilibiliExternalCandidateAdapter(ExternalCandidateAdapter):
             self.search_url,
             params={"keyword": query_text},
             headers=COMMON_HEADERS,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+            timeout=http_timeout_seconds(),
         )
         response.raise_for_status()
         html = response.text
@@ -486,7 +505,7 @@ class YouTubeExternalCandidateAdapter(ExternalCandidateAdapter):
             self.search_url,
             params={"search_query": query_text},
             headers=COMMON_HEADERS,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+            timeout=http_timeout_seconds(),
         )
         response.raise_for_status()
         matched = YOUTUBE_INITIAL_DATA_RE.search(response.text)
@@ -572,7 +591,7 @@ class MoocExternalCandidateAdapter(ExternalCandidateAdapter):
             self.course_search_url,
             params={"q": search_query},
             headers=COMMON_HEADERS,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+            timeout=http_timeout_seconds(),
         )
         response.raise_for_status()
         entries = parse_duckduckgo_result_entries(response.text, limit=max(1, limit * 3))
@@ -615,7 +634,7 @@ class MoocExternalCandidateAdapter(ExternalCandidateAdapter):
             self.search_url,
             params={"search": query_text},
             headers=COMMON_HEADERS,
-            timeout=REQUEST_TIMEOUT_SECONDS,
+            timeout=http_timeout_seconds(),
         )
         response.raise_for_status()
         title_match = re.search(r"<title>\s*([^<]+)\s*</title>", response.text)
@@ -643,6 +662,177 @@ EXTERNAL_CANDIDATE_ADAPTERS: tuple[ExternalCandidateAdapter, ...] = (
 )
 
 
+def get_ordered_external_candidate_adapters(preferred_provider: str = "") -> list[ExternalCandidateAdapter]:
+    """按期望平台排序 provider，优先把更贴近 seed 来源的平台提前。"""
+    normalized_provider = clean_text(preferred_provider).lower()
+    adapters = list(EXTERNAL_CANDIDATE_ADAPTERS)
+    if not normalized_provider:
+        return adapters
+    adapters.sort(key=lambda adapter: (0 if adapter.provider == normalized_provider else 1, adapter.provider))
+    return adapters
+
+
+def _run_adapter_search(
+    adapter: ExternalCandidateAdapter,
+    normalized_query: str,
+    *,
+    subject_hint: str,
+    preferred_tags: Optional[list[str]],
+    per_provider_limit: int,
+) -> tuple[ExternalProviderFetchSummary, list[ExternalCandidate]]:
+    """单 provider 抓取，带有限次重试。"""
+    start = perf_counter()
+    log_provider_fetch_start(adapter, normalized_query)
+    retries = max(0, int(getattr(settings, "RECOMMENDATION_EXTERNAL_FETCH_RETRIES", 1)))
+    for attempt in range(retries + 1):
+        try:
+            provider_items = adapter.search(
+                normalized_query,
+                subject_hint=subject_hint,
+                preferred_tags=list(preferred_tags or []),
+                limit=per_provider_limit,
+            )
+            latency_ms = int((perf_counter() - start) * 1000)
+            provider_added = sum(1 for item in provider_items if item.external_url)
+            log_provider_fetch_success(
+                adapter,
+                query_text=normalized_query,
+                candidate_count=provider_added,
+                latency_ms=latency_ms,
+            )
+            return (
+                build_provider_success_summary(
+                    adapter,
+                    candidate_count=provider_added,
+                    latency_ms=latency_ms,
+                ),
+                provider_items,
+            )
+        except Exception as exc:
+            if attempt < retries:
+                time.sleep(0.25)
+                continue
+            latency_ms = int((perf_counter() - start) * 1000)
+            log_provider_fetch_failure(
+                adapter,
+                query_text=normalized_query,
+                error_message=str(exc),
+                latency_ms=latency_ms,
+            )
+            return (
+                build_provider_failure_summary(adapter, error_message=str(exc), latency_ms=latency_ms),
+                [],
+            )
+
+
+def _fetch_report_parallel(
+    normalized_query: str,
+    *,
+    subject_hint: str,
+    preferred_tags: Optional[list[str]],
+    preferred_provider: str,
+    limit: int,
+) -> ExternalCandidateFetchReport:
+    """并行抓取各 provider，总等待时间有上限。"""
+    per_provider_limit = 1 if limit <= 3 else 2
+    wall_timeout = float(getattr(settings, "RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS", 8.0)) + 0.5
+    ordered_adapters = get_ordered_external_candidate_adapters(preferred_provider)
+    results_by_provider: dict[str, tuple[ExternalProviderFetchSummary, list[ExternalCandidate]]] = {}
+
+    with ThreadPoolExecutor(max_workers=len(ordered_adapters)) as executor:
+        future_to_adapter = {
+            executor.submit(
+                _run_adapter_search,
+                adapter,
+                normalized_query,
+                subject_hint=subject_hint,
+                preferred_tags=preferred_tags,
+                per_provider_limit=per_provider_limit,
+            ): adapter
+            for adapter in ordered_adapters
+        }
+        done, not_done = wait(future_to_adapter.keys(), timeout=wall_timeout)
+        for future in done:
+            adapter = future_to_adapter[future]
+            try:
+                results_by_provider[adapter.provider] = future.result()
+            except Exception as exc:
+                results_by_provider[adapter.provider] = (
+                    build_provider_failure_summary(adapter, error_message=str(exc), latency_ms=0),
+                    [],
+                )
+        for future in not_done:
+            future.cancel()
+            adapter = future_to_adapter[future]
+            results_by_provider[adapter.provider] = (
+                build_provider_failure_summary(
+                    adapter,
+                    error_message="等待站外候选响应超时",
+                    latency_ms=int(wall_timeout * 1000),
+                ),
+                [],
+            )
+
+    provider_summaries: list[ExternalProviderFetchSummary] = []
+    candidates: list[ExternalCandidate] = []
+    seen_urls: set[str] = set()
+    for adapter in ordered_adapters:
+        summary, provider_items = results_by_provider.get(
+            adapter.provider,
+            (
+                build_provider_failure_summary(adapter, error_message="未执行抓取", latency_ms=0),
+                [],
+            ),
+        )
+        provider_summaries.append(summary)
+        for item in provider_items:
+            if not item.external_url or item.external_url in seen_urls:
+                continue
+            seen_urls.add(item.external_url)
+            candidates.append(item)
+            if len(candidates) >= limit:
+                break
+        if len(candidates) >= limit:
+            break
+
+    return ExternalCandidateFetchReport(candidates=candidates[:limit], providers=provider_summaries)
+
+
+def _fetch_report_sequential(
+    normalized_query: str,
+    *,
+    subject_hint: str,
+    preferred_tags: Optional[list[str]],
+    preferred_provider: str,
+    limit: int,
+) -> ExternalCandidateFetchReport:
+    """串行抓取（与旧行为一致，便于对照）。"""
+    candidates: list[ExternalCandidate] = []
+    provider_summaries: list[ExternalProviderFetchSummary] = []
+    seen_urls: set[str] = set()
+    per_provider_limit = 1 if limit <= 3 else 2
+    for adapter in get_ordered_external_candidate_adapters(preferred_provider):
+        summary, provider_items = _run_adapter_search(
+            adapter,
+            normalized_query,
+            subject_hint=subject_hint,
+            preferred_tags=preferred_tags,
+            per_provider_limit=per_provider_limit,
+        )
+        provider_summaries.append(summary)
+        for item in provider_items:
+            if not item.external_url or item.external_url in seen_urls:
+                continue
+            seen_urls.add(item.external_url)
+            candidates.append(item)
+            if len(candidates) >= limit:
+                break
+        if len(candidates) >= limit:
+            break
+
+    return ExternalCandidateFetchReport(candidates=candidates[:limit], providers=provider_summaries)
+
+
 def serialize_provider_summary(summary: ExternalProviderFetchSummary) -> dict:
     """序列化 provider 摘要。"""
     return {
@@ -660,6 +850,7 @@ def fetch_external_candidates_report(
     *,
     subject_hint: str = "",
     preferred_tags: Optional[list[str]] = None,
+    preferred_provider: str = "",
     limit: int = 3,
 ) -> ExternalCandidateFetchReport:
     """按统一接口抓取站外候选元数据并返回 provider 摘要。"""
@@ -670,84 +861,33 @@ def fetch_external_candidates_report(
         normalized_query,
         subject_hint=subject_hint,
         preferred_tags=preferred_tags,
+        preferred_provider=preferred_provider,
         limit=limit,
     )
     if cached_report is not None:
         return cached_report
 
-    candidates = []
-    provider_summaries = []
-    seen_urls = set()
-    per_provider_limit = 1 if limit <= 3 else 2
-    for adapter in EXTERNAL_CANDIDATE_ADAPTERS:
-        start = perf_counter()
-        log_provider_fetch_start(adapter, normalized_query)
-        try:
-            provider_items = adapter.search(
-                normalized_query,
-                subject_hint=subject_hint,
-                preferred_tags=list(preferred_tags or []),
-                limit=per_provider_limit,
-            )
-        except requests.RequestException as exc:
-            latency_ms = int((perf_counter() - start) * 1000)
-            error_message = str(exc)
-            log_provider_fetch_failure(
-                adapter,
-                query_text=normalized_query,
-                error_message=error_message,
-                latency_ms=latency_ms,
-            )
-            provider_summaries.append(
-                build_provider_failure_summary(adapter, error_message=error_message, latency_ms=latency_ms)
-            )
-            continue
-        except Exception as exc:
-            latency_ms = int((perf_counter() - start) * 1000)
-            error_message = str(exc)
-            log_provider_fetch_failure(
-                adapter,
-                query_text=normalized_query,
-                error_message=error_message,
-                latency_ms=latency_ms,
-            )
-            provider_summaries.append(
-                build_provider_failure_summary(adapter, error_message=error_message, latency_ms=latency_ms)
-            )
-            continue
-
-        provider_added = 0
-        for item in provider_items:
-            if not item.external_url or item.external_url in seen_urls:
-                continue
-            seen_urls.add(item.external_url)
-            candidates.append(item)
-            provider_added += 1
-            if len(candidates) >= limit:
-                break
-
-        latency_ms = int((perf_counter() - start) * 1000)
-        log_provider_fetch_success(
-            adapter,
-            query_text=normalized_query,
-            candidate_count=provider_added,
-            latency_ms=latency_ms,
+    if getattr(settings, "RECOMMENDATION_EXTERNAL_FETCH_PARALLEL", True):
+        report = _fetch_report_parallel(
+            normalized_query,
+            subject_hint=subject_hint,
+            preferred_tags=preferred_tags,
+            preferred_provider=preferred_provider,
+            limit=limit,
         )
-        provider_summaries.append(
-            build_provider_success_summary(
-                adapter,
-                candidate_count=provider_added,
-                latency_ms=latency_ms,
-            )
+    else:
+        report = _fetch_report_sequential(
+            normalized_query,
+            subject_hint=subject_hint,
+            preferred_tags=preferred_tags,
+            preferred_provider=preferred_provider,
+            limit=limit,
         )
-        if len(candidates) >= limit:
-            break
-
-    report = ExternalCandidateFetchReport(candidates=candidates[:limit], providers=provider_summaries)
     set_cached_external_candidate_report(
         normalized_query,
         subject_hint=subject_hint,
         preferred_tags=preferred_tags,
+        preferred_provider=preferred_provider,
         limit=limit,
         report=report,
     )

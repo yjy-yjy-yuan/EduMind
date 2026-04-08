@@ -16,11 +16,8 @@
       <div class="hero-tip">当前阶段仅实现 UI 页面与交互占位；真实功能将在后续通过预留接口接入。</div>
     </section>
 
-    <section class="card">
+    <section class="card card--flow">
       <div class="title">使用流程</div>
-      <div class="workflow-flow" aria-label="使用流程图">
-        <div v-for="step in flowSteps" :key="step" class="workflow-flow__step">{{ step }}</div>
-      </div>
       <ol class="ol">
         <li>登录/注册后进入系统</li>
         <li>上传本地视频或粘贴链接</li>
@@ -33,7 +30,11 @@
     <section class="card">
       <div class="title">详细教程</div>
       <div class="accordions">
-        <details class="acc" open>
+        <details
+          class="acc"
+          :open="openAccordionId === TUTORIAL.LOGIN"
+          @toggle="onAccordionToggle(TUTORIAL.LOGIN, $event)"
+        >
           <summary class="acc-summary">
             <span class="acc-badge">01</span>
             <span class="acc-title">登录 / 注册</span>
@@ -51,7 +52,11 @@
           </div>
         </details>
 
-        <details class="acc">
+        <details
+          class="acc"
+          :open="openAccordionId === TUTORIAL.UPLOAD"
+          @toggle="onAccordionToggle(TUTORIAL.UPLOAD, $event)"
+        >
           <summary class="acc-summary">
             <span class="acc-badge">02</span>
             <span class="acc-title">视频上传与分析</span>
@@ -70,9 +75,52 @@
           </div>
         </details>
 
-        <details class="acc">
+        <details
+          class="acc"
+          :open="openAccordionId === TUTORIAL.PREFS"
+          @toggle="onAccordionToggle(TUTORIAL.PREFS, $event)"
+        >
           <summary class="acc-summary">
             <span class="acc-badge">03</span>
+            <span class="acc-title">偏好设置</span>
+          </summary>
+          <div class="acc-body">
+            <ol class="ol">
+              <li>在「上传」页可配置处理偏好（Whisper 模型、摘要风格、语言与端侧转录等，随版本迭代）</li>
+              <li>偏好会保存在本机，便于下次上传沿用同一习惯</li>
+              <li>若使用 iOS 容器，系统权限与离线转录能力也会影响可用选项</li>
+            </ol>
+
+            <div class="pref-explain">
+              <div class="pref-explain__block">
+                <div class="pref-explain__title">选择不同模型会有什么效果</div>
+                <p>
+                  这里的「模型」指转录所用的 Whisper
+                  档位（如 tiny、base、small、medium、large、turbo）。档位越小通常越快、占用更低，但听写细节更容易丢；档位越大一般越利于准确率与复杂语句，但耗时与资源占用更高。turbo
+                  偏向更快出初稿。实际列表与是否可离线使用，以「上传」页当前展示及 iOS/后端能力为准。
+                </p>
+              </div>
+              <div class="pref-explain__block">
+                <div class="pref-explain__title">选择不同摘要风格会有什么效果</div>
+                <p>
+                  摘要风格（简洁 / 学习 / 详细）会改变自动生成摘要的长度与结构：「简洁」更短、抓要点；「学习」更偏复习提纲与结构化表达；「详细」会展开更多上下文。同一视频在不同风格下会得到不同侧重点的摘要文本，可在上传页切换后对新任务生效。
+                </p>
+              </div>
+            </div>
+
+            <div class="acc-actions acc-actions--single">
+              <button class="btn btn--primary" @click="go('/upload')">前往上传</button>
+            </div>
+          </div>
+        </details>
+
+        <details
+          class="acc"
+          :open="openAccordionId === TUTORIAL.PLAY"
+          @toggle="onAccordionToggle(TUTORIAL.PLAY, $event)"
+        >
+          <summary class="acc-summary">
+            <span class="acc-badge">04</span>
             <span class="acc-title">视频播放</span>
           </summary>
           <div class="acc-body">
@@ -87,9 +135,13 @@
           </div>
         </details>
 
-        <details class="acc">
+        <details
+          class="acc"
+          :open="openAccordionId === TUTORIAL.QA"
+          @toggle="onAccordionToggle(TUTORIAL.QA, $event)"
+        >
           <summary class="acc-summary">
-            <span class="acc-badge">04</span>
+            <span class="acc-badge">05</span>
             <span class="acc-title">智能问答</span>
           </summary>
           <div class="acc-body">
@@ -104,9 +156,13 @@
           </div>
         </details>
 
-        <details class="acc">
+        <details
+          class="acc"
+          :open="openAccordionId === TUTORIAL.NOTES"
+          @toggle="onAccordionToggle(TUTORIAL.NOTES, $event)"
+        >
           <summary class="acc-summary">
-            <span class="acc-badge">05</span>
+            <span class="acc-badge">06</span>
             <span class="acc-title">笔记系统辅助学习</span>
           </summary>
           <div class="acc-body">
@@ -122,9 +178,13 @@
           </div>
         </details>
 
-        <details class="acc">
+        <details
+          class="acc"
+          :open="openAccordionId === TUTORIAL.PATH"
+          @toggle="onAccordionToggle(TUTORIAL.PATH, $event)"
+        >
           <summary class="acc-summary">
-            <span class="acc-badge">06</span>
+            <span class="acc-badge">07</span>
             <span class="acc-title">学习路径</span>
           </summary>
           <div class="acc-body">
@@ -144,7 +204,11 @@
     <section class="card">
       <div class="title">常见问题</div>
       <div class="accordions">
-        <details class="acc">
+        <details
+          class="acc"
+          :open="openAccordionId === FAQ.UPLOAD"
+          @toggle="onAccordionToggle(FAQ.UPLOAD, $event)"
+        >
           <summary class="acc-summary">
             <span class="acc-title">如何上传视频？</span>
           </summary>
@@ -152,7 +216,11 @@
             在“上传”页面选择本地视频文件或输入视频链接即可开始上传。
           </div>
         </details>
-        <details class="acc">
+        <details
+          class="acc"
+          :open="openAccordionId === FAQ.DURATION"
+          @toggle="onAccordionToggle(FAQ.DURATION, $event)"
+        >
           <summary class="acc-summary">
             <span class="acc-title">视频处理需要多长时间？</span>
           </summary>
@@ -160,7 +228,11 @@
             当前为 UI-only 阶段，页面使用本地 mock 数据模拟处理时间与状态变化。
           </div>
         </details>
-        <details class="acc">
+        <details
+          class="acc"
+          :open="openAccordionId === FAQ.AI_QA"
+          @toggle="onAccordionToggle(FAQ.AI_QA, $event)"
+        >
           <summary class="acc-summary">
             <span class="acc-title">如何使用 AI 问答功能？</span>
           </summary>
@@ -168,7 +240,11 @@
             当前问答页使用占位回复演示交互；后续会切换到正式问答接口。
           </div>
         </details>
-        <details class="acc">
+        <details
+          class="acc"
+          :open="openAccordionId === FAQ.BLANK"
+          @toggle="onAccordionToggle(FAQ.BLANK, $event)"
+        >
           <summary class="acc-summary">
             <span class="acc-title">页面打不开/白屏怎么办？</span>
           </summary>
@@ -182,10 +258,43 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+const TUTORIAL = Object.freeze({
+  LOGIN: 'tutorial-login',
+  UPLOAD: 'tutorial-upload',
+  PREFS: 'tutorial-prefs',
+  PLAY: 'tutorial-play',
+  QA: 'tutorial-qa',
+  NOTES: 'tutorial-notes',
+  PATH: 'tutorial-path'
+})
+
+const FAQ = Object.freeze({
+  UPLOAD: 'faq-upload',
+  DURATION: 'faq-duration',
+  AI_QA: 'faq-ai-qa',
+  BLANK: 'faq-blank'
+})
+
 const router = useRouter()
-const flowSteps = ['登录', '上传', '分析', '播放', '问答', '笔记', '路径']
+
+/** 全局唯一展开项：详细教程与常见问题共用，保证同时仅一个 details 面板展开 */
+const openAccordionId = ref(TUTORIAL.LOGIN)
+
+const onAccordionToggle = (id, event) => {
+  const el = event.currentTarget
+  if (!(el instanceof HTMLDetailsElement)) return
+  if (el.open) {
+    openAccordionId.value = id
+    return
+  }
+  if (openAccordionId.value === id) {
+    openAccordionId.value = null
+  }
+}
+
 const goBack = () => {
   if (window.history.length > 1) router.back()
   else router.replace('/')
@@ -234,6 +343,7 @@ const go = (path) => router.push(path)
   background: linear-gradient(135deg, #a792bc, #7f698f);
   box-shadow: var(--shadow-sm);
   border: 1px solid rgba(255, 255, 255, 0.18);
+  margin-bottom: 18px;
 }
 
 .hero-title {
@@ -261,22 +371,32 @@ const go = (path) => router.push(path)
   opacity: 0.92;
 }
 
-.workflow-flow {
+.pref-explain {
   margin-top: 14px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  gap: 12px;
 }
 
-.workflow-flow__step {
-  position: relative;
-  padding: 10px 14px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, rgba(139, 121, 157, 0.12), rgba(183, 157, 213, 0.22));
-  color: #0f4c5c;
-  font-size: 12px;
+.pref-explain__block {
+  padding: 12px 12px 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(139, 121, 157, 0.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 232, 249, 0.85));
+}
+
+.pref-explain__title {
+  margin: 0 0 8px;
+  font-size: 13px;
   font-weight: 900;
-  letter-spacing: 0.02em;
+  color: var(--primary-deep, #4b3f63);
+  letter-spacing: 0.01em;
+}
+
+.pref-explain__block p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text);
 }
 
 .btn {
@@ -303,6 +423,10 @@ const go = (path) => router.push(path)
   display: grid;
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.card--flow {
+  margin-top: 4px;
 }
 
 .title {
@@ -336,12 +460,18 @@ const go = (path) => router.push(path)
   border-radius: var(--radius-sm);
   background: #fff;
   overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.acc[open] {
+  box-shadow: inset 0 0 0 1px rgba(139, 121, 157, 0.12);
 }
 
 .acc-summary {
   list-style: none;
   cursor: pointer;
   padding: 12px;
+  -webkit-tap-highlight-color: transparent;
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 10px;
@@ -373,6 +503,7 @@ const go = (path) => router.push(path)
   color: var(--text);
   font-size: 13px;
   line-height: 1.7;
+  transition: opacity 0.18s ease;
 }
 
 .acc-actions {
@@ -380,6 +511,11 @@ const go = (path) => router.push(path)
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+}
+
+.acc-actions--single {
+  grid-template-columns: 1fr;
+  max-width: 220px;
 }
 
 .acc-note {
@@ -390,6 +526,7 @@ const go = (path) => router.push(path)
 </style>
 <style scoped>
 .hero {
+  margin-bottom: 18px;
   background:
     radial-gradient(circle at right top, rgba(255, 255, 255, 0.24), transparent 44%),
     linear-gradient(145deg, #8b799d, #665775);

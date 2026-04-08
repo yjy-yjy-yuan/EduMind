@@ -116,11 +116,8 @@
 
 ### 2026-03-30
 - `6c4fe40` `fix(note-edit): compact timestamp card layout`
-- 继续收缩单个笔记编辑页，压平重点时间点为轻量单行结构，保留删除笔记卡片。
-- 调整视频详情页，将“开始处理/播放/问答”卡片移动到“Whisper 模型”下方，保持“删除视频”位置不变。
-
-- 分支创建：`2026-03-29`
-- 创建基线：`089a234` `style(mobile-frontend): refine upload and tab bar chrome`
+  - 继续收缩单个笔记编辑页，压平重点时间点为轻量单行结构，保留删除笔记卡片。
+  - 调整视频详情页，将「开始处理/播放/问答」卡片移动到「Whisper 模型」下方，保持「删除视频」位置不变。
 
 ### 2026-03-29
 - `3bcee95` `feat(agent): add backend learning flow`
@@ -131,3 +128,15 @@
 - `bb7c5f6` `feat(player): simplify auto note titles`
 - `cd15a84` `fix(agent): simplify note title fallback`
 - `c79f30e` `fix(frontend): ignore abort bootstrap errors`
+
+## 0331-refactor/recommendation-flow
+
+- 分支创建：`2026-03-31`
+- 创建基线：`8d4542a` `feat(learning): converge note workflow into player-first timestamp capture (#17)`
+
+### 2026-03-31
+- `dae4292` `fix(auth): enforce expiring auth tokens across mobile and ios flows`
+
+### 2026-04-01
+- `a007418` `feat(recommendation): harden pipeline and align note-QA learning flow`
+- `67bc068` `feat(mobile): refine guide accordion and home layout`

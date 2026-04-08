@@ -130,27 +130,6 @@
       </div>
     </section>
 
-    <section class="support-strip ios-card">
-      <div class="section-head section-head--compact">
-        <div>
-          <h2>辅助入口</h2>
-          <p>保留高频学习动作，其余入口用轻量方式承接，不打断主页面节奏。</p>
-        </div>
-      </div>
-      <div class="support-strip__list">
-        <button
-          v-for="item in supportActions"
-          :key="item.route"
-          class="support-link"
-          @click="go(item.route)"
-        >
-          <span class="quick-card__tag" :class="item.tagClass">{{ item.tag }}</span>
-          <span class="support-link__label">{{ item.title }}</span>
-          <span class="support-link__arrow">›</span>
-        </button>
-      </div>
-    </section>
-
     <section class="recommend-panel ios-card">
       <div class="section-head">
         <div>
@@ -182,6 +161,11 @@
 
       <div v-if="recommendationQuerySummary" class="message message--hint">
         <span>本轮站外检索围绕：{{ recommendationQuerySummary }}</span>
+      </div>
+
+      <div v-if="recommendationExternalFetchBanner" class="message message--warn">
+        <span>{{ recommendationExternalFetchBanner }}</span>
+        <button type="button" class="overview-link" @click="go('/recommendations')">去推荐页</button>
       </div>
 
       <div v-if="recommendationProviderReports.length > 0" class="recommend-provider-list">
@@ -250,17 +234,16 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BrandLogo from '@/components/BrandLogo.vue'
 import { getVideoRecommendations } from '@/api/recommendation'
+import { shouldIncludeExternalRecommendationsByDefault } from '@/config'
+import {
+  isRecommendationPrimaryActionDisabled,
+  parseRecommendationActionTarget,
+  resolveRecommendationUrl,
+  shouldOpenRecommendationExternalSource
+} from '@/services/recommendationActions'
 import { getVideoList } from '@/api/video'
 import { listNativeOfflineTranscripts } from '@/services/nativeOfflineTranscripts'
 import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
-
-const quickActions = [
-  { route: '/local-transcripts', tag: '本地', tagClass: 'tag--mint', title: '本地转录', desc: '查看 iOS 离线转录结果' },
-  { route: '/notes', tag: '笔记', tagClass: 'tag--leaf', title: '学习笔记', desc: '把结论沉淀成稳定回看入口' },
-  { route: '/qa', tag: '问答', tagClass: 'tag--lilac', title: 'AI 问答', desc: '围绕课程内容继续追问' },
-  { route: '/recommendations', tag: '推荐', tagClass: 'tag--cobalt', title: '推荐学习', desc: '集中查看继续学习、复盘与相关推荐' },
-  { route: '/learning-path', tag: '路径', tagClass: 'tag--teal', title: '学习路径', desc: '后续承接推荐学习顺序' }
-]
 
 const router = useRouter()
 const loading = ref(false)
@@ -279,8 +262,6 @@ const recommendationMeta = ref({
   externalFailedProviderCount: 0,
   externalFetchFailed: false
 })
-
-const supportActions = computed(() => quickActions)
 
 const normalizeList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
@@ -420,7 +401,11 @@ const reloadRecommendations = async () => {
   recommendationLoading.value = true
   recommendationError.value = ''
   try {
-    const res = await getVideoRecommendations({ scene: 'home', limit: 4, include_external: true })
+    const res = await getVideoRecommendations({
+      scene: 'home',
+      limit: 4,
+      include_external: shouldIncludeExternalRecommendationsByDefault()
+    })
     const payload = res?.data || {}
     const items = normalizeRecommendationItems(payload)
     recommendations.value = items.length > 0 ? items : fallbackRecommendations(allVideos.value)
@@ -459,9 +444,7 @@ const decorateRecommendationItem = (item) => ({
   subjectText: String(item?.subject || '').trim() ? `科目 · ${String(item.subject).trim()}` : '',
   importHint: String(item?.import_hint || '').trim(),
   actionTarget: String(item?.action_target || '').trim(),
-  primaryActionDisabled: isExternalRecommendation(item)
-    ? !Boolean(item?.can_import ?? resolveRecommendationUrl(item))
-    : false
+  primaryActionDisabled: isRecommendationPrimaryActionDisabled(item, isExternalRecommendation(item))
 })
 const recommendationCards = computed(() => recommendations.value.map((item) => decorateRecommendationItem(item)))
 const externalRecommendationCount = computed(() => recommendationCards.value.filter((item) => isExternalRecommendation(item)).length)
@@ -476,6 +459,9 @@ const recommendationQuerySummary = computed(() => {
   const query = recommendationMeta.value.externalQuery
   if (!query) return ''
   const parts = [query.subject, query.primary_topic].filter(Boolean)
+  if (query.preferred_provider_label) {
+    parts.push(`优先来源：${query.preferred_provider_label}`)
+  }
   if (Array.isArray(query.preferred_tags) && query.preferred_tags.length > 0) {
     parts.push(`优先标签：${query.preferred_tags.join('、')}`)
   }
@@ -496,28 +482,23 @@ const providerStatusText = (provider) => {
   if (provider?.status === 'empty') return '暂无候选'
   return `${Number(provider?.candidate_count || 0)} 条候选`
 }
+const recommendationExternalFetchBanner = computed(() => {
+  if (!recommendationMeta.value.externalFetchFailed) return ''
+  return '部分站外来源未返回结果，站内推荐仍可使用。可检查网络后刷新本页，或前往推荐页重试；若需加快首屏，请保持关闭站外（环境变量 VITE_RECOMMENDATION_INCLUDE_EXTERNAL）。'
+})
+
 const providerStatusDetail = (provider) => {
-  if (provider?.status === 'failed') return String(provider?.error_message || '当前 provider 抓取失败，请到推荐页查看详情。')
+  if (provider?.status === 'failed')
+    return String(
+      provider?.error_message ||
+        '当前来源抓取失败。可检查网络、稍后再试，或在环境变量中关闭站外默认加载。'
+    )
   if (provider?.status === 'empty') return `当前已检索但没有返回可用候选，耗时 ${Number(provider?.latency_ms || 0)} ms`
   return `本轮抓取耗时 ${Number(provider?.latency_ms || 0)} ms，可在推荐页继续导入。`
 }
 
 const recommendationKey = (item) =>
   String(item?.id || item?.external_url || item?.target_url || item?.source_url || item?.link || item?.title || 'recommendation')
-
-const resolveRecommendationUrl = (item) =>
-  String(item?.external_url || item?.target_url || item?.source_url || item?.link || '').trim()
-const parseRecommendationActionTarget = (target) => {
-  const text = String(target || '').trim()
-  if (!text || !text.startsWith('/')) return null
-  const [path, search = ''] = text.split('?')
-  if (!search) return { path }
-  const query = {}
-  new URLSearchParams(search).forEach((value, key) => {
-    query[key] = value
-  })
-  return { path, query }
-}
 
 const isExternalRecommendation = (item) => {
   const itemType = String(item?.item_type || item?.content_type || item?.origin_type || '').trim().toLowerCase()
@@ -546,12 +527,20 @@ const openRecommendation = (item) => {
     recommendationError.value = item.importHint || '当前站外候选暂不可直接导入。'
     return
   }
-  const actionLocation = parseRecommendationActionTarget(item?.actionTarget || item?.action_target)
+  const actionTarget = String(item?.actionTarget || item?.action_target || '').trim()
+  const actionLocation = parseRecommendationActionTarget(actionTarget)
   if (actionLocation) {
     router.push(actionLocation)
     return
   }
   if (isExternalRecommendation(item)) {
+    if (shouldOpenRecommendationExternalSource(item)) {
+      const externalTarget = actionTarget || resolveRecommendationUrl(item)
+      if (externalTarget && typeof window !== 'undefined') {
+        window.location.assign(externalTarget)
+        return
+      }
+    }
     const url = resolveRecommendationUrl(item)
     if (!url) return
     router.push({
@@ -584,8 +573,7 @@ onMounted(reloadDashboard)
 
 .welcome,
 .overview,
-.recommend-panel,
-.support-strip {
+.recommend-panel {
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(17, 24, 39, 0.08);
@@ -842,8 +830,7 @@ onMounted(reloadDashboard)
 .summary-card,
 .focus-card,
 .recommend-card,
-.video-item,
-.support-link {
+.video-item {
   border: 1px solid rgba(17, 24, 39, 0.08);
   background: rgba(247, 241, 251, 0.96);
 }
@@ -928,8 +915,7 @@ onMounted(reloadDashboard)
 }
 
 .overview,
-.recommend-panel,
-.support-strip {
+.recommend-panel {
   display: grid;
   gap: 16px;
   padding: 20px;
@@ -1137,77 +1123,10 @@ onMounted(reloadDashboard)
   color: var(--info-text);
 }
 
-.video-item__arrow,
-.support-card__arrow {
+.video-item__arrow {
   color: #8b7da3;
   font-size: 20px;
   line-height: 1;
-}
-
-.quick-card__tag {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 4px 9px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.tag--mint {
-  background: rgba(234, 225, 246, 0.92);
-  color: var(--ok-text);
-}
-
-.tag--leaf {
-  background: rgba(233, 224, 243, 0.92);
-  color: #6b5b84;
-}
-
-.tag--lilac {
-  background: var(--lilac-bg);
-  color: var(--lilac-text);
-}
-
-.tag--teal {
-  background: rgba(231, 220, 243, 0.94);
-  color: #6e5d7f;
-}
-
-.tag--cobalt {
-  background: var(--info-bg);
-  color: var(--info-text);
-}
-
-.section-head--compact {
-  align-items: flex-start;
-}
-
-.support-strip__list {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.support-link {
-  width: 100%;
-  border-radius: 18px;
-  padding: 14px 15px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-align: left;
-}
-
-.support-link__label {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 700;
-  color: #111827;
-}
-
-.support-link__arrow {
-  color: #8b7da3;
-  font-size: 18px;
 }
 
 .recommend-list {
@@ -1280,6 +1199,14 @@ onMounted(reloadDashboard)
   border-color: var(--primary-soft);
 }
 
+.message--warn {
+  justify-content: flex-start;
+  color: rgba(120, 53, 15, 0.95);
+  background: rgba(254, 243, 199, 0.95);
+  border-style: solid;
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
 .skeleton-item {
   height: 64px;
   border-radius: 18px;
@@ -1311,8 +1238,7 @@ onMounted(reloadDashboard)
   .hero-actions,
   .summary-grid,
   .recommend-summary,
-  .recommend-list,
-  .support-strip__list {
+  .recommend-list {
     grid-template-columns: 1fr;
   }
 

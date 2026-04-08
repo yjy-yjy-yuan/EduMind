@@ -12,7 +12,7 @@ const parseJSON = (text, fallback = null) => {
   }
 }
 
-const isBackendAuthToken = (token) => /^\d+\.[a-f0-9]{64}$/i.test(String(token || ''))
+const isBackendAuthToken = (token) => /^\d+\.(?:\d+\.)?[a-f0-9]{64}$/i.test(String(token || ''))
 
 const storedUser = parseJSON(storageGet('m_user'), null)
 const storedToken = storageGet('m_token')

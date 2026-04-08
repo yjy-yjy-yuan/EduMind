@@ -9,6 +9,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 VENV_PYTHON="${REPO_DIR}/.venv/bin/python"
+PYCACHE_DIR="${REPO_DIR}/.pycache-hook"
 
 if [ ! -x "$VENV_PYTHON" ]; then
   echo "Missing ${VENV_PYTHON}. Create the project virtualenv before pushing." >&2
@@ -37,10 +38,21 @@ echo "Running mypy..."
     scripts/hooks
 )
 
-echo "Running backend fast test suite..."
+echo "Running backend syntax validation..."
 (
   cd "$REPO_DIR"
-  "$VENV_PYTHON" -m pytest backend_fastapi/tests/unit backend_fastapi/tests/api backend_fastapi/tests/smoke -q
+  mkdir -p "$PYCACHE_DIR"
+  PYTHONPYCACHEPREFIX="$PYCACHE_DIR" "$VENV_PYTHON" -m compileall \
+    backend_fastapi/app \
+    backend_fastapi/scripts \
+    scripts/hooks \
+    scripts/validate_backend_smoke.py
+)
+
+echo "Running backend smoke validation..."
+(
+  cd "$REPO_DIR"
+  "$VENV_PYTHON" scripts/validate_backend_smoke.py
 )
 
 echo "Running mobile iOS build..."

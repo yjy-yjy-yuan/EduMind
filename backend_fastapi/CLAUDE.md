@@ -9,13 +9,9 @@ FastAPI + SQLAlchemy 2.0 + ProcessPoolExecutor 后端服务
 python run.py
 uvicorn app.main:app --reload --port 2004
 
-# 测试
-pytest tests/ -v                    # 所有测试
-pytest tests/smoke/ -v              # 冒烟测试
-pytest tests/api/ -v                # API 测试
-pytest tests/unit/ -v               # 单元测试
-pytest -m smoke                     # 按标记运行
-pytest --cov=app --cov-report=html  # 覆盖率报告
+# 验证
+python ../scripts/validate_backend_smoke.py
+mkdir -p ../.pycache-hook && PYTHONPYCACHEPREFIX="$PWD/../.pycache-hook" python -m compileall app scripts ../scripts/hooks ../scripts/validate_backend_smoke.py
 
 # 数据库迁移
 alembic revision --autogenerate -m "描述"
@@ -72,14 +68,9 @@ async def get_video(video_id: int, db: Session = Depends(get_db)):
 ## Testing
 
 ```bash
-# PYTHONPATH 设置 (如果需要)
-PYTHONPATH=. pytest tests/ -v
-
-# 测试标记
-# @pytest.mark.smoke   - 冒烟测试
-# @pytest.mark.unit    - 单元测试
-# @pytest.mark.api     - API 测试
-# @pytest.mark.slow    - 慢速测试
+# 当前仓库要求修改程序时不要使用 pytest 做验证
+python ../scripts/validate_backend_smoke.py
+mkdir -p ../.pycache-hook && PYTHONPYCACHEPREFIX="$PWD/../.pycache-hook" python -m compileall app scripts ../scripts/hooks ../scripts/validate_backend_smoke.py
 ```
 
 ## Development Environment

@@ -4,6 +4,7 @@
       <h2>笔记</h2>
       <div class="actions">
         <button class="link" @click="reload" :disabled="loading">{{ loading ? '…' : '刷新' }}</button>
+        <button class="link" @click="goToQa">问答</button>
         <button class="link" @click="goNewNote">新建</button>
       </div>
     </header>
@@ -63,6 +64,11 @@
 
       <div class="filter-actions">
         <button class="btn btn--primary" @click="applyFilters" :disabled="loading">应用筛选</button>
+      </div>
+
+      <div class="qa-row">
+        <span class="qa-row__text">{{ filters.videoId ? '已选视频，可带着上下文去追问。' : '打开 AI 问答；在上方选择「关联视频」后可带着该视频追问。' }}</span>
+        <button type="button" class="link" @click="goToQa">去问答</button>
       </div>
     </section>
 
@@ -313,6 +319,13 @@ const goNewNote = () => {
   router.push({ path: '/notes/new', query })
 }
 
+const goToQa = () => {
+  const query = {}
+  if (filters.videoId) query.videoId = String(filters.videoId)
+  if (selectedVideoTitle.value) query.videoTitle = selectedVideoTitle.value
+  router.push({ path: '/qa', query })
+}
+
 const clearFocusState = async () => {
   const query = { ...route.query }
   delete query.noteId
@@ -543,6 +556,24 @@ onMounted(reload)
 .filter-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.qa-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding-top: 4px;
+  border-top: 1px dashed rgba(32, 42, 55, 0.12);
+}
+
+.qa-row__text {
+  flex: 1 1 200px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+  font-weight: 600;
 }
 
 .btn {

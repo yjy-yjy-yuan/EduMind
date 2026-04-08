@@ -80,9 +80,12 @@
 
             <div class="timestamp-actions">
               <div class="time-preview">{{ formatSeconds(item.timeSeconds) }}</div>
+              <button type="button" class="timestamp-remove" @click="removeTimestampRow(item.localKey)">移除</button>
             </div>
           </div>
         </div>
+
+        <button type="button" class="mini" @click="addEmptyTimestampRow">添加时间点</button>
       </section>
 
       <button v-if="!isNew" class="danger" @click="remove" :disabled="saving">删除笔记</button>
@@ -93,7 +96,7 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { addNoteTimestamp, createNote, deleteNote, getNote, updateNote } from '@/api/note'
+import { addNoteTimestamp, createNote, deleteNote, deleteNoteTimestamp, getNote, updateNote } from '@/api/note'
 import { getSubtitleContext } from '@/api/subtitle'
 import { getVideo, getVideoList } from '@/api/video'
 import {
@@ -453,21 +456,69 @@ const timestampsEqual = (current, original) =>
   Math.abs(Number(current?.timeSeconds || 0) - Number(original?.timeSeconds || 0)) < 0.001 &&
   normalizeText(current?.subtitleText) === normalizeText(original?.subtitleText)
 
+const extractNewTimestampId = (response) => {
+  const body = response?.data
+  const inner = body?.data ?? body
+  const id = inner?.id
+  return id != null && id !== '' ? Number(id) : null
+}
+
+const removeTimestampRow = (localKey) => {
+  timestamps.value = timestamps.value.filter((item) => item.localKey !== localKey)
+}
+
+const addEmptyTimestampRow = () => {
+  timestamps.value = sortTimestamps([
+    ...timestamps.value,
+    toEditableTimestamp({ time_seconds: 0, subtitle_text: '' })
+  ])
+}
+
 const syncTimestamps = async (noteId) => {
-  const currentById = new Map(timestamps.value.filter((item) => item.id).map((item) => [Number(item.id), item]))
+  const list = timestamps.value
+  const currentById = new Map(
+    list.filter((item) => item.id != null && item.id !== '').map((item) => [Number(item.id), item])
+  )
+  const originalById = new Map(originalTimestamps.value.map((o) => [Number(o.id), o]))
 
-  for (const original of originalTimestamps.value) {
-    const current = currentById.get(Number(original.id))
-    if (!current) continue
-
-    if (!timestampsEqual(current, original)) {
-      await addNoteTimestamp(noteId, toTimestampPayload(current))
+  for (const orig of originalTimestamps.value) {
+    const oid = Number(orig.id)
+    if (!Number.isFinite(oid) || oid <= 0) continue
+    if (!currentById.has(oid)) {
+      await deleteNoteTimestamp(noteId, oid)
     }
   }
 
-  for (const item of timestamps.value.filter((entry) => !entry.id)) {
-    await addNoteTimestamp(noteId, toTimestampPayload(item))
+  for (const item of list) {
+    if (item.id != null && item.id !== '') continue
+    const res = await addNoteTimestamp(noteId, toTimestampPayload(item))
+    const newId = extractNewTimestampId(res)
+    if (newId) {
+      item.id = newId
+      item.localKey = `saved-${newId}`
+    }
   }
+
+  for (const item of list) {
+    if (item.id == null || item.id === '') continue
+    const oid = Number(item.id)
+    const orig = originalById.get(oid)
+    if (!orig) continue
+    if (timestampsEqual(item, orig)) continue
+    await deleteNoteTimestamp(noteId, oid)
+    const res = await addNoteTimestamp(noteId, toTimestampPayload(item))
+    const newId = extractNewTimestampId(res)
+    if (newId) {
+      item.id = newId
+      item.localKey = `saved-${newId}`
+    }
+  }
+
+  originalTimestamps.value = timestamps.value.map((item) => ({
+    id: item.id,
+    timeSeconds: item.timeSeconds,
+    subtitleText: item.subtitleText
+  }))
 }
 
 const buildPayload = () => ({
@@ -986,6 +1037,17 @@ onMounted(load)
   font-size: 12px;
   color: #7a667f;
   font-weight: 800;
+}
+
+.timestamp-remove {
+  flex-shrink: 0;
+  border: 1px solid rgba(185, 28, 28, 0.35);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #b91c1c;
+  background: rgba(254, 242, 242, 0.9);
 }
 
 .adder {

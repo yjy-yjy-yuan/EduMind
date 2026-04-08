@@ -93,6 +93,7 @@
               <div class="setting-hint">把视频里的关键结论沉淀到笔记页，形成稳定回看入口。</div>
             </div>
             <div class="block-actions">
+              <button class="mini" @click="openNewVideoNote">新建笔记</button>
               <button class="mini" @click="openVideoNotes">查看全部</button>
             </div>
           </div>
@@ -631,7 +632,21 @@ const importSummaryToNote = async () => {
   }
 }
 
-const qa = () => router.push({ path: '/qa', query: { videoId: String(id.value) } })
+const qa = () => {
+  const title = String(video.value?.title || '').trim()
+  router.push({
+    path: '/qa',
+    query: { videoId: String(id.value), ...(title ? { videoTitle: title } : {}) }
+  })
+}
+
+const openNewVideoNote = () => {
+  const title = String(video.value?.title || '').trim()
+  router.push({
+    path: '/notes/new',
+    query: { videoId: String(id.value), ...(title ? { videoTitle: title } : {}) }
+  })
+}
 
 const openVideoNotes = () => router.push({ path: '/notes', query: { videoId: String(id.value) } })
 

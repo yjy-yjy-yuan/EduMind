@@ -9,7 +9,7 @@
 | Web | FastAPI + Uvicorn |
 | ORM | SQLAlchemy 2.0 |
 | 数据校验 | Pydantic v2 |
-| 后台任务 | ProcessPoolExecutor |
+| 后台任务 | 可配置执行器（本地默认 ThreadPoolExecutor） |
 | AI | Whisper、Ollama / 外部模型服务 |
 
 ## 快速开始
@@ -101,19 +101,22 @@ python run.py
 
 这些接口当前要求 EduMind 用户已登录，前端会自动带上现有 Bearer token。
 
-## 测试
+## 验证与历史测试
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-cd backend_fastapi
-pytest tests/ -v
-pytest -m smoke
-pytest -m api
-pytest --cov=app
+python ../scripts/validate_backend_smoke.py
+mkdir -p ../.pycache-hook
+PYTHONPYCACHEPREFIX="$PWD/../.pycache-hook" python -m compileall app scripts ../scripts/hooks ../scripts/validate_backend_smoke.py
 ```
 
-测试目录约定：
+说明：
+
+- `backend_fastapi/tests/` 仍保留历史回归测试目录和 pytest 风格组织方式。
+- 当前仓库规则要求修改程序时不要用 `pytest` 作为本次验证手段，因此默认验证链路改为 `validate_backend_smoke.py + compileall`。
+
+历史测试目录约定：
 
 - `tests/unit/`：service、task、runtime、工具函数等单元测试
 - `tests/api/`：FastAPI 路由与响应行为测试

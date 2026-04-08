@@ -20,11 +20,14 @@ class Settings(BaseSettings):
     APP_ENV: str = "local"
 
     # 应用配置
-    APP_NAME: str = "AI-EdVision"
+    APP_NAME: str = "EduMind"
     DEBUG: bool = True
     HOST: str = "0.0.0.0"
     PORT: int = 2004  # FastAPI 端口
     SECRET_KEY: str = "dev-secret-key-change-in-production"
+    # 认证 token（HMAC，与 app/utils/auth_token.py 一致）
+    AUTH_TOKEN_TTL_SECONDS: int = 604800  # 默认 7 天
+    AUTH_TOKEN_CLOCK_SKEW_SECONDS: int = 120  # 校验过期时允许的时钟偏差（秒）
     AUTO_CREATE_TABLES: bool = False
     BACKGROUND_TASK_EXECUTOR: str = "auto"
     BACKGROUND_TASK_WORKERS: int = 2
@@ -77,6 +80,13 @@ class Settings(BaseSettings):
     WHISPER_PRELOAD_ON_STARTUP: bool = True
     WHISPER_LOAD_TIMEOUT_SECONDS: int = 60
     WHISPER_DOWNLOAD_TIMEOUT_SECONDS: int = 300
+
+    # 视频推荐：站内候选上限（避免全表扫描）、站外默认开关、站外 HTTP 超时与抓取策略
+    RECOMMENDATION_MAX_CANDIDATES_SCAN: int = 400
+    RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT: bool = False
+    RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS: float = 8.0
+    RECOMMENDATION_EXTERNAL_FETCH_PARALLEL: bool = True
+    RECOMMENDATION_EXTERNAL_FETCH_RETRIES: int = 1
 
     # CORS 配置 (允许前端访问) - 使用字符串，支持逗号分隔
     CORS_ORIGINS: Union[str, List[str]] = (

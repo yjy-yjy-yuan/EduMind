@@ -1,6 +1,60 @@
 # 变更日志
 
+## 2026-04-04
+
+### 推荐同主题来源偏好与推荐页收口
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)、[`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)：`related` 场景会从 seed 视频 URL 推断优先来源 provider，并把该来源写入站外抓取缓存键、provider 抓取顺序、候选排序和 `external_query` 响应，避免同主题扩展时被异来源结果抢前。
+- 更新 [`backend_fastapi/tests/unit/test_video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_video_recommendation_service.py)：补充“同主题相关推荐优先同来源 provider” 的历史回归用例说明，固定当前推荐排序预期。
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)：首页/上传页会展示推荐查询中的“优先来源”；推荐页移除冗余路线/来源说明区，收口为“场景 -> 当前推荐 -> 同主题扩展”主流程，并在相关推荐卡片上直接展示来源徽标。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步当前 `build:ios` 产物，供 iOS `WKWebView` 加载最新推荐页结构。
+- 更新 [`docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)：补充“相关推荐优先同来源 provider” 的当前行为说明，避免推荐文档仍停留在仅同主题、不含来源语境的旧描述。
+
+### Hook 与验证文档纠错（修正过时 pytest 说明）
+- 更新 [`scripts/hooks/pre_push.sh`](/Users/yuan/final-work/EduMind/scripts/hooks/pre_push.sh)、新增 [`scripts/validate_backend_smoke.py`](/Users/yuan/final-work/EduMind/scripts/validate_backend_smoke.py)：将推送前后端校验从 `pytest` 收敛为 `mypy + compileall + backend smoke validation + mobile build:ios`，与仓库“修改程序时禁止使用 pytest 验证”的现行规则保持一致。
+- 更新 [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)、[`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)、[`backend_fastapi/README_RUN.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README_RUN.md)、[`backend_fastapi/tests/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)、[`backend_fastapi/CLAUDE.md`](/Users/yuan/final-work/EduMind/backend_fastapi/CLAUDE.md)：修正文档中仍把 `pytest` 写成当前默认验证命令的过时内容，统一改为现行 smoke/build/static-check 流程。
+- 对 2026-03-17 记录的更正说明：此前 `CHANGELOG.md` 与 `README.md` 中关于 `pre-push` 会运行 `pytest` 的描述已经过时；当前规则应以 `pre-push` 中实际执行的非-`pytest` 验证链路为准。
+
+## 2026-04-01
+
+### 新手使用指南与首页信息架构（Guide / Home / iOS WebAssets）
+- 更新 [`mobile-frontend/src/views/Home.vue`](mobile-frontend/src/views/Home.vue)：移除「辅助入口」整卡及相关脚本与样式，避免首页冗余入口。
+- 更新 [`mobile-frontend/src/views/Guide.vue`](mobile-frontend/src/views/Guide.vue)：
+  - 「使用流程」仅保留有序说明，去掉流程 pill；
+  - 「详细教程」中「偏好设置」补充 Whisper 模型档位与摘要风格（简洁/学习/详细）的可见说明；
+  - 「详细教程」与「常见问题」内全部 `<details>` 共用单一展开状态，实现全局手风琴（同时仅一项展开），并加轻量过渡样式；
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步当前 `npm run build:ios` 产物，供 WKWebView 加载。
+- 更新 [`AGENTS.md`](AGENTS.md)、新增根目录 [`index.md`](index.md)：约定 `CHANGELOG.md` 与变更日志工作流索引的关系。
+
+### 分支提交日志（COMMIT_LOG）补全与纠错
+- 更新 [`COMMIT_LOG.md`](COMMIT_LOG.md)：为 `0331-refactor/recommendation-flow` 追加 `2026-04-01` 提交条目（`a007418`、`67bc068`）；修正 `0329-feature/notes-video-enhancemen` 小节中误粘贴的重复「分支创建」段落，并将 `6c4fe40` 的补充说明改为嵌套列表。
+- 更新 [`index.md`](index.md)：补充与 [`COMMIT_LOG.md`](COMMIT_LOG.md) 的分工说明。
+
+### 视频推荐链路重构（性能/契约/站外）
+- 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)：新增 `RECOMMENDATION_MAX_CANDIDATES_SCAN`、`RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT`、`RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS`、`RECOMMENDATION_EXTERNAL_FETCH_PARALLEL`、`RECOMMENDATION_EXTERNAL_FETCH_RETRIES`。
+- 更新 [`backend_fastapi/app/services/video_recommendation_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_recommendation_service.py)、[`backend_fastapi/app/routers/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/recommendation.py)、[`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：站内推荐改为按配置上限加载候选，避免全表扫描；可选 `coach` 查询参数返回模板化 `coach_summary`。
+- 更新 [`backend_fastapi/app/services/external_candidate_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/external_candidate_service.py)：站外抓取使用可配置超时、有限重试、可选并行抓取与总等待预算；补充缓存键说明文档。
+- 更新 [`backend_fastapi/app/schemas/recommendation.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/recommendation.py)：响应增加可选 `coach_summary`。
+- 更新 [`mobile-frontend/src/config/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/config/index.js)、[`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)：首页与推荐页默认 `include_external` 由 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 控制；站外失败时展示可操作提示样式。
+- 更新 [`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)、[`mobile-frontend/.env.example`](/Users/yuan/final-work/EduMind/mobile-frontend/.env.example)：补充推荐相关环境变量说明。
+
+### 根路径与页面标题统一为 EduMind
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)：根路由 `message` 与启动/关闭日志改为使用 `settings.APP_NAME`（EduMind），去除遗留的 AI-EdVision 文案。
+- 更新 [`mobile-frontend/index.html`](/Users/yuan/final-work/EduMind/mobile-frontend/index.html)、[`mobile-frontend/dist/index.html`](/Users/yuan/final-work/EduMind/mobile-frontend/dist/index.html)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.html`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.html)：页面标题改为 EduMind Mobile。
+
+### 认证配置补全（修复登录 500）
+- 更新 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：补充 `AUTH_TOKEN_TTL_SECONDS` 与 `AUTH_TOKEN_CLOCK_SKEW_SECONDS`，与 [`app/utils/auth_token.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/auth_token.py) 对齐，避免 `POST /api/auth/login` 在签发 token 时因缺少配置字段报错。
+
+### 笔记系统学习链路补全（对齐 NOTE_SYSTEM 提示词缺口）
+- 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：本视频笔记区增加「新建笔记」；跳转问答时附带 `videoTitle` 查询参数。
+- 更新 [`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：在视频上下文下增加「记笔记」入口，跳转 `/notes/new` 并传递 `videoId` / `videoTitle`。
+- 更新 [`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)：时间戳行「移除」、保存时与后端同步（删除已移除、新增无 id、变更先删后加）、「添加时间点」按钮。
+- 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：笔记列表顶栏与筛选区增加「问答 / 去问答」入口；在筛选了关联视频时跳转 `/qa` 并附带 `videoId`、`videoTitle`。
+
 ## 2026-03-30
+
+### iOS WebView 强制切换最新前端资源
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：将 `WKWebView` 切换为无持久缓存数据仓库，并在启动时清理 Cookie，修复 `fix(note-edit): compact timestamp card layout`、`fix(mobile-frontend): align video detail action cards under whisper model` 等前端改动已经进入包内但容器仍可能显示旧版页面的问题。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.html`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.html)：重新同步当前 iOS 构建产物，确保容器实际加载的是包含紧凑时间点卡片、播放器时间戳记笔记和视频详情动作卡片调整后的版本。
 
 ### 播放器时间戳记笔记收口
 - 更新 [`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)：将播放器页收为唯一主入口，继续保留时间戳记笔记流程，但标题固定为分类 + 时间点，分类由系统自动判断，学习想法改为快捷标签输入。
@@ -1004,3 +1058,33 @@
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/OnDeviceWhisperRuntime.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/OnDeviceWhisperRuntime.swift)、[`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：为 iOS 工程接入本机 `whisper.spm` 依赖，并新增本地 Whisper 运行时，支持模型缓存、首次下载、多语种参数映射和本机分段转录。
 - 更新 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/ContentView.swift)：将原生离线主链路改为“本机 Whisper 优先，Apple Speech 兜底”，并在 Xcode 日志与桥接事件里持续输出当前引擎和处理进度，避免再因为后端未启动而阻断本地转录。
 - 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)、[`mobile-frontend/src/views/LocalTranscripts.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscripts.vue)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)：新增 `Whisper 本机离线转录` 引擎展示，方便区分本机 Whisper、Apple Speech 与旧的后端 Whisper。
+
+## 2026-03-31 12:55 (Asia/Shanghai) 安全与架构基线加固迁移
+
+- 更新 [`backend_fastapi/app/main.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/main.py)：新增 `SecurityHeadersMiddleware`，统一附加 `X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy` 等安全响应头，并在 `production` 环境附加 `Strict-Transport-Security`，降低 MIME 嗅探、点击劫持与跨站上下文泄露风险。
+- 更新 [`mobile-frontend/src/config/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/config/index.js)：将 mock 开关改为“生产默认不可开启”，仅在显式设置 `VITE_ALLOW_UI_ONLY_IN_PROD=true` 时允许生产环境走 `UI_ONLY_MODE`，避免线上误入 UI-only 假链路造成功能假成功与数据不一致。
+- 审计说明：目标参考仓库 `yjy-yjy-yuan/claude-code` 当前为 `size=0` 空仓库，未发现可迁移代码结构；本次迁移按现有 EduMind iOS-only 架构完成安全基线强化。
+
+### 深度安全迁移第一步：认证 token 增加过期控制
+
+- 更新 [`backend_fastapi/app/utils/auth_token.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/auth_token.py)、[`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)、[`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：登录签发 token 升级为 `userId.expiresAt.signature`，新增 `AUTH_TOKEN_TTL_SECONDS`（默认 7 天）和 `AUTH_TOKEN_CLOCK_SKEW_SECONDS` 配置，服务端校验时强制检查过期时间；同时保持旧格式 `userId.signature` 的兼容解析，避免升级期间现有会话瞬时失效。
+- 更新 [`mobile-frontend/src/store/auth.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/store/auth.js)：前端本地 token 格式识别同步兼容新旧两种签名结构，防止升级后误清理合法登录态。
+- 新增 [`backend_fastapi/tests/unit/test_auth_token.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/unit/test_auth_token.py)：覆盖新 token 生成/解析、过期拒绝、旧 token 兼容三类关键路径。
+
+### 深度安全迁移第二步：上传文件类型双重校验
+
+- 更新 [`backend_fastapi/app/routers/video.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/video.py)：在本地视频上传接口中新增 MIME 校验，形成“扩展名 + `content-type`”双重防护；仅允许 `video/*` 或兼容 `application/octet-stream`，拦截伪装为 `.mp4` 的文本/脚本类上传。
+- 更新 [`backend_fastapi/tests/api/test_video_api.py`](/Users/yuan/final-work/EduMind/backend_fastapi/tests/api/test_video_api.py)：新增“伪装 MIME 拒绝”和“octet-stream 兼容通过”测试用例，确保 iOS/WebView 上传链路兼容且安全边界明确。
+
+## 2026-04-02 20:58 (Asia/Shanghai) 推荐交互与文档同步
+
+- 新增 [`mobile-frontend/src/services/recommendationActions.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/services/recommendationActions.js)，并更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：统一推荐卡片动作解析，修复站外候选 `can_import=false` 时仍被误判为“不可导入”或错误跳到上传页的问题；现在可导入候选继续走现有 URL 导入链路，不可直接导入的候选会按后端动作打开原始来源页。
+- 更新 [`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)：修复“看同主题”按钮不可点击的问题，并补全完整交互闭环。按钮现在只对站内视频开放，点击后会进入 loading、自动滚动到“相关推荐”区域、优先请求 `scene=related`，并在接口空结果或失败时使用当前页已加载的站内推荐做同主题兜底渲染。
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`mobile-frontend/README.md`](/Users/yuan/final-work/EduMind/mobile-frontend/README.md)、[`docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md)、[`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md)：同步当前推荐链路现状，修正“全表加载视频”等过时说明，并补充站外动作分流、环境变量控制与“看同主题”当前行为。
+- 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)：同步最新前端构建产物到 iOS `WKWebView` 资源目录。
+- 验证与 hooked checks：
+  - `cd /Users/yuan/final-work/EduMind/mobile-frontend && npm run build:ios`
+  - `cd /Users/yuan/final-work/EduMind && bash ios-app/sync_ios_web_assets.sh`
+  - `cd /Users/yuan/final-work/EduMind && pre-commit run --files README.md mobile-frontend/README.md docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md mobile-frontend/src/services/recommendationActions.js mobile-frontend/src/views/Home.vue mobile-frontend/src/views/Recommendations.vue mobile-frontend/src/views/Upload.vue`
+  - `cd /Users/yuan/final-work/EduMind && MYPYPATH=backend_fastapi ./.venv/bin/python -m mypy --config-file pyproject.toml backend_fastapi/app/models backend_fastapi/app/schemas backend_fastapi/scripts/init_db.py scripts/hooks`
+  - `cd /Users/yuan/final-work/EduMind && ./.venv/bin/python -m pytest backend_fastapi/tests/unit backend_fastapi/tests/api backend_fastapi/tests/smoke -q`

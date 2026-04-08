@@ -85,14 +85,16 @@ npm install
 npm run dev
 ```
 
-## 8. 运行测试
+## 8. 运行验证
 
 ```bash
-cd backend_fastapi
 . .venv/bin/activate
-pytest tests/ -v
-pytest -m smoke
+python scripts/validate_backend_smoke.py
+mkdir -p .pycache-hook
+PYTHONPYCACHEPREFIX="$PWD/.pycache-hook" python -m compileall backend_fastapi/app backend_fastapi/scripts scripts/hooks scripts/validate_backend_smoke.py
 ```
+
+如需查看历史回归测试组织方式，可参考 [backend_fastapi/tests/README.md](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)。当前仓库规则要求修改程序时不要用 `pytest` 作为本次验证手段。
 
 ## 9. 常见问题
 

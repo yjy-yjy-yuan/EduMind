@@ -36,13 +36,18 @@
 - `unit/test_video_recommendation_service.py`
 - `smoke/test_app_startup.py`
 
-## 常用命令
+## 当前验证约定
 
-在 `backend_fastapi/` 目录下执行：
+当前仓库规则要求修改程序时不要用 `pytest` 作为本次验证手段；优先在仓库根目录执行：
 
 ```bash
-pytest tests/ -v
-pytest tests/unit/ -v
-pytest tests/api/ -v
-pytest -m smoke
+. .venv/bin/activate
+python scripts/validate_backend_smoke.py
+mkdir -p .pycache-hook
+PYTHONPYCACHEPREFIX="$PWD/.pycache-hook" python -m compileall backend_fastapi/app backend_fastapi/scripts scripts/hooks scripts/validate_backend_smoke.py
 ```
+
+补充说明：
+
+- 本目录仍保留历史 pytest 风格的命名与分层，方便后续维护已有回归用例。
+- 若未来刷新这批历史测试，再决定是否恢复独立测试命令文档；在此之前，以当前 smoke/build/static checks 为准。

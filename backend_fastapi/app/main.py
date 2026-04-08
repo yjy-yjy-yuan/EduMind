@@ -49,6 +49,18 @@ class RequestTimingMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        if str(settings.APP_ENV).lower() == "production":
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        return response
+
+
 def recover_interrupted_video_tasks():
     """将服务重启前中断的后台任务转为失败，避免状态永久卡住。"""
     db = SessionLocal()
@@ -81,7 +93,7 @@ def recover_interrupted_video_tasks():
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时执行
-    logger.info("启动 AI-EdVision API...")
+    logger.info("启动 %s API...", settings.APP_NAME)
 
     if settings.AUTO_CREATE_TABLES:
         Base.metadata.create_all(bind=engine)
@@ -103,7 +115,7 @@ async def lifespan(app: FastAPI):
 
     # 关闭时执行
     shutdown_whisper_runtime()
-    logger.info("关闭 AI-EdVision API...")
+    logger.info("关闭 %s API...", settings.APP_NAME)
 
 
 # 创建 FastAPI 应用
@@ -125,6 +137,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(RequestTimingMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 # 注册路由
@@ -152,7 +165,12 @@ app.include_router(agent.router, prefix="/api/agent", tags=["学习流智能体"
 # 根路由
 @app.get("/")
 async def root():
-    return {"status": "success", "message": "Welcome to AI-EdVision API", "version": "2.0.0", "docs": "/docs"}
+    return {
+        "status": "success",
+        "message": f"Welcome to {settings.APP_NAME} API",
+        "version": "2.0.0",
+        "docs": "/docs",
+    }
 
 
 # 健康检查

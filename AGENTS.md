@@ -14,7 +14,7 @@ Do not reintroduce `frontend/`, `backend/`, Android modules, or desktop-web-spec
 - `mobile-frontend/`: the only frontend codebase. It provides the H5 UI loaded by iOS `WKWebView`.
 - `ios-app/`: the iOS container project, native bridge layer, on-device media/file access, on-device audio extraction/transcription execution, and Web asset sync script.
 - `docs/`: only keep documents that directly support the iOS mobile chain, Mac development, backend deployment, database setup, or video-processing workflow.
-- `CHANGELOG.md`, `README.md`, `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`: root-level control documents that must stay aligned with the current iOS-only architecture.
+- `CHANGELOG.md`, `index.md`, `README.md`, `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`: root-level control documents; `index.md` describes the changelog workflow paired with `CHANGELOG.md`.
 
 ## Architecture Rules
 - UI is frontend, real functionality is backend.
@@ -52,11 +52,11 @@ iOS Web assets sync:
 bash ios-app/sync_ios_web_assets.sh
 ```
 
-FastAPI tests:
+Backend smoke validation:
 
 ```bash
 . .venv/bin/activate
-pytest backend_fastapi/tests/ -v
+python scripts/validate_backend_smoke.py
 ```
 
 iOS native validation:
@@ -72,9 +72,9 @@ bash ios-app/validate_ios_build.sh
 - Prefer small top-level helpers over nested functions unless there is a hard technical reason.
 
 ## Testing Guidelines
-- Pytest is the default Python test framework.
-- Put backend tests in `backend_fastapi/tests/`.
-- New backend features should include direct unit or API coverage.
+- Historical backend regression tests remain under `backend_fastapi/tests/`.
+- Verification for the modified program must use non-`pytest` checks such as `python scripts/validate_backend_smoke.py`, `python -m compileall ...`, frontend build, and iOS container validation.
+- New backend features should still keep `backend_fastapi/tests/` coverage in sync when those historical tests are maintained.
 - For frontend changes, build output alone is insufficient. iOS container validation is required.
 - For `ios-app/` native changes, at minimum run an iOS build validation and verify the affected bridge or native flow in the container.
 
@@ -93,6 +93,8 @@ bash ios-app/validate_ios_build.sh
 
 - 所有变更只在 `CHANGELOG.md` 中追加新条目，不修改或删除历史记录。
 - 如果需要更正历史说明，在最新条目中写“对某某日期记录的更正说明”。
+- 每次完成实质修改并 **commit** 时，将对应说明**同步追加**到 `CHANGELOG.md`（与代码同一提交或紧邻的提交中包含 changelog 更新）；无用户可见或行为变化的纯内部调整可按惯例省略，但若记录须保持追加原则。
+- 人类与自动化助手（Agent）均遵循上述规则；流程说明见根目录 [`index.md`](index.md)。
 
 ## Git Hooks Guidance
 When a task involves Git hooks, first thoroughly analyze the current project to determine:
@@ -200,3 +202,5 @@ Set up or improve Git hooks following industry best practices.
 ## Removal Policy
 - Files unrelated to the iOS mobile chain should not be restored.
 - Do not add back legacy desktop-web modules, Flask compatibility branches, or Android app code unless explicitly requested.
+
+## The use of pytest to test the modified program is prohibited.

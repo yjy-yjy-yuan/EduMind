@@ -266,6 +266,31 @@ class TestVideoAPI:
         assert response.status_code == 400
         assert response.json()["detail"] == "不支持的文件类型"
 
+    def test_upload_video_invalid_content_type(self, client):
+        """测试伪装扩展名但非视频 MIME 会被拒绝。"""
+        response = client.post(
+            "/api/videos/upload",
+            files={"file": ("fake.mp4", io.BytesIO(b"not-a-video"), "text/plain")},
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "文件内容类型无效，请上传视频文件"
+
+    def test_upload_video_accepts_octet_stream_content_type(self, client, tmp_path, monkeypatch):
+        """测试兼容 iOS/浏览器可能上报的 octet-stream。"""
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "UPLOAD_FOLDER", str(tmp_path / "uploads"))
+        monkeypatch.setattr(settings, "TEMP_FOLDER", str(tmp_path / "temp"))
+        monkeypatch.setattr("app.core.executor.submit_task", lambda *args, **kwargs: None)
+
+        response = client.post(
+            "/api/videos/upload",
+            files={"file": ("octet.mp4", io.BytesIO(b"fake-video-content"), "application/octet-stream")},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["duplicate"] is False
+
     def test_upload_video_url_creates_downloading_record(self, client, db, monkeypatch):
         """测试链接上传会立即创建下载中记录"""
         from app.models.video import Video
