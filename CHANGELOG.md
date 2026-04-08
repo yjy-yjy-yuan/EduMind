@@ -1,5 +1,60 @@
 # 变更日志
 
+## 2026-04-08 (续续续续续续续续续续续续)
+
+### 语义搜索内嵌索引模式 - 时序优化与并行处理
+- **背景问题**：当前语义索引成被强制为异步后台任务，仅在视频主处理完成后才启动。导致用户看到"处理完成"回复，但搜索结果暂不可用，存在时序割裂体验。
+- **核心改进**：
+  - 新增视频处理配置组：
+    - `SEARCH_INDEX_STARTUP_MODE`: `"after_video_completed"` (默认，保持兼容) | `"inline_after_subtitle"` (并行处理)
+    - `SEARCH_INLINE_INDEX_WAIT_TIMEOUT_SECONDS`: 内嵌索引等待超时（秒；-1 表示不等待）
+    - `SEARCH_INLINE_INDEX_FAIL_POLICY`: 索引失败策略 (`"mark_completed_without_index"` | `"require_index_success"`)
+  - 优先级说明：
+    - `SEARCH_ENABLED=false`: 所有索引模式失效
+    - `SEARCH_ENABLED=true` 且 `SEARCH_AUTO_INDEX_NEW_VIDEOS=false`: 仅允许手动索引
+    - `SEARCH_ENABLED=true` 且 `SEARCH_AUTO_INDEX_NEW_VIDEOS=true`: 按 `SEARCH_INDEX_STARTUP_MODE` 决定启动时机
+- **后端改动**：
+  - `backend_fastapi/app/core/config.py`: 新增上述三个配置项
+  - `backend_fastapi/app/tasks/video_processing.py`:
+    - 新增 `start_indexing_async()`: 在字幕文件就绪后异步启动索引任务（与摘要/标签并行）
+    - 新增 `wait_for_indexing_ready()`: 等待索引完成或超时；支持两种失败策略
+    - 修改 `process_video_task()`: 集成内嵌模式支持
+      - 字幕保存后，若 `SEARCH_INDEX_STARTUP_MODE=="inline_after_subtitle"` 则立即启动索引
+      - 完成处理前，根据配置等待索引完成或应用失败策略
+      - 对于 `"after_video_completed"` 模式，保持旧的异步调用方式以确保向后兼容
+  - `backend_fastapi/app/tasks/vector_indexing.py`:
+    - 新增 `index_video_inline()`: 内嵌模式特有的索引函数
+      - 不要求 `video.status == COMPLETED`，允许在 `PROCESSING` 阶段执行
+      - 接收已生成的 `subtitle_path` 参数，避免重复读取
+      - 使用独立数据库会话，与主流程并行无阻塞
+    - 补强失败路径一致性与异常健壮性：
+      - `index_video_for_search()` 与 `index_video_inline()` 在 `try` 前统一初始化 `vector_index/video`，避免异常分支未绑定变量风险
+      - 明确失败场景下同步清理 `videos.has_semantic_index` 与 `videos.vector_index_id`
+      - 异常分支提交改为“有更新才提交”，提交失败时执行 `rollback` 并记录异常日志，避免二次异常覆盖原始错误
+- **状态流程**：
+  - **after_video_completed 模式** (默认，向后兼容)：
+    - `PROCESSING` → 所有主处理完成 → `COMPLETED` → 异步提交 `index_video_for_search`
+  - **inline_after_subtitle 模式** (新增)：
+    - `PROCESSING` → 字幕就绪 → 异步启动 `index_video_inline` (与摘要/标签并行) → 主处理完成前等待索引结果 → `COMPLETED` (若失败策略允许)
+- **数据库落库**：
+  - 复用 `vector_indexes` 表现有结构，完善状态流转：`PENDING` → `PROCESSING` → `COMPLETED` / `FAILED`
+  - `videos.has_semantic_index` 与 `videos.vector_index_id` 保持一致性
+  - 无新增表，遵守最小化原则
+- **资源管理**：
+  - 内嵌索引与摘要/标签生成可并行，但不抢占主处理资源
+  - 超时和失败策略允许主流程优雅降级，不强制阻塞
+- **进度展示**：
+  - `video.current_step` 在等待索引时更新为"等待语义索引完成中..."
+  - 进度条 (`video.process_progress`) 推进到 98% 后等待索引
+- **验证结果**：
+  - ✅ `python -m compileall backend_fastapi/app/tasks/video_processing.py backend_fastapi/app/tasks/vector_indexing.py backend_fastapi/app/core/config.py`
+  - ✅ 手动导入验证：`start_indexing_async`, `wait_for_indexing_ready`, `index_video_inline` 无导入错误
+  - ✅ `python scripts/validate_backend_smoke.py`
+- **后续计划**：
+  - 可选：前端显示"语义索引进度"，在处理过程中实时轮询 `VectorIndex.status`
+  - 可选：添加手动重新索引 API，允许用户在需要时触发
+  - 可选：统计分析异步与内嵌模式的性能差异，为默认值提供数据支持
+
 ## 2026-04-08 (续续续续续续续续续续续)
 
 ### 搜索页返回保留关键词与结果 - 状态记忆补齐

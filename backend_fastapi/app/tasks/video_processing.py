@@ -413,6 +413,155 @@ def update_video_status(video_id: int, status: str, progress: float, step: str, 
         engine.dispose()
 
 
+def start_indexing_async(
+    video_id: int,
+    user_id: int,
+    subtitle_path: str,
+    embedding_backend: str = None,
+):
+    """
+    在字幕文件就绪后启动内嵌语义索引
+
+    用途：当字幕已生成且可用时，在字幕生成完成后立即启动异步索引任务，
+         使其与后续的摘要/标签生成兼容，从而降低用户感知的总处理时间
+
+    Args:
+        video_id: 视频 ID
+        user_id: 用户 ID
+        subtitle_path: 已生成的字幕文件路径
+        embedding_backend: 向量后端（如果为 None，从配置读取）
+    """
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.core.executor import submit_task
+    from app.models.vector_index import VectorIndex
+    from app.models.vector_index import VectorIndexStatus
+
+    db = SessionLocal()
+    try:
+        backend = embedding_backend or settings.SEARCH_BACKEND
+
+        # 检查字幕文件是否存在
+        if not subtitle_path or not os.path.exists(subtitle_path):
+            logger.warning(
+                f"跳过内嵌索引启动：字幕文件不可用 | " f"video_id={video_id} | subtitle_path={subtitle_path}"
+            )
+            return
+
+        # 获取或创建 VectorIndex 记录
+        vector_index = (
+            db.query(VectorIndex).filter(VectorIndex.video_id == video_id, VectorIndex.user_id == user_id).first()
+        )
+
+        if vector_index is None:
+            collection_name = f"user_{user_id}_video_{video_id}_chunks"
+            vector_index = VectorIndex(
+                video_id=video_id,
+                user_id=user_id,
+                collection_name=collection_name,
+                embedding_backend=backend,
+                embedding_model=settings.SEARCH_LOCAL_MODEL if backend == "local" else None,
+                status=VectorIndexStatus.PENDING,
+            )
+            db.add(vector_index)
+            db.commit()
+        else:
+            # 已有记录时，重置状态为 PENDING（准备新一轮索引）
+            # 这确保 wait_for_indexing_ready() 不会被旧状态误导
+            vector_index.status = VectorIndexStatus.PENDING
+            vector_index.error_message = None
+            vector_index.chunk_count = 0
+            db.commit()
+
+        # 导入索引函数
+        from app.tasks.vector_indexing import index_video_inline
+
+        logger.info(f"提交内嵌语义索引任务 | video_id={video_id} | " f"user_id={user_id} | backend={backend}")
+        # 使用后台任务执行器提交索引任务
+        submit_task(index_video_inline, video_id, user_id, subtitle_path, backend)
+
+    except Exception as e:
+        logger.warning(f"启动内嵌索引失败（不中断视频处理）| " f"video_id={video_id} | error={e}")
+    finally:
+        db.close()
+
+
+def wait_for_indexing_ready(video_id: int, user_id: int, timeout_seconds: int = 30) -> bool:
+    """
+    等待语义索引完成或超时
+
+    用途：在设置 VideoStatus.COMPLETED 之前，验证语义索引是否已完成或失败。
+         根据 SEARCH_INLINE_INDEX_FAIL_POLICY 配置决定是否允许主流程继续。
+
+    Args:
+        video_id: 视频 ID
+        user_id: 用户 ID
+        timeout_seconds: 最大等待超时（秒）；-1 表示不等待
+
+    Returns:
+        bool: True 表示索引已完成或已跳过，False 表示索引失败且策略要求中止
+    """
+    from app.core.config import settings
+    from app.core.database import SessionLocal
+    from app.models.vector_index import VectorIndex
+    from app.models.vector_index import VectorIndexStatus
+
+    # 如果超时设置为负数，表示不等待
+    if timeout_seconds < 0:
+        logger.info(f"跳过索引等待（timeout_seconds={timeout_seconds}）")
+        return True
+
+    db = SessionLocal()
+    try:
+        start_time = time.time()
+
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed > timeout_seconds:
+                logger.warning(f"等待语义索引超时（{timeout_seconds}s）| video_id={video_id}")
+                # 超时时，根据失败策略处理
+                if settings.SEARCH_INLINE_INDEX_FAIL_POLICY == "require_index_success":
+                    return False
+                else:
+                    return True  # mark_completed_without_index
+
+            vector_index = (
+                db.query(VectorIndex).filter(VectorIndex.video_id == video_id, VectorIndex.user_id == user_id).first()
+            )
+
+            # 未找到索引记录，表示可能未启动内嵌模式
+            if not vector_index:
+                logger.debug(f"未找到 VectorIndex 记录，跳过等待 | video_id={video_id}")
+                return True
+
+            # 索引已完成
+            if vector_index.status == VectorIndexStatus.COMPLETED:
+                logger.info(f"语义索引完成 | video_id={video_id} | " f"chunk_count={vector_index.chunk_count}")
+                return True
+
+            # 索引失败
+            if vector_index.status == VectorIndexStatus.FAILED:
+                logger.warning(f"语义索引失败 | video_id={video_id} | " f"error={vector_index.error_message}")
+                if settings.SEARCH_INLINE_INDEX_FAIL_POLICY == "require_index_success":
+                    return False
+                else:
+                    return True  # mark_completed_without_index
+
+            # 仍在处理中，等待一段时间后重试
+            time.sleep(1)
+
+    except Exception as e:
+        logger.warning(f"检查索引状态异常 | video_id={video_id} | error={e}")
+        # 异常时，根据配置决定是否允许继续
+        if settings.SEARCH_INLINE_INDEX_FAIL_POLICY == "require_index_success":
+            return False
+        else:
+            return True
+
+    finally:
+        db.close()
+
+
 def process_video_task(
     video_id: int,
     language: str = "zh",
@@ -599,6 +748,28 @@ def process_video_task(
 
         sync_subtitles_to_db(db, video_id, result, language)
 
+        # 如果启用了内嵌索引模式，则在字幕就绪后立即启动（与后续摘要/标签并行）
+        inline_indexing_started = False
+        if (
+            settings.SEARCH_ENABLED
+            and settings.SEARCH_AUTO_INDEX_NEW_VIDEOS
+            and settings.SEARCH_INDEX_STARTUP_MODE == "inline_after_subtitle"
+            and video.subtitle_filepath
+            and os.path.exists(video.subtitle_filepath)
+        ):
+            try:
+                start_indexing_async(
+                    video_id=video_id,
+                    user_id=video.user_id,
+                    subtitle_path=video.subtitle_filepath,
+                    embedding_backend=settings.SEARCH_BACKEND,
+                )
+                inline_indexing_started = True
+                logger.info(f"已启动内嵌语义索引任务 | video_id={video_id}")
+            except Exception as e:
+                logger.warning(f"启动内嵌索引任务失败（将继续处理）| video_id={video_id} | error={e}")
+                inline_indexing_started = False
+
         if auto_generate_summary or auto_generate_tags:
             from app.services.video_content_service import generate_primary_topic_name
             from app.services.video_content_service import generate_video_summary
@@ -691,6 +862,41 @@ def process_video_task(
             except Exception:
                 pass
 
+        # 如果启用了内嵌索引模式且已启动，则等待索引完成
+        if (
+            settings.SEARCH_ENABLED
+            and settings.SEARCH_AUTO_INDEX_NEW_VIDEOS
+            and settings.SEARCH_INDEX_STARTUP_MODE == "inline_after_subtitle"
+            and inline_indexing_started
+        ):
+            try:
+                video.process_progress = 98.0
+                video.current_step = "等待语义索引完成中..."
+                db.commit()
+
+                # 等待索引完成
+                indexing_ready = wait_for_indexing_ready(
+                    video_id=video_id,
+                    user_id=video.user_id,
+                    timeout_seconds=settings.SEARCH_INLINE_INDEX_WAIT_TIMEOUT_SECONDS,
+                )
+
+                if not indexing_ready:
+                    logger.warning(
+                        f"等待索引完成失败，根据配置决定是否继续 | "
+                        f"video_id={video_id} | policy={settings.SEARCH_INLINE_INDEX_FAIL_POLICY}"
+                    )
+                    if settings.SEARCH_INLINE_INDEX_FAIL_POLICY == "require_index_success":
+                        video.status = VideoStatus.FAILED
+                        video.current_step = "语义索引失败，处理中止"
+                        db.commit()
+                        logger.error(f"视频处理因索引失败而中止 | video_id={video_id}")
+                        return {"status": "failed", "message": "语义索引失败"}
+                    # 否则继续标记为 COMPLETED
+
+            except Exception as e:
+                logger.warning(f"等待索引完成时发生异常（将继续标记处理完成）| " f"video_id={video_id} | error={e}")
+
         # 完成
         video.status = VideoStatus.COMPLETED
         video.process_progress = 100.0
@@ -698,13 +904,17 @@ def process_video_task(
         video.error_message = None
         db.commit()
 
-        # 如果启用了搜索且配置了自动索引，则提交向量索引任务
-        if settings.SEARCH_ENABLED and settings.SEARCH_AUTO_INDEX_NEW_VIDEOS:
+        # 如果使用旧的 after_video_completed 模式，则提交异步索引任务
+        if (
+            settings.SEARCH_ENABLED
+            and settings.SEARCH_AUTO_INDEX_NEW_VIDEOS
+            and settings.SEARCH_INDEX_STARTUP_MODE == "after_video_completed"
+        ):
             try:
                 from app.core.executor import submit_task
                 from app.tasks.vector_indexing import index_video_for_search
 
-                logger.info(f"提交语义搜索索引任务 | video_id={video_id}")
+                logger.info(f"提交异步语义搜索索引任务（after_video_completed 模式）| video_id={video_id}")
                 submit_task(index_video_for_search, video_id, video.user_id, settings.SEARCH_BACKEND)
             except Exception as e:
                 logger.warning(f"提交索引任务失败（不中断视频处理）| video_id={video_id} | error={e}")

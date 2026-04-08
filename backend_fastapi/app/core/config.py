@@ -106,6 +106,18 @@ class Settings(BaseSettings):
     SEARCH_AUTO_INDEX_NEW_VIDEOS: bool = True
     SEARCH_MAX_RESULTS: int = 20
 
+    # 语义搜索索引启动模式配置
+    # 说明: SEARCH_ENABLED=true && SEARCH_AUTO_INDEX_NEW_VIDEOS=true 时，按以下模式决定索引启动时机
+    # - "after_video_completed": 保持当前行为，先 VideoStatus.COMPLETED，再异步提交 index_video_for_search
+    # - "inline_after_subtitle": 在字幕文件已落盘且 subtitle_filepath 可用后启动内嵌索引，允许与摘要/标签并行
+    SEARCH_INDEX_STARTUP_MODE: str = "after_video_completed"
+    # 内嵌索引模式下，主处理流程等待索引完成的最大超时（秒）；-1 表示不等待
+    SEARCH_INLINE_INDEX_WAIT_TIMEOUT_SECONDS: int = 30
+    # 内嵌索引失败策略:
+    # - "mark_completed_without_index": 主流程仍可 COMPLETED，索引失败时 has_semantic_index=false
+    # - "require_index_success": 索引失败则不进入 COMPLETED（需明确前端展示）
+    SEARCH_INLINE_INDEX_FAIL_POLICY: str = "mark_completed_without_index"
+
     # 自适应切片配置
     SEARCH_ADAPTIVE_CHUNKING: bool = True  # 是否启用自适应切片
     # 自适应参数规则：(max_duration_inclusive, chunk_duration, overlap)
