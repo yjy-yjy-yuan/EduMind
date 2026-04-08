@@ -1,5 +1,18 @@
 # 变更日志
 
+## 2026-04-08 (续续续续)
+
+### 生产监控完整集成 - 搜索日志系统落地
+- **问题诊断**：前期创建了 check-in 文件 [`backend_fastapi/app/services/search/search_logging.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search_logging.py)，但主流程 [`app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py) 完全未引入，导致日志系统形同虚设。同时验证脚本存在导入路径错误（`gemini_embedder.py` 不存在、Schema 类名误写等），使得"验证通过"的宣布失效。
+- **修复内容**：
+  - 重写 [`search_logging.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search_logging.py)：定义 `SearchEventLogger` 类，实现 9 个 JSON 结构化日志方法（`log_search_request_received`、`log_adaptive_chunking_selected`、`log_video_chunking_completed`、`log_embedding_batch_completed`、`log_indexing_completed`、`log_indexing_failed`、`log_search_completed`、`log_search_failed`、`log_chromadb_search_executed`）
+  - 在 [`search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py) 中新增导入和 12 处日志调用点：
+    - `build_video_index_internal()` 中 7 处：参数选择、切片完成、嵌入完成、索引成功/失败等
+    - `semantic_search_videos()` 中 5 处：请求入口、每个视频搜索、搜索完成/失败等（含结果统计）
+  - 创建新的验证脚本 [`scripts/validate_search_integration.py`](/Users/yuan/final-work/EduMind/scripts/validate_search_integration.py)：修复导入路径（`embedder.py`、`vector_index.py`、正确的 Schema 类名）、验证 9 个浮点边界、验证日志集成、验证前端编译
+- **验证结果**：脚本实际运行通过 ✅（后端模块导入、自适应切片 9 个浮点边界、生产监控集成、前端编译）
+- **提交**：commit 61878a48，pre-commit hooks 通过（black、isort、flake8）
+
 ## 2026-04-08 (续续续)
 
 ### 语义搜索前端落地与文档纠偏
