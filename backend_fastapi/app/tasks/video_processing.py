@@ -17,10 +17,10 @@ import subprocess
 import threading
 import time
 
+from app.services.video_content_service import extract_transcript_text
 from app.services.whisper_runtime import clear_whisper_device_cache
 from app.services.whisper_runtime import get_whisper_device
 from app.services.whisper_runtime import transcribe_audio_with_whisper
-from app.services.video_content_service import extract_transcript_text
 from sqlalchemy import inspect
 
 logger = logging.getLogger(__name__)
@@ -282,7 +282,9 @@ def transcribe_with_live_progress(
     while thread.is_alive():
         elapsed = time.time() - started_at
         progress_ratio = min(elapsed / estimated_seconds, 1.0)
-        progress = TRANSCRIPTION_PROGRESS_START + (TRANSCRIPTION_PROGRESS_END - TRANSCRIPTION_PROGRESS_START) * progress_ratio
+        progress = (
+            TRANSCRIPTION_PROGRESS_START + (TRANSCRIPTION_PROGRESS_END - TRANSCRIPTION_PROGRESS_START) * progress_ratio
+        )
         step = f"语音识别中（已运行 {format_elapsed_label(elapsed)}）"
         update_video_status(video_id, "processing", round(min(progress, TRANSCRIPTION_PROGRESS_END), 1), step)
         thread.join(timeout=TRANSCRIPTION_POLL_SECONDS)
@@ -598,9 +600,9 @@ def process_video_task(
         sync_subtitles_to_db(db, video_id, result, language)
 
         if auto_generate_summary or auto_generate_tags:
+            from app.services.video_content_service import generate_primary_topic_name
             from app.services.video_content_service import generate_video_summary
             from app.services.video_content_service import generate_video_tags
-            from app.services.video_content_service import generate_primary_topic_name
             from app.services.video_content_service import normalize_summary_style
 
             normalized_summary_style = normalize_summary_style(summary_style)
@@ -695,6 +697,17 @@ def process_video_task(
         video.current_step = f"处理完成（{model}）"
         video.error_message = None
         db.commit()
+
+        # 如果启用了搜索且配置了自动索引，则提交向量索引任务
+        if settings.SEARCH_ENABLED and settings.SEARCH_AUTO_INDEX_NEW_VIDEOS:
+            try:
+                from app.core.executor import submit_task
+                from app.tasks.vector_indexing import index_video_for_search
+
+                logger.info(f"提交语义搜索索引任务 | video_id={video_id}")
+                submit_task(index_video_for_search, video_id, video.user_id, settings.SEARCH_BACKEND)
+            except Exception as e:
+                logger.warning(f"提交索引任务失败（不中断视频处理）| video_id={video_id} | error={e}")
 
         logger.info(f"视频处理完成 | ID: {video_id}")
         return {"status": "success", "message": "视频处理成功"}
