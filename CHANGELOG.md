@@ -1,5 +1,20 @@
 # 变更日志
 
+## 2026-04-08 (续续续续续续续续续续)
+
+### 搜索结果在 iOS 真机页不显示 - 渲染链路修复
+- **问题诊断**：后端语义搜索接口已经能返回真实结果，但 [`mobile-frontend/src/views/Search.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Search.vue) 将结果卡片实现为 `defineComponent + template` 的运行时模板字符串组件；该写法在当前 iOS 生产构建与 `WKWebView` 加载链路下存在渲染不稳定风险，导致真机页面可能出现“接口有结果、列表却不显示”的现象。
+- **前端修复**：
+  - 重构 [`mobile-frontend/src/views/Search.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Search.vue)：移除运行时模板字符串组件，将搜索结果卡片改为 SFC 编译期模板直接渲染，避免生产包中依赖运行时模板编译。
+  - 保持现有展示能力不变：视频标题、时间范围、相似度条、`preview_text` 预览和“点击播放此片段”提示仍由搜索页直接渲染。
+  - 补强响应解析：搜索结果读取同时兼容 `res.data` 与已解包响应对象，避免请求封装差异导致列表被误判为空。
+- **iOS 资源同步**：
+  - 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js) 与 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)，确保真机容器加载到最新搜索页产物。
+- **验证结果**：
+  - ✅ `npm run build:ios`
+  - ✅ `bash ios-app/sync_ios_web_assets.sh`
+  - ✅ `bash ios-app/validate_ios_build.sh`
+
 ## 2026-04-08 (续续续续续续续续)
 
 ### 对 2026-04-08 搜索结果显示增强记录的更正说明

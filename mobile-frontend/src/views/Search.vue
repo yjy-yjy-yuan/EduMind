@@ -66,17 +66,86 @@
         <template v-if="searchScope === 'all'">
           <div v-for="group in groupedResults" :key="group.videoId" class="result-group">
             <div class="result-group-title">{{ group.videoTitle }}</div>
-            <ResultCard
+            <button
               v-for="result in group.items"
               :key="result.chunk_id"
-              :result="result"
-              @open="handleResultClick"
-            />
+              type="button"
+              class="result-item"
+              @click="handleResultClick(result)"
+            >
+              <div class="result-header">
+                <div class="result-video-title">{{ getVideoTitle(result) }}</div>
+                <div class="result-similarity-percentage">
+                  <span class="percentage-text">{{ getSimilarityPercentage(result.similarity_score) }}% 相关</span>
+                </div>
+              </div>
+
+              <div class="result-meta">
+                <div class="result-time">
+                  <span class="time-label">⏱️</span>
+                  <span class="time-range">{{ formatTime(result.start_time) }} - {{ formatTime(result.end_time) }}</span>
+                </div>
+              </div>
+
+              <div class="result-similarity">
+                <div class="similarity-bar">
+                  <div
+                    class="similarity-fill"
+                    :style="{ width: (result.similarity_score * 100) + '%', backgroundColor: getSimilarityColor(result.similarity_score) }"
+                  ></div>
+                </div>
+              </div>
+
+              <div :class="['result-preview', { placeholder: !result.preview_text || !result.preview_text.trim() }]">
+                {{ getPreviewText(result) }}
+              </div>
+
+              <div class="result-cta">
+                <span class="play-hint">👉 点击播放此片段</span>
+              </div>
+            </button>
           </div>
         </template>
 
         <template v-else>
-          <ResultCard v-for="result in results" :key="result.chunk_id" :result="result" @open="handleResultClick" />
+          <button
+            v-for="result in results"
+            :key="result.chunk_id"
+            type="button"
+            class="result-item"
+            @click="handleResultClick(result)"
+          >
+            <div class="result-header">
+              <div class="result-video-title">{{ getVideoTitle(result) }}</div>
+              <div class="result-similarity-percentage">
+                <span class="percentage-text">{{ getSimilarityPercentage(result.similarity_score) }}% 相关</span>
+              </div>
+            </div>
+
+            <div class="result-meta">
+              <div class="result-time">
+                <span class="time-label">⏱️</span>
+                <span class="time-range">{{ formatTime(result.start_time) }} - {{ formatTime(result.end_time) }}</span>
+              </div>
+            </div>
+
+            <div class="result-similarity">
+              <div class="similarity-bar">
+                <div
+                  class="similarity-fill"
+                  :style="{ width: (result.similarity_score * 100) + '%', backgroundColor: getSimilarityColor(result.similarity_score) }"
+                ></div>
+              </div>
+            </div>
+
+            <div :class="['result-preview', { placeholder: !result.preview_text || !result.preview_text.trim() }]">
+              {{ getPreviewText(result) }}
+            </div>
+
+            <div class="result-cta">
+              <span class="play-hint">👉 点击播放此片段</span>
+            </div>
+          </button>
         </template>
       </div>
     </div>
@@ -84,98 +153,12 @@
 </template>
 
 <script>
-import { computed, defineComponent, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { semanticSearch } from '@/api/search'
 
-const ResultCard = defineComponent({
-  name: 'SearchResultCard',
-  props: {
-    result: {
-      type: Object,
-      required: true
-    }
-  },
-  emits: ['open'],
-  setup(props, { emit }) {
-    const formatTime = (seconds) => {
-      const total = Math.max(0, Math.round(Number(seconds || 0)))
-      const minutes = Math.floor(total / 60)
-      const remain = total % 60
-      return `${String(minutes).padStart(2, '0')}:${String(remain).padStart(2, '0')}`
-    }
-
-    const getSimilarityColor = (similarity) => {
-      if (similarity >= 0.7) return '#4CAF50'
-      if (similarity >= 0.5) return '#FFC107'
-      return '#FF6B6B'
-    }
-
-    const getSimilarityPercentage = (similarity) => {
-      return Math.round(similarity * 100)
-    }
-
-    const getVideoTitle = (result) => {
-      return result.video_title || `视频 ID: ${result.video_id}`
-    }
-
-    const getPreviewText = (result) => {
-      if (result.preview_text && result.preview_text.trim()) {
-        return result.preview_text
-      }
-      return '（暂无文本预览）'
-    }
-
-    const open = () => emit('open', props.result)
-
-    return {
-      formatTime,
-      getSimilarityColor,
-      getSimilarityPercentage,
-      getVideoTitle,
-      getPreviewText,
-      open
-    }
-  },
-  template: `
-    <div class="result-item" @click="open">
-      <div class="result-header">
-        <div class="result-video-title">{{ getVideoTitle(result) }}</div>
-        <div class="result-similarity-percentage">
-          <span class="percentage-text">{{ getSimilarityPercentage(result.similarity_score) }}% 相关</span>
-        </div>
-      </div>
-
-      <div class="result-meta">
-        <div class="result-time">
-          <span class="time-label">⏱️</span>
-          <span class="time-range">{{ formatTime(result.start_time) }} - {{ formatTime(result.end_time) }}</span>
-        </div>
-      </div>
-
-      <div class="result-similarity">
-        <div class="similarity-bar">
-          <div
-            class="similarity-fill"
-            :style="{ width: (result.similarity_score * 100) + '%', backgroundColor: getSimilarityColor(result.similarity_score) }"
-          ></div>
-        </div>
-      </div>
-
-      <div :class="['result-preview', { placeholder: !result.preview_text || !result.preview_text.trim() }]">
-        {{ getPreviewText(result) }}
-      </div>
-
-      <div class="result-cta">
-        <span class="play-hint">👉 点击播放此片段</span>
-      </div>
-    </div>
-  `
-})
-
 export default {
   name: 'SearchPage',
-  components: { ResultCard },
   setup() {
     const route = useRoute()
     const router = useRouter()
@@ -220,6 +203,30 @@ export default {
       })
     })
 
+    const formatTime = (seconds) => {
+      const total = Math.max(0, Math.round(Number(seconds || 0)))
+      const minutes = Math.floor(total / 60)
+      const remain = total % 60
+      return `${String(minutes).padStart(2, '0')}:${String(remain).padStart(2, '0')}`
+    }
+
+    const getSimilarityColor = (similarity) => {
+      if (similarity >= 0.7) return '#4CAF50'
+      if (similarity >= 0.5) return '#FFC107'
+      return '#FF6B6B'
+    }
+
+    const getSimilarityPercentage = (similarity) => Math.round(Number(similarity || 0) * 100)
+
+    const getVideoTitle = (result) => result.video_title || `视频 ID: ${result.video_id}`
+
+    const getPreviewText = (result) => {
+      if (result.preview_text && result.preview_text.trim()) {
+        return result.preview_text
+      }
+      return '（暂无文本预览）'
+    }
+
     const clearSearch = () => {
       query.value = ''
       results.value = []
@@ -248,7 +255,8 @@ export default {
           limit: 20,
           threshold: 0.5
         })
-        results.value = Array.isArray(res.data?.results) ? res.data.results : []
+        const payload = res?.data ?? res ?? {}
+        results.value = Array.isArray(payload.results) ? payload.results : []
       } catch (err) {
         error.value = err?.response?.data?.detail || err?.message || '搜索失败，请稍后重试'
         results.value = []
@@ -267,6 +275,11 @@ export default {
     return {
       currentVideoLabel,
       error,
+      formatTime,
+      getPreviewText,
+      getSimilarityColor,
+      getSimilarityPercentage,
+      getVideoTitle,
       groupedResults,
       handleResultClick,
       handleSearch,
@@ -430,6 +443,10 @@ export default {
 }
 
 .result-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
   background: white;
   padding: 12px;
   border-radius: 8px;
