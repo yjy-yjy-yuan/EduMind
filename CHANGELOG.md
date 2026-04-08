@@ -2,6 +2,10 @@
 
 ## 2026-04-08 (续续续续续续续续续续续续)
 
+### 语义搜索全局检索写入 MySQL
+- **backend_fastapi**：新增表 `semantic_search_logs` 与模型 `SemanticSearchLog`；当 `POST /api/search/semantic/search` 请求未带 `video_ids`（跨视频全局检索）时，在成功返回或「无可搜索视频」空结果路径写入一条日志（查询、实际参与检索的视频 ID 列表、结果数、耗时、limit/threshold）；`record_global_semantic_search` 失败不影响搜索主流程。迁移 SQL：`backend_fastapi/migrations/add_semantic_search_logs.sql`；`scripts/init_db.py` 已纳入该表。
+- **（续）**：`semantic_search_logs.created_at` 的 ORM 默认值改为数据库侧 `CURRENT_TIMESTAMP`，与迁移 SQL 对齐；`threshold_used` 在模型与写库服务中统一为 `Decimal` 语义并按 `0.001` 精度量化。`record_global_semantic_search` 现在会统一兜底 `limit`/`threshold`/`video_ids`，写库失败 warning 也会补齐 `query_len`、`video_count`、`limit`、`threshold` 上下文；部署文档明确现有库优先执行 `backend_fastapi/migrations/add_semantic_search_logs.sql`，新库/本地开发再使用 `backend_fastapi/scripts/init_db.py --create`。
+
 ### 语义搜索 query key 与「已索引」文案收口
 - **mobile-frontend**：`Search.vue` 使用 `route.query[SEARCH_ROUTE_SCOPE_QUERY]` 读取 scope，与首页 `router.push` 的 query key 一致；移除 `SEARCH_ROUTE_SCOPE_ALL`，与 `scope=` 取值统一为 `DEFAULT_SEARCH_SCOPE`；`SEARCH_COPY_ALL_SCOPE_HINT` 与首页说明同源，跨视频表述统一为「已索引」语义；搜索页输入框占位、锁定角标、通用空态、搜索/加载/重试文案迁入 `searchDefaults.js`。
 - **（续）**：`Search.vue` 的搜索结果标题、无结果提示、当前视频标签、预览兜底与“点击播放此片段”提示继续收口到 `searchDefaults.js` 与计算属性；`Home.vue` 搜索按钮文案复用 `SEARCH_COPY_SEARCH_BUTTON`，保证首页与搜索页一致。

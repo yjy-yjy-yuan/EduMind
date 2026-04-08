@@ -17,8 +17,8 @@
 - 本地文本嵌入：`app/services/search/local_embedder.py`
 - ChromaDB 存储：`app/services/search/store.py`
 - 后台索引任务：`app/tasks/vector_indexing.py`
-- 数据模型：`app/models/vector_index.py`
-- 迁移脚本：`scripts/migrations_semantic_search.py`
+- 数据模型：`app/models/vector_index.py`、`app/models/semantic_search_log.py`
+- 迁移脚本：`scripts/migrations_semantic_search.py`（向量索引相关历史脚本）；全局检索日志表：`migrations/add_semantic_search_logs.sql`
 
 ### 已实现能力
 
@@ -32,6 +32,15 @@
 - 支持后台索引任务状态流转：`pending -> processing -> completed/failed`。
 - 支持在视频处理完成后按配置自动提交索引任务。
 - 搜索结果已回填字幕预览文本 `preview_text`。
+- **全局语义搜索落库**：当请求体未携带 `video_ids`（或为空列表）时，即跨「当前用户全部已索引视频」检索，每次检索会在 `semantic_search_logs` 写入一条记录（含查询文本、实际参与检索的视频 ID 列表、命中条数、耗时、`limit`/`threshold`）；无可搜视频时也会写入（`result_count=0`）。写库失败仅打日志，不影响搜索接口。实现见 `app/services/search/search_log.py`。
+
+### 数据库：`semantic_search_logs`
+
+- 推荐路径：
+  - 现有 MySQL 库增量部署：优先执行 `backend_fastapi/migrations/add_semantic_search_logs.sql`
+  - 本地开发或新库初始化：可使用 `python backend_fastapi/scripts/init_db.py --create`
+  - 仅在明确允许自动建表时，才依赖 `AUTO_CREATE_TABLES=true`
+- `scripts/migrations_semantic_search.py` 主要覆盖早期向量索引相关结构；`semantic_search_logs` 这张表请以 `backend_fastapi/migrations/add_semantic_search_logs.sql` 为准。
 
 ## 当前限制
 

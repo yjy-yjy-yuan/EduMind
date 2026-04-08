@@ -4,6 +4,7 @@ from app.models.base import Base
 from app.models.base import TimestampMixin
 from app.models.note import Note
 from app.models.qa import Question
+from app.models.semantic_search_log import SemanticSearchLog
 from app.models.subtitle import Subtitle
 from app.models.user import User
 from app.models.vector_index import VectorIndex
@@ -24,4 +25,5 @@ __all__ = [
     "VectorIndexStatus",
     "User",
     "Question",
+    "SemanticSearchLog",
 ]

@@ -13,6 +13,8 @@ from app.schemas.search import SearchResultChunk
 from app.schemas.search import SemanticSearchRequest
 from app.schemas.search import SemanticSearchResponse
 from app.services.search.search import semantic_search_videos
+from app.services.search.search_log import is_global_semantic_search_request
+from app.services.search.search_log import maybe_record_global_semantic_search
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import HTTPException
@@ -78,6 +80,9 @@ async def semantic_search(
     if len(request.query) > 500:
         raise HTTPException(status_code=400, detail="查询内容过长（最多 500 字符）")
 
+    is_global_request = is_global_semantic_search_request(request.video_ids)
+    query_stripped = request.query.strip()
+
     # 确定搜索范围内的视频
     video_ids = request.video_ids or []
     if not video_ids:
@@ -95,6 +100,17 @@ async def semantic_search(
         video_ids = indexed_video_ids
 
     if not video_ids:
+        maybe_record_global_semantic_search(
+            db,
+            is_global_request=is_global_request,
+            user_id=current_user_id,
+            query_text=query_stripped,
+            video_ids_searched=[],
+            result_count=0,
+            total_time_ms=0,
+            limit_used=request.limit,
+            threshold_used=request.threshold,
+        )
         return SemanticSearchResponse(
             query=request.query,
             results=[],
@@ -117,6 +133,18 @@ async def semantic_search(
         )
 
         elapsed_ms = int((time.time() - start_time) * 1000)
+
+        maybe_record_global_semantic_search(
+            db,
+            is_global_request=is_global_request,
+            user_id=current_user_id,
+            query_text=query_stripped,
+            video_ids_searched=video_ids,
+            result_count=len(results),
+            total_time_ms=elapsed_ms,
+            limit_used=request.limit,
+            threshold_used=request.threshold,
+        )
 
         return SemanticSearchResponse(
             query=request.query,

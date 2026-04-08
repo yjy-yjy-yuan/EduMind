@@ -21,6 +21,7 @@ from app.core.database import engine
 from app.models import Base
 from app.models import Note
 from app.models import Question
+from app.models import SemanticSearchLog
 from app.models import Subtitle
 from app.models import User
 from app.models import Video
@@ -33,6 +34,7 @@ TABLE_DESCRIPTIONS = {
     "notes": "学习笔记表",
     "note_timestamps": "笔记时间戳关联表",
     "questions": "问答记录表",
+    "semantic_search_logs": "语义搜索全局检索日志表",
 }
 
 MANAGED_TABLE_NAMES = {
@@ -42,6 +44,7 @@ MANAGED_TABLE_NAMES = {
     Note.__tablename__,
     NoteTimestamp.__tablename__,
     Question.__tablename__,
+    SemanticSearchLog.__tablename__,
 }
 
 
