@@ -1,18 +1,20 @@
-"""本地模型向量嵌入 - 改编自 SentrySearch（可选）"""
+"""本地模型向量嵌入"""
 
 import logging
 from typing import List
 from typing import Optional
 
+from sklearn.feature_extraction.text import HashingVectorizer
+
 logger = logging.getLogger(__name__)
 
 
 class LocalEmbedder:
-    """使用本地模型（如 Qwen3-VL）生成向量"""
+    """使用本地哈希向量器生成文本嵌入，适合字幕语义搜索。"""
 
     def __init__(
         self,
-        model_name: str = "qwen8b",
+        model_name: str = "hashing-char-ngrams-zh",
         dimensions: int = 768,
         quantize: Optional[str] = None,
     ):
@@ -20,31 +22,50 @@ class LocalEmbedder:
         初始化本地嵌入器
 
         Args:
-            model_name: 模型名称（qwen8b, qwen32b 等）
+            model_name: 逻辑模型名（用于日志和元数据）
             dimensions: 向量维度
-            quantize: 量化方式（可选）
+            quantize: 量化方式（当前未使用，保留兼容）
         """
         self.model_name = model_name
         self.dimensions = dimensions
         self.quantize = quantize
-        self.model = None
+        self._vectorizer = HashingVectorizer(
+            n_features=dimensions,
+            alternate_sign=False,
+            analyzer="char",
+            ngram_range=(2, 4),
+            norm="l2",
+            lowercase=False,
+        )
+        logger.info("LocalEmbedder initialized | model=%s | dimensions=%s", model_name, dimensions)
 
-        # 实现：根据 model_name 加载对应的本地模型
-        # 这是一个简化实现，实际使用时需要集成具体的模型
-        logger.warning(f"LocalEmbedder initialized with model {model_name} (stub)")
+    def _embed_text(self, text: str) -> List[float]:
+        normalized = str(text or "").strip()
+        if not normalized:
+            return [0.0] * self.dimensions
+        matrix = self._vectorizer.transform([normalized])
+        return matrix.toarray()[0].astype(float).tolist()
 
     def embed_video_chunk(self, chunk_path: str, verbose: bool = False) -> List[float]:
-        """将视频片段嵌入为向量（需要实现）"""
-        logger.warning("LocalEmbedder.embed_video_chunk not fully implemented")
-        # 返回零向量作为占位符
-        return [0.0] * self.dimensions
+        """
+        本地后端不直接处理视频像素嵌入。
+
+        当前打通方案优先使用字幕文本构建索引；若走到这里，说明缺少字幕支撑。
+        """
+        raise RuntimeError(
+            "Local semantic search currently requires subtitle text chunks; video-only embedding is unsupported."
+        )
 
     def embed_query(self, query_text: str, verbose: bool = False) -> List[float]:
-        """将文本查询嵌入为向量（需要实现）"""
-        logger.warning("LocalEmbedder.embed_query not fully implemented")
-        # 返回零向量作为占位符
-        return [0.0] * self.dimensions
+        """将文本查询嵌入为向量。"""
+        if verbose:
+            logger.info("Embedding local query: %s", query_text[:50])
+        return self._embed_text(query_text)
 
     def embed_batch(self, texts: List[str], verbose: bool = False) -> List[List[float]]:
-        """批量嵌入文本（需要实现）"""
-        return [[0.0] * self.dimensions for _ in texts]
+        """批量嵌入文本。"""
+        normalized = [str(text or "").strip() for text in texts]
+        if not normalized:
+            return []
+        matrix = self._vectorizer.transform(normalized)
+        return matrix.toarray().astype(float).tolist()

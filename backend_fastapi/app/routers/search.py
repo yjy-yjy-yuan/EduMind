@@ -85,13 +85,21 @@ async def semantic_search(
         videos = db.query(Video).filter(Video.user_id == current_user_id, Video.has_semantic_index.is_(True)).all()
         video_ids = [v.id for v in videos]
     else:
-        # 验证用户对所有指定视频的访问权限
+        # 验证用户对所有指定视频的访问权限，并仅保留已构建索引的视频
+        indexed_video_ids = []
         for vid in video_ids:
-            verify_user_video_access(current_user_id, vid, db)
+            video = verify_user_video_access(current_user_id, vid, db)
+            if video.has_semantic_index:
+                indexed_video_ids.append(video.id)
+
+        video_ids = indexed_video_ids
 
     if not video_ids:
         return SemanticSearchResponse(
-            query=request.query, results=[], total_time_ms=0, message="没有可搜索的视频（需要先构建索引）"
+            query=request.query,
+            results=[],
+            total_time_ms=0,
+            message="没有可搜索的视频（需要先构建索引）",
         )
 
     try:

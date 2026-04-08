@@ -14,9 +14,9 @@ import chromadb
 logger = logging.getLogger(__name__)
 
 
-def make_chunk_id(source_file: str, start_time: float) -> str:
+def make_chunk_id(source_file: str, start_time: float, end_time: float, preview_text: str = "") -> str:
     """生成确定的分片 ID"""
-    raw = f"{source_file}:{start_time}"
+    raw = f"{source_file}:{start_time}:{end_time}:{preview_text[:80]}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
@@ -127,17 +127,24 @@ class EduMindStore:
         metadatas = []
 
         for chunk in chunks:
-            chunk_id = make_chunk_id(chunk["source_file"], chunk["start_time"])
+            chunk_id = make_chunk_id(
+                chunk["source_file"],
+                chunk["start_time"],
+                chunk["end_time"],
+                str(chunk.get("preview_text") or chunk.get("text") or ""),
+            )
             ids.append(chunk_id)
             embeddings.append(chunk["embedding"])
-            metadatas.append(
-                {
-                    "source_file": str(chunk["source_file"]),
-                    "start_time": float(chunk["start_time"]),
-                    "end_time": float(chunk["end_time"]),
-                    "indexed_at": now,
-                }
-            )
+            meta = {
+                "source_file": str(chunk["source_file"]),
+                "start_time": float(chunk["start_time"]),
+                "end_time": float(chunk["end_time"]),
+                "indexed_at": now,
+            }
+            for key, value in chunk.items():
+                if key not in {"chunk_id", "embedding", "source_file", "start_time", "end_time"}:
+                    meta[key] = value
+            metadatas.append(meta)
 
         self._collection.upsert(
             ids=ids,
@@ -176,7 +183,7 @@ class EduMindStore:
         for i in range(len(results["ids"][0])):
             meta = results["metadatas"][0][i]
             distance = results["distances"][0][i]
-            similarity = 1.0 - distance  # cosine distance -> similarity
+            similarity = max(0.0, 1.0 - (float(distance) / 2.0))  # cosine distance [0,2] -> similarity [0,1]
 
             # 应用阈值过滤
             if similarity >= threshold:
@@ -186,6 +193,7 @@ class EduMindStore:
                         "source_file": meta["source_file"],
                         "start_time": meta["start_time"],
                         "end_time": meta["end_time"],
+                        "preview_text": meta.get("preview_text"),
                         "similarity_score": similarity,
                         "distance": distance,
                     }

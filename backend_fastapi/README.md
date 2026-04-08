@@ -139,16 +139,17 @@ PYTHONPYCACHEPREFIX="$PWD/../.pycache-hook" python -m compileall app scripts ../
 
 - 对 `mp4` / `mov` 做重叠切片
 - 按视频时长自动选择切片参数，短视频更细、长视频更粗
-- Gemini 文本查询嵌入和视频分片嵌入
+- `gemini` / `local` 双后端工厂
+- `local` 后端可直接对字幕文本分块做本地向量索引与查询
 - ChromaDB 持久化集合
 - 手动触发索引、查询索引状态、执行语义搜索
 - 视频处理完成后按配置自动提交索引任务
+- 搜索结果回填字幕预览文本 `preview_text`
 
 当前限制：
 
-- `LocalEmbedder` 仍是占位实现
-- 搜索结果还没有字幕预览文本
 - 搜索用户识别当前优先取 `X-User-ID` 请求头，否则回退默认用户
+- 当前更偏向字幕语义召回；若没有字幕文件，本地 `local` 后端不会退化成可用的视频视觉嵌入
 
 部署步骤、数据库字段和当前已知限制见 [backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md](/Users/yuan/final-work/EduMind/backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)。
 

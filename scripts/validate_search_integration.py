@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -170,6 +171,70 @@ def verify_logging_integration() -> bool:
         return False
 
 
+def verify_local_subtitle_search_path() -> bool:
+    print_section("本地字幕语义链路验证")
+    try:
+        backend_path_setup()
+        from app.services.search.local_embedder import LocalEmbedder
+        from app.services.search.search import _build_subtitle_chunks
+
+        sample_srt = """1
+00:00:00,000 --> 00:00:05,000
+排列组合里常见一个技巧叫插空法
+
+2
+00:00:05,000 --> 00:00:11,000
+当对象不能相邻时就可以先排其他对象再插空
+
+3
+00:00:11,000 --> 00:00:18,000
+如果题目问剩余位置的排法也要一起计入
+
+4
+00:00:18,000 --> 00:00:25,000
+最后把两部分方法数相乘就能得到答案
+"""
+
+        with tempfile.NamedTemporaryFile("w", suffix=".srt", delete=False, encoding="utf-8") as handle:
+            handle.write(sample_srt)
+            subtitle_path = handle.name
+
+        try:
+            chunks = _build_subtitle_chunks(
+                source_file="/tmp/demo.mp4",
+                subtitle_path=subtitle_path,
+                chunk_duration=10,
+                overlap=2,
+            )
+        finally:
+            Path(subtitle_path).unlink(missing_ok=True)
+
+        if len(chunks) < 2:
+            print(colored(f"✗ 字幕分块数量异常: {len(chunks)}", "red"))
+            return False
+        if not all(chunk.get("preview_text") for chunk in chunks):
+            print(colored("✗ 存在缺失 preview_text 的字幕分块", "red"))
+            return False
+        print(colored(f"✓ 字幕分块成功，生成 {len(chunks)} 个时间窗分块", "green"))
+
+        embedder = LocalEmbedder()
+        vector = embedder.embed_query("插空法")
+        if len(vector) != 768 or not any(value != 0.0 for value in vector):
+            print(colored("✗ 本地查询向量异常", "red"))
+            return False
+
+        batch_vectors = embedder.embed_batch([chunk["text"] for chunk in chunks[:2]])
+        if len(batch_vectors) != 2:
+            print(colored("✗ 本地批量向量数量异常", "red"))
+            return False
+
+        print(colored("✓ LocalEmbedder 查询与批量嵌入可用", "green"))
+        return True
+    except Exception as exc:
+        print(colored(f"✗ 本地字幕语义链路验证异常: {exc}", "red"))
+        return False
+
+
 def verify_frontend_build() -> bool:
     print_section("前端编译验证")
     try:
@@ -208,6 +273,7 @@ def main() -> int:
         ("后端模块导入", verify_backend_imports()),
         ("自适应切片边界", verify_adaptive_chunking()),
         ("生产监控集成", verify_logging_integration()),
+        ("本地字幕语义链路", verify_local_subtitle_search_path()),
         ("前端编译", verify_frontend_build()),
     ]
 

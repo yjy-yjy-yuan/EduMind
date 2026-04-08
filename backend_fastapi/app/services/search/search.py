@@ -1,23 +1,94 @@
 """语义搜索服务 API"""
 
 import logging
+import os
 import time
 from typing import List
 from typing import Optional
 from typing import Tuple
 
 from app.core.config import settings
-from app.models.vector_index import VectorIndex
 from app.schemas.search import SearchResultChunk
 from app.services.search.chunker import chunk_video
 from app.services.search.chunker import get_video_duration
 from app.services.search.embedder import get_embedder
 from app.services.search.search_logging import SearchEventLogger
 from app.services.search.store import EduMindStore
-from app.services.search.store import make_chunk_id
+from app.utils.qa_utils import parse_srt_chunks
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+
+def _build_subtitle_chunks(
+    *,
+    source_file: str,
+    subtitle_path: str,
+    chunk_duration: int,
+    overlap: int,
+) -> List[dict]:
+    """将字幕按时间窗口聚合为搜索分块。"""
+    subtitles = parse_srt_chunks(subtitle_path)
+    if not subtitles:
+        return []
+
+    max_overlap = max(0, min(overlap, max(chunk_duration - 1, 0)))
+    chunks: List[dict] = []
+    buffer: List[dict] = []
+    buffer_start: Optional[float] = None
+
+    def flush_buffer() -> None:
+        nonlocal buffer, buffer_start
+        if not buffer:
+            return
+
+        merged_text = " ".join(str(item.get("text") or "").strip() for item in buffer).strip()
+        if merged_text:
+            preview_text = merged_text[:240]
+            chunks.append(
+                {
+                    "source_file": source_file,
+                    "start_time": float(buffer[0]["start_time"]),
+                    "end_time": float(buffer[-1]["end_time"]),
+                    "preview_text": preview_text,
+                    "text": merged_text,
+                }
+            )
+
+        if max_overlap <= 0:
+            buffer = []
+            buffer_start = None
+            return
+
+        overlap_start = max(float(buffer[-1]["end_time"]) - max_overlap, float(buffer[0]["start_time"]))
+        buffer = [item for item in buffer if float(item["end_time"]) > overlap_start]
+        buffer_start = float(buffer[0]["start_time"]) if buffer else None
+
+    for subtitle in subtitles:
+        text = str(subtitle.get("text") or "").strip()
+        if not text:
+            continue
+
+        if not buffer:
+            buffer_start = float(subtitle["start_time"])
+
+        buffer.append(subtitle)
+        current_end = float(subtitle["end_time"])
+        current_start = float(buffer_start if buffer_start is not None else subtitle["start_time"])
+        if current_end - current_start >= chunk_duration:
+            flush_buffer()
+
+    flush_buffer()
+
+    deduped = []
+    seen = set()
+    for chunk in chunks:
+        key = (chunk["start_time"], chunk["end_time"], chunk["preview_text"])
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(chunk)
+    return deduped
 
 
 def get_adaptive_chunk_params(video_duration_seconds: float) -> Tuple[int, int]:
@@ -59,6 +130,7 @@ def build_video_index_internal(
     collection_name: str,
     backend: str = "gemini",
     db: Optional[Session] = None,
+    subtitle_path: Optional[str] = None,
 ) -> int:
     """
     构建视频的语义索引
@@ -88,11 +160,12 @@ def build_video_index_internal(
 
         # 检查是否已索引
         if store.is_indexed(video_path):
-            logger.warning(f"Video {video_id} already indexed, skipping")
-            return store.get_chunk_count()
+            removed = store.remove_file(video_path)
+            logger.info("Video %s already indexed, removed %s stale chunks before rebuilding", video_id, removed)
 
         # 获取嵌入器
-        embedder = get_embedder(backend=backend)
+        model = settings.SEARCH_LOCAL_MODEL if backend == "local" else None
+        embedder = get_embedder(backend=backend, model=model) if model else get_embedder(backend=backend)
 
         # 获取视频时长并计算自适应参数
         video_duration = get_video_duration(video_path)
@@ -103,20 +176,35 @@ def build_video_index_internal(
             video_id=video_id, video_duration_seconds=video_duration, chunk_duration=chunk_duration, overlap=overlap
         )
 
-        # 切片视频
         logger.info(
-            f"Chunking video {video_id}: duration={video_duration:.0f}s, "
+            f"Preparing search chunks for video {video_id}: duration={video_duration:.0f}s, "
             f"chunk={chunk_duration}s, overlap={overlap}s"
         )
         chunk_start_time = time.time()
-        chunks = chunk_video(
-            video_path,
-            chunk_duration=chunk_duration,
-            overlap=overlap,
-            preprocess=settings.SEARCH_PREPROCESS,
-            target_resolution=settings.SEARCH_PREPROCESS_RESOLUTION,
-            target_fps=settings.SEARCH_PREPROCESS_FPS,
-        )
+        use_subtitle_chunks = bool(subtitle_path and os.path.exists(subtitle_path))
+        if use_subtitle_chunks:
+            chunks = _build_subtitle_chunks(
+                source_file=video_path,
+                subtitle_path=subtitle_path,
+                chunk_duration=chunk_duration,
+                overlap=overlap,
+            )
+            logger.info(
+                "Built subtitle chunks for video %s | subtitle=%s | chunks=%s", video_id, subtitle_path, len(chunks)
+            )
+        else:
+            if backend == "local":
+                raise RuntimeError(
+                    "Local semantic search requires subtitle text for indexing, but no subtitle file was found."
+                )
+            chunks = chunk_video(
+                video_path,
+                chunk_duration=chunk_duration,
+                overlap=overlap,
+                preprocess=settings.SEARCH_PREPROCESS,
+                target_resolution=settings.SEARCH_PREPROCESS_RESOLUTION,
+                target_fps=settings.SEARCH_PREPROCESS_FPS,
+            )
 
         chunk_time_ms = (time.time() - chunk_start_time) * 1000
         SearchEventLogger.log_video_chunking_completed(
@@ -130,13 +218,22 @@ def build_video_index_internal(
         # 嵌入分片
         logger.info(f"Embedding {len(chunks)} chunks")
         embedding_start_time = time.time()
-        for chunk in chunks:
-            try:
-                embedding = embedder.embed_video_chunk(chunk["chunk_path"])
+        if use_subtitle_chunks:
+            texts = [chunk["text"] for chunk in chunks]
+            if hasattr(embedder, "embed_batch"):
+                embeddings = embedder.embed_batch(texts)
+            else:
+                embeddings = [embedder.embed_query(text) for text in texts]
+            for chunk, embedding in zip(chunks, embeddings):
                 chunk["embedding"] = embedding
-            except Exception as e:
-                logger.error(f"Failed to embed chunk: {e}")
-                raise
+        else:
+            for chunk in chunks:
+                try:
+                    embedding = embedder.embed_video_chunk(chunk["chunk_path"])
+                    chunk["embedding"] = embedding
+                except Exception as e:
+                    logger.error(f"Failed to embed chunk: {e}")
+                    raise
         embedding_time_ms = (time.time() - embedding_start_time) * 1000
         SearchEventLogger.log_embedding_batch_completed(
             video_id=video_id, batch_size=len(chunks), duration_ms=embedding_time_ms
@@ -147,13 +244,12 @@ def build_video_index_internal(
         store.add_chunks_batch(chunks)
 
         # 清理临时文件
-        import os
-
-        for chunk in chunks:
-            try:
-                os.unlink(chunk["chunk_path"])
-            except Exception as e:
-                logger.warning(f"Failed to cleanup chunk file: {e}")
+        if not use_subtitle_chunks:
+            for chunk in chunks:
+                try:
+                    os.unlink(chunk["chunk_path"])
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup chunk file: {e}")
 
         logger.info(f"Successfully indexed video {video_id} with {len(chunks)} chunks")
 
@@ -259,7 +355,7 @@ def semantic_search_videos(
                         start_time=result["start_time"],
                         end_time=result["end_time"],
                         similarity_score=result["similarity_score"],
-                        preview_text=None,  # TODO: 从字幕中获取
+                        preview_text=result.get("preview_text"),
                     )
                     all_results.append(chunk)
 

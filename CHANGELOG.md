@@ -1,5 +1,21 @@
 # 变更日志
 
+## 2026-04-08 (续续续续续续)
+
+### 语义搜索主链路真实打通（本地字幕语义搜索）
+- 更新 [`backend_fastapi/app/services/search/local_embedder.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/local_embedder.py)：将原本的占位 `LocalEmbedder` 改为可运行的本地文本向量实现，使用稳定的哈希向量方案支撑中文字幕语义搜索。
+- 更新 [`backend_fastapi/app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py)：新增字幕时间窗聚合分块逻辑，索引时优先使用字幕文本而不是强依赖视频视觉分片；同时修正 `0s` 起始分块被 `or` 误判的问题，并在重建索引前清理旧分块。
+- 更新 [`backend_fastapi/app/services/search/store.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/store.py)：存储与检索阶段保留 `preview_text`，修正相似度换算，并将 chunk ID 生成规则扩展到 `source_file + start_time + end_time + preview_text`，避免字幕分块出现重复 ID。
+- 更新 [`backend_fastapi/app/tasks/vector_indexing.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/vector_indexing.py)：索引任务允许优先使用 `processed_filepath`，缺失时回退到原始 `filepath`；索引完成后清空旧错误信息，保证状态与实际结果一致。
+- 更新 [`backend_fastapi/app/models/vector_index.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/vector_index.py)：`VectorIndexStatus` 的 SQLAlchemy 枚举映射改为持久化枚举 value（小写），与现有 MySQL `vector_indexes.status` 数据保持一致，修复索引任务刚进入 `processing` 就因大小写不匹配失败的问题。
+- 更新 [`backend_fastapi/app/routers/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/search.py)：指定 `video_ids` 搜索时只保留当前用户已构建索引的视频，避免未建索引视频走到深层搜索逻辑后返回 500。
+- 更新 [`.gitignore`](/Users/yuan/final-work/EduMind/.gitignore)：忽略 `backend_fastapi/data/`，避免本地 ChromaDB 持久化目录被误提交。
+
+### 文档与验证同步
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)、[`backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md`](/Users/yuan/final-work/EduMind/backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)、[`docs/SEARCH_IMPLEMENTATION_SUMMARY.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_IMPLEMENTATION_SUMMARY.md)：修正“LocalEmbedder 仍是占位实现”“`preview_text` 仍为 null”“默认后端应使用 gemini”等过时描述，同步当前真实可用路径为本地字幕语义搜索。
+- 更新 [`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：补充语义搜索示例配置，默认示例切到 `SEARCH_BACKEND=local` 与 `SEARCH_LOCAL_MODEL=hashing-char-ngrams-zh`。
+- 更新 [`scripts/validate_search_integration.py`](/Users/yuan/final-work/EduMind/scripts/validate_search_integration.py)：新增“本地字幕语义链路验证”，覆盖字幕分块、`preview_text` 回填以及 `LocalEmbedder` 的查询/批量嵌入能力。
+
 ## 2026-04-08 (续续续续续)
 
 ### 对 2026-04-08 搜索修复记录的更正说明

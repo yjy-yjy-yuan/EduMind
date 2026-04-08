@@ -44,7 +44,10 @@ class VectorIndex(Base):
     embedding_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     # 状态管理
-    status: Mapped[VectorIndexStatus] = mapped_column(SQLEnum(VectorIndexStatus), default=VectorIndexStatus.PENDING)
+    status: Mapped[VectorIndexStatus] = mapped_column(
+        SQLEnum(VectorIndexStatus, values_callable=lambda enum_cls: [member.value for member in enum_cls]),
+        default=VectorIndexStatus.PENDING,
+    )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # 时间戳

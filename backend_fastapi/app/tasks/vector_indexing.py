@@ -1,6 +1,7 @@
 """向量索引后台任务"""
 
 import logging
+import os
 from datetime import datetime
 
 from app.core.config import settings
@@ -77,12 +78,21 @@ def index_video_for_search(video_id: int, user_id: int, embedding_backend: str =
                 db.commit()
             return
 
-        # 检查处理后的视频文件
-        if not video.processed_filepath:
-            logger.error(f"No processed video file: {video_id}")
+        # 优先使用处理后文件，若没有则回退到原始上传文件
+        video_source_path = video.processed_filepath or video.filepath
+        if not video_source_path:
+            logger.error(f"No available video file for indexing: {video_id}")
             if vector_index:
                 vector_index.status = VectorIndexStatus.FAILED
-                vector_index.error_message = "No processed video file"
+                vector_index.error_message = "No available video file for indexing"
+                db.commit()
+            return
+
+        if not os.path.exists(video_source_path):
+            logger.error(f"Video file does not exist: {video_source_path}")
+            if vector_index:
+                vector_index.status = VectorIndexStatus.FAILED
+                vector_index.error_message = f"Video file missing: {video_source_path}"
                 db.commit()
             return
 
@@ -92,16 +102,18 @@ def index_video_for_search(video_id: int, user_id: int, embedding_backend: str =
         chunk_count = build_video_index_internal(
             video_id=video_id,
             user_id=user_id,
-            video_path=video.processed_filepath,
+            video_path=video_source_path,
             collection_name=vector_index.collection_name,
             backend=backend,
             db=db,
+            subtitle_path=video.subtitle_filepath,
         )
 
         # 更新记录
         vector_index.chunk_count = chunk_count
         vector_index.status = VectorIndexStatus.COMPLETED
         vector_index.indexed_at = datetime.utcnow()
+        vector_index.error_message = None
 
         video.has_semantic_index = True
         video.vector_index_id = vector_index.id
