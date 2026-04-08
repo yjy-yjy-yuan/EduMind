@@ -1,5 +1,17 @@
 # 变更日志
 
+## 2026-04-08 (续续)
+
+### 语义搜索自适应切片 - 边界问题修复
+- **问题诊断**：初始实现中规则表使用 (min_dur, max_dur) 的闭区间格式，导致浮点数时长（如 180.5s、600.5s）无法匹配任何规则，直接回退到默认 30s/5s 参数，使自适应方案形同虚设。
+- **根本原因**：整数边界定义 `(0, 180), (181, 600)` 之间存在间隙，单精度浮点数在边界处容易落入间隙。
+- **修复方案**：改用单值上限规则
+  - 规则格式改为 `(max_duration_inclusive, chunk_duration, overlap)`
+  - 匹配逻辑改为 `duration <= max_duration` 取第一个匹配规则
+  - 彻底消除任何歧义和间隙
+- **验证结果**：测试所有关键边界（180.0, 180.5, 181.0, 600.0, 600.5, 1800.0, 1800.5, 3600.0, 3600.5），全部正常返回预期参数，无 fallback
+- 修改文件：[`app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)（规则格式）、[`app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py)（匹配逻辑）
+
 ## 2026-04-08 (续)
 
 ### 语义搜索自适应切片实现

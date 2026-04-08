@@ -32,16 +32,12 @@ def get_adaptive_chunk_params(video_duration_seconds: float) -> Tuple[int, int]:
     if not settings.SEARCH_ADAPTIVE_CHUNKING:
         return settings.SEARCH_CHUNK_DURATION, settings.SEARCH_CHUNK_OVERLAP
 
-    # 遍历自适应参数规则，找到匹配的范围。
-    # 规则按 (min, max] 解释，第一条规则包含 0；这样既保留“<=3min”这类边界，又避免 180.5 / 600.5 掉回默认值。
-    adaptive_rules = settings.SEARCH_ADAPTIVE_PARAMS
-    for idx, (min_dur, max_dur, chunk_dur, overlap) in enumerate(adaptive_rules):
-        is_last_rule = idx == len(adaptive_rules) - 1
-        lower_matches = video_duration_seconds > min_dur or idx == 0
-        upper_matches = video_duration_seconds <= max_dur or is_last_rule
-        if lower_matches and upper_matches:
+    # 遍历自适应参数规则，找到第一个满足上限的规则
+    # 规则格式已改为 (max_duration, chunk_duration, overlap)，使用单值上限完全避免边界歧义
+    for max_dur, chunk_dur, overlap in settings.SEARCH_ADAPTIVE_PARAMS:
+        if video_duration_seconds <= max_dur:
             logger.info(
-                f"Adaptive chunking: duration={video_duration_seconds:.0f}s → "
+                f"Adaptive chunking: duration={video_duration_seconds:.1f}s → "
                 f"chunk={chunk_dur}s, overlap={overlap}s"
             )
             return chunk_dur, overlap

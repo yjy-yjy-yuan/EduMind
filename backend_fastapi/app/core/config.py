@@ -108,15 +108,15 @@ class Settings(BaseSettings):
 
     # 自适应切片配置
     SEARCH_ADAPTIVE_CHUNKING: bool = True  # 是否启用自适应切片
-    # 自适应参数规则：(min_duration, max_duration, chunk_duration, overlap)
-    # 范围按 (min, max] 解释，第一条规则包含 min=0，最后一条规则的 max 视为兜底上限
-    # 格式：[(0, 180, 12, 2), (180, 600, 20, 4), ...]
+    # 自适应参数规则：(max_duration_inclusive, chunk_duration, overlap)
+    # 使用单值上限，遍历时返回第一个匹配的规则，完全避免边界歧义。
+    # 含义：若 duration <= max_duration_inclusive，则使用该参数
     SEARCH_ADAPTIVE_PARAMS: List[tuple] = [
-        (0, 180, 12, 2),  # <= 3min:   12s chunk, 2s overlap
-        (180, 600, 20, 4),  # <= 10min:  20s chunk, 4s overlap
-        (600, 1800, 45, 8),  # <= 30min:  45s chunk, 8s overlap
-        (1800, 3600, 60, 10),  # <= 60min:  60s chunk, 10s overlap
-        (3600, 999999, 75, 12),  # > 60min:   75s chunk, 12s overlap
+        (180, 12, 2),  # duration <= 180s (3min):     12s chunk, 2s overlap
+        (600, 20, 4),  # duration <= 600s (10min):    20s chunk, 4s overlap
+        (1800, 45, 8),  # duration <= 1800s (30min):   45s chunk, 8s overlap
+        (3600, 60, 10),  # duration <= 3600s (60min):   60s chunk, 10s overlap
+        (999999, 75, 12),  # duration > 3600s (兜底):      75s chunk, 12s overlap
     ]
 
     # CORS 配置 (允许前端访问) - 使用字符串，支持逗号分隔

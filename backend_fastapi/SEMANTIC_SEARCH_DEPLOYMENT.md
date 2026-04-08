@@ -62,7 +62,8 @@ SEARCH_AUTO_INDEX_NEW_VIDEOS=true
 说明：
 
 - 启用 `SEARCH_ADAPTIVE_CHUNKING=true` 后，索引会按视频总时长自动选择切片参数，短视频切得更细，长视频切得更粗。
-- 当前默认规则是：`<3min -> 12s/2s`、`<10min -> 20s/4s`、`<30min -> 45s/8s`、`<60min -> 60s/10s`、`>=60min -> 75s/12s`。
+- 当前默认规则是：`<=3min -> 12s/2s`、`<=10min -> 20s/4s`、`<=30min -> 45s/8s`、`<=60min -> 60s/10s`、`>60min -> 75s/12s`。
+- 规则表当前使用“单值上限”匹配，像 `180.5s`、`600.5s` 这类浮点时长会自动落入下一档，不会再错误回退到固定 `30s/5s`。
 - `SEARCH_GEMINI_API_KEY` 为空时，代码会继续尝试走 Gemini SDK 的默认环境变量。
 - 开发环境的后台执行器默认是线程池；生产环境可通过 `BACKGROUND_TASK_EXECUTOR=process` 切到进程池。
 
