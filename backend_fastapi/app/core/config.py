@@ -106,6 +106,19 @@ class Settings(BaseSettings):
     SEARCH_AUTO_INDEX_NEW_VIDEOS: bool = True
     SEARCH_MAX_RESULTS: int = 20
 
+    # 自适应切片配置
+    SEARCH_ADAPTIVE_CHUNKING: bool = True  # 是否启用自适应切片
+    # 自适应参数规则：(min_duration, max_duration, chunk_duration, overlap)
+    # 范围按 (min, max] 解释，第一条规则包含 min=0，最后一条规则的 max 视为兜底上限
+    # 格式：[(0, 180, 12, 2), (180, 600, 20, 4), ...]
+    SEARCH_ADAPTIVE_PARAMS: List[tuple] = [
+        (0, 180, 12, 2),  # <= 3min:   12s chunk, 2s overlap
+        (180, 600, 20, 4),  # <= 10min:  20s chunk, 4s overlap
+        (600, 1800, 45, 8),  # <= 30min:  45s chunk, 8s overlap
+        (1800, 3600, 60, 10),  # <= 60min:  60s chunk, 10s overlap
+        (3600, 999999, 75, 12),  # > 60min:   75s chunk, 12s overlap
+    ]
+
     # CORS 配置 (允许前端访问) - 使用字符串，支持逗号分隔
     CORS_ORIGINS: Union[str, List[str]] = (
         "null,http://localhost:328,http://127.0.0.1:328,http://localhost:5173,http://127.0.0.1:5173"

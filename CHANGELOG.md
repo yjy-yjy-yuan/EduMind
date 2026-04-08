@@ -1,5 +1,20 @@
 # 变更日志
 
+## 2026-04-08 (续)
+
+### 语义搜索自适应切片实现
+- 在 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py) 中新增自适应切片配置：
+  - `SEARCH_ADAPTIVE_CHUNKING: bool = True` 控制是否启用自适应
+  - `SEARCH_ADAPTIVE_PARAMS: List[tuple]` 定义时长分层参数规则
+  - 规则：≤3min(12s/2s), ≤10min(20s/4s), ≤30min(45s/8s), ≤60min(60s/10s), >60min(75s/12s)
+- 在 [`backend_fastapi/app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py) 中：
+  - 新增 `get_adaptive_chunk_params()` 函数，根据视频时长计算自适应参数
+  - 修改 `build_video_index_internal()` 调用该函数动态应用切片参数
+  - 添加详细日志记录视频时长与计算出的参数
+  - 修正浮点边界时长（如 `180.5s`、`600.5s`）会错误回退到默认 `30s/5s` 的区间匹配问题
+- 验证数据：3min(17→18片), 10min(37→38片), 30min(48→49片), 60min(71→72片), 120min(114→115片)，与用户预期基本一致（误差≤1片）
+- 收益：长视频成本降低 50-60%（如 120min 从 288→115 API 调用），短视频细粒度提升 50-100%
+
 ## 2026-04-08
 
 ### 语义搜索后端文档同步与纠错

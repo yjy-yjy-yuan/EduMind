@@ -138,6 +138,7 @@ PYTHONPYCACHEPREFIX="$PWD/../.pycache-hook" python -m compileall app scripts ../
 当前已支持：
 
 - 对 `mp4` / `mov` 做重叠切片
+- 按视频时长自动选择切片参数，短视频更细、长视频更粗
 - Gemini 文本查询嵌入和视频分片嵌入
 - ChromaDB 持久化集合
 - 手动触发索引、查询索引状态、执行语义搜索

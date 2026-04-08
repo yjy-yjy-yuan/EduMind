@@ -4,6 +4,7 @@ import logging
 import time
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 from app.core.config import settings
 from app.models.vector_index import VectorIndex
@@ -16,6 +17,42 @@ from app.services.search.store import make_chunk_id
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+
+def get_adaptive_chunk_params(video_duration_seconds: float) -> Tuple[int, int]:
+    """
+    根据视频时长获取自适应切片参数
+
+    Args:
+        video_duration_seconds: 视频时长（秒）
+
+    Returns:
+        (chunk_duration, overlap) 元组
+    """
+    if not settings.SEARCH_ADAPTIVE_CHUNKING:
+        return settings.SEARCH_CHUNK_DURATION, settings.SEARCH_CHUNK_OVERLAP
+
+    # 遍历自适应参数规则，找到匹配的范围。
+    # 规则按 (min, max] 解释，第一条规则包含 0；这样既保留“<=3min”这类边界，又避免 180.5 / 600.5 掉回默认值。
+    adaptive_rules = settings.SEARCH_ADAPTIVE_PARAMS
+    for idx, (min_dur, max_dur, chunk_dur, overlap) in enumerate(adaptive_rules):
+        is_last_rule = idx == len(adaptive_rules) - 1
+        lower_matches = video_duration_seconds > min_dur or idx == 0
+        upper_matches = video_duration_seconds <= max_dur or is_last_rule
+        if lower_matches and upper_matches:
+            logger.info(
+                f"Adaptive chunking: duration={video_duration_seconds:.0f}s → "
+                f"chunk={chunk_dur}s, overlap={overlap}s"
+            )
+            return chunk_dur, overlap
+
+    # fallback 到全局配置
+    logger.warning(
+        f"No adaptive rule for duration {video_duration_seconds}s, "
+        f"using fallback: chunk={settings.SEARCH_CHUNK_DURATION}s, "
+        f"overlap={settings.SEARCH_CHUNK_OVERLAP}s"
+    )
+    return settings.SEARCH_CHUNK_DURATION, settings.SEARCH_CHUNK_OVERLAP
 
 
 def build_video_index_internal(
@@ -59,12 +96,19 @@ def build_video_index_internal(
         # 获取嵌入器
         embedder = get_embedder(backend=backend)
 
+        # 获取视频时长并计算自适应参数
+        video_duration = get_video_duration(video_path)
+        chunk_duration, overlap = get_adaptive_chunk_params(video_duration)
+
         # 切片视频
-        logger.info(f"Chunking video {video_id}")
+        logger.info(
+            f"Chunking video {video_id}: duration={video_duration:.0f}s, "
+            f"chunk={chunk_duration}s, overlap={overlap}s"
+        )
         chunks = chunk_video(
             video_path,
-            chunk_duration=settings.SEARCH_CHUNK_DURATION,
-            overlap=settings.SEARCH_CHUNK_OVERLAP,
+            chunk_duration=chunk_duration,
+            overlap=overlap,
             preprocess=settings.SEARCH_PREPROCESS,
             target_resolution=settings.SEARCH_PREPROCESS_RESOLUTION,
             target_fps=settings.SEARCH_PREPROCESS_FPS,
