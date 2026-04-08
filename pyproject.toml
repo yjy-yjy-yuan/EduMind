@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ai-edvision"
+name = "EDUMIND"
 version = "0.1.0"
-description = "基于深度学习的视频智能伴学系统"
+description = "教育思维"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

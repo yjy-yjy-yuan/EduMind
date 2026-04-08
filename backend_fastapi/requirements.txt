@@ -19,6 +19,12 @@ torch>=2.0.0
 sentence-transformers==3.4.1
 faiss-cpu==1.8.0
 
+# 语义搜索 (SentrySearch 集成)
+chromadb>=0.4.0
+google-generativeai>=0.3.0
+transformers>=4.36.0
+Pillow>=10.0.0
+
 # 工具
 python-dotenv==1.0.0
 yt-dlp>=2024.3.10

@@ -6,6 +6,8 @@ from app.models.note import Note
 from app.models.qa import Question
 from app.models.subtitle import Subtitle
 from app.models.user import User
+from app.models.vector_index import VectorIndex
+from app.models.vector_index import VectorIndexStatus
 from app.models.video import Video
 from app.models.video import VideoProcessingOrigin
 from app.models.video import VideoStatus
@@ -18,6 +20,8 @@ __all__ = [
     "VideoStatus",
     "Subtitle",
     "Note",
+    "VectorIndex",
+    "VectorIndexStatus",
     "User",
     "Question",
 ]
