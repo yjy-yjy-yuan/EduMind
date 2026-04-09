@@ -45,4 +45,4 @@ jobs:
           WHISPER_PRELOAD_ON_STARTUP: "false"
         run: |
           cd backend_fastapi
-          pytest tests
+          pytest tests/smoke

@@ -124,7 +124,7 @@ python scripts/validate_backend_smoke.py
 当前最小检查项：
 
 - `ruff check backend_fastapi/tests`
-- `cd backend_fastapi && pytest tests`
+- `cd backend_fastapi && pytest tests/smoke`
 
 说明：
 

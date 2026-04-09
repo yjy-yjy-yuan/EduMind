@@ -90,7 +90,7 @@ bash ios-app/validate_ios_build.sh
   - `pytest.ini`
 - Current minimal CI checks:
   - `ruff check backend_fastapi/tests`
-  - `cd backend_fastapi && pytest tests`
+  - `cd backend_fastapi && pytest tests/smoke`
 - CI uses Python `3.10` and pip cache; this is the default backend CI runtime unless explicitly changed.
 - Rule boundary:
   - Local modification verification for this repository still follows the non-`pytest` rule in this document.

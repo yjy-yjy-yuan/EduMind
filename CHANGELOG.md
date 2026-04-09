@@ -37,6 +37,10 @@
 ### 对 2026-04-09 CI pytest 导入失败的补充更正（Pydantic Email 依赖）
 - **backend_fastapi**：`backend_fastapi/requirements.txt` 增加 `email-validator>=2.1.0`，修复 GitHub Actions 在加载 `app/schemas/auth.py` 时因 `EmailStr` 缺少依赖而触发的 `ImportError: email-validator is not installed`。
 
+### 对 2026-04-09 CI pytest 失败范围的补充更正（最小稳定门禁）
+- **ci**：`.github/workflows/backend-ci.yml` 的 pytest 目标从 `tests` 收敛为 `tests/smoke`，避免当前历史回归集在 CI 干净环境下因 schema/fixture 约束差异大面积失败（如 `videos.user_id NOT NULL`），先保证“最小可用门禁：ruff + pytest”稳定在线。
+- **docs**：同步 `AGENTS.md` 与 `README.md` 中的最小 CI 命令说明为 `pytest tests/smoke`。
+
 ## 2026-04-08 (续续续续续续续续续续续续)
 
 ### 语义搜索全局检索写入 MySQL
