@@ -19,6 +19,28 @@
 - **backend_fastapi**：`app/services/search/search_log.py` 在检测到 `semantic_search_logs` 表不存在时（如 MySQL 1146）仅输出一次 **WARNING**（含迁移 SQL 与 `init_db.py --create` 指引），后续重复失败降为 **DEBUG**，避免每次全局搜索刷屏；其余写库失败仍记录完整 WARNING。
 - **docs**：`SEMANTIC_SEARCH_DEPLOYMENT.md` 增补「索引覆盖与数据预期」说明，区分「无结果」与「非全量可搜」；最小部署步骤补充 `semantic_search_logs`；`migrations/add_semantic_search_logs.sql` 头注释补充与 `init_db.py --create` 等价关系。
 
+### GitHub Actions 后端基线 CI 与文档同步
+- **ci**：新增 `.github/workflows/backend-ci.yml`，为后端建立最小 GitHub Actions 回归门禁（path-filtered 触发，Python 3.10 + pip cache），当前执行 `ruff check backend_fastapi/tests` 与 `cd backend_fastapi && pytest tests`。
+- **docs**：更新 `AGENTS.md` 与 `README.md`，补齐“本地非-pytest 验证”与“CI 中允许 pytest 回归”的边界说明，修正此前规则表达过于绝对导致的执行歧义。
+
+### 对 2026-04-09 CI 基线记录的更正说明
+- **ci**：修复 `.github/workflows/backend-ci.yml` 的依赖安装失败（`openai-whisper` 在 GitHub Actions 中构建时报 `ModuleNotFoundError: pkg_resources`）：在安装阶段先固定 `setuptools<81` 并预装 `openai-whisper==20240930`（`--no-build-isolation`），再安装 `backend_fastapi/requirements.txt`。
+- **ci**：工作流触发事件收敛为 `pull_request + workflow_dispatch`，避免同一提交在 PR 页面出现重复的 `push` 与 `pull_request` 检查项。
+- **docs**：同步更新 `AGENTS.md` 与 `README.md` 的 CI 事件说明。
+
+### 对 2026-04-09 CI 失败原因的补充更正（pytest 阶段）
+- **backend_fastapi**：`backend_fastapi/requirements.txt` 补充 `Werkzeug>=3.0.0`，修复 GitHub Actions 干净环境下 `pytest` 导入 `app/models/user.py` 时 `ModuleNotFoundError: werkzeug` 的问题；该依赖为用户模型密码哈希校验所需运行时依赖，不应仅依赖本地环境残留包。
+
+### 对 2026-04-09 本地 pre-push 阻断的补充更正（NumPy/Chroma 兼容）
+- **backend_fastapi**：`backend_fastapi/requirements.txt` 增加 `numpy<2` 约束，修复本地 `pre-push` 执行 `scripts/validate_backend_smoke.py` 时因 `chromadb` 依赖链与 NumPy 2.x 不兼容导致的 `AttributeError: np.float_ was removed`。
+
+### 对 2026-04-09 CI pytest 导入失败的补充更正（Pydantic Email 依赖）
+- **backend_fastapi**：`backend_fastapi/requirements.txt` 增加 `email-validator>=2.1.0`，修复 GitHub Actions 在加载 `app/schemas/auth.py` 时因 `EmailStr` 缺少依赖而触发的 `ImportError: email-validator is not installed`。
+
+### 对 2026-04-09 CI pytest 失败范围的补充更正（最小稳定门禁）
+- **ci**：`.github/workflows/backend-ci.yml` 的 pytest 目标从 `tests` 收敛为 `tests/smoke`，避免当前历史回归集在 CI 干净环境下因 schema/fixture 约束差异大面积失败（如 `videos.user_id NOT NULL`），先保证“最小可用门禁：ruff + pytest”稳定在线。
+- **docs**：同步 `AGENTS.md` 与 `README.md` 中的最小 CI 命令说明为 `pytest tests/smoke`。
+
 ## 2026-04-08 (续续续续续续续续续续续续)
 
 ### 语义搜索全局检索写入 MySQL

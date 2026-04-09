@@ -78,6 +78,25 @@ bash ios-app/validate_ios_build.sh
 - For frontend changes, build output alone is insufficient. iOS container validation is required.
 - For `ios-app/` native changes, at minimum run an iOS build validation and verify the affected bridge or native flow in the container.
 
+## CI (GitHub Actions) Baseline
+- Repository baseline CI workflow: `.github/workflows/backend-ci.yml`.
+- CI events:
+  - `pull_request`
+  - `workflow_dispatch`
+- CI trigger scope (path-filtered):
+  - `.github/workflows/backend-ci.yml`
+  - `backend_fastapi/**`
+  - `pyproject.toml`
+  - `pytest.ini`
+- Current minimal CI checks:
+  - `ruff check backend_fastapi/tests`
+  - `cd backend_fastapi && pytest tests/smoke`
+- CI uses Python `3.10` and pip cache; this is the default backend CI runtime unless explicitly changed.
+- Rule boundary:
+  - Local modification verification for this repository still follows the non-`pytest` rule in this document.
+  - `pytest` is allowed in GitHub Actions CI as a regression guardrail and can be used when explicitly troubleshooting CI failures.
+- When CI scope or commands change, update this section and related workflow/docs in the same patch.
+
 ## Commit & Pull Request Guidelines
 - Use short imperative commit titles.
 - Keep each commit focused on one change.
@@ -203,4 +222,6 @@ Set up or improve Git hooks following industry best practices.
 - Files unrelated to the iOS mobile chain should not be restored.
 - Do not add back legacy desktop-web modules, Flask compatibility branches, or Android app code unless explicitly requested.
 
-## The use of pytest to test the modified program is prohibited.
+## Local pytest usage boundary
+- For normal local verification of modified code in this repository, using `pytest` as the primary validation command is prohibited.
+- `pytest` is allowed in GitHub Actions CI regression workflows (for example `.github/workflows/backend-ci.yml`) and in explicit CI-failure troubleshooting scenarios.

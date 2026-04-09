@@ -100,6 +100,37 @@ python scripts/validate_backend_smoke.py
 
 `backend_fastapi/tests/` 仍保留历史回归用例与 pytest 风格目录结构；更具体的放置规则见 [backend_fastapi/tests/README.md](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)。
 
+补充边界：
+
+- 本地改动验证默认遵循上述非-`pytest` 规则
+- GitHub Actions CI 基线允许运行 `pytest` 作为回归门禁（见下节）
+
+## GitHub Actions CI（基线）
+
+仓库当前新增最小后端 CI 工作流：[`.github/workflows/backend-ci.yml`](/Users/yuan/final-work/EduMind/.github/workflows/backend-ci.yml)。
+
+触发事件：
+
+- `pull_request`
+- `workflow_dispatch`
+
+触发范围（path-filtered）：
+
+- `.github/workflows/backend-ci.yml`
+- `backend_fastapi/**`
+- `pyproject.toml`
+- `pytest.ini`
+
+当前最小检查项：
+
+- `ruff check backend_fastapi/tests`
+- `cd backend_fastapi && pytest tests/smoke`
+
+说明：
+
+- 运行时使用 Python `3.10` 与 pip cache
+- 该 CI 负责云端回归门禁，不替代本地 iOS / smoke / build 验证链路
+
 ## Git Hooks 与本地质量门
 
 当前仓库使用 `pre-commit` 框架，而不是 Husky。默认本地质量门如下：
