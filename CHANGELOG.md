@@ -31,6 +31,9 @@
 ### 对 2026-04-09 CI 失败原因的补充更正（pytest 阶段）
 - **backend_fastapi**：`backend_fastapi/requirements.txt` 补充 `Werkzeug>=3.0.0`，修复 GitHub Actions 干净环境下 `pytest` 导入 `app/models/user.py` 时 `ModuleNotFoundError: werkzeug` 的问题；该依赖为用户模型密码哈希校验所需运行时依赖，不应仅依赖本地环境残留包。
 
+### 对 2026-04-09 本地 pre-push 阻断的补充更正（NumPy/Chroma 兼容）
+- **backend_fastapi**：`backend_fastapi/requirements.txt` 增加 `numpy<2` 约束，修复本地 `pre-push` 执行 `scripts/validate_backend_smoke.py` 时因 `chromadb` 依赖链与 NumPy 2.x 不兼容导致的 `AttributeError: np.float_ was removed`。
+
 ## 2026-04-08 (续续续续续续续续续续续续)
 
 ### 语义搜索全局检索写入 MySQL
