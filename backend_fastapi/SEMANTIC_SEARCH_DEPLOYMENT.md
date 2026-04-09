@@ -1,6 +1,6 @@
 # EduMind 语义搜索后端落地说明
 
-更新日期：2026-04-08
+更新日期：2026-04-09
 
 本文档记录 `backend_fastapi/` 中已经落地的语义搜索后端能力、当前限制和最小部署步骤。它描述的是当前仓库状态，不再把计划项写成“已完成”。
 
@@ -32,6 +32,7 @@
 - 支持后台索引任务状态流转：`pending -> processing -> completed/failed`。
 - 支持在视频处理完成后按配置自动提交索引任务。
 - 搜索结果已回填字幕预览文本 `preview_text`。
+- 当前本地默认链路会先做字幕语义召回，再结合查询词与 `preview_text` / 视频标题的词面命中做融合重排；接口返回的 `similarity_score` 与 `threshold` 都以融合后的分数为准，不再是“纯向量相似度”。
 - **全局语义搜索落库**：当请求体未携带 `video_ids`（或为空列表）时，即跨「当前用户全部已索引视频」检索，每次检索会在 `semantic_search_logs` 写入一条记录（含查询文本、实际参与检索的视频 ID 列表、命中条数、耗时、`limit`/`threshold`）；无可搜视频时也会写入（`result_count=0`）。写库失败仅打日志，不影响搜索接口。实现见 `app/services/search/search_log.py`。
 
 ### 数据库：`semantic_search_logs`
@@ -41,7 +42,7 @@
   - 本地开发或新库初始化：可使用 `python backend_fastapi/scripts/init_db.py --create`
   - 仅在明确允许自动建表时，才依赖 `AUTO_CREATE_TABLES=true`
 - `scripts/migrations_semantic_search.py` 主要覆盖早期向量索引相关结构；`semantic_search_logs` 这张表请以 `backend_fastapi/migrations/add_semantic_search_logs.sql` 为准。
-- 若表尚未创建，全局搜索仍会返回结果，但审计落库会失败；`search_log.py` 对「表不存在」仅打一次 WARNING（后续为 DEBUG），完整修复请执行上述 SQL 或 `init_db.py --create`。
+- 若库中**尚未执行**建表（迁移脚本或 `init_db.py --create` 未跑），则属于**部署动作未完成**，不是代码缺陷：全局搜索仍会返回结果，但审计落库失败；进程内表现为「首次全局搜索一条 WARNING、之后同类失败为 DEBUG」，直至表真正创建。完整修复请执行上述 SQL 或 `init_db.py --create`。
 
 ## 索引覆盖与数据预期（诊断结论）
 
@@ -58,6 +59,7 @@
 - 认证尚未完全接入搜索路由；当前用户解析优先取请求头 `X-User-ID`，否则回退到默认用户 `1`。
 - 当前默认打通方案更偏向字幕语义搜索，并不是生产级视频视觉 embedding 方案。
 - 本地 `local` 后端依赖字幕文件；若视频只有文件没有字幕，本地索引不会自动退化成可用的视觉向量方案。
+- 当前本地链路对字幕识别质量仍然敏感；若字幕 OCR/ASR 本身有错字或口语化噪声，融合重排只能缓解结果排序，不能替代字幕清洗或别名归一。
 - 本文档不把“视频片段裁剪导出”列为已完成能力，仓库当前没有完整落地 `trimmer.py`。
 - 本文档不把前端搜索 UI 或 iOS 搜索交互列为已完成能力；当前提交范围主要是后端链路。
 
@@ -85,6 +87,7 @@ SEARCH_AUTO_INDEX_NEW_VIDEOS=true
 - 启用 `SEARCH_ADAPTIVE_CHUNKING=true` 后，索引会按视频总时长自动选择切片参数，短视频切得更细，长视频切得更粗。
 - 当前默认规则是：`<=3min -> 12s/2s`、`<=10min -> 20s/4s`、`<=30min -> 45s/8s`、`<=60min -> 60s/10s`、`>60min -> 75s/12s`。
 - 规则表当前使用“单值上限”匹配，像 `180.5s`、`600.5s` 这类浮点时长会自动落入下一档，不会再错误回退到固定 `30s/5s`。
+- 字幕分块在 overlap 场景下会以重叠窗口起点作为后续 chunk 的开始时间，避免长字幕把多个片段错误锚定到更早时间。
 - 本地默认打通方案使用 `SEARCH_BACKEND=local`，优先把字幕聚合成时间窗分块后再做文本向量。
 - 若切回 `SEARCH_BACKEND=gemini`，需要保证 `SEARCH_GEMINI_API_KEY` 或 Gemini SDK 默认环境变量可用。
 - 开发环境的后台执行器默认是线程池；生产环境可通过 `BACKGROUND_TASK_EXECUTOR=process` 切到进程池。

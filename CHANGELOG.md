@@ -2,6 +2,14 @@
 
 ## 2026-04-09
 
+### 语义搜索相关性重排与字幕分块窗口修正
+- **backend_fastapi**：更新 `app/services/search/search.py`，语义搜索结果改为“向量分 + 词面命中分”融合重排，并在融合后统一执行 `threshold` 过滤，降低无关视频长期停留在 `55%+` 的噪声结果；同时放宽底层 Chroma 候选召回，再由融合分数统一裁剪，避免高阈值场景下把真实相关片段过早滤掉。
+- **backend_fastapi**：修正字幕时间窗分块的 overlap 锚点，后续 chunk 改为以重叠窗口起点而不是首条字幕起点计时，避免长字幕跨越 overlap 时把片段错误拉回到更早时间，影响相关片段定位与展示。
+- **docs**：`backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md` 补充当前检索排序与阈值行为说明，明确默认本地链路是字幕语义召回 + 词面重排，而不是纯向量分排序。
+
+### 语义搜索部署文档页眉与 semantic_search_logs 说明
+- **docs**：`SEMANTIC_SEARCH_DEPLOYMENT.md` 更新日期改为 2026-04-09；明确未执行建表时属部署未完成，并说明「一次 WARNING + 后续 DEBUG」会持续至表创建。
+
 ### 语义搜索全局检索日志表缺失时的日志行为与部署说明
 - **backend_fastapi**：`app/services/search/search_log.py` 在检测到 `semantic_search_logs` 表不存在时（如 MySQL 1146）仅输出一次 **WARNING**（含迁移 SQL 与 `init_db.py --create` 指引），后续重复失败降为 **DEBUG**，避免每次全局搜索刷屏；其余写库失败仍记录完整 WARNING。
 - **docs**：`SEMANTIC_SEARCH_DEPLOYMENT.md` 增补「索引覆盖与数据预期」说明，区分「无结果」与「非全量可搜」；最小部署步骤补充 `semantic_search_logs`；`migrations/add_semantic_search_logs.sql` 头注释补充与 `init_db.py --create` 等价关系。
