@@ -19,6 +19,10 @@
 - **backend_fastapi**：`app/services/search/search_log.py` 在检测到 `semantic_search_logs` 表不存在时（如 MySQL 1146）仅输出一次 **WARNING**（含迁移 SQL 与 `init_db.py --create` 指引），后续重复失败降为 **DEBUG**，避免每次全局搜索刷屏；其余写库失败仍记录完整 WARNING。
 - **docs**：`SEMANTIC_SEARCH_DEPLOYMENT.md` 增补「索引覆盖与数据预期」说明，区分「无结果」与「非全量可搜」；最小部署步骤补充 `semantic_search_logs`；`migrations/add_semantic_search_logs.sql` 头注释补充与 `init_db.py --create` 等价关系。
 
+### GitHub Actions 后端基线 CI 与文档同步
+- **ci**：新增 `.github/workflows/backend-ci.yml`，为后端建立最小 GitHub Actions 回归门禁（path-filtered 触发，Python 3.10 + pip cache），当前执行 `ruff check backend_fastapi/tests` 与 `cd backend_fastapi && pytest tests`。
+- **docs**：更新 `AGENTS.md` 与 `README.md`，补齐“本地非-pytest 验证”与“CI 中允许 pytest 回归”的边界说明，修正此前规则表达过于绝对导致的执行歧义。
+
 ## 2026-04-08 (续续续续续续续续续续续续)
 
 ### 语义搜索全局检索写入 MySQL
