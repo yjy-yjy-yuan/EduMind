@@ -1,6 +1,222 @@
 # 变更日志
 
+## 2026-04-09
+
+### 语义搜索相关性重排与字幕分块窗口修正
+- **backend_fastapi**：更新 `app/services/search/search.py`，语义搜索结果改为“向量分 + 词面命中分”融合重排，并在融合后统一执行 `threshold` 过滤，降低无关视频长期停留在 `55%+` 的噪声结果；同时放宽底层 Chroma 候选召回，再由融合分数统一裁剪，避免高阈值场景下把真实相关片段过早滤掉。
+- **backend_fastapi**：修正字幕时间窗分块的 overlap 锚点，后续 chunk 改为以重叠窗口起点而不是首条字幕起点计时，避免长字幕跨越 overlap 时把片段错误拉回到更早时间，影响相关片段定位与展示。
+- **docs**：`backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md` 补充当前检索排序与阈值行为说明，明确默认本地链路是字幕语义召回 + 词面重排，而不是纯向量分排序。
+
+### 语义搜索部署文档页眉与 semantic_search_logs 说明
+- **docs**：`SEMANTIC_SEARCH_DEPLOYMENT.md` 更新日期改为 2026-04-09；明确未执行建表时属部署未完成，并说明「一次 WARNING + 后续 DEBUG」会持续至表创建。
+
+### 语义搜索全局检索日志表缺失时的日志行为与部署说明
+- **backend_fastapi**：`app/services/search/search_log.py` 在检测到 `semantic_search_logs` 表不存在时（如 MySQL 1146）仅输出一次 **WARNING**（含迁移 SQL 与 `init_db.py --create` 指引），后续重复失败降为 **DEBUG**，避免每次全局搜索刷屏；其余写库失败仍记录完整 WARNING。
+- **docs**：`SEMANTIC_SEARCH_DEPLOYMENT.md` 增补「索引覆盖与数据预期」说明，区分「无结果」与「非全量可搜」；最小部署步骤补充 `semantic_search_logs`；`migrations/add_semantic_search_logs.sql` 头注释补充与 `init_db.py --create` 等价关系。
+
+## 2026-04-08 (续续续续续续续续续续续续)
+
+### 语义搜索全局检索写入 MySQL
+- **backend_fastapi**：新增表 `semantic_search_logs` 与模型 `SemanticSearchLog`；当 `POST /api/search/semantic/search` 请求未带 `video_ids`（跨视频全局检索）时，在成功返回或「无可搜索视频」空结果路径写入一条日志（查询、实际参与检索的视频 ID 列表、结果数、耗时、limit/threshold）；`record_global_semantic_search` 失败不影响搜索主流程。迁移 SQL：`backend_fastapi/migrations/add_semantic_search_logs.sql`；`scripts/init_db.py` 已纳入该表。
+- **（续）**：`semantic_search_logs.created_at` 的 ORM 默认值改为数据库侧 `CURRENT_TIMESTAMP`，与迁移 SQL 对齐；`threshold_used` 在模型与写库服务中统一为 `Decimal` 语义并按 `0.001` 精度量化。`record_global_semantic_search` 现在会统一兜底 `limit`/`threshold`/`video_ids`，写库失败 warning 也会补齐 `query_len`、`video_count`、`limit`、`threshold` 上下文；部署文档明确现有库优先执行 `backend_fastapi/migrations/add_semantic_search_logs.sql`，新库/本地开发再使用 `backend_fastapi/scripts/init_db.py --create`。
+
+### 语义搜索 query key 与「已索引」文案收口
+- **mobile-frontend**：`Search.vue` 使用 `route.query[SEARCH_ROUTE_SCOPE_QUERY]` 读取 scope，与首页 `router.push` 的 query key 一致；移除 `SEARCH_ROUTE_SCOPE_ALL`，与 `scope=` 取值统一为 `DEFAULT_SEARCH_SCOPE`；`SEARCH_COPY_ALL_SCOPE_HINT` 与首页说明同源，跨视频表述统一为「已索引」语义；搜索页输入框占位、锁定角标、通用空态、搜索/加载/重试文案迁入 `searchDefaults.js`。
+- **（续）**：`Search.vue` 的搜索结果标题、无结果提示、当前视频标签、预览兜底与“点击播放此片段”提示继续收口到 `searchDefaults.js` 与计算属性；`Home.vue` 搜索按钮文案复用 `SEARCH_COPY_SEARCH_BUTTON`，保证首页与搜索页一致。
+
+### 语义搜索文案与默认范围常量
+- **mobile-frontend**：首页跨视频搜索区块标题、说明与占位符迁入 `src/config/searchDefaults.js`（`SEARCH_COPY_HOME_*`），与搜索页「在我的全部视频中搜索」表述对齐；`Search.vue` 中 `scope=all` 与 `v-model` 取值统一使用 `DEFAULT_SEARCH_SCOPE`（`all`），避免魔法字符串散落。
+
+### 首页跨视频语义搜索入口
+- **mobile-frontend**：`Home.vue` 增加「跨视频语义搜索」入口，跳转 `/search?scope=all`；`Search.vue` 识别 `scope=all` 默认全视频范围，范围选项文案为「在我的全部视频中搜索」；集中默认 `limit`/`threshold`（`src/config/searchDefaults.js`）；当后端返回 `message` 且结果为空时展示「去上传 / 视频库 / 当前视频详情」引导；`503`（未启用语义搜索）展示可读说明；`api/search.js` 默认参数与上述常量一致。
+- **（续）**：首页改为内嵌搜索框（说明为在「我的全部视频」范围内搜索），支持带关键词跳转 `/search?scope=all&q=…`；`scope=all` 时搜索页锁定为「全部视频」、隐藏「当前视频」切换并展示固定范围条；`q` 与本地缓存恢复顺序已处理。
+
+### 语义搜索内嵌索引模式 - 时序优化与并行处理
+- **背景问题**：当前语义索引成被强制为异步后台任务，仅在视频主处理完成后才启动。导致用户看到"处理完成"回复，但搜索结果暂不可用，存在时序割裂体验。
+- **核心改进**：
+  - 新增视频处理配置组：
+    - `SEARCH_INDEX_STARTUP_MODE`: `"after_video_completed"` (默认，保持兼容) | `"inline_after_subtitle"` (并行处理)
+    - `SEARCH_INLINE_INDEX_WAIT_TIMEOUT_SECONDS`: 内嵌索引等待超时（秒；-1 表示不等待）
+    - `SEARCH_INLINE_INDEX_FAIL_POLICY`: 索引失败策略 (`"mark_completed_without_index"` | `"require_index_success"`)
+  - 优先级说明：
+    - `SEARCH_ENABLED=false`: 所有索引模式失效
+    - `SEARCH_ENABLED=true` 且 `SEARCH_AUTO_INDEX_NEW_VIDEOS=false`: 仅允许手动索引
+    - `SEARCH_ENABLED=true` 且 `SEARCH_AUTO_INDEX_NEW_VIDEOS=true`: 按 `SEARCH_INDEX_STARTUP_MODE` 决定启动时机
+- **后端改动**：
+  - `backend_fastapi/app/core/config.py`: 新增上述三个配置项
+  - `backend_fastapi/app/tasks/video_processing.py`:
+    - 新增 `start_indexing_async()`: 在字幕文件就绪后异步启动索引任务（与摘要/标签并行）
+    - 新增 `wait_for_indexing_ready()`: 等待索引完成或超时；支持两种失败策略
+    - 修改 `process_video_task()`: 集成内嵌模式支持
+      - 字幕保存后，若 `SEARCH_INDEX_STARTUP_MODE=="inline_after_subtitle"` 则立即启动索引
+      - 完成处理前，根据配置等待索引完成或应用失败策略
+      - 对于 `"after_video_completed"` 模式，保持旧的异步调用方式以确保向后兼容
+  - `backend_fastapi/app/tasks/vector_indexing.py`:
+    - 新增 `index_video_inline()`: 内嵌模式特有的索引函数
+      - 不要求 `video.status == COMPLETED`，允许在 `PROCESSING` 阶段执行
+      - 接收已生成的 `subtitle_path` 参数，避免重复读取
+      - 使用独立数据库会话，与主流程并行无阻塞
+    - 补强失败路径一致性与异常健壮性：
+      - `index_video_for_search()` 与 `index_video_inline()` 在 `try` 前统一初始化 `vector_index/video`，避免异常分支未绑定变量风险
+      - 明确失败场景下同步清理 `videos.has_semantic_index` 与 `videos.vector_index_id`
+      - 异常分支提交改为“有更新才提交”，提交失败时执行 `rollback` 并记录异常日志，避免二次异常覆盖原始错误
+- **状态流程**：
+  - **after_video_completed 模式** (默认，向后兼容)：
+    - `PROCESSING` → 所有主处理完成 → `COMPLETED` → 异步提交 `index_video_for_search`
+  - **inline_after_subtitle 模式** (新增)：
+    - `PROCESSING` → 字幕就绪 → 异步启动 `index_video_inline` (与摘要/标签并行) → 主处理完成前等待索引结果 → `COMPLETED` (若失败策略允许)
+- **数据库落库**：
+  - 复用 `vector_indexes` 表现有结构，完善状态流转：`PENDING` → `PROCESSING` → `COMPLETED` / `FAILED`
+  - `videos.has_semantic_index` 与 `videos.vector_index_id` 保持一致性
+  - 无新增表，遵守最小化原则
+- **资源管理**：
+  - 内嵌索引与摘要/标签生成可并行，但不抢占主处理资源
+  - 超时和失败策略允许主流程优雅降级，不强制阻塞
+- **进度展示**：
+  - `video.current_step` 在等待索引时更新为"等待语义索引完成中..."
+  - 进度条 (`video.process_progress`) 推进到 98% 后等待索引
+- **验证结果**：
+  - ✅ `python -m compileall backend_fastapi/app/tasks/video_processing.py backend_fastapi/app/tasks/vector_indexing.py backend_fastapi/app/core/config.py`
+  - ✅ 手动导入验证：`start_indexing_async`, `wait_for_indexing_ready`, `index_video_inline` 无导入错误
+  - ✅ `python scripts/validate_backend_smoke.py`
+- **后续计划**：
+  - 可选：前端显示"语义索引进度"，在处理过程中实时轮询 `VectorIndex.status`
+  - 可选：添加手动重新索引 API，允许用户在需要时触发
+  - 可选：统计分析异步与内嵌模式的性能差异，为默认值提供数据支持
+
+## 2026-04-08 (续续续续续续续续续续续)
+
+### 搜索页返回保留关键词与结果 - 状态记忆补齐
+- 更新 [`mobile-frontend/src/views/Search.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Search.vue)：为搜索页新增按上下文持久化的状态记忆，保存搜索关键词、搜索范围、结果列表、错误信息与已搜索状态；点击搜索结果进入播放器前会先落盘，再回到搜索页时自动恢复。
+- 状态隔离规则：
+  - 当前视频搜索按 `videoId` 独立记忆，避免不同视频上下文互相覆盖
+  - 所有视频搜索使用独立的全局搜索缓存
+- 清空行为同步修正：点击“清空”会同时删除对应搜索缓存，避免旧结果误恢复。
+- 文档同步：更新 [`docs/SEARCH_RESULTS_DISPLAY_ENHANCEMENT.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_RESULTS_DISPLAY_ENHANCEMENT.md)，补充“返回保留状态”能力与实现方式说明。
+- 验证结果：
+  - ✅ `./.venv/bin/pre-commit run --files mobile-frontend/src/views/Search.vue`
+  - ✅ `npm run build:ios`
+  - ✅ `bash ios-app/sync_ios_web_assets.sh`
+  - ✅ `bash ios-app/validate_ios_build.sh`
+
+## 2026-04-08 (续续续续续续续续续续)
+
+### 搜索结果在 iOS 真机页不显示 - 渲染链路修复
+- **问题诊断**：后端语义搜索接口已经能返回真实结果，但 [`mobile-frontend/src/views/Search.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Search.vue) 将结果卡片实现为 `defineComponent + template` 的运行时模板字符串组件；该写法在当前 iOS 生产构建与 `WKWebView` 加载链路下存在渲染不稳定风险，导致真机页面可能出现“接口有结果、列表却不显示”的现象。
+- **前端修复**：
+  - 重构 [`mobile-frontend/src/views/Search.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Search.vue)：移除运行时模板字符串组件，将搜索结果卡片改为 SFC 编译期模板直接渲染，避免生产包中依赖运行时模板编译。
+  - 保持现有展示能力不变：视频标题、时间范围、相似度条、`preview_text` 预览和“点击播放此片段”提示仍由搜索页直接渲染。
+  - 补强响应解析：搜索结果读取同时兼容 `res.data` 与已解包响应对象，避免请求封装差异导致列表被误判为空。
+- **iOS 资源同步**：
+  - 更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js) 与 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)，确保真机容器加载到最新搜索页产物。
+- **验证结果**：
+  - ✅ `npm run build:ios`
+  - ✅ `bash ios-app/sync_ios_web_assets.sh`
+  - ✅ `bash ios-app/validate_ios_build.sh`
+
+## 2026-04-08 (续续续续续续续续)
+
+### 对 2026-04-08 搜索结果显示增强记录的更正说明
+- 更正 [`docs/IMPLEMENTATION_SUMMARY_SEARCH_DISPLAY.txt`](/Users/yuan/final-work/EduMind/docs/IMPLEMENTATION_SUMMARY_SEARCH_DISPLAY.txt)：此前摘要文档把当前实现写成“完整预览/完整文本”，与真实代码不一致。当前搜索结果展示的仍是移动端友好的 `preview_text` 预览，而不是全文；后端在 [`backend_fastapi/app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py) 中会将该预览截断为最多 `240` 字。
+- 更正后续规划表述：视频分组补充 `duration`、`uploaded_at` 等元信息属于下一阶段增强项，不属于当前已交付能力；当前已完成的是视频标题、时间范围、相似度展示、预览文本展示与播放器时间点跳转。
+
+## 2026-04-08 (续续续续续续续)
+
+### 搜索结果详细内容显示 - 功能增强
+- **后端改动**：
+  - 扩展 [`app/schemas/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/schemas/search.py) 中 `SearchResultChunk` 的 schema，新增 `video_title` 字段
+  - 修改 [`app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py) 中 `semantic_search_videos()` 函数，在搜索前从数据库获取视频标题映射，并在返回结果时补齐每条结果的 `video_title`
+  - 确保 `video_title` 为 `null` 时前端能优雅降级处理
+- **前端改动**：
+  - 重构 [`mobile-frontend/src/views/Search.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Search.vue) 中 `ResultCard` 组件，增强结果卡片内容展示：
+    - 顶部：视频标题（缺失时回退为"视频 ID: xxx"）+ 相似度百分比
+    - 中部：时间范围（⏱️ MM:SS 格式）+ 相似度条
+    - 主体：较完整的 preview_text（最高 60px 可滚动）
+    - 底部：交互提示"👉 点击播放此片段"
+  - 改进分组逻辑：`groupedResults` 中补齐 `videoTitle`，模板显示时优先用标题替代"视频 ID"
+  - 优化样式：结果卡片按压反馈、时间范围 monospace 字体、分组标题颜色、预览文本换行保留等
+- **验证结果**：
+  - ✅ 后端编译通过（`python -m compileall`）
+  - ✅ 前端编译成功（730ms）
+  - ✅ 搜索集成验证通过（5 大项全通）
+  - ✅ Pre-commit hooks 通过
+- **实现文档**：详见 [`docs/SEARCH_RESULTS_DISPLAY_ENHANCEMENT.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_RESULTS_DISPLAY_ENHANCEMENT.md)
+
+## 2026-04-08 (续续续续续续)
+- 更新 [`backend_fastapi/app/services/search/local_embedder.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/local_embedder.py)：将原本的占位 `LocalEmbedder` 改为可运行的本地文本向量实现，使用稳定的哈希向量方案支撑中文字幕语义搜索。
+- 更新 [`backend_fastapi/app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py)：新增字幕时间窗聚合分块逻辑，索引时优先使用字幕文本而不是强依赖视频视觉分片；同时修正 `0s` 起始分块被 `or` 误判的问题，并在重建索引前清理旧分块。
+- 更新 [`backend_fastapi/app/services/search/store.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/store.py)：存储与检索阶段保留 `preview_text`，修正相似度换算，并将 chunk ID 生成规则扩展到 `source_file + start_time + end_time + preview_text`，避免字幕分块出现重复 ID。
+- 更新 [`backend_fastapi/app/tasks/vector_indexing.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/tasks/vector_indexing.py)：索引任务允许优先使用 `processed_filepath`，缺失时回退到原始 `filepath`；索引完成后清空旧错误信息，保证状态与实际结果一致。
+- 更新 [`backend_fastapi/app/models/vector_index.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/models/vector_index.py)：`VectorIndexStatus` 的 SQLAlchemy 枚举映射改为持久化枚举 value（小写），与现有 MySQL `vector_indexes.status` 数据保持一致，修复索引任务刚进入 `processing` 就因大小写不匹配失败的问题。
+- 更新 [`backend_fastapi/app/routers/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/routers/search.py)：指定 `video_ids` 搜索时只保留当前用户已构建索引的视频，避免未建索引视频走到深层搜索逻辑后返回 500。
+- 更新 [`.gitignore`](/Users/yuan/final-work/EduMind/.gitignore)：忽略 `backend_fastapi/data/`，避免本地 ChromaDB 持久化目录被误提交。
+
+### 文档与验证同步
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)、[`backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md`](/Users/yuan/final-work/EduMind/backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)、[`docs/SEARCH_IMPLEMENTATION_SUMMARY.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_IMPLEMENTATION_SUMMARY.md)：修正“LocalEmbedder 仍是占位实现”“`preview_text` 仍为 null”“默认后端应使用 gemini”等过时描述，同步当前真实可用路径为本地字幕语义搜索。
+- 更新 [`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：补充语义搜索示例配置，默认示例切到 `SEARCH_BACKEND=local` 与 `SEARCH_LOCAL_MODEL=hashing-char-ngrams-zh`。
+- 更新 [`scripts/validate_search_integration.py`](/Users/yuan/final-work/EduMind/scripts/validate_search_integration.py)：新增“本地字幕语义链路验证”，覆盖字幕分块、`preview_text` 回填以及 `LocalEmbedder` 的查询/批量嵌入能力。
+
+## 2026-04-08 (续续续续续)
+
+### 对 2026-04-08 搜索修复记录的更正说明
+- 更正 [`scripts/validate_search_integration.py`](/Users/yuan/final-work/EduMind/scripts/validate_search_integration.py)：此前直接用系统 `python3` 运行会因缺少 `chromadb` 依赖而失败，现已改为必要时自动切换到项目 `.venv` 再执行，避免“脚本存在但实际跑不过”的问题。
+- 更正 [`backend_fastapi/app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py)：补齐 `SearchEventLogger.log_chromadb_search_executed(...)` 调用，并将索引完成、搜索完成日志中的 `duration_ms` 从占位 `0` 改为真实耗时，避免“日志已接入但关键统计仍是占位值”。
+- 更正 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`docs/SEARCH_FIXES_SUMMARY.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_FIXES_SUMMARY.md)：同步当前真实状态，明确语义搜索前端已经有基础页面与播放器跳转链路，并将搜索专项验证命令更新为 `./.venv/bin/python scripts/validate_search_integration.py`。
+
+## 2026-04-08 (续续续续)
+
+### 生产监控完整集成 - 搜索日志系统落地
+- **问题诊断**：前期创建了 check-in 文件 [`backend_fastapi/app/services/search/search_logging.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search_logging.py)，但主流程 [`app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py) 完全未引入，导致日志系统形同虚设。同时验证脚本存在导入路径错误（`gemini_embedder.py` 不存在、Schema 类名误写等），使得"验证通过"的宣布失效。
+- **修复内容**：
+  - 重写 [`search_logging.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search_logging.py)：定义 `SearchEventLogger` 类，实现 9 个 JSON 结构化日志方法（`log_search_request`、`log_adaptive_chunking_selected`、`log_video_chunking_completed`、`log_embedding_batch_completed`、`log_indexing_completed`、`log_indexing_failed`、`log_search_completed`、`log_search_failed`、`log_chromadb_search_executed`）
+  - 在 [`search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py) 中新增导入和 9 处日志调用点：
+    - `build_video_index_internal()` 中 5 处：参数选择、切片完成、嵌入完成、索引成功/失败等
+    - `semantic_search_videos()` 中 4 处：请求入口、ChromaDB 搜索统计、搜索完成/失败
+  - 创建新的验证脚本 [`scripts/validate_search_integration.py`](/Users/yuan/final-work/EduMind/scripts/validate_search_integration.py)：修复导入路径（`embedder.py`、`vector_index.py`、正确的 Schema 类名）、验证 9 个浮点边界、验证日志集成、验证前端编译
+- **验证结果**：脚本实际运行通过 ✅（后端模块导入、自适应切片 9 个浮点边界、生产监控集成、前端编译）
+- **提交**：commit 61878a48，pre-commit hooks 通过（black、isort、flake8）
+
+## 2026-04-08 (续续续)
+
+### 语义搜索前端落地与文档纠偏
+- 新增 [`mobile-frontend/src/views/Search.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Search.vue)、[`mobile-frontend/src/api/search.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/search.js)，并更新 [`mobile-frontend/src/router/index.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/router/index.js)、[`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)、[`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)：补齐 `/search` 搜索页、视频详情页进入当前视频搜索的入口，以及搜索结果跳转播放器并读取 `start` 时间点的链路。
+- 更新 [`docs/SEARCH_FRONTEND_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_FRONTEND_PROMPT.md)、[`docs/SEARCH_TESTING_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_TESTING_PROMPT.md)、[`docs/SEARCH_PRODUCTION_MONITORING_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_PRODUCTION_MONITORING_PROMPT.md)、[`docs/SEARCH_IMPLEMENTATION_SUMMARY.md`](/Users/yuan/final-work/EduMind/docs/SEARCH_IMPLEMENTATION_SUMMARY.md)：同步当前真实接口、前端落地方式和生产监控阶段边界，移除把未来规划或错误字段写成已完成能力的旧描述。
+- 删除 [`scripts/validate_search_module.py`](/Users/yuan/final-work/EduMind/scripts/validate_search_module.py) 与 [`backend_fastapi/app/services/search/search_logging.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search_logging.py)：前者未与当前代码保持一致且会给出错误验证结论，后者尚未接入主流程；本次先移除不准确或未落地的辅助文件，避免继续误导后续实现。
+
+## 2026-04-08 (续续)
+
+### 语义搜索自适应切片 - 边界问题修复
+- **问题诊断**：初始实现中规则表使用 (min_dur, max_dur) 的闭区间格式，导致浮点数时长（如 180.5s、600.5s）无法匹配任何规则，直接回退到默认 30s/5s 参数，使自适应方案形同虚设。
+- **根本原因**：整数边界定义 `(0, 180), (181, 600)` 之间存在间隙，单精度浮点数在边界处容易落入间隙。
+- **修复方案**：改用单值上限规则
+  - 规则格式改为 `(max_duration_inclusive, chunk_duration, overlap)`
+  - 匹配逻辑改为 `duration <= max_duration` 取第一个匹配规则
+  - 彻底消除任何歧义和间隙
+- **验证结果**：测试所有关键边界（180.0, 180.5, 181.0, 600.0, 600.5, 1800.0, 1800.5, 3600.0, 3600.5），全部正常返回预期参数，无 fallback
+- 修改文件：[`app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py)（规则格式）、[`app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py)（匹配逻辑）
+
+## 2026-04-08 (续)
+
+### 语义搜索自适应切片实现
+- 在 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py) 中新增自适应切片配置：
+  - `SEARCH_ADAPTIVE_CHUNKING: bool = True` 控制是否启用自适应
+  - `SEARCH_ADAPTIVE_PARAMS: List[tuple]` 定义时长分层参数规则
+  - 规则：≤3min(12s/2s), ≤10min(20s/4s), ≤30min(45s/8s), ≤60min(60s/10s), >60min(75s/12s)
+- 在 [`backend_fastapi/app/services/search/search.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/search/search.py) 中：
+  - 新增 `get_adaptive_chunk_params()` 函数，根据视频时长计算自适应参数
+  - 修改 `build_video_index_internal()` 调用该函数动态应用切片参数
+  - 添加详细日志记录视频时长与计算出的参数
+  - 修正浮点边界时长（如 `180.5s`、`600.5s`）会错误回退到默认 `30s/5s` 的区间匹配问题
+- 验证数据：3min(17→18片), 10min(37→38片), 30min(48→49片), 60min(71→72片), 120min(114→115片)，与用户预期基本一致（误差≤1片）
+- 收益：长视频成本降低 50-60%（如 120min 从 288→115 API 调用），短视频细粒度提升 50-100%
+
 ## 2026-04-08
+
+### 语义搜索后端文档同步与纠错
+- 更新 [`README.md`](/Users/yuan/final-work/EduMind/README.md)、[`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)：补充当前语义搜索后端的真实落地范围、当前限制和文档入口，避免把实验性后端链路误写成前后端都已闭环。
+- 重写 [`backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md`](/Users/yuan/final-work/EduMind/backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)：移除把计划项当成“已完成”的旧描述，改为当前代码入口、最小部署步骤、已知限制和验收建议，并补充 `videos.user_id` 迁移依赖说明。
+- 重写 [`SENTRYSEARCH_INTEGRATION_PROMPT.md`](/Users/yuan/final-work/EduMind/SENTRYSEARCH_INTEGRATION_PROMPT.md)：从冗长的规划提示词改为当前集成记录，明确已吸收的模块、未完成部分和后续维护约束。
+- 对 2026-04-08 同日搜索实现记录的更正说明：当前不应再把 `LocalEmbedder`、字幕预览文本、视频片段裁剪导出和完整认证接入描述为已完成能力。
 
 ### 认证示例配置补全
 - 更新 [`backend_fastapi/.env.example`](/Users/yuan/final-work/EduMind/backend_fastapi/.env.example)：将 `AUTH_TOKEN_TTL_SECONDS` 与 `AUTH_TOKEN_CLOCK_SKEW_SECONDS` 从注释示例改为默认可见配置，避免开发者按示例复制环境文件时遗漏认证过期相关参数。

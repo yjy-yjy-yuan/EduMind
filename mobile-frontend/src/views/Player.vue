@@ -149,6 +149,11 @@ import { getSubtitleContext } from '@/api/subtitle'
 const route = useRoute()
 const router = useRouter()
 const id = computed(() => route.params.id)
+const initialStartSeconds = computed(() => {
+  const raw = route.query.start
+  const parsed = Number.parseFloat(String(raw ?? ""))
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
+})
 const videoTitle = ref(`视频 ${id.value}`)
 const pageError = ref('')
 const playerState = ref('准备中')
@@ -164,6 +169,7 @@ const selectedNoteTags = ref(['再思考'])
 const selectedThoughts = ref(['需要回看'])
 const noteBusy = ref(false)
 const noteResult = ref(null)
+const pendingSeekSeconds = ref(null)
 const noteTagOptions = ['再思考', '很重要', '待复习', '需要查证', '想再看一遍']
 const thoughtOptions = ['需要回看', '需要查证', '要补充例子', '容易忘', '和前面有关']
 
@@ -277,10 +283,15 @@ const handleLoadStart = () => {
 
 const handleLoadedMetadata = (event) => {
   durationSeconds.value = Number(event?.target?.duration || 0)
+  if (initialStartSeconds.value !== null && pendingSeekSeconds.value === null) {
+    pendingSeekSeconds.value = initialStartSeconds.value
+  }
+  applyPendingSeek(event?.target)
   playerState.value = '视频元数据已加载'
 }
 
 const handleCanPlay = () => {
+  applyPendingSeek(videoRef.value)
   playerState.value = '可以开始播放'
 }
 
@@ -299,6 +310,21 @@ const handleWaiting = () => {
 const handleVideoError = () => {
   playerState.value = '播放失败'
   pageError.value = '视频流加载失败。请确认后端服务在线、手机与 Mac 在同一网络，并且该视频文件仍存在。'
+}
+
+const applyPendingSeek = (element) => {
+  if (!element || pendingSeekSeconds.value === null) return
+  const duration = Number(element.duration || durationSeconds.value || 0)
+  const target = Math.max(0, Number(pendingSeekSeconds.value || 0))
+  if (!Number.isFinite(target)) {
+    pendingSeekSeconds.value = null
+    return
+  }
+  if (duration > 0) {
+    element.currentTime = Math.min(target, Math.max(duration - 0.25, 0))
+    currentTimeSeconds.value = Number(element.currentTime || target)
+    pendingSeekSeconds.value = null
+  }
 }
 
 const formatSeconds = (seconds) => {

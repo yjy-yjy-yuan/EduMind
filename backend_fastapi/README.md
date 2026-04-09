@@ -125,6 +125,34 @@ PYTHONPYCACHEPREFIX="$PWD/../.pycache-hook" python -m compileall app scripts ../
 
 新增后端测试请统一放进 `backend_fastapi/tests/`，不要散落到 `app/` 或仓库根目录。更详细的放置规则见 [backend_fastapi/tests/README.md](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)。
 
+## 语义搜索后端
+
+当前 `backend_fastapi/` 已经接入一版语义搜索后端主链路，入口主要包括：
+
+- `app/routers/search.py`
+- `app/schemas/search.py`
+- `app/models/vector_index.py`
+- `app/services/search/`
+- `app/tasks/vector_indexing.py`
+
+当前已支持：
+
+- 对 `mp4` / `mov` 做重叠切片
+- 按视频时长自动选择切片参数，短视频更细、长视频更粗
+- `gemini` / `local` 双后端工厂
+- `local` 后端可直接对字幕文本分块做本地向量索引与查询
+- ChromaDB 持久化集合
+- 手动触发索引、查询索引状态、执行语义搜索
+- 视频处理完成后按配置自动提交索引任务
+- 搜索结果回填字幕预览文本 `preview_text`
+
+当前限制：
+
+- 搜索用户识别当前优先取 `X-User-ID` 请求头，否则回退默认用户
+- 当前更偏向字幕语义召回；若没有字幕文件，本地 `local` 后端不会退化成可用的视频视觉嵌入
+
+部署步骤、数据库字段和当前已知限制见 [backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md](/Users/yuan/final-work/EduMind/backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)。
+
 ## 端口约定
 
 | 服务 | 默认端口 |

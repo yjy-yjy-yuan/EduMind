@@ -1,7 +1,7 @@
 # 视频上传功能实现方案
 
-> 基于当前仓库通盘梳理，供「马上实现上传视频功能」时使用。  
-> 涉及：`backend_fastapi/`、`mobile-frontend/`、`ios-app/`。  
+> 基于当前仓库通盘梳理，供「马上实现上传视频功能」时使用。
+> 涉及：`backend_fastapi/`、`mobile-frontend/`、`ios-app/`。
 > **连调逻辑**：真机 = 前端（H5/WebView），功能在后端（FastAPI 端口 2004），前后端通过 API 基地址（端口）连调；详见仓库根目录 `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md` 第二节。
 
 ---
@@ -21,7 +21,7 @@
 
 ### 1. 后端实际落盘路径（你「已经上传」的视频应在此）
 
-- **默认根目录**：`backend_fastapi/uploads/`  
+- **默认根目录**：`backend_fastapi/uploads/`
   - 即配置里 `UPLOAD_FOLDER` 未设置时，由 `config.py` 计算为 `os.path.join(BASE_DIR, "uploads")`，`BASE_DIR` 为 `backend_fastapi` 目录。
 - **单个视频文件**：直接放在该目录下，例如：
   - `backend_fastapi/uploads/local-我的视频.mp4`
@@ -78,7 +78,7 @@ UPLOAD_FOLDER=/your/custom/uploads
 
 - 在 `mobile-frontend` 的 `.env`（或构建时环境变量）中：
   - `VITE_MOBILE_UI_ONLY=false`（关闭纯 UI 模式，走真实接口）。
-  - `VITE_MOBILE_API_BASE_URL=http://<后端地址>:2004`  
+  - `VITE_MOBILE_API_BASE_URL=http://<后端地址>:2004`
     本机浏览器：`http://127.0.0.1:2004`；真机连调：`http://<Mac的局域网IP>:2004`（Mac 终端执行 `ipconfig getifaddr en0` 得到 IP，例如 `http://192.168.1.10:2004`）。
 - 重新构建或启动 dev：`npm run dev` / `npm run build:ios` 等，确保请求会发到上述基地址。
 

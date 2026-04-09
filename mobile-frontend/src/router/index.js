@@ -18,6 +18,7 @@ import Profile from '@/views/Profile.vue'
 import LearningPath from '@/views/LearningPath.vue'
 import Guide from '@/views/Guide.vue'
 import DesignAssistant from '@/views/DesignAssistant.vue'
+import Search from '@/views/Search.vue'
 
 const isFileProtocol = window.location.protocol === 'file:'
 const history = isFileProtocol ? createMemoryHistory() : createWebHistory()
@@ -37,6 +38,7 @@ const router = createRouter({
     { path: '/notes/new', name: 'NoteNew', component: NoteEdit, meta: { title: '新建笔记', hideTabBar: true, requiresAuth: true } },
     { path: '/notes/:id', name: 'NoteEdit', component: NoteEdit, meta: { title: '编辑笔记', hideTabBar: true, requiresAuth: true } },
     { path: '/qa', name: 'QA', component: QA, meta: { title: 'AI 问答', hideTabBar: true } },
+    { path: '/search', name: 'Search', component: Search, meta: { title: '搜索' } },
     { path: '/learning-path', name: 'LearningPath', component: LearningPath, meta: { title: '学习路径' } },
     { path: '/guide', name: 'Guide', component: Guide, meta: { title: '使用指南', hideTabBar: true } },
     { path: '/design-assistant', name: 'DesignAssistant', component: DesignAssistant, meta: { title: '设计助手', hideTabBar: true, requiresAuth: true } },

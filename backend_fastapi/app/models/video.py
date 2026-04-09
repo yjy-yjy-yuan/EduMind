@@ -48,6 +48,9 @@ class Video(Base):
     # 主键
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
+    # 用户关联
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+
     # 基本信息
     title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     filename: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -90,6 +93,10 @@ class Video(Base):
         default=VideoProcessingOrigin.ONLINE_BACKEND,
         nullable=False,
     )
+
+    # 语义搜索索引
+    has_semantic_index: Mapped[bool] = mapped_column(default=False)
+    vector_index_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     # 关系
     subtitles: Mapped[List["Subtitle"]] = relationship("Subtitle", back_populates="video", lazy="selectin")

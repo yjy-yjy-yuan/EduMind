@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.database import engine
 from app.models.base import Base
+from app.models.semantic_search_log import SemanticSearchLog  # noqa: F401
 from app.models.video import Video
 from app.models.video import VideoStatus
 from app.services.ollama_runtime import get_ollama_runtime_status
@@ -148,6 +149,7 @@ from app.routers import design
 from app.routers import note
 from app.routers import qa
 from app.routers import recommendation
+from app.routers import search
 from app.routers import subtitle
 from app.routers import video
 
@@ -159,6 +161,7 @@ app.include_router(chat.router, prefix="/api/chat", tags=["聊天系统"])
 app.include_router(design.router, prefix="/api/design", tags=["设计助手"])
 app.include_router(auth.router, prefix="/api/auth", tags=["用户认证"])
 app.include_router(recommendation.router, prefix="/api/recommendations", tags=["视频推荐"])
+app.include_router(search.router, tags=["语义搜索"])
 app.include_router(agent.router, prefix="/api/agent", tags=["学习流智能体"])
 
 

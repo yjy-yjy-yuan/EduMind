@@ -16,15 +16,15 @@
 
 ## 二、前置条件
 
-1. **已有固定域名**  
-   - 公网：已备案域名并解析到服务器（如 `api.yourdomain.com`）。  
+1. **已有固定域名**
+   - 公网：已备案域名并解析到服务器（如 `api.yourdomain.com`）。
    - 内网：内网 DNS 或 hosts 可解析的域名（如 `api.edumind.local`）。
 
-2. **后端可被访问**  
-   - 公网：服务器开放 80/443，配置 Nginx 反向代理到本机 2004。  
+2. **后端可被访问**
+   - 公网：服务器开放 80/443，配置 Nginx 反向代理到本机 2004。
    - 内网：同一内网设备能访问该域名或 IP:2004。
 
-3. **HTTPS（推荐）**  
+3. **HTTPS（推荐）**
    - 小程序、部分 WebView 要求生产环境使用 HTTPS；可用 Let's Encrypt 或云厂商证书。
 
 ---
@@ -74,7 +74,7 @@ server {
 
 在 **mobile-frontend** 中：
 
-1. **生产/固定域名构建**  
+1. **生产/固定域名构建**
    - 新建 `.env.production`（或构建时传入环境变量）：
    ```bash
    VITE_MOBILE_API_BASE_URL=https://api.yourdomain.com
@@ -82,24 +82,24 @@ server {
    ```
    - 将 `https://api.yourdomain.com` 替换为你的实际固定域名，**不要带末尾斜杠**。
 
-2. **构建命令**  
-   - 复制示例并改为实际域名：`cp .env.production.example .env.production`，编辑将 `https://api.yourdomain.com` 改为实际固定域名。  
-   - 本地/内网 H5：`npm run build` 或 `npm run build:web`（会读 `.env.production`）。  
+2. **构建命令**
+   - 复制示例并改为实际域名：`cp .env.production.example .env.production`，编辑将 `https://api.yourdomain.com` 改为实际固定域名。
+   - 本地/内网 H5：`npm run build` 或 `npm run build:web`（会读 `.env.production`）。
    - iOS 打包：`npm run build:ios` 使用 mode `ios`，会读 `.env.ios`；可将 `.env.production.example` 复制为 `.env.ios` 并改域名后执行 `npm run build:ios`。
 
-3. **与本地开发隔离**  
-   - 本地开发仍用 `.env`：`VITE_MOBILE_API_BASE_URL=http://127.0.0.1:2004`，真机联调时可改为本机 IP。  
+3. **与本地开发隔离**
+   - 本地开发仍用 `.env`：`VITE_MOBILE_API_BASE_URL=http://127.0.0.1:2004`，真机联调时可改为本机 IP。
    - 固定域名只用于「生产/内网正式」构建，不覆盖开发环境。
 
-4. **可选：运行时覆盖**  
+4. **可选：运行时覆盖**
    - 当前项目已支持通过「我的 → 开发设置」或 URL 参数 `apiBase`、localStorage `m_api_base_url` 覆盖 API 基地址；若希望生产包不允许改，可在前端逻辑中根据环境判断是否展示开发设置入口。
 
 ---
 
 ## 五、验收步骤
 
-1. 后端在固定域名下可访问：`curl -I https://api.yourdomain.com/health` 返回 200。  
-2. 前端使用该域名构建：构建产物中请求地址为 `https://api.yourdomain.com/api/...`（可搜打包后的 JS 确认）。  
+1. 后端在固定域名下可访问：`curl -I https://api.yourdomain.com/health` 返回 200。
+2. 前端使用该域名构建：构建产物中请求地址为 `https://api.yourdomain.com/api/...`（可搜打包后的 JS 确认）。
 3. 换 Wi‑Fi 或换地点后，在真机/浏览器打开同一 H5 或 App，上传、登录等请求仍发往固定域名并成功。
 
 ---
@@ -132,8 +132,8 @@ server {
 
 ## 七、小结
 
-- **固定域名**：后端通过域名（如 `https://api.yourdomain.com`）对外提供服务，前端构建时将该地址写入 `VITE_MOBILE_API_BASE_URL`。  
-- **可实行步骤**：后端部署 + Nginx（可选）+ `.env` 的 CORS/HOST；前端 `.env.production` + 构建命令；验收时换网络验证。  
+- **固定域名**：后端通过域名（如 `https://api.yourdomain.com`）对外提供服务，前端构建时将该地址写入 `VITE_MOBILE_API_BASE_URL`。
+- **可实行步骤**：后端部署 + Nginx（可选）+ `.env` 的 CORS/HOST；前端 `.env.production` + 构建命令；验收时换网络验证。
 - **提示词**：见上文第六节，复制给 AI 或执行者即可按文档落实配置与示例，无需改业务代码。
 
 ---

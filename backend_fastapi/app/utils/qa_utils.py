@@ -12,7 +12,6 @@ from typing import Generator
 from typing import Optional
 
 import requests
-
 from app.core.config import settings
 from app.services.video_content_service import clean_multiline_text
 from app.services.video_content_service import clean_whitespace
@@ -21,9 +20,7 @@ from app.services.video_content_service import tokenize_sentence
 logger = logging.getLogger(__name__)
 
 SUPPORTED_QA_PROVIDERS = {"qwen", "deepseek"}
-SRT_TIME_RE = re.compile(
-    r"(?P<start>\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(?P<end>\d{2}:\d{2}:\d{2}[,.]\d{3})"
-)
+SRT_TIME_RE = re.compile(r"(?P<start>\d{2}:\d{2}:\d{2}[,.]\d{3})\s*-->\s*(?P<end>\d{2}:\d{2}:\d{2}[,.]\d{3})")
 
 
 class QAConfigError(RuntimeError):
@@ -320,7 +317,13 @@ def build_subtitle_chunks(subtitles: list[dict], *, max_chars: int = 280, max_it
     return chunks
 
 
-def compute_bm25_score(question_tokens: list[str], document_tokens: list[str], document_frequency: Counter, total_docs: int, average_doc_length: float) -> float:
+def compute_bm25_score(
+    question_tokens: list[str],
+    document_tokens: list[str],
+    document_frequency: Counter,
+    total_docs: int,
+    average_doc_length: float,
+) -> float:
     if not question_tokens or not document_tokens:
         return 0.0
 
@@ -606,9 +609,7 @@ class QASystem:
         resolved_model = resolve_model(normalized_provider, model, deep_thinking=deep_thinking)
         provider_label = resolve_provider_label(normalized_provider)
         history_messages = normalize_history_messages(history)
-        answering_stage, answering_message = resolve_answering_status(
-            normalized_provider, deep_thinking=deep_thinking
-        )
+        answering_stage, answering_message = resolve_answering_status(normalized_provider, deep_thinking=deep_thinking)
 
         if mode == "video":
             if not self._chunks:

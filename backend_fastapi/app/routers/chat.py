@@ -19,6 +19,7 @@ async def chat_completions(request: ChatRequest):
     """聊天完成接口（流式/非流式）"""
     try:
         if request.stream:
+
             async def generate():
                 try:
                     from app.utils.chat_system import stream_chat

@@ -122,6 +122,7 @@
         <div class="actions video-detail__section video-detail__section--actions">
           <button class="btn" @click="startProcess" :disabled="processDisabled">开始处理</button>
           <button class="btn btn--primary" @click="play" :disabled="!canOpenPlayerWhileProcessing">{{ playLabel }}</button>
+          <button class="btn" @click="openSearch">搜索</button>
           <button class="btn" @click="qa">问答</button>
         </div>
 
@@ -636,6 +637,14 @@ const qa = () => {
   const title = String(video.value?.title || '').trim()
   router.push({
     path: '/qa',
+    query: { videoId: String(id.value), ...(title ? { videoTitle: title } : {}) }
+  })
+}
+
+const openSearch = () => {
+  const title = String(video.value?.title || '').trim()
+  router.push({
+    path: '/search',
     query: { videoId: String(id.value), ...(title ? { videoTitle: title } : {}) }
   })
 }

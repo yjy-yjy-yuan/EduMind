@@ -4,6 +4,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 from typing import List
+from typing import Optional
 from typing import Set
 from typing import Union
 
@@ -87,6 +88,48 @@ class Settings(BaseSettings):
     RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS: float = 8.0
     RECOMMENDATION_EXTERNAL_FETCH_PARALLEL: bool = True
     RECOMMENDATION_EXTERNAL_FETCH_RETRIES: int = 1
+
+    # 语义搜索配置
+    SEARCH_ENABLED: bool = False
+    SEARCH_BACKEND: str = "gemini"
+    SEARCH_GEMINI_API_KEY: Optional[str] = None
+    SEARCH_CHROMA_DB_DIR: str = "./data/chroma"
+    SEARCH_CHUNK_DURATION: int = 30
+    SEARCH_CHUNK_OVERLAP: int = 5
+    SEARCH_EMBEDDING_DIM: int = 768
+    SEARCH_SIMILARITY_THRESHOLD: float = 0.5
+    SEARCH_LOCAL_MODEL: str = "qwen8b"
+    SEARCH_PREPROCESS: bool = True
+    SEARCH_PREPROCESS_RESOLUTION: int = 480
+    SEARCH_PREPROCESS_FPS: int = 5
+    SEARCH_SKIP_STILL_FRAMES: bool = True
+    SEARCH_AUTO_INDEX_NEW_VIDEOS: bool = True
+    SEARCH_MAX_RESULTS: int = 20
+
+    # 语义搜索索引启动模式配置
+    # 说明: SEARCH_ENABLED=true && SEARCH_AUTO_INDEX_NEW_VIDEOS=true 时，按以下模式决定索引启动时机
+    # - "after_video_completed": 保持当前行为，先 VideoStatus.COMPLETED，再异步提交 index_video_for_search
+    # - "inline_after_subtitle": 在字幕文件已落盘且 subtitle_filepath 可用后启动内嵌索引，允许与摘要/标签并行
+    SEARCH_INDEX_STARTUP_MODE: str = "after_video_completed"
+    # 内嵌索引模式下，主处理流程等待索引完成的最大超时（秒）；-1 表示不等待
+    SEARCH_INLINE_INDEX_WAIT_TIMEOUT_SECONDS: int = 30
+    # 内嵌索引失败策略:
+    # - "mark_completed_without_index": 主流程仍可 COMPLETED，索引失败时 has_semantic_index=false
+    # - "require_index_success": 索引失败则不进入 COMPLETED（需明确前端展示）
+    SEARCH_INLINE_INDEX_FAIL_POLICY: str = "mark_completed_without_index"
+
+    # 自适应切片配置
+    SEARCH_ADAPTIVE_CHUNKING: bool = True  # 是否启用自适应切片
+    # 自适应参数规则：(max_duration_inclusive, chunk_duration, overlap)
+    # 使用单值上限，遍历时返回第一个匹配的规则，完全避免边界歧义。
+    # 含义：若 duration <= max_duration_inclusive，则使用该参数
+    SEARCH_ADAPTIVE_PARAMS: List[tuple] = [
+        (180, 12, 2),  # duration <= 180s (3min):     12s chunk, 2s overlap
+        (600, 20, 4),  # duration <= 600s (10min):    20s chunk, 4s overlap
+        (1800, 45, 8),  # duration <= 1800s (30min):   45s chunk, 8s overlap
+        (3600, 60, 10),  # duration <= 3600s (60min):   60s chunk, 10s overlap
+        (999999, 75, 12),  # duration > 3600s (兜底):      75s chunk, 12s overlap
+    ]
 
     # CORS 配置 (允许前端访问) - 使用字符串，支持逗号分隔
     CORS_ORIGINS: Union[str, List[str]] = (

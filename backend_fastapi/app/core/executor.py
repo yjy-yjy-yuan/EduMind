@@ -6,10 +6,10 @@
 
 import atexit
 import logging
+from concurrent.futures import Executor
 from concurrent.futures import Future
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import Executor
 from threading import Lock
 from typing import Any
 from typing import Callable
@@ -50,7 +50,9 @@ def get_executor() -> Executor:
         if _executor is None:
             _executor_kind = _resolve_executor_kind()
             _executor = _create_executor(_executor_kind)
-            logger.info("后台执行器初始化完成 | type=%s | max_workers=%s", _executor_kind, settings.BACKGROUND_TASK_WORKERS)
+            logger.info(
+                "后台执行器初始化完成 | type=%s | max_workers=%s", _executor_kind, settings.BACKGROUND_TASK_WORKERS
+            )
             atexit.register(shutdown_executor)
     return _executor
 

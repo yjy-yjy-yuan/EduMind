@@ -33,6 +33,7 @@ dist/
 backend/uploads/
 backend/instance/
 backend_fastapi/uploads/
+backend_fastapi/data/
 
 # Local model/cache artifacts
 .cache/
