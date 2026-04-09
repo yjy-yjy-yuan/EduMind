@@ -12,6 +12,7 @@ cryptography>=42.0.0
 # 验证和配置
 pydantic==2.5.3
 pydantic-settings==2.1.0
+Werkzeug>=3.0.0
 
 # AI/ML (保持不变)
 openai-whisper==20240930

@@ -28,6 +28,9 @@
 - **ci**：工作流触发事件收敛为 `pull_request + workflow_dispatch`，避免同一提交在 PR 页面出现重复的 `push` 与 `pull_request` 检查项。
 - **docs**：同步更新 `AGENTS.md` 与 `README.md` 的 CI 事件说明。
 
+### 对 2026-04-09 CI 失败原因的补充更正（pytest 阶段）
+- **backend_fastapi**：`backend_fastapi/requirements.txt` 补充 `Werkzeug>=3.0.0`，修复 GitHub Actions 干净环境下 `pytest` 导入 `app/models/user.py` 时 `ModuleNotFoundError: werkzeug` 的问题；该依赖为用户模型密码哈希校验所需运行时依赖，不应仅依赖本地环境残留包。
+
 ## 2026-04-08 (续续续续续续续续续续续续)
 
 ### 语义搜索全局检索写入 MySQL
