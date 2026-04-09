@@ -2,6 +2,11 @@
 
 ## 2026-04-09
 
+### 首页搜索入口直达执行与前端提示词同步
+- **mobile-frontend**：更新 `src/views/Home.vue`、`src/views/Search.vue`、`src/config/searchDefaults.js`，首页输入关键词后点击搜索会带着一次性路由标记进入 `/search` 并立即发起检索，不再要求用户在搜索页二次点击“搜索”；自动搜索标记会在首次消费后从 URL 中移除，避免返回搜索页时重复请求，同时保持既有的关键词与结果记忆能力。
+- **docs**：更新 `docs/HOME_SEARCH_ENTRY_PROMPT.md` 与 `docs/SEARCH_FRONTEND_PROMPT.md`，同步当前真实行为：首页入口支持 `scope=all + q=...` 直达检索；搜索页已支持 `video_title`、`preview_text`、跨视频分组与首页来源自动搜索，不再保留“`preview_text` 通常为 null / 不返回 `video_title`”等过时描述。
+- **ios-app**：同步 `ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js` 与 `index.css`，确保 `WKWebView` 加载到本次首页直达搜索修正后的前端产物。
+
 ### 语义搜索相关性重排与字幕分块窗口修正
 - **backend_fastapi**：更新 `app/services/search/search.py`，语义搜索结果改为“向量分 + 词面命中分”融合重排，并在融合后统一执行 `threshold` 过滤，降低无关视频长期停留在 `55%+` 的噪声结果；同时放宽底层 Chroma 候选召回，再由融合分数统一裁剪，避免高阈值场景下把真实相关片段过早滤掉。
 - **backend_fastapi**：修正字幕时间窗分块的 overlap 锚点，后续 chunk 改为以重叠窗口起点而不是首条字幕起点计时，避免长字幕跨越 overlap 时把片段错误拉回到更早时间，影响相关片段定位与展示。

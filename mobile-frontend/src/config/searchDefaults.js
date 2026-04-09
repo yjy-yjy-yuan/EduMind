@@ -11,6 +11,8 @@ export const DEFAULT_SEARCH_THRESHOLD = 0.5
 export const SEARCH_ROUTE_SCOPE_QUERY = 'scope'
 /** 首页输入框预填到搜索页的关键词参数 */
 export const SEARCH_ROUTE_PREFILL_QUERY = 'q'
+/** 首页点击搜索后，搜索页据此直接自动触发一次检索 */
+export const SEARCH_ROUTE_AUTO_SEARCH_QUERY = 'autoSearch'
 
 /** 跨视频范围一句说明（首页说明、搜索页范围选项与锁定条共用；仅覆盖已建立语义索引的内容） */
 export const SEARCH_COPY_ALL_SCOPE_HINT = '在我的全部已索引视频中搜索'

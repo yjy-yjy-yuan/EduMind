@@ -171,13 +171,14 @@
 </template>
 
 <script>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { semanticSearch } from '@/api/search'
 import {
   DEFAULT_SEARCH_LIMIT,
   DEFAULT_SEARCH_SCOPE,
   DEFAULT_SEARCH_THRESHOLD,
+  SEARCH_ROUTE_AUTO_SEARCH_QUERY,
   SEARCH_COPY_ALL_SCOPE_HINT,
   SEARCH_COPY_CURRENT_VIDEO_LABEL_FALLBACK,
   SEARCH_COPY_CURRENT_VIDEO_LABEL_NO_CONTEXT,
@@ -248,6 +249,7 @@ export default {
     }
     const searchScope = ref(initialSearchScope())
     const indexEmptyHint = ref('')
+    const isAutoSearchingFromRoute = ref(false)
     const searchStateKey = computed(() => {
       if (currentVideoId.value !== null) {
         return `${SEARCH_STATE_KEY_PREFIX}:video:${currentVideoId.value}`
@@ -329,6 +331,20 @@ export default {
       if (pre) {
         query.value = pre
       }
+    }
+
+    const shouldAutoSearchFromRoute = () =>
+      String(route.query[SEARCH_ROUTE_AUTO_SEARCH_QUERY] || '').trim() === '1'
+
+    const consumeRouteAutoSearchFlag = async () => {
+      if (!shouldAutoSearchFromRoute()) return
+
+      const nextQuery = { ...route.query }
+      delete nextQuery[SEARCH_ROUTE_AUTO_SEARCH_QUERY]
+      await router.replace({
+        path: route.path,
+        query: nextQuery
+      })
     }
 
     const restoreSearchState = () => {
@@ -413,6 +429,24 @@ export default {
       }
     }
 
+    const maybeAutoSearchFromRoute = async () => {
+      if (isAutoSearchingFromRoute.value || !shouldAutoSearchFromRoute()) return
+
+      const prefill = String(route.query[SEARCH_ROUTE_PREFILL_QUERY] || '').trim()
+      if (!prefill) return
+
+      isAutoSearchingFromRoute.value = true
+      query.value = prefill
+
+      try {
+        await nextTick()
+        await consumeRouteAutoSearchFlag()
+        await handleSearch()
+      } finally {
+        isAutoSearchingFromRoute.value = false
+      }
+    }
+
     const handleResultClick = (result) => {
       persistSearchState()
       router.push({
@@ -430,6 +464,14 @@ export default {
       () => {
         applyRoutePrefill()
       }
+    )
+
+    watch(
+      () => route.query[SEARCH_ROUTE_AUTO_SEARCH_QUERY],
+      () => {
+        maybeAutoSearchFromRoute()
+      },
+      { immediate: true }
     )
 
     watch(

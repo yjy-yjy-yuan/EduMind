@@ -257,6 +257,7 @@ import { getVideoRecommendations } from '@/api/recommendation'
 import { shouldIncludeExternalRecommendationsByDefault } from '@/config'
 import {
   DEFAULT_SEARCH_SCOPE,
+  SEARCH_ROUTE_AUTO_SEARCH_QUERY,
   SEARCH_COPY_HOME_INPUT_PLACEHOLDER,
   SEARCH_COPY_HOME_SEMANTIC_DESCRIPTION,
   SEARCH_COPY_HOME_SEMANTIC_TITLE,
@@ -456,6 +457,7 @@ const submitHomeSemanticSearch = () => {
     path: '/search',
     query: {
       [SEARCH_ROUTE_SCOPE_QUERY]: DEFAULT_SEARCH_SCOPE,
+      ...(q ? { [SEARCH_ROUTE_AUTO_SEARCH_QUERY]: '1' } : {}),
       ...(q ? { [SEARCH_ROUTE_PREFILL_QUERY]: q } : {})
     }
   })

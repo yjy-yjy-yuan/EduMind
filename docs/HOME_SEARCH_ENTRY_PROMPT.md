@@ -28,10 +28,12 @@
 
 - 在 `Home.vue` 增加明显入口（风格与 `ios-page` / `ios-card` 一致）。
 - 点击后跳转 `/search`，并携带**默认全局搜索**意图（例如 query 参数 `scope=all`）。
+- 若首页输入框已有关键词，应一并带上预填查询参数（例如 `q=...`），并让搜索页在落地后**自动触发一次搜索**，而不是要求用户二次点击。
 
 ### 2. 搜索页默认行为（与首页联动）
 
 - 当来源是首页入口时，默认 `searchScope = 'all'`。
+- 当来源同时携带首页关键词时，搜索页应在初始化后直接执行该次搜索，并在消费后移除一次性标记，避免返回页面时重复发请求。
 - 页面文案明确：**「在我的全部视频中搜索」**（或等价表述，与产品一致）。
 - 从视频详情进入时，保留「当前视频」能力，**不破坏现有行为**。
 
@@ -50,13 +52,14 @@
 
 - 默认值集中管理（如 `DEFAULT_SEARCH_SCOPE='all'`、`DEFAULT_LIMIT`、`DEFAULT_THRESHOLD`），避免散落硬编码。
 - **不重复实现搜索逻辑**；`Home.vue` 只做入口与参数传递。
+- 若需要首页直达搜索，优先通过路由 query 传递一次性意图标记，由 `Search.vue` 消费后清理，不要在首页直接复制搜索页的请求逻辑。
 - 新增文案尽量集中，便于后续统一修改。
 
 ## 验收标准（本切片相关）
 
 1. `cd mobile-frontend && npm run build:ios` 通过。
 2. `bash ios-app/sync_ios_web_assets.sh` 完成资源同步。
-3. `WKWebView` 验证：首页可进入搜索；默认全视频搜索；结果与跳转行为与 [`SEARCH_FRONTEND_PROMPT.md`](SEARCH_FRONTEND_PROMPT.md) 一致。
+3. `WKWebView` 验证：首页可进入搜索；默认全视频搜索；带关键词时进入搜索页后会立即发起检索；结果与跳转行为与 [`SEARCH_FRONTEND_PROMPT.md`](SEARCH_FRONTEND_PROMPT.md) 一致。
 4. 如有用户可见变更：`. .venv/bin/activate && python scripts/validate_backend_smoke.py`（若未动后端可省略）；并更新 `CHANGELOG.md`。
 
 ## 非目标
