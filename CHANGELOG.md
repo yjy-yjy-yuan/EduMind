@@ -23,6 +23,11 @@
 - **ci**：新增 `.github/workflows/backend-ci.yml`，为后端建立最小 GitHub Actions 回归门禁（path-filtered 触发，Python 3.10 + pip cache），当前执行 `ruff check backend_fastapi/tests` 与 `cd backend_fastapi && pytest tests`。
 - **docs**：更新 `AGENTS.md` 与 `README.md`，补齐“本地非-pytest 验证”与“CI 中允许 pytest 回归”的边界说明，修正此前规则表达过于绝对导致的执行歧义。
 
+### 对 2026-04-09 CI 基线记录的更正说明
+- **ci**：修复 `.github/workflows/backend-ci.yml` 的依赖安装失败（`openai-whisper` 在 GitHub Actions 中构建时报 `ModuleNotFoundError: pkg_resources`）：在安装阶段先固定 `setuptools<81` 并预装 `openai-whisper==20240930`（`--no-build-isolation`），再安装 `backend_fastapi/requirements.txt`。
+- **ci**：工作流触发事件收敛为 `pull_request + workflow_dispatch`，避免同一提交在 PR 页面出现重复的 `push` 与 `pull_request` 检查项。
+- **docs**：同步更新 `AGENTS.md` 与 `README.md` 的 CI 事件说明。
+
 ## 2026-04-08 (续续续续续续续续续续续续)
 
 ### 语义搜索全局检索写入 MySQL

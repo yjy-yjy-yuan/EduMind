@@ -109,6 +109,11 @@ python scripts/validate_backend_smoke.py
 
 仓库当前新增最小后端 CI 工作流：[`.github/workflows/backend-ci.yml`](/Users/yuan/final-work/EduMind/.github/workflows/backend-ci.yml)。
 
+触发事件：
+
+- `pull_request`
+- `workflow_dispatch`
+
 触发范围（path-filtered）：
 
 - `.github/workflows/backend-ci.yml`

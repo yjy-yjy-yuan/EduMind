@@ -80,6 +80,9 @@ bash ios-app/validate_ios_build.sh
 
 ## CI (GitHub Actions) Baseline
 - Repository baseline CI workflow: `.github/workflows/backend-ci.yml`.
+- CI events:
+  - `pull_request`
+  - `workflow_dispatch`
 - CI trigger scope (path-filtered):
   - `.github/workflows/backend-ci.yml`
   - `backend_fastapi/**`

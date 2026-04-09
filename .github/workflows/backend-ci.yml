@@ -1,18 +1,13 @@
 name: Backend CI
 
 on:
-  push:
-    paths:
-      - ".github/workflows/backend-ci.yml"
-      - "backend_fastapi/**"
-      - "pyproject.toml"
-      - "pytest.ini"
   pull_request:
     paths:
       - ".github/workflows/backend-ci.yml"
       - "backend_fastapi/**"
       - "pyproject.toml"
       - "pytest.ini"
+  workflow_dispatch:
 
 jobs:
   ruff-and-pytest:
@@ -36,7 +31,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install ruff
+          pip install "setuptools<81" wheel ruff
+          pip install --no-build-isolation openai-whisper==20240930
           pip install -r backend_fastapi/requirements.txt
 
       - name: Ruff check
