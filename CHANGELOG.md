@@ -34,6 +34,9 @@
 ### 对 2026-04-09 本地 pre-push 阻断的补充更正（NumPy/Chroma 兼容）
 - **backend_fastapi**：`backend_fastapi/requirements.txt` 增加 `numpy<2` 约束，修复本地 `pre-push` 执行 `scripts/validate_backend_smoke.py` 时因 `chromadb` 依赖链与 NumPy 2.x 不兼容导致的 `AttributeError: np.float_ was removed`。
 
+### 对 2026-04-09 CI pytest 导入失败的补充更正（Pydantic Email 依赖）
+- **backend_fastapi**：`backend_fastapi/requirements.txt` 增加 `email-validator>=2.1.0`，修复 GitHub Actions 在加载 `app/schemas/auth.py` 时因 `EmailStr` 缺少依赖而触发的 `ImportError: email-validator is not installed`。
+
 ## 2026-04-08 (续续续续续续续续续续续续)
 
 ### 语义搜索全局检索写入 MySQL
