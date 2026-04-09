@@ -41,6 +41,15 @@
   - 本地开发或新库初始化：可使用 `python backend_fastapi/scripts/init_db.py --create`
   - 仅在明确允许自动建表时，才依赖 `AUTO_CREATE_TABLES=true`
 - `scripts/migrations_semantic_search.py` 主要覆盖早期向量索引相关结构；`semantic_search_logs` 这张表请以 `backend_fastapi/migrations/add_semantic_search_logs.sql` 为准。
+- 若表尚未创建，全局搜索仍会返回结果，但审计落库会失败；`search_log.py` 对「表不存在」仅打一次 WARNING（后续为 DEBUG），完整修复请执行上述 SQL 或 `init_db.py --create`。
+
+## 索引覆盖与数据预期（诊断结论）
+
+以下结论依赖具体库内数据，用于纠正过时的「全盘否定」诊断，**不作为代码自动保证**：
+
+- **「所有视频都未切片、全局搜索完全无结果」** 在环境已正确配置 Chroma 与向量索引时通常**不成立**：多数已完成语义索引的视频可以返回片段。
+- **「全量已上传视频都可搜」** 不一定成立：处理失败、字幕路径失效、或 `COMPLETED` 但 `subtitle_filepath` 为空等情况会导致**无法建字幕索引**，从而无法参与搜索。
+- 示例（需用实际数据核对）：`id=1` 处理失败且字幕路径失效；`id=11`、`id=12` 为 `COMPLETED` 但 `subtitle_filepath` 为空，因此未进索引；其余已索引条目在集合存在时可正常返回结果。
 
 ## 当前限制
 
@@ -97,6 +106,8 @@ pip install -r backend_fastapi/requirements.txt
 - `vector_indexes` 表
 - `videos.has_semantic_index`
 - `videos.vector_index_id`
+- 全局检索审计：`semantic_search_logs`（见 `backend_fastapi/migrations/add_semantic_search_logs.sql`
+  或 `python backend_fastapi/scripts/init_db.py --create`）
 - 若现有 `videos` 表尚无 `user_id`，还需要执行 `backend_fastapi/migrations/add_user_id_to_videos.sql`
 
 ### 3. 准备 ChromaDB 目录

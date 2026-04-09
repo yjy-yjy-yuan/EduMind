@@ -1,5 +1,9 @@
 -- 语义搜索全局检索日志表（跨 video_ids 为空时的检索）
--- 执行示例：mysql -u root -p edumind < backend_fastapi/migrations/add_semantic_search_logs.sql
+-- 与 ORM 模型 app.models.semantic_search_log.SemanticSearchLog 一致。
+--
+-- 现有库增量部署（任选其一）：
+--   mysql -h 127.0.0.1 -u root -p edumind < backend_fastapi/migrations/add_semantic_search_logs.sql
+--   或在 backend_fastapi 目录：python scripts/init_db.py --create
 
 CREATE TABLE IF NOT EXISTS semantic_search_logs (
     id INT PRIMARY KEY AUTO_INCREMENT,

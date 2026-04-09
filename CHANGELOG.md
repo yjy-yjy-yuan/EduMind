@@ -1,5 +1,11 @@
 # 变更日志
 
+## 2026-04-09
+
+### 语义搜索全局检索日志表缺失时的日志行为与部署说明
+- **backend_fastapi**：`app/services/search/search_log.py` 在检测到 `semantic_search_logs` 表不存在时（如 MySQL 1146）仅输出一次 **WARNING**（含迁移 SQL 与 `init_db.py --create` 指引），后续重复失败降为 **DEBUG**，避免每次全局搜索刷屏；其余写库失败仍记录完整 WARNING。
+- **docs**：`SEMANTIC_SEARCH_DEPLOYMENT.md` 增补「索引覆盖与数据预期」说明，区分「无结果」与「非全量可搜」；最小部署步骤补充 `semantic_search_logs`；`migrations/add_semantic_search_logs.sql` 头注释补充与 `init_db.py --create` 等价关系。
+
 ## 2026-04-08 (续续续续续续续续续续续续)
 
 ### 语义搜索全局检索写入 MySQL

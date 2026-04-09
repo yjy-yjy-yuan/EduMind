@@ -13,6 +13,22 @@ from app.models.semantic_search_log import SemanticSearchLog
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
+
+# 表缺失时仅打一次 WARNING，避免每次全局搜索刷屏；其余失败仍按原逻辑记录。
+_MISSING_SEMANTIC_SEARCH_LOGS_TABLE_WARNED = False
+
+
+def _semantic_search_logs_table_missing(exc: BaseException) -> bool:
+    """判断是否为 MySQL 表不存在（如 1146）导致的全局检索日志写入失败。"""
+    parts: list[str] = [str(exc).lower()]
+    if exc.__cause__ is not None:
+        parts.append(str(exc.__cause__).lower())
+    text = " ".join(parts)
+    if "semantic_search_logs" not in text:
+        return False
+    return "doesn't exist" in text or "does not exist" in text or "1146" in text or "no such table" in text
+
+
 DEFAULT_LIMIT_USED = 10
 DEFAULT_THRESHOLD_USED = Decimal("0.500")
 THRESHOLD_QUANTIZE = Decimal("0.001")
@@ -84,16 +100,29 @@ def record_global_semantic_search(
         db.add(row)
         db.commit()
     except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "record_global_semantic_search failed user=%s query_len=%s video_count=%s limit=%s threshold=%s: %s",
-            user_id,
-            len(normalized_query_text),
-            len(normalized_video_ids or []),
-            normalized_limit_used,
-            normalized_threshold_used,
-            exc,
-            exc_info=True,
-        )
+        global _MISSING_SEMANTIC_SEARCH_LOGS_TABLE_WARNED
+        if _semantic_search_logs_table_missing(exc):
+            if not _MISSING_SEMANTIC_SEARCH_LOGS_TABLE_WARNED:
+                _MISSING_SEMANTIC_SEARCH_LOGS_TABLE_WARNED = True
+                logger.warning(
+                    "semantic_search_logs 表不存在，全局搜索审计无法落库（搜索接口仍可用）。"
+                    "请执行 backend_fastapi/migrations/add_semantic_search_logs.sql，"
+                    "或运行 python backend_fastapi/scripts/init_db.py --create；"
+                    "说明见 SEMANTIC_SEARCH_DEPLOYMENT.md。"
+                )
+            else:
+                logger.debug("record_global_semantic_search skipped (semantic_search_logs missing): %s", exc)
+        else:
+            logger.warning(
+                "record_global_semantic_search failed user=%s query_len=%s video_count=%s limit=%s threshold=%s: %s",
+                user_id,
+                len(normalized_query_text),
+                len(normalized_video_ids or []),
+                normalized_limit_used,
+                normalized_threshold_used,
+                exc,
+                exc_info=True,
+            )
         try:
             db.rollback()
         except Exception:  # noqa: BLE001
