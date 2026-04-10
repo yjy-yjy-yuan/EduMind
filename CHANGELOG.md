@@ -2,6 +2,55 @@
 
 ## 2026-04-10
 
+> **读数先看这里（避免误读旧条目）**：同日期内凡出现「**12 个索引**」「**16 个测试**」「**16/16**」「**80/80**」等字样的**较早小节**，数字与迁移细节均已由下方 **「对同日『相似度审计日志持久化（P1-1）』记录的口径更正说明」** 取代；**一律以该更正小节为准**，较早小节正文保留不改，仅作变更考古。
+
+### 对同日「相似度审计日志持久化（P1-1）」记录的口径更正说明
+- **数字与迁移**：`add_similarity_audit_logs.sql` 实际为 **4 个二级索引**（`idx_trace_id`、`idx_date_key`、`idx_date_trace`、`idx_created_at`）及主键；同日旧条目中的「12 个索引」「16 个测试」「16/16」及「80/80」类合计口径以本说明为准：**持久化专项单元测试 17 项**，与相似度域 **64 项** 一并执行时合计 **81/81**。历史条目正文不删改，便于变更考古。
+- **docs**：`SIMILARITY_AUDIT_LOG_PERSISTENCE.md` 检查清单拆为「代码与仓库侧 / 目标环境侧」，已完成项与 `[x]` 一致；测试计数等与实现同步；`_record_similarity_audit_log` 增加会话/DB 极端异常时回退 `SimilarityMetrics`，避免影响相似度主路径。
+
+> **再次提示**：其后的 **「相似度审计日志持久化（P1-1）- TDD 完整实现」** 等较早条目中的索引数、测试数等**未改原文**；若与更正说明冲突，**以更正说明为准**。
+
+### 相似度审计：检查清单分栏与 CHANGELOG 醒目提示（可读性）
+- **docs**：`SIMILARITY_AUDIT_LOG_PERSISTENCE.md` 将检查清单分为「代码与仓库侧（全 [x]）」与「目标环境侧（部署自验）」，与「已完成」表述一致。
+- **CHANGELOG**：在 **2026-04-10** 日期下增加顶部 blockquote，并在「P1-1 - TDD 完整实现」小节增加旁注，强化「数字以同日口径更正说明为准」。
+
+### 相似度审计持久化主链路接入与行为校准
+- **backend_fastapi**：`lifespan` 中调用 `init_persistence_service()`；`llm_similarity_service` 经 `_record_similarity_audit_log` 写入全局持久化服务（未初始化时回退 `SimilarityMetrics`），`get_metrics_for_day` / `check_score_drift` 与持久化统计对齐。
+- **backend_fastapi**：`scripts/init_db.py` 将 `similarity_audit_logs` 纳入 `MANAGED_TABLE_NAMES` 与表说明，与 `init_db.py --create` 文档一致。
+- **backend_fastapi**：`SimilarityAuditLogPersistenceService` 中 `record_log` 失败时 `rollback`；`persist_from_memory` 成功后从内存 deque 移除已落库项并加入指数退避重试；`_compute_stats` 的 `date` 与查询日一致。
+- **backend_fastapi**：`app/models/__init__.py` 导出 `SimilarityAuditLogModel`。
+- **docs**：`SIMILARITY_AUDIT_LOG_PERSISTENCE.md` 与实现一致（同步持久化、`SessionLocal` 示例、`main.py` lifespan、运维段修正）。
+
+### 相似度审计日志持久化（P1-1）- TDD 完整实现
+
+> **归档原文**：索引数、测试数、验证合计等若与同日 **「口径更正说明」** 不一致，**以更正说明为准**。
+
+- **backend_fastapi**：新增持久化层完整实现，转变内存专用的审计日志为可复用的 DB + 内存混合架构：
+  - `app/models/similarity_audit_log.py`：ORM 模型定义，与内存 `SimilarityAuditLog` 双向转换；索引策略支持 `trace_id`、`date_key` 快速查询。
+  - `app/repositories/similarity_audit_log_repository.py`：Repository 层提供 CRUD、batch 保存、按日期范围查询、按 `trace_id` 单行查询等接口。
+  - `app/services/similarity_audit_log_service.py`：Service 层实现"内存 + DB 可用性优先"设计——DB 故障自动降级到内存，失败重试策略，内存缓冲大小管理，支持从内存二次持久化恢复。
+  - `app/services/similarity_service_container.py`：全局 Service Locator，便于应用启动初始化和依赖注入。
+- **migrations**：新增 `add_similarity_audit_logs.sql`，含 12 个精心设计的索引和字段注释；支持快速回滚（显式 `DROP TABLE IF EXISTS`）。
+- **tests**：新增 `tests/unit/test_similarity_audit_log_persistence.py`，16 个 TDD 单元测试全部通过：
+  - Repository 层 6 项：单条/批量保存、按日期/trace_id 查询、查询一致性。
+  - Service 层 5 项：初始化、内存+DB 并行、DB 故障降级、从 DB 恢复、trace_id 溯源。
+  - 降级与重试 3 项：DB 错误容错、初始失败重试、缓冲大小限制。
+  - 集成 2 项：端到端保存查询、重启恢复验证。
+- **docs**：新增 `docs/SIMILARITY_AUDIT_LOG_PERSISTENCE.md`，详细说明架构、部署、运维、故障排除、性能指标、配置优化等。
+- **validation**：
+  - 单元测试：16/16 新增测试通过；原有 64 个相似度测试无回归。
+  - 编译检查：`python -m compileall` 通过。
+  - 烟雾测试：`validate_backend_smoke.py` 通过。
+  - Pre-commit 钩子：black、isort、flake8、bash 等全部通过。
+
+### 相似度审计日志持久化的设计原则
+1. **可用性优先**：DB 连接失败不阻断主流程，自动降级到内存缓冲。
+2. **一致性保证**：查询时优先读 DB（支持重启恢复），降级到内存。
+3. **内存安全**：缓冲区采用 FIFO 队列，大小可配置（默认 1000），防止无限增长。
+4. **索引优化**：trace_id、date_key、联合索引支持快速查询，避免全表扫描。
+
+## 2026-04-10
+
 ### 智能体编排与能力强化统一提示词
 - **docs**：新增根目录 `PROJECT_AGENT_ORCHESTRATION_PROMPT.md`，固化已定决策（编排仅在 `backend_fastapi` 内模块化、未来可拆 `agent-service`；业务优先强化视频学习/搜索/问答）、系统七条要求、TDD 与里程碑提交约定、建议目录结构与遥测/治理边界，供研发与自动化助手对齐。
 

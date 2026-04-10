@@ -18,6 +18,7 @@ import logging
 import re
 import time
 import uuid
+from datetime import datetime
 from typing import Any
 from typing import Dict
 from typing import List
@@ -26,6 +27,7 @@ from typing import Tuple
 
 import requests
 from app.core.config import settings
+from app.core.database import SessionLocal
 from app.services.config_model_params import InputValidationConfig
 from app.services.config_model_params import ModelParamWhitelist
 from app.services.config_model_params import SimilarityConfig
@@ -35,6 +37,7 @@ from app.services.similarity_analytics import SimilarityMetrics
 from app.services.similarity_score_parser import ParseResult
 from app.services.similarity_score_parser import SimilarityScoreParser
 from app.services.similarity_score_parser import TagInputValidator
+from app.services.similarity_service_container import get_persistence_service
 
 # 导入新的模块化组件
 from app.services.tag_similarity_prompts import TagSimilarityPromptFactory
@@ -46,6 +49,27 @@ from openai import OpenAI
 logger = logging.getLogger(__name__)
 audit_logger = SimilarityAuditLogger("similarity_audit")
 metrics = SimilarityMetrics()
+
+
+def _record_similarity_audit_log(audit_log: SimilarityAuditLog) -> None:
+    """将审计日志写入持久化服务（内存 + DB）；未初始化或会话/DB 异常时回退到进程内 metrics。"""
+    try:
+        try:
+            persistence = get_persistence_service()
+        except RuntimeError:
+            metrics.record_log(audit_log)
+            return
+        db = SessionLocal()
+        try:
+            persistence.record_log(audit_log, db)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning(
+            "similarity audit log persistence failed, falling back to memory metrics: %s",
+            exc,
+        )
+        metrics.record_log(audit_log)
 
 
 class LLMSimilarityService:
@@ -208,7 +232,7 @@ class LLMSimilarityService:
                                 provider_latency_ms=provider_latency,
                                 parse_latency_ms=parse_elapsed,  # 传真实延迟
                             )
-                            metrics.record_log(audit_log)
+                            _record_similarity_audit_log(audit_log)
                             return score
                     except Exception as e:
                         logger.debug(f"[{trace_id}] Ollama 失败（尝试 {attempt+1}/{max_retries}）: {e}")
@@ -231,7 +255,7 @@ class LLMSimilarityService:
                                 provider_latency_ms=provider_latency,
                                 parse_latency_ms=parse_elapsed,  # 传真实延迟
                             )
-                            metrics.record_log(audit_log)
+                            _record_similarity_audit_log(audit_log)
                             return score
                     except Exception as e:
                         logger.debug(f"[{trace_id}] OpenAI 失败（尝试 {attempt+1}/{max_retries}）: {e}")
@@ -261,7 +285,7 @@ class LLMSimilarityService:
             fallback_reason="llm_unavailable_after_retries",
             fallback_score=SimilarityConfig.DEFAULT_FALLBACK_SCORE_ON_ERROR,
         )
-        metrics.record_log(audit_log_final)
+        _record_similarity_audit_log(audit_log_final)
         return SimilarityConfig.DEFAULT_FALLBACK_SCORE_ON_ERROR or 0.0
 
     def _calculate_similarity_with_ollama(self, trace_id: str, tag1: str, tag2: str) -> Optional[Tuple[float, float]]:
@@ -472,11 +496,38 @@ class LLMSimilarityService:
 
     def get_metrics_for_day(self, date: str = None) -> Dict[str, Any]:
         """获取指定日期的性能指标"""
-        return metrics.get_stats_for_day(date)
+        try:
+            persistence = get_persistence_service()
+        except RuntimeError:
+            return metrics.get_stats_for_day(date)
+        db = SessionLocal()
+        try:
+            return persistence.get_daily_stats(date, db)
+        finally:
+            db.close()
 
     def check_score_drift(self, date: str = None, baseline: float = 0.5, threshold: float = 0.1) -> Dict[str, Any]:
         """检测分值分布漂移"""
-        return metrics.check_drift(date, baseline, threshold)
+        stats = self.get_metrics_for_day(date)
+        target_date = stats.get("date") or date or datetime.utcnow().date().isoformat()
+        avg_score = stats.get("avg_score")
+        if avg_score is None:
+            return {"date": target_date, "drift_detected": False, "reason": "No valid scores"}
+
+        eps = 1e-9
+        drift_abs = abs(avg_score - baseline)
+        drift_pct = drift_abs / baseline if baseline != 0 else 0
+        drift_detected = (drift_pct - threshold) > eps
+
+        return {
+            "date": target_date,
+            "drift_detected": drift_detected,
+            "baseline_mean": baseline,
+            "actual_mean": avg_score,
+            "drift_abs": drift_abs,
+            "drift_pct": drift_pct,
+            "threshold": threshold,
+        }
 
     def get_prompt_version(self) -> str:
         """获取当前提示词版本"""
