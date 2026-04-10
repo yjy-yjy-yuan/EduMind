@@ -1,6 +1,5 @@
-"""搜索服务的结构化日志记录模块"""
+"""搜索服务的结构化日志记录模块（经 app.analytics 统一管道输出）"""
 
-import json
 import logging
 from datetime import datetime
 from typing import Optional
@@ -9,12 +8,18 @@ logger = logging.getLogger(__name__)
 
 
 class SearchEventLogger:
-    """搜索事件日志记录器 - Phase 1 JSON 日志基础设施"""
+    """搜索事件日志记录器 — 向后兼容；底层写入集中式 AnalyticsTelemetry。"""
 
     @staticmethod
     def _log_event(event: dict) -> None:
-        """记录 JSON 事件"""
-        logger.info(json.dumps(event, ensure_ascii=False))
+        """记录 JSON 事件（统一 schema + 可配置 logger 级别）。"""
+        try:
+            from app.analytics.adapters.search import emit_search_legacy_event
+            from app.analytics.pipeline import get_telemetry
+
+            emit_search_legacy_event(get_telemetry(), event)
+        except Exception as exc:
+            logger.debug("search analytics emit skipped: %s", exc, exc_info=True)
 
     @staticmethod
     def log_search_request(

@@ -2,6 +2,13 @@
 
 ## 2026-04-10
 
+### 集中式遥测管道（P1-2）— `app.analytics`
+- **backend_fastapi**：新增 `app/analytics`（`schema` 统一字段、`pipeline` 写入入口、`alerting` 失败率/超时率/漂移提示、`adapters/search` 与 `adapters/similarity` 模块化映射）；配置项 `ANALYTICS_*` 控制日志级别与告警阈值。
+- **backend_fastapi**：`SearchEventLogger` 经 `emit_search_legacy_event` 写入管道；`SimilarityAuditLogger` 经 `emit_similarity_audit_event` 输出统一 JSON（原 `[START]/[SUCCESS]` 前缀行不再输出）；异常时 DEBUG 记录，不阻断主业务。
+- **tests**：新增 `test_analytics_schema.py`、`test_analytics_pipeline.py`、`test_analytics_alerting.py`、`test_analytics_adapters.py`（共 14 项）覆盖 schema 校验、写入级别、告警与适配器映射。
+- **docs**：新增 `docs/ANALYTICS_PIPELINE_MIGRATION.md`（旧入口→新入口映射、迁移清单、残留风险）。
+- **validation**：`pytest` 上述 14 项 + `test_similarity_analytics.py`；`black` / `isort` / `flake8`（pre-commit）对变更文件通过。
+
 > **读数先看这里（避免误读旧条目）**：同日期内凡出现「**12 个索引**」「**16 个测试**」「**16/16**」「**80/80**」等字样的**较早小节**，数字与迁移细节均已由下方 **「对同日『相似度审计日志持久化（P1-1）』记录的口径更正说明」** 取代；**一律以该更正小节为准**，较早小节正文保留不改，仅作变更考古。
 
 ### 对同日「相似度审计日志持久化（P1-1）」记录的口径更正说明

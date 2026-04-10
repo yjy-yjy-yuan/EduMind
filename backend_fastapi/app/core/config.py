@@ -122,6 +122,13 @@ class Settings(BaseSettings):
     # - "require_index_success": 索引失败则不进入 COMPLETED（需明确前端展示）
     SEARCH_INLINE_INDEX_FAIL_POLICY: str = "mark_completed_without_index"
 
+    # 集中式遥测管道（app.analytics）
+    ANALYTICS_LOG_LEVEL: str = "INFO"  # DEBUG|INFO|WARNING|ERROR — 作用于 app.analytics.telemetry
+    ANALYTICS_ALERT_MAX_FAILURE_RATE: float = 0.15
+    ANALYTICS_ALERT_MAX_TIMEOUT_RATE: float = 0.10
+    ANALYTICS_ALERT_LATENCY_TIMEOUT_MS: float = 30_000.0
+    ANALYTICS_ALERT_DRIFT_REL_THRESHOLD: float = 0.10
+
     # 自适应切片配置
     SEARCH_ADAPTIVE_CHUNKING: bool = True  # 是否启用自适应切片
     # 自适应参数规则：(max_duration_inclusive, chunk_duration, overlap)

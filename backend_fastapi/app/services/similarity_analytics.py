@@ -104,11 +104,21 @@ class SimilarityAuditLogger:
     用途：
     - 集中式记录相似度计算的各个阶段
     - 支持结构化输出便于后续分析
+    - 统一写入 app.analytics 管道（向后兼容：方法签名与返回值不变）
     """
 
     def __init__(self, logger_name: str = "similarity_audit"):
         self.logger = logging.getLogger(logger_name)
         self.logger.setLevel(logging.INFO)
+
+    def _emit_unified(self, log: SimilarityAuditLog) -> None:
+        try:
+            from app.analytics.adapters.similarity import emit_similarity_audit_event
+            from app.analytics.pipeline import get_telemetry
+
+            emit_similarity_audit_event(get_telemetry(), log)
+        except Exception as exc:
+            self.logger.debug("analytics pipeline emit skipped: %s", exc, exc_info=True)
 
     def log_call_start(
         self,
@@ -129,7 +139,7 @@ class SimilarityAuditLogger:
             provider=provider,
             model=model,
         )
-        self.logger.info(f"[START] {log.to_json()}")
+        self._emit_unified(log)
         return log
 
     def log_success(
@@ -150,7 +160,7 @@ class SimilarityAuditLogger:
         log.parse_latency_ms = parse_latency_ms
         log.parse_ok = True
         log.latency_ms = provider_latency_ms + parse_latency_ms
-        self.logger.info(f"[SUCCESS] {log.to_json()}")
+        self._emit_unified(log)
 
     def log_parse_error(
         self,
@@ -168,7 +178,7 @@ class SimilarityAuditLogger:
         log.error_message = error_message
         log.score_raw = score_raw
         log.parse_latency_ms = parse_latency_ms
-        self.logger.warning(f"[PARSE_ERROR] {log.to_json()}")
+        self._emit_unified(log)
 
     def log_provider_error(
         self,
@@ -183,7 +193,7 @@ class SimilarityAuditLogger:
         log.error_message = error_message
         log.provider_latency_ms = latency_ms
         log.latency_ms = latency_ms
-        self.logger.error(f"[PROVIDER_ERROR] {log.to_json()}")
+        self._emit_unified(log)
 
     def log_retry(
         self,
@@ -195,7 +205,7 @@ class SimilarityAuditLogger:
         log.event_type = SimilarityEventType.RETRY_START.value
         log.retry_count = attempt
         log.metadata['retry_reason'] = reason
-        self.logger.info(f"[RETRY] Attempt {attempt}: {log.to_json()}")
+        self._emit_unified(log)
 
     def log_fallback(
         self,
@@ -207,7 +217,7 @@ class SimilarityAuditLogger:
         log.event_type = SimilarityEventType.FALLBACK.value
         log.fallback_reason = fallback_reason
         log.score = fallback_score
-        self.logger.warning(f"[FALLBACK] {log.to_json()}")
+        self._emit_unified(log)
 
 
 # ============================================================================

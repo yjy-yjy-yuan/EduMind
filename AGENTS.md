@@ -225,4 +225,4 @@ Set up or improve Git hooks following industry best practices.
 
 ## Local pytest usage boundary
 - For normal local verification of modified code in this repository, using `pytest` as the primary validation command is prohibited.
-- `pytest` is allowed in GitHub Actions CI regression workflows (for example `.github/workflows/backend-ci.yml`) and in explicit CI-failure troubleshooting scenarios.
+- `pytest` is allowed in GitHub Actions CI regression workflows (for example `.github/workflows/backend-ci.yml`), in explicit CI-failure troubleshooting scenarios, and when the repository owner / tech lead explicitly approves a scoped local `pytest` run for a specific task (this does not change the default rule).
