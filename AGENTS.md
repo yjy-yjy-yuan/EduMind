@@ -14,7 +14,8 @@ Do not reintroduce `frontend/`, `backend/`, Android modules, or desktop-web-spec
 - `mobile-frontend/`: the only frontend codebase. It provides the H5 UI loaded by iOS `WKWebView`.
 - `ios-app/`: the iOS container project, native bridge layer, on-device media/file access, on-device audio extraction/transcription execution, and Web asset sync script.
 - `docs/`: only keep documents that directly support the iOS mobile chain, Mac development, backend deployment, database setup, or video-processing workflow.
-- `CHANGELOG.md`, `index.md`, `README.md`, `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`: root-level control documents; `index.md` describes the changelog workflow paired with `CHANGELOG.md`.
+- `CHANGELOG.md`, `index.md`, `README.md`: root-level control documents.
+- `docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`: master implementation prompt for the iOS mobile chain.
 
 ## Architecture Rules
 - UI is frontend, real functionality is backend.

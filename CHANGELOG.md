@@ -1,5 +1,16 @@
 # 变更日志
 
+## 2026-04-10
+
+### 智能体编排与能力强化统一提示词
+- **docs**：新增根目录 `PROJECT_AGENT_ORCHESTRATION_PROMPT.md`，固化已定决策（编排仅在 `backend_fastapi` 内模块化、未来可拆 `agent-service`；业务优先强化视频学习/搜索/问答）、系统七条要求、TDD 与里程碑提交约定、建议目录结构与遥测/治理边界，供研发与自动化助手对齐。
+
+### 关键词搜索（标签相似度）P0 收尾与文档校准
+- **backend_fastapi**：`app/services/llm_similarity_service.py` 完成 P0 收尾校准：provider 侧耗时测量使用 `time.perf_counter()`，并将 `provider_latency_ms` 改为 `max(0.0, total-parse)` 下限保护，避免浮点精度导致的负值噪声。
+- **tests**：新增并收敛 `backend_fastapi/tests/unit/test_llm_similarity_service.py`（7 项），补齐重试链路、返回值解包、延迟拆分、配置注入与主流程联通验证；移除恒真断言并改为精确/近似断言，和生产逻辑保持一致。
+- **docs**：重写 `docs/KEYWORD_SEARCH_OPTIMIZATION.md` 与 `KEYWORD_SEARCH_DELIVERY_SUMMARY.md`，修正过度承诺与过时描述，明确当前已完成项与 P1 未闭环项（持久化遥测、训练闭环等）；更新 `docs/SENTRYSEARCH_INTEGRATION_PROMPT.md`，更正“local embedder 占位”等历史陈述。
+- **validation**：本地复验通过：`pytest tests/unit/test_llm_similarity_service.py`、`pytest tests/unit/test_similarity_score_parser.py tests/unit/test_similarity_analytics.py`、`pytest tests/smoke`。
+
 ## 2026-04-09
 
 ### 首页搜索入口直达执行与前端提示词同步

@@ -1,6 +1,6 @@
 # 首页搜索入口（跨视频语义搜索）— 可执行提示词
 
-从「跨视频语义搜索」完整实现提示词（如 EduMind v2）中抽取的**仅首页入口与默认意图**切片，便于单独维护与修改。搜索页实现细节见 [`SEARCH_FRONTEND_PROMPT.md`](SEARCH_FRONTEND_PROMPT.md)。仓库级边界与分层见根目录 [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](../PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)。
+从「跨视频语义搜索」完整实现提示词（如 EduMind v2）中抽取的**仅首页入口与默认意图**切片，便于单独维护与修改。搜索页实现细节见 [`SEARCH_FRONTEND_PROMPT.md`](SEARCH_FRONTEND_PROMPT.md)。仓库级边界与分层见 [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)。
 
 ---
 

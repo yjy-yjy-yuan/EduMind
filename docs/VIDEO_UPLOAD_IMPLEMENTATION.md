@@ -2,7 +2,7 @@
 
 > 基于当前仓库通盘梳理，供「马上实现上传视频功能」时使用。
 > 涉及：`backend_fastapi/`、`mobile-frontend/`、`ios-app/`。
-> **连调逻辑**：真机 = 前端（H5/WebView），功能在后端（FastAPI 端口 2004），前后端通过 API 基地址（端口）连调；详见仓库根目录 `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md` 第二节。
+> **连调逻辑**：真机 = 前端（H5/WebView），功能在后端（FastAPI 端口 2004），前后端通过 API 基地址（端口）连调；详见 `docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md` 第二节。
 
 ---
 
@@ -109,7 +109,7 @@ UPLOAD_FOLDER=/your/custom/uploads
 
 - **已经上传的视频放在哪里**：**`backend_fastapi/uploads/`**（或你在 `.env` 里配置的 `UPLOAD_FOLDER`）。原始视频文件直接在该目录下，字幕、缓存等在其子目录。
 - **要实现上传功能**：后端已就绪；把移动端切到「非 UI_ONLY」并配置正确的 `VITE_MOBILE_API_BASE_URL`，即可在 H5/iOS WebView 中完成真实上传；无需改后端上传接口或前端表单字段名。
-- **固定域名**：若后端使用固定域名（如 `https://api.yourdomain.com`），在 `mobile-frontend` 构建前设置 `VITE_MOBILE_API_BASE_URL` 为该域名（可建 `.env.production` 或 `.env.ios`），再执行 `npm run build` / `npm run build:ios`，换 Wi‑Fi/换地点后请求仍发往该域名。详见主提示词 `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md` 第三节「后端固定域名」。
+- **固定域名**：若后端使用固定域名（如 `https://api.yourdomain.com`），在 `mobile-frontend` 构建前设置 `VITE_MOBILE_API_BASE_URL` 为该域名（可建 `.env.production` 或 `.env.ios`），再执行 `npm run build` / `npm run build:ios`，换 Wi‑Fi/换地点后请求仍发往该域名。详见主提示词 `docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md` 第三节「后端固定域名」。
 
 若你希望增加「扫描 uploads 目录并导入已有视频」的脚本或接口，可以说明运行环境（本地/服务器）和期望的调用方式，我可以按当前项目结构给出具体代码位置和示例。
 

@@ -17,7 +17,7 @@ EduMind/
 ├── ios-app/           # iOS 容器
 ├── docs/              # iOS 链路相关文档
 ├── AGENTS.md
-├── PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md
+├── docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md
 └── CHANGELOG.md
 ```
 
@@ -207,6 +207,13 @@ cd mobile-frontend && npm run build:ios
 ```
 
 部署与当前限制的详细说明见 [backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md](/Users/yuan/final-work/EduMind/backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)。
+
+## 标签相似度优化文档
+
+标签相似度（关键词相关子能力）的最新交付与技术说明见：
+
+- [docs/KEYWORD_SEARCH_OPTIMIZATION.md](/Users/yuan/final-work/EduMind/docs/KEYWORD_SEARCH_OPTIMIZATION.md)
+- [KEYWORD_SEARCH_DELIVERY_SUMMARY.md](/Users/yuan/final-work/EduMind/KEYWORD_SEARCH_DELIVERY_SUMMARY.md)
 
 ## Blitz / Codex CLI 开发工作流
 
@@ -502,12 +509,12 @@ bash scripts/install_git_hooks.sh
 1. 真实功能只写在 `backend_fastapi/`
 2. `mobile-frontend/` 不直接实现业务规则或数据库逻辑
 3. 前端改动后必须同步 iOS `WebAssets`
-4. 文档规范以 `AGENTS.md` 与 `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md` 为准
+4. 文档规范以 `AGENTS.md` 与 `docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md` 为准
 
 ## 相关文档
 
 - [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)
-- [`PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)
+- [`docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)
 - [`docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md)
 - [`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md)
 - [`docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md)

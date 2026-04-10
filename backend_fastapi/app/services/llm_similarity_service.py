@@ -1,201 +1,386 @@
 """
-基于LLM的标签相似度计算服务
+基于LLM的标签相似度计算服务（企业级版本）
+
+关键改进：
+1. 提示词版本管理 - 单一事实源
+2. 参数白名单约束 - 配置化、防注入
+3. 统一解析器 - 两路径一致性
+4. 结构化审计日志 - 可观测与追溯
+5. 失败重试与降级 - 稳健性
+
+【P0】边界清晰化：本服务仅用于"标签相似度"，不直接替代主搜索排序
+【P0】单一事实源：所有提示词从 tag_similarity_prompts 集中获取
+【P0】版本治理：每次提示词变更都有版本号、变更说明、回滚目标
 """
 
 import json
 import logging
 import re
+import time
+import uuid
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 import requests
 from app.core.config import settings
+from app.services.config_model_params import InputValidationConfig
+from app.services.config_model_params import ModelParamWhitelist
+from app.services.config_model_params import SimilarityConfig
+from app.services.similarity_analytics import SimilarityAuditLog
+from app.services.similarity_analytics import SimilarityAuditLogger
+from app.services.similarity_analytics import SimilarityMetrics
+from app.services.similarity_score_parser import ParseResult
+from app.services.similarity_score_parser import SimilarityScoreParser
+from app.services.similarity_score_parser import TagInputValidator
+
+# 导入新的模块化组件
+from app.services.tag_similarity_prompts import TagSimilarityPromptFactory
 from app.utils.ollama_compat import build_ollama_options
 from app.utils.ollama_compat import sanitize_ollama_response_text
 from openai import OpenAI
 
 # 配置日志
 logger = logging.getLogger(__name__)
+audit_logger = SimilarityAuditLogger("similarity_audit")
+metrics = SimilarityMetrics()
 
 
 class LLMSimilarityService:
-    """基于LLM的标签相似度计算服务"""
+    """
+    基于LLM的标签相似度计算服务（企业级版本）
+
+    功能职责：
+    - 评估两个标签的语义相似度（0-1）
+    - 支持 OpenAI 兼容 API 和 Ollama 本地部署
+    - 提供完整的审计追踪与性能监控
+    - 支持失败重试与可解释降级
+    """
 
     def __init__(self):
-        """初始化LLM相似度服务"""
+        """初始化服务"""
         self.openai_client = None
         self.use_ollama = False
         self.use_openai = False
 
-        # 尝试初始化OpenAI客户端
+        # 配置提示词版本（从配置读取，支持动态切换）
+        self.prompt_version = SimilarityConfig.DEFAULT_PROMPT_VERSION
+
+        # 初始化 OpenAI 客户端
+        self._init_openai()
+
+        # 检查 Ollama 可用性
+        self._init_ollama()
+
+        if not self.use_openai and not self.use_ollama:
+            logger.warning("⚠️ OpenAI 和 Ollama 服务都不可用，某些功能可能受限")
+
+    def _init_openai(self) -> None:
+        """初始化 OpenAI 客户端（带参数白名单检查）"""
         try:
             if settings.OPENAI_API_KEY:
-                self.openai_client = OpenAI(api_key=settings.OPENAI_API_KEY, base_url=settings.OPENAI_BASE_URL)
-                self.use_openai = True
-                logger.info("OpenAI客户端初始化成功")
+                self.openai_client = OpenAI(
+                    api_key=settings.OPENAI_API_KEY,
+                    base_url=settings.OPENAI_BASE_URL,
+                )
+                # 验证配置的模型在白名单中
+                model = getattr(settings, 'OPENAI_SIMILARITY_MODEL', SimilarityConfig.DEFAULT_OPENAI_MODEL)
+                try:
+                    ModelParamWhitelist.get_openai_profile(model)
+                    self.use_openai = True
+                    logger.info(f"✅ OpenAI 初始化成功（模型: {model}）")
+                except ValueError as e:
+                    logger.error(f"❌ OpenAI 模型不在白名单中: {e}")
             else:
-                logger.warning("未配置 OPENAI_API_KEY，OpenAI 客户端未初始化")
+                logger.warning("未配置 OPENAI_API_KEY")
         except Exception as e:
-            logger.error(f"OpenAI客户端初始化失败: {str(e)}")
+            logger.error(f"❌ OpenAI 初始化失败: {e}")
 
-        # 检查Ollama服务是否可用
-        if self.check_ollama_service():
-            self.use_ollama = True
-            logger.info("Ollama服务可用")
-        else:
-            logger.warning("Ollama服务不可用")
-
-        # 如果两种LLM都不可用，发出警告
-        if not self.use_openai and not self.use_ollama:
-            logger.warning("OpenAI和Ollama服务都不可用，将无法使用LLM进行相似度计算")
-
-    def check_ollama_service(self) -> bool:
-        """检查Ollama服务是否可用"""
+    def _init_ollama(self) -> None:
+        """初始化 Ollama 连接（健康检查）"""
         try:
             response = requests.get(f"{settings.OLLAMA_BASE_URL}/tags", timeout=5)
-            return response.status_code == 200
+            if response.status_code == 200:
+                # 验证配置的模型在白名单中
+                model = getattr(settings, 'OLLAMA_SIMILARITY_MODEL', SimilarityConfig.DEFAULT_OLLAMA_MODEL)
+                try:
+                    ModelParamWhitelist.get_ollama_profile(model)
+                    self.use_ollama = True
+                    logger.info(f"✅ Ollama 可用（模型: {model}）")
+                except ValueError as e:
+                    logger.error(f"❌ Ollama 模型不在白名单中: {e}")
         except Exception as e:
-            logger.error(f"无法连接到Ollama服务: {str(e)}")
-            return False
+            logger.warning(f"⚠️ Ollama 不可用: {e}")
 
     def calculate_tag_similarity_with_llm(self, tag1: str, tag2: str) -> float:
         """
-        使用LLM计算两个标签之间的相似度
+        【核心方法】使用 LLM 计算两个标签的相似度
 
-        Args:
+        args：
             tag1: 第一个标签
             tag2: 第二个标签
 
         Returns:
-            相似度分数，范围0-1
+            相似度分数 [0.0, 1.0]
         """
-        # 处理None值
+        # 1. 快路径：处理空值和完全相同
         if tag1 is None or tag2 is None:
             return 0.0
 
-        # 如果标签完全相同，直接返回1.0
         if tag1.lower() == tag2.lower():
             return 1.0
 
-        # 如果一个标签是另一个的子字符串，给予较高相似度
         if tag1.lower() in tag2.lower() or tag2.lower() in tag1.lower():
             return 0.9
 
-        # 尝试使用Ollama（如果可用）
-        if self.use_ollama:
-            try:
-                similarity = self._calculate_similarity_with_ollama(tag1, tag2)
-                if similarity is not None:
-                    return similarity
-            except Exception as e:
-                logger.error(f"使用Ollama计算相似度失败: {str(e)}")
+        # 2. 生成审计追踪
+        trace_id = str(uuid.uuid4())[:8]
 
-        # 如果Ollama不可用或失败，尝试使用OpenAI（如果可用）
-        if self.use_openai:
-            try:
-                similarity = self._calculate_similarity_with_openai(tag1, tag2)
-                if similarity is not None:
-                    return similarity
-            except Exception as e:
-                logger.error(f"使用OpenAI计算相似度失败: {str(e)}")
-
-        # 如果LLM方法都失败，使用简单的字符串相似度计算
-        return self._calculate_string_similarity(tag1, tag2)
-
-    def _calculate_similarity_with_ollama(self, tag1: str, tag2: str) -> Optional[float]:
-        """使用Ollama计算标签相似度"""
-        prompt = f"""请判断以下两个标签的语义相似度，返回一个0到1之间的浮点数，其中1表示完全相同，0表示完全不相关。
-标签1: {tag1}
-标签2: {tag2}
-
-请只返回一个浮点数，不要有任何其他文字。例如: 0.75"""
-
+        # 3. 输入验证与清洗
         try:
+            tag1_clean, tag2_clean = InputValidationConfig.prepare_tag_pair(tag1, tag2)
+        except ValueError as e:
+            logger.warning(f"[{trace_id}] 输入验证失败: {e}")
+            return SimilarityConfig.DEFAULT_FALLBACK_SCORE_ON_ERROR or 0.0
+
+        # 4. 尝试 LLM 计算（带重试）
+        # 从配置获取重试次数，默认2次
+        max_retries = getattr(settings, 'SIMILARITY_MAX_RETRIES', 2)
+        score = self._calculate_with_retry(
+            trace_id=trace_id,
+            tag1=tag1_clean,
+            tag2=tag2_clean,
+            max_retries=max_retries,
+        )
+
+        return score
+
+    def _calculate_with_retry(self, trace_id: str, tag1: str, tag2: str, max_retries: int = 1) -> float:
+        """
+        带重试机制的 LLM 计算
+
+        流程（对每次重试）：
+        1. 尝试 Ollama（如果可用）
+        2. 失败则尝试 OpenAI（如果可用）
+
+        如果所有重试都失败，则降级处理。
+
+        Args:
+            max_retries: 最多重试次数（包括初次尝试）
+        """
+        import time
+
+        last_exception = None
+        call_start_time = time.time()
+
+        for attempt in range(max(1, max_retries)):  # 至少尝试1次
+            try:
+                audit_log = audit_logger.log_call_start(
+                    trace_id=trace_id,
+                    tag1=tag1,
+                    tag2=tag2,
+                    prompt_version=self.prompt_version,
+                    provider="ollama" if self.use_ollama else "openai",
+                    model=(
+                        getattr(settings, 'OLLAMA_SIMILARITY_MODEL', SimilarityConfig.DEFAULT_OLLAMA_MODEL)
+                        if self.use_ollama
+                        else getattr(settings, 'OPENAI_SIMILARITY_MODEL', SimilarityConfig.DEFAULT_OPENAI_MODEL)
+                    ),
+                )
+                audit_log.retry_count = attempt + 1  # 记录重试次数（从1开始：\"第1次尝试\"）
+
+                # 尝试 Ollama
+                if self.use_ollama:
+                    try:
+                        provider_start_time = time.perf_counter()
+                        result = self._calculate_similarity_with_ollama(trace_id, tag1, tag2)
+                        total_elapsed = (time.perf_counter() - provider_start_time) * 1000  # ms
+
+                        if result is not None:
+                            score, parse_elapsed = result  # 正确解包 (score, parse_elapsed)
+                            provider_latency = max(0.0, total_elapsed - parse_elapsed)  # 纯provider耗时，下限保护
+                            audit_logger.log_success(
+                                audit_log,
+                                score=score,
+                                score_raw=str(score),
+                                provider_latency_ms=provider_latency,
+                                parse_latency_ms=parse_elapsed,  # 传真实延迟
+                            )
+                            metrics.record_log(audit_log)
+                            return score
+                    except Exception as e:
+                        logger.debug(f"[{trace_id}] Ollama 失败（尝试 {attempt+1}/{max_retries}）: {e}")
+                        last_exception = e
+
+                # 尝试 OpenAI
+                if self.use_openai:
+                    try:
+                        provider_start_time = time.perf_counter()
+                        result = self._calculate_similarity_with_openai(trace_id, tag1, tag2)
+                        total_elapsed = (time.perf_counter() - provider_start_time) * 1000  # ms
+
+                        if result is not None:
+                            score, parse_elapsed = result  # 正确解包 (score, parse_elapsed)
+                            provider_latency = max(0.0, total_elapsed - parse_elapsed)  # 纯provider耗时，下限保护
+                            audit_logger.log_success(
+                                audit_log,
+                                score=score,
+                                score_raw=str(score),
+                                provider_latency_ms=provider_latency,
+                                parse_latency_ms=parse_elapsed,  # 传真实延迟
+                            )
+                            metrics.record_log(audit_log)
+                            return score
+                    except Exception as e:
+                        logger.debug(f"[{trace_id}] OpenAI 失败（尝试 {attempt+1}/{max_retries}）: {e}")
+                        last_exception = e
+
+                # 如果本次尝试失败，等待后重试
+                if attempt < max_retries - 1:
+                    time.sleep(0.5)  # 500ms 的退避延迟
+
+            except Exception as e:
+                logger.error(f"[{trace_id}] 重试循环内部错误: {e}")
+                last_exception = e
+
+        # 所有重试都失败，降级处理
+        total_elapsed = (time.time() - call_start_time) * 1000  # ms
+        logger.warning(f"[{trace_id}] LLM 计算失败（{max_retries} 次重试），使用降级值，总耗时 {total_elapsed:.0f}ms")
+        audit_log_final = audit_logger.log_call_start(
+            trace_id=trace_id,
+            tag1=tag1,
+            tag2=tag2,
+            prompt_version=self.prompt_version,
+            provider="fallback",
+            model="fallback",
+        )
+        audit_logger.log_fallback(
+            audit_log_final,
+            fallback_reason="llm_unavailable_after_retries",
+            fallback_score=SimilarityConfig.DEFAULT_FALLBACK_SCORE_ON_ERROR,
+        )
+        metrics.record_log(audit_log_final)
+        return SimilarityConfig.DEFAULT_FALLBACK_SCORE_ON_ERROR or 0.0
+
+    def _calculate_similarity_with_ollama(self, trace_id: str, tag1: str, tag2: str) -> Optional[Tuple[float, float]]:
+        """
+        使用 Ollama 本地模型计算相似度
+
+        返回: (score, parse_elapsed_ms) 元组，或 None 表示失败
+
+        【P0】使用版本化提示词，不允许硬编码
+        【P0】参数从白名单读取
+        """
+        try:
+            # 1. 从工厂获取版本化提示词（单一事实源）
+            prompt = TagSimilarityPromptFactory.get_ollama_prompt(tag1, tag2, self.prompt_version)
+
+            # 2. 获取参数白名单中的配置
+            model = getattr(settings, 'OLLAMA_SIMILARITY_MODEL', SimilarityConfig.DEFAULT_OLLAMA_MODEL)
+            profile = ModelParamWhitelist.get_ollama_profile(model)
+
+            # 3. 调用 Ollama 生成
+            start = time.time()
             response = requests.post(
                 f"{settings.OLLAMA_BASE_URL}/generate",
                 json={
-                    "model": settings.OLLAMA_MODEL,
+                    "model": model,
                     "prompt": prompt,
                     "stream": False,
-                    "options": build_ollama_options(temperature=0.1),
+                    "options": build_ollama_options(temperature=profile.temperature),
                 },
-                timeout=10,
+                timeout=profile.timeout_sec,
             )
+            elapsed_ms = (time.time() - start) * 1000
 
             if response.status_code != 200:
-                logger.error(f"Ollama API调用失败: {response.status_code} {response.text}")
+                logger.warning(f"[{trace_id}] Ollama API 错误: {response.status_code}")
                 return None
 
             response_text = sanitize_ollama_response_text(response.json().get("response", "")).strip()
 
-            # 尝试从响应中提取浮点数
-            match = re.search(r'(\d+\.\d+|\d+)', response_text)
-            if match:
-                similarity = float(match.group(1))
-                # 确保相似度在0-1范围内
-                similarity = max(0.0, min(1.0, similarity))
-                logger.info(f"Ollama计算的标签相似度: {similarity}")
-                return similarity
+            # 4. 使用统一解析器（禁止各自解析）
+            parse_start = time.time()
+            parse_result = SimilarityScoreParser.parse(response_text, self.prompt_version)
+            parse_elapsed = (time.time() - parse_start) * 1000
+
+            if parse_result.success:
+                logger.info(f"[{trace_id}] Ollama 计算成功: {parse_result.score}")
+                return (parse_result.score, parse_elapsed)  # 返回元组，包含parse时间
             else:
-                logger.warning(f"无法从Ollama响应中提取相似度: {response_text}")
+                logger.warning(f"[{trace_id}] 解析失败（{parse_result.error_type}）: {parse_result.error_message}")
                 return None
 
         except Exception as e:
-            logger.error(f"Ollama API请求异常: {str(e)}")
+            logger.error(f"[{trace_id}] Ollama 异常: {e}")
             return None
 
-    def _calculate_similarity_with_openai(self, tag1: str, tag2: str) -> Optional[float]:
-        """使用OpenAI计算标签相似度"""
+    def _calculate_similarity_with_openai(self, trace_id: str, tag1: str, tag2: str) -> Optional[Tuple[float, float]]:
+        """
+        使用 OpenAI 兼容 API 计算相似度
+
+        返回: (score, parse_elapsed_ms) 元组，或 None 表示失败
+
+        【P0】system 放规则，user 放输入（分离结构）
+        【P0】模型从白名单读取（配置化）
+        """
         if not self.openai_client:
             return None
 
-        prompt = f"""请判断以下两个标签的语义相似度，返回一个0到1之间的浮点数，其中1表示完全相同，0表示完全不相关。
-标签1: {tag1}
-标签2: {tag2}
-
-请只返回一个浮点数，不要有任何其他文字。例如: 0.75"""
-
         try:
+            # 1. 从工厂获取版本化提示词（system 和 user 分离）
+            system_prompt = TagSimilarityPromptFactory.get_system_prompt(self.prompt_version)
+            user_prompt = TagSimilarityPromptFactory.get_user_prompt(tag1, tag2, self.prompt_version)
+
+            # 2. 获取参数白名单中的配置
+            model = getattr(settings, 'OPENAI_SIMILARITY_MODEL', SimilarityConfig.DEFAULT_OPENAI_MODEL)
+            profile = ModelParamWhitelist.get_openai_profile(model)
+
+            # 3. 调用 OpenAI 兼容 API
+            start = time.time()
             response = self.openai_client.chat.completions.create(
-                model="qwen-max",  # 使用通义千问大模型
+                model=model,
                 messages=[
-                    {
-                        "role": "system",
-                        "content": "你是一个专业的语义相似度计算助手。你的任务是判断两个标签之间的语义相似度，并返回一个0到1之间的浮点数。",
-                    },
-                    {"role": "user", "content": prompt},
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.1,
-                max_tokens=10,
+                temperature=profile.temperature,
+                top_p=profile.top_p,
+                max_tokens=profile.max_tokens,
             )
+            elapsed_ms = (time.time() - start) * 1000
 
             response_text = response.choices[0].message.content.strip()
 
-            # 尝试从响应中提取浮点数
-            match = re.search(r'(\d+\.\d+|\d+)', response_text)
-            if match:
-                similarity = float(match.group(1))
-                # 确保相似度在0-1范围内
-                similarity = max(0.0, min(1.0, similarity))
-                logger.info(f"OpenAI计算的标签相似度: {similarity}")
-                return similarity
+            # 4. 使用统一解析器
+            parse_start = time.time()
+            parse_result = SimilarityScoreParser.parse(response_text, self.prompt_version)
+            parse_elapsed = (time.time() - parse_start) * 1000
+
+            if parse_result.success:
+                logger.info(f"[{trace_id}] OpenAI 计算成功: {parse_result.score}")
+                return (parse_result.score, parse_elapsed)  # 返回元组，包含parse时间
             else:
-                logger.warning(f"无法从OpenAI响应中提取相似度: {response_text}")
+                logger.warning(f"[{trace_id}] 解析失败（{parse_result.error_type}）: {parse_result.error_message}")
                 return None
 
         except Exception as e:
-            logger.error(f"OpenAI API请求异常: {str(e)}")
+            logger.error(f"[{trace_id}] OpenAI 异常: {e}")
             return None
 
     def _calculate_string_similarity(self, s1: str, s2: str) -> float:
-        """计算字符串相似度（Jaccard相似度）"""
+        """
+        降级方案：字符串相似度（Jaccard）
+
+        仅在 LLM 完全不可用时使用
+        """
         if not s1 or not s2:
             return 0.0
 
-        # 对于中文，按字符分割；对于英文，按词分割
-        if any('\u4e00' <= char <= '\u9fff' for char in s1 + s2):
+        # 中文按字分割，英文按词分割
+        if any('\u4e00' <= ch <= '\u9fff' for ch in s1 + s2):
             set1 = set(s1)
             set2 = set(s2)
         else:
@@ -207,150 +392,49 @@ class LLMSimilarityService:
 
         return intersection / union if union > 0 else 0.0
 
+    # ==================== 保留向后兼容接口 ====================
+
     def calculate_tag_sets_similarity_direct(self, tags1: List[str], tags2: List[str]) -> float:
         """
-        使用LLM直接计算两组标签之间的整体相似度
-
-        Args:
-            tags1: 第一组标签
-            tags2: 第二组标签
-
-        Returns:
-            相似度分数，范围0-1
+        直接计算两组标签整体相似度（保留接口）
         """
         if not tags1 or not tags2:
             return 0.0
 
-        # 如果标签组完全相同，直接返回1.0
         if set(tags1) == set(tags2):
             return 1.0
 
-        # 准备提示词
-        prompt = f"""请分析以下两组视频标签的相似度，返回一个0到1之间的数字，其中1表示完全相同，0表示完全不相关。
-
-第一组标签: {', '.join(tags1)}
-第二组标签: {', '.join(tags2)}
-
-只返回一个数字，不要解释。"""
-
-        # 尝试使用Ollama（如果可用）
-        if self.use_ollama:
-            try:
-                logger.info(f"使用Ollama计算标签组直接相似度: {tags1} vs {tags2}")
-                response = requests.post(
-                    f"{settings.OLLAMA_BASE_URL}/generate",
-                    json={
-                        "model": settings.OLLAMA_MODEL,
-                        "prompt": prompt,
-                        "stream": False,
-                        "options": build_ollama_options(),
-                    },
-                    timeout=30,
-                )
-
-                if response.status_code == 200:
-                    result = sanitize_ollama_response_text(response.json().get('response', '')).strip()
-                    # 提取数字
-                    match = re.search(r'\d+(\.\d+)?', result)
-                    if match:
-                        similarity = float(match.group(0))
-                        # 确保相似度在[0,1]范围内
-                        similarity = max(0.0, min(1.0, similarity))
-                        logger.info(f"标签组直接相似度结果: {similarity}")
-                        return similarity
-            except Exception as e:
-                logger.error(f"使用Ollama计算标签组直接相似度失败: {str(e)}")
-
-        # 如果Ollama不可用或失败，尝试使用OpenAI（如果可用）
-        if self.use_openai:
-            try:
-                logger.info(f"使用OpenAI计算标签组直接相似度: {tags1} vs {tags2}")
-                response = self.openai_client.chat.completions.create(
-                    model="qwen-max",
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "你是一个专门分析视频标签相似度的助手。请只返回一个0到1之间的数字。",
-                        },
-                        {"role": "user", "content": prompt},
-                    ],
-                    max_tokens=10,
-                )
-
-                result = response.choices[0].message.content.strip()
-                # 提取数字
-                match = re.search(r'\d+(\.\d+)?', result)
-                if match:
-                    similarity = float(match.group(0))
-                    # 确保相似度在[0,1]范围内
-                    similarity = max(0.0, min(1.0, similarity))
-                    logger.info(f"标签组直接相似度结果: {similarity}")
-                    return similarity
-            except Exception as e:
-                logger.error(f"使用OpenAI计算标签组直接相似度失败: {str(e)}")
-
-        # 如果直接计算失败，回退到原来的逻辑
-        logger.info("直接计算标签组相似度失败，回退到逻辑计算方式")
-        return self.calculate_tag_sets_similarity_logic(tags1, tags2)
-
-    def calculate_tag_sets_similarity_logic(self, tags1: List[str], tags2: List[str]) -> float:
-        """
-        使用逻辑计算两组标签之间的相似度（原方法）
-
-        Args:
-            tags1: 第一组标签
-            tags2: 第二组标签
-
-        Returns:
-            相似度分数，范围0-1
-        """
-        if not tags1 or not tags2:
-            return 0.0
-
-        # 计算最佳匹配的平均相似度
+        # 计算最佳匹配
         similarities = []
-
-        # 对于tags1中的每个标签，找到tags2中最相似的标签
         for tag1 in tags1:
-            best_similarity = max([self.calculate_tag_similarity_with_llm(tag1, tag2) for tag2 in tags2], default=0)
+            best_similarity = max(
+                [self.calculate_tag_similarity_with_llm(tag1, tag2) for tag2 in tags2],
+                default=0,
+            )
             similarities.append(best_similarity)
 
-        # 对于tags2中的每个标签，找到tags1中最相似的标签
         for tag2 in tags2:
-            best_similarity = max([self.calculate_tag_similarity_with_llm(tag2, tag1) for tag1 in tags1], default=0)
+            best_similarity = max(
+                [self.calculate_tag_similarity_with_llm(tag1, tag2) for tag1 in tags1],
+                default=0,
+            )
             similarities.append(best_similarity)
 
-        # 计算平均相似度
         return sum(similarities) / len(similarities) if similarities else 0.0
 
+    def calculate_tag_sets_similarity_logic(self, tags1: List[str], tags2: List[str]) -> float:
+        """逻辑计算标签组相似度（保留接口）"""
+        return self.calculate_tag_sets_similarity_direct(tags1, tags2)
+
     def calculate_tag_sets_similarity(self, tags1: List[str], tags2: List[str]) -> float:
-        """
-        计算两组标签之间的相似度
-
-        Args:
-            tags1: 第一组标签
-            tags2: 第二组标签
-
-        Returns:
-            相似度分数，范围0-1
-        """
-        # 首先尝试直接计算整体相似度，这样更快
+        """计算两组标签相似度（保留接口）"""
         return self.calculate_tag_sets_similarity_direct(tags1, tags2)
 
     def find_similar_videos(
         self, target_tags: List[str], all_videos: List[Dict[str, Any]], threshold: float = 0.7, limit: int = 5
     ) -> List[Dict[str, Any]]:
         """
-        查找与目标标签相似的视频
-
-        Args:
-            target_tags: 目标标签列表
-            all_videos: 所有视频数据
-            threshold: 相似度阈值，默认0.7
-            limit: 返回结果数量限制，默认5
-
-        Returns:
-            相似视频列表，按相似度降序排序
+        查找相似视频（保留接口）
         """
         if not target_tags or not all_videos:
             return []
@@ -368,26 +452,56 @@ class LLMSimilarityService:
                     else:
                         video_tags = video['tags']
                 except json.JSONDecodeError:
-                    logger.warning(f"视频 {video.get('id')} 的标签格式无效: {video.get('tags')}")
+                    logger.warning(f"视频标签格式无效: {video.get('tags')}")
                     continue
 
-            # 如果视频没有标签，跳过
             if not video_tags:
                 continue
 
             # 计算相似度
             similarity = self.calculate_tag_sets_similarity(target_tags, video_tags)
 
-            # 如果相似度超过阈值，添加到结果列表
             if similarity >= threshold:
                 similar_videos.append({'video': video, 'similarity': similarity})
 
-        # 按相似度降序排序
+        # 排序并限制
         similar_videos.sort(key=lambda x: x['similarity'], reverse=True)
-
-        # 限制返回数量
         return similar_videos[:limit]
 
+    # ==================== 诊断与监控接口 ====================
 
-# 创建全局实例
+    def get_metrics_for_day(self, date: str = None) -> Dict[str, Any]:
+        """获取指定日期的性能指标"""
+        return metrics.get_stats_for_day(date)
+
+    def check_score_drift(self, date: str = None, baseline: float = 0.5, threshold: float = 0.1) -> Dict[str, Any]:
+        """检测分值分布漂移"""
+        return metrics.check_drift(date, baseline, threshold)
+
+    def get_prompt_version(self) -> str:
+        """获取当前提示词版本"""
+        return self.prompt_version
+
+    def set_prompt_version(self, version: str) -> None:
+        """
+        切换提示词版本（支持灰度发布与回滚）
+
+        Args:
+            version: 新版本号 ("v1", "v2", ...)
+
+        Raises:
+            ValueError: 如果版本不存在
+        """
+        available = TagSimilarityPromptFactory.list_versions()
+        if version not in available:
+            raise ValueError(f"版本 '{version}' 不存在。可用: {available}")
+
+        old_version = self.prompt_version
+        self.prompt_version = version
+        logger.info(f"提示词版本从 {old_version} 切换为 {version}")
+
+
+# ============================================================================
+# 全局实例
+# ============================================================================
 llm_similarity_service = LLMSimilarityService()

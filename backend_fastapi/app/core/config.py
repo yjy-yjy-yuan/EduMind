@@ -98,6 +98,10 @@ class Settings(BaseSettings):
     SEARCH_CHUNK_OVERLAP: int = 5
     SEARCH_EMBEDDING_DIM: int = 768
     SEARCH_SIMILARITY_THRESHOLD: float = 0.5
+
+    # 标签相似度计算配置（LLM路径）
+    SIMILARITY_MAX_RETRIES: int = 2  # 标签相似度LLM计算最多重试次数
+    SIMILARITY_PROMPT_VERSION: str = "v2"  # 版本化提示词版本
     SEARCH_LOCAL_MODEL: str = "qwen8b"
     SEARCH_PREPROCESS: bool = True
     SEARCH_PREPROCESS_RESOLUTION: int = 480
