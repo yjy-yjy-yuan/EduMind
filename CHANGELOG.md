@@ -2,6 +2,27 @@
 
 ## 2026-04-10
 
+### 语义搜索后端韧性增强与无效视频清理对齐
+- **backend_fastapi**：`app/services/search/search.py` 新增 `SemanticSearchBackendUnavailableError`；当一次检索中“目标视频全部查询失败”时不再伪装成空结果，统一由路由返回 `503` 并提示先重建索引。
+- **backend_fastapi**：`app/services/search/store.py` 增加 Chroma 集合损坏探测与恢复（`_decode_seq_id` / `max_seqid` / `object of type 'int' has no len()` 等典型错误），并通过 `SEARCH_CHROMA_ANONYMIZED_TELEMETRY` 默认关闭匿名遥测噪声；新增 `app/services/search/chroma_telemetry.py` no-op 遥测适配器。
+- **backend_fastapi**：`app/tasks/vector_indexing.py` 支持“视频文件缺失但字幕可用”时的字幕降级索引，并统一索引失败错误信息为可观测结构。
+- **backend_fastapi**：当前运行库已清理历史不可恢复视频 `id=1/11/12` 及关联索引数据，避免继续出现在视频列表和检索候选中。
+- **docs**：`backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md` 更新到 2026-04-10，移除过时示例口径并同步上述行为说明。
+
+### Compounding 闭环 MVP（P1-3）— 轨迹导出与反馈管道
+- **backend_fastapi**：新增 `app/compounding`（`formats` 反馈 JSON schema、`sanitization` 脱敏裁剪、`quality` 质检标记、`export_service` 按日导出 JSONL/CSV、`report` 质量报告含 error_rate 与相似度 batch 统计摘要）。
+- **scripts**：`scripts/export_compounding_trajectories.py` 离线调度（**幂等**、**重试**、不走路由）。
+- **docs**：`docs/COMPOUNDING_FEEDBACK_MVP.md`（已完成/未完成能力边界）。
+- **tests**：`tests/unit/test_compounding_export.py`。
+- **validation**：`pytest tests/unit/test_compounding_export.py`；`black`/`isort`/`flake8`；`validate_backend_smoke.py`。
+
+### Compounding 闭环 MVP（P1-3）补强：配置化脱敏与质量校验增强
+- **backend_fastapi**：`app/compounding/sanitization.py` 新增 `default_sanitizer_config()`，脱敏盐与裁剪阈值改为优先读取 `Settings`（`COMPOUNDING_*`）；`search` 导出特征补充 `trace_id` 与 `trace_id_present`，为后续 search/similarity 跨域关联预留字段。
+- **backend_fastapi**：`app/compounding/export_service.py` 的日界计算显式为“UTC 语义的 naive 边界”，并在反馈质检前统一构建完整 `FeedbackRecordV1`（含 `meta.date_key`）再校验。
+- **backend_fastapi**：`app/compounding/quality.py` 的 `validate_feedback_dict()` 增强 `trace_id` 字段存在性与 `meta.date_key` 一致性检查。
+- **backend_fastapi**：`app/core/config.py` 新增 `COMPOUNDING_USER_ID_HASH_SALT`、`COMPOUNDING_QUERY_TEXT_MAX_CHARS`、`COMPOUNDING_TAG_MAX_CHARS`、`COMPOUNDING_ERROR_MESSAGE_MAX_CHARS`。
+- **tests/docs**：`tests/unit/test_compounding_export.py` 补充设置注入与质量校验用例；`docs/COMPOUNDING_FEEDBACK_MVP.md` 同步更新。
+
 ### 对「集中式遥测」测试条数口径的更正说明
 - **计数规则**：遥测专项以 `pytest tests/unit/test_analytics_*.py` 的实际 `collected` 为准；同日较早「14 项」「19 passed」等表述为历史快照。与 `test_similarity_analytics.py` 一并执行时，合计条数按两者当次 `collected` 相加，**一律以命令行输出为准**。
 - **tests**：补充 `duration_ms` 超过 **1e12** 时降级并写入 `parse_error` 的用例。

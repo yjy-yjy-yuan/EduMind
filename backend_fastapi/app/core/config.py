@@ -94,6 +94,7 @@ class Settings(BaseSettings):
     SEARCH_BACKEND: str = "gemini"
     SEARCH_GEMINI_API_KEY: Optional[str] = None
     SEARCH_CHROMA_DB_DIR: str = "./data/chroma"
+    SEARCH_CHROMA_ANONYMIZED_TELEMETRY: bool = False
     SEARCH_CHUNK_DURATION: int = 30
     SEARCH_CHUNK_OVERLAP: int = 5
     SEARCH_EMBEDDING_DIM: int = 768
@@ -132,6 +133,12 @@ class Settings(BaseSettings):
     ANALYTICS_ALERT_MIN_INTERVAL_SEC: float = 60.0
     # 未透传上游 trace_id 时写入事件的占位符（metadata.trace_id_source=missing）
     ANALYTICS_TRACE_ID_PLACEHOLDER: str = "unset"
+
+    # Compounding 导出脱敏配置（P1-3）
+    COMPOUNDING_USER_ID_HASH_SALT: str = "edumind_compounding_v1"
+    COMPOUNDING_QUERY_TEXT_MAX_CHARS: int = 200
+    COMPOUNDING_TAG_MAX_CHARS: int = 64
+    COMPOUNDING_ERROR_MESSAGE_MAX_CHARS: int = 120
 
     # 自适应切片配置
     SEARCH_ADAPTIVE_CHUNKING: bool = True  # 是否启用自适应切片

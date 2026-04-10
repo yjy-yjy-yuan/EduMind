@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 _SEARCH_TEXT_CLEAN_RE = re.compile(r"[^\w\u4e00-\u9fff]+")
 
 
+class SemanticSearchBackendUnavailableError(RuntimeError):
+    """语义搜索后端不可用（例如索引存储损坏或读取失败）。"""
+
+
 def _normalize_search_text(text: Optional[str]) -> str:
     """归一化文本，提升关键词重排稳定性。"""
     raw = str(text or "").strip().lower()
@@ -403,6 +407,8 @@ def semantic_search_videos(
         all_results = []
         chromadb_start_time = time.time()
         per_video_candidate_limit = max(limit * 4, 12)
+        failed_video_count = 0
+        first_failure_message: Optional[str] = None
         for video_id in video_ids:
             try:
                 # 构建集合名
@@ -449,7 +455,16 @@ def semantic_search_videos(
             except Exception as e:
                 logger.warning(f"Failed to search video {video_id}: {e}")
                 SearchEventLogger.log_search_failed(user_id=user_id, error_message=str(e), trace_id=trace_id)
+                failed_video_count += 1
+                if first_failure_message is None:
+                    first_failure_message = str(e)
                 continue
+
+        if failed_video_count == len(video_ids) and len(video_ids) > 0:
+            detail = first_failure_message or "unknown backend error"
+            raise SemanticSearchBackendUnavailableError(
+                f"All indexed videos failed during semantic search | videos={len(video_ids)} | detail={detail}"
+            )
 
         SearchEventLogger.log_chromadb_search_executed(
             videos_searched=len(video_ids),

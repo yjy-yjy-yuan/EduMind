@@ -12,6 +12,7 @@ from app.schemas.search import IndexingStatusResponse
 from app.schemas.search import SearchResultChunk
 from app.schemas.search import SemanticSearchRequest
 from app.schemas.search import SemanticSearchResponse
+from app.services.search.search import SemanticSearchBackendUnavailableError
 from app.services.search.search import semantic_search_videos
 from app.services.search.search_log import is_global_semantic_search_request
 from app.services.search.search_log import maybe_record_global_semantic_search
@@ -155,6 +156,12 @@ async def semantic_search(
             query=request.query,
             results=results,
             total_time_ms=elapsed_ms,
+        )
+    except SemanticSearchBackendUnavailableError as e:
+        logger.error("Semantic search backend unavailable for user %s: %s", current_user_id, e, exc_info=True)
+        raise HTTPException(
+            status_code=503,
+            detail="语义索引暂不可用，请在视频库重建索引后重试（可先触发“重建索引”）。",
         )
     except Exception as e:
         logger.error(f"Search failed for user {current_user_id}: {e}", exc_info=True)

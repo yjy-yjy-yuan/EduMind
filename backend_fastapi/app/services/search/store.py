@@ -2,6 +2,7 @@
 
 import hashlib
 import logging
+import os
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
@@ -10,6 +11,8 @@ from typing import List
 from typing import Optional
 
 import chromadb
+from app.core.config import settings
+from chromadb.config import Settings as ChromaClientSettings
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +52,20 @@ class EduMindStore:
         db_path = str(Path(db_path).resolve())
         Path(db_path).mkdir(parents=True, exist_ok=True)
 
-        self._client = chromadb.PersistentClient(path=db_path)
+        # 显式关闭匿名遥测，避免运行时 posthog 噪声日志干扰排障。
+        telemetry_enabled = bool(settings.SEARCH_CHROMA_ANONYMIZED_TELEMETRY)
+        os.environ["ANONYMIZED_TELEMETRY"] = "TRUE" if telemetry_enabled else "FALSE"
+        telemetry_impl = (
+            "chromadb.telemetry.product.posthog.Posthog"
+            if telemetry_enabled
+            else "app.services.search.chroma_telemetry.NoOpTelemetryClient"
+        )
+        client_settings = ChromaClientSettings(
+            anonymized_telemetry=telemetry_enabled,
+            chroma_product_telemetry_impl=telemetry_impl,
+            chroma_telemetry_impl=telemetry_impl,
+        )
+        self._client = chromadb.PersistentClient(path=db_path, settings=client_settings)
         self._backend = backend
         self._model = model
         self._collection_name = collection_name
@@ -60,12 +76,46 @@ class EduMindStore:
         }
         if model:
             metadata["embedding_model"] = model
+        self._collection_metadata = metadata
 
-        self._collection = self._client.get_or_create_collection(
-            name=collection_name,
-            metadata=metadata,
-        )
+        self._collection = self._get_or_recover_collection()
         logger.info(f"Initialized ChromaDB collection: {collection_name}")
+
+    @staticmethod
+    def _is_chroma_collection_corrupted(exc: BaseException) -> bool:
+        """
+        检测 Chroma SQLite 元数据损坏/版本不兼容导致的典型异常。
+
+        常见报错:
+        - TypeError: object of type 'int' has no len()
+        - _decode_seq_id / max_seqid 相关调用栈
+        """
+        text = str(exc).lower()
+        cause = str(exc.__cause__).lower() if exc.__cause__ else ""
+        stack = f"{text} {cause}"
+        if "object of type 'int' has no len()" in stack:
+            return True
+        return "_decode_seq_id" in stack or "max_seqid" in stack
+
+    def _recreate_collection(self) -> chromadb.Collection:
+        """删除并重建当前 collection（用于损坏自愈）。"""
+        try:
+            self._client.delete_collection(name=self._collection_name)
+            logger.warning("Deleted corrupted Chroma collection: %s", self._collection_name)
+        except Exception as delete_exc:  # noqa: BLE001
+            logger.warning("Failed to delete collection during recovery (%s): %s", self._collection_name, delete_exc)
+
+        return self._client.get_or_create_collection(name=self._collection_name, metadata=self._collection_metadata)
+
+    def _get_or_recover_collection(self) -> chromadb.Collection:
+        """初始化 collection；若检测到损坏则尝试一次恢复。"""
+        try:
+            return self._client.get_or_create_collection(name=self._collection_name, metadata=self._collection_metadata)
+        except Exception as exc:  # noqa: BLE001
+            if self._is_chroma_collection_corrupted(exc):
+                logger.error("Detected corrupted Chroma collection '%s', recreating...", self._collection_name)
+                return self._recreate_collection()
+            raise
 
     @property
     def collection(self) -> chromadb.Collection:
@@ -170,14 +220,22 @@ class EduMindStore:
         Returns:
             结果列表，包含 source_file, start_time, end_time, similarity_score
         """
-        count = self._collection.count()
-        if count == 0:
-            return []
+        try:
+            count = self._collection.count()
+            if count == 0:
+                return []
 
-        results = self._collection.query(
-            query_embeddings=[query_embedding],
-            n_results=min(n_results, count),
-        )
+            results = self._collection.query(
+                query_embeddings=[query_embedding],
+                n_results=min(n_results, count),
+            )
+        except Exception as exc:  # noqa: BLE001
+            if self._is_chroma_collection_corrupted(exc):
+                logger.error(
+                    "Chroma collection corrupted during search: %s. Requires re-index for this video.",
+                    self._collection_name,
+                )
+            raise
 
         hits = []
         for i in range(len(results["ids"][0])):
@@ -203,24 +261,54 @@ class EduMindStore:
 
     def is_indexed(self, source_file: str) -> bool:
         """检查文件是否已索引"""
-        results = self._collection.get(
-            where={"source_file": source_file},
-            limit=1,
-        )
-        return len(results["ids"]) > 0
+        try:
+            results = self._collection.get(
+                where={"source_file": source_file},
+                limit=1,
+            )
+            return len(results["ids"]) > 0
+        except Exception as exc:  # noqa: BLE001
+            if self._is_chroma_collection_corrupted(exc):
+                logger.error(
+                    "Chroma collection corrupted in is_indexed (%s). Recreating collection for recovery.",
+                    self._collection_name,
+                )
+                self._collection = self._recreate_collection()
+                return False
+            raise
 
     def remove_file(self, source_file: str) -> int:
         """删除文件的所有分片"""
-        results = self._collection.get(where={"source_file": source_file})
-        ids = results["ids"]
-        if ids:
-            self._collection.delete(ids=ids)
-            logger.info(f"Removed {len(ids)} chunks for {source_file}")
-        return len(ids)
+        try:
+            results = self._collection.get(where={"source_file": source_file})
+            ids = results["ids"]
+            if ids:
+                self._collection.delete(ids=ids)
+                logger.info(f"Removed {len(ids)} chunks for {source_file}")
+            return len(ids)
+        except Exception as exc:  # noqa: BLE001
+            if self._is_chroma_collection_corrupted(exc):
+                logger.error(
+                    "Chroma collection corrupted in remove_file (%s). Recreating collection.",
+                    self._collection_name,
+                )
+                self._collection = self._recreate_collection()
+                return 0
+            raise
 
     def get_chunk_count(self) -> int:
         """获取总分片数"""
-        return self._collection.count()
+        try:
+            return self._collection.count()
+        except Exception as exc:  # noqa: BLE001
+            if self._is_chroma_collection_corrupted(exc):
+                logger.error(
+                    "Chroma collection corrupted in get_chunk_count (%s). Recreating collection.",
+                    self._collection_name,
+                )
+                self._collection = self._recreate_collection()
+                return 0
+            raise
 
     def get_stats(self) -> dict:
         """获取统计信息"""
