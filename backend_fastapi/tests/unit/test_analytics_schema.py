@@ -1,5 +1,7 @@
 """AnalyticsEvent schema 校验。"""
 
+import math
+
 import pytest
 from app.analytics.schema import AnalyticsEvent
 from app.analytics.schema import AnalyticsStatus
@@ -62,4 +64,26 @@ class TestAnalyticsSchema:
             latency_ms=-1.0,
         )
         with pytest.raises(ValueError):
+            validate_analytics_event(ev)
+
+    def test_latency_nan_rejected(self):
+        ev = AnalyticsEvent(
+            event_type="ok_event",
+            trace_id="x",
+            module="search",
+            status=AnalyticsStatus.OK.value,
+            latency_ms=float("nan"),
+        )
+        with pytest.raises(ValueError, match="finite"):
+            validate_analytics_event(ev)
+
+    def test_latency_inf_rejected(self):
+        ev = AnalyticsEvent(
+            event_type="ok_event",
+            trace_id="x",
+            module="search",
+            status=AnalyticsStatus.OK.value,
+            latency_ms=math.inf,
+        )
+        with pytest.raises(ValueError, match="finite"):
             validate_analytics_event(ev)

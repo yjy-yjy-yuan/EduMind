@@ -2,12 +2,26 @@
 
 ## 2026-04-10
 
+### 对「集中式遥测」测试条数口径的更正说明
+- **计数规则**：遥测专项以 `pytest tests/unit/test_analytics_*.py` 的实际 `collected` 为准；同日较早「14 项」「19 passed」等表述为历史快照。与 `test_similarity_analytics.py` 一并执行时，合计条数按两者当次 `collected` 相加，**一律以命令行输出为准**。
+- **tests**：补充 `duration_ms` 超过 **1e12** 时降级并写入 `parse_error` 的用例。
+
+### 集中式遥测：duration 非有限值与负值统一降级（P0）
+- **backend_fastapi**：`_parse_duration_ms` 经 `_finalize_duration_value` 统一拒绝 nan/inf/负值/超上限，写入 `metadata.parse_error`，**不丢事件**；`validate_analytics_event` 对 `latency_ms` 增加 **`math.isfinite`** 校验。
+- **tests**：`duration_ms` 为 `'nan'`、`'inf'`、`'-1'` 及 schema 层 nan/inf 拒绝用例。
+
+### 集中式遥测管道改进（duration 容错 / 状态推断 / 告警节流 / trace 透传）
+- **backend_fastapi**：`legacy_search_dict_to_event` 对 `duration_ms` 容错解析，失败写入 `metadata.parse_error`，事件仍落库；`event` 名补充 **timeout / degraded / error** 等关键字映射。
+- **backend_fastapi**：`AnalyticsAlertEngine` 对 `failure_rate:<module>`、`timeout_or_slow:<module>` 做 **最小间隔节流**（`ANALYTICS_ALERT_MIN_INTERVAL_SEC`）。
+- **backend_fastapi**：未带 `trace_id` 时使用 **`ANALYTICS_TRACE_ID_PLACEHOLDER`**，并标注 `metadata.trace_id_source`；语义搜索 API 从 **`X-Trace-Id` / `X-Request-Id`** 透传至 `semantic_search_videos` 与相关 `SearchEventLogger` 调用。
+- **docs**：`ANALYTICS_PIPELINE_MIGRATION.md` 同步；**tests**：适配器与告警单测补充。
+
 ### 集中式遥测管道（P1-2）— `app.analytics`
 - **backend_fastapi**：新增 `app/analytics`（`schema` 统一字段、`pipeline` 写入入口、`alerting` 失败率/超时率/漂移提示、`adapters/search` 与 `adapters/similarity` 模块化映射）；配置项 `ANALYTICS_*` 控制日志级别与告警阈值。
 - **backend_fastapi**：`SearchEventLogger` 经 `emit_search_legacy_event` 写入管道；`SimilarityAuditLogger` 经 `emit_similarity_audit_event` 输出统一 JSON（原 `[START]/[SUCCESS]` 前缀行不再输出）；异常时 DEBUG 记录，不阻断主业务。
-- **tests**：新增 `test_analytics_schema.py`、`test_analytics_pipeline.py`、`test_analytics_alerting.py`、`test_analytics_adapters.py`（共 14 项）覆盖 schema 校验、写入级别、告警与适配器映射。
+- **tests**：新增 `test_analytics_schema.py`、`test_analytics_pipeline.py`、`test_analytics_alerting.py`、`test_analytics_adapters.py`（初版 14 项；**当前遥测四文件合计以 `pytest tests/unit/test_analytics_*.py` 收集为准**，见同日 **「对『集中式遥测』测试条数口径的更正说明」**）。
 - **docs**：新增 `docs/ANALYTICS_PIPELINE_MIGRATION.md`（旧入口→新入口映射、迁移清单、残留风险）。
-- **validation**：`pytest` 上述 14 项 + `test_similarity_analytics.py`；`black` / `isort` / `flake8`（pre-commit）对变更文件通过。
+- **validation**：`pytest` 遥测四文件 + `test_similarity_analytics.py`；`black` / `isort` / `flake8`（pre-commit）对变更文件通过。
 
 > **读数先看这里（避免误读旧条目）**：同日期内凡出现「**12 个索引**」「**16 个测试**」「**16/16**」「**80/80**」等字样的**较早小节**，数字与迁移细节均已由下方 **「对同日『相似度审计日志持久化（P1-1）』记录的口径更正说明」** 取代；**一律以该更正小节为准**，较早小节正文保留不改，仅作变更考古。
 

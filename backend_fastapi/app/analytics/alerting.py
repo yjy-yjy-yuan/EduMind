@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import time
 from collections import deque
 from dataclasses import dataclass
 from typing import Deque
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -32,20 +34,35 @@ def default_thresholds() -> AlertingThresholds:
 class AnalyticsAlertEngine:
     """
     轻量滑动窗口：按 (module, status, latency_ms) 观察，触发可读告警字符串。
-    不依赖外部存储；仅进程内近似。
+    不依赖外部存储；仅进程内近似。同键告警受最小间隔节流，避免高流量重复 WARNING。
     """
 
     def __init__(
         self,
         thresholds: Optional[AlertingThresholds] = None,
         window_size: int = 500,
+        min_interval_sec: Optional[float] = None,
     ):
         self.thresholds = thresholds or default_thresholds()
         self._window_size = max(50, window_size)
         self._rows: Deque[Tuple[str, str, Optional[float]]] = deque(maxlen=self._window_size)
+        self._min_interval = float(
+            min_interval_sec
+            if min_interval_sec is not None
+            else getattr(settings, "ANALYTICS_ALERT_MIN_INTERVAL_SEC", 60.0)
+        )
+        self._last_alert_at: Dict[str, float] = {}
 
     def observe(self, module: str, status: str, latency_ms: Optional[float]) -> None:
         self._rows.append((module, status, latency_ms))
+
+    def _append_throttled(self, key: str, message: str, alerts: List[str]) -> None:
+        now = time.monotonic()
+        last = self._last_alert_at.get(key)
+        if last is not None and (now - last) < self._min_interval:
+            return
+        self._last_alert_at[key] = now
+        alerts.append(message)
 
     def evaluate_rates(self, module: str) -> List[str]:
         """对指定 module 计算失败率 / 超时率告警。"""
@@ -61,17 +78,21 @@ class AnalyticsAlertEngine:
 
         fail_rate = fail / n
         if fail_rate > self.thresholds.max_failure_rate:
-            alerts.append(
+            self._append_throttled(
+                f"failure_rate:{module}",
                 f"analytics_alert failure_rate module={module} rate={fail_rate:.3f} "
-                f"threshold={self.thresholds.max_failure_rate:.3f} window={n}"
+                f"threshold={self.thresholds.max_failure_rate:.3f} window={n}",
+                alerts,
             )
 
         timeout_rate = max(to / n, slow / n)
         if timeout_rate > self.thresholds.max_timeout_rate:
-            alerts.append(
+            self._append_throttled(
+                f"timeout_or_slow:{module}",
                 f"analytics_alert timeout_or_slow module={module} rate={timeout_rate:.3f} "
                 f"threshold={self.thresholds.max_timeout_rate:.3f} latency_cap_ms="
-                f"{self.thresholds.latency_timeout_ms:.0f} window={n}"
+                f"{self.thresholds.latency_timeout_ms:.0f} window={n}",
+                alerts,
             )
 
         return alerts

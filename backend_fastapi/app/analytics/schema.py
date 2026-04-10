@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import asdict
 from dataclasses import dataclass
@@ -75,5 +76,8 @@ def validate_analytics_event(event: AnalyticsEvent) -> None:
     allowed = {s.value for s in AnalyticsStatus}
     if event.status not in allowed:
         raise ValueError(f"invalid status: {event.status!r}, expected one of {sorted(allowed)}")
-    if event.latency_ms is not None and (event.latency_ms < 0 or event.latency_ms > 1e12):
-        raise ValueError("latency_ms out of range")
+    if event.latency_ms is not None:
+        if not math.isfinite(event.latency_ms):
+            raise ValueError("latency_ms must be finite")
+        if event.latency_ms < 0 or event.latency_ms > 1e12:
+            raise ValueError("latency_ms out of range")

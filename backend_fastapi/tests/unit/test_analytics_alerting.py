@@ -14,11 +14,30 @@ class TestAnalyticsAlerting:
                 drift_relative_threshold=0.1,
             ),
             window_size=50,
+            min_interval_sec=0.0,
         )
         for i in range(25):
             eng.observe("search", "error" if i < 15 else "ok", 10.0)
         msgs = eng.evaluate_rates("search")
         assert msgs and any("failure_rate" in m for m in msgs)
+
+    def test_rate_alerts_throttled_on_second_evaluate(self):
+        eng = AnalyticsAlertEngine(
+            thresholds=AlertingThresholds(
+                max_failure_rate=0.2,
+                max_timeout_rate=0.5,
+                latency_timeout_ms=1000.0,
+                drift_relative_threshold=0.1,
+            ),
+            window_size=50,
+            min_interval_sec=3600.0,
+        )
+        for i in range(25):
+            eng.observe("search", "error" if i < 15 else "ok", 10.0)
+        msgs1 = eng.evaluate_rates("search")
+        msgs2 = eng.evaluate_rates("search")
+        assert msgs1
+        assert msgs2 == []
 
     def test_drift_report_message(self):
         rep = {

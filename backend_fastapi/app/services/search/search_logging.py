@@ -23,21 +23,27 @@ class SearchEventLogger:
 
     @staticmethod
     def log_search_request(
-        user_id: int, query_text: str, video_ids: Optional[list] = None, threshold: float = 0.5, limit: int = 20
+        user_id: int,
+        query_text: str,
+        video_ids: Optional[list] = None,
+        threshold: float = 0.5,
+        limit: int = 20,
+        trace_id: Optional[str] = None,
     ) -> None:
-        """记录搜索请求入口"""
-        SearchEventLogger._log_event(
-            {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "event": "search_request_received",
-                "user_id": user_id,
-                "query_length": len(query_text),
-                "video_count": len(video_ids) if video_ids else 0,
-                "threshold": threshold,
-                "limit": limit,
-                "search_scope": "single_video" if video_ids else "all_videos",
-            }
-        )
+        """记录搜索请求入口（建议透传上游 X-Trace-Id）。"""
+        payload = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "event": "search_request_received",
+            "user_id": user_id,
+            "query_length": len(query_text),
+            "video_count": len(video_ids) if video_ids else 0,
+            "threshold": threshold,
+            "limit": limit,
+            "search_scope": "single_video" if video_ids else "all_videos",
+        }
+        if trace_id:
+            payload["trace_id"] = trace_id[:128]
+        SearchEventLogger._log_event(payload)
 
     @staticmethod
     def log_adaptive_chunking_selected(
@@ -118,42 +124,48 @@ class SearchEventLogger:
         result_count: int,
         duration_ms: float,
         max_similarity: Optional[float] = None,
+        trace_id: Optional[str] = None,
     ) -> None:
         """记录搜索完成"""
-        SearchEventLogger._log_event(
-            {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "event": "search_completed",
-                "user_id": user_id,
-                "query_length": len(query_text),
-                "video_count": video_count,
-                "result_count": result_count,
-                "duration_ms": round(duration_ms, 1),
-                "max_similarity": round(max_similarity, 3) if max_similarity else None,
-            }
-        )
+        payload = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "event": "search_completed",
+            "user_id": user_id,
+            "query_length": len(query_text),
+            "video_count": video_count,
+            "result_count": result_count,
+            "duration_ms": round(duration_ms, 1),
+            "max_similarity": round(max_similarity, 3) if max_similarity else None,
+        }
+        if trace_id:
+            payload["trace_id"] = trace_id[:128]
+        SearchEventLogger._log_event(payload)
 
     @staticmethod
-    def log_search_failed(user_id: int, error_message: str) -> None:
+    def log_search_failed(user_id: int, error_message: str, trace_id: Optional[str] = None) -> None:
         """记录搜索失败"""
-        SearchEventLogger._log_event(
-            {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "event": "search_failed",
-                "user_id": user_id,
-                "error_message": str(error_message)[:200],
-            }
-        )
+        payload = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "event": "search_failed",
+            "user_id": user_id,
+            "error_message": str(error_message)[:200],
+        }
+        if trace_id:
+            payload["trace_id"] = trace_id[:128]
+        SearchEventLogger._log_event(payload)
 
     @staticmethod
-    def log_chromadb_search_executed(videos_searched: int, results_found: int, duration_ms: float) -> None:
+    def log_chromadb_search_executed(
+        videos_searched: int, results_found: int, duration_ms: float, trace_id: Optional[str] = None
+    ) -> None:
         """记录 ChromaDB 搜索执行"""
-        SearchEventLogger._log_event(
-            {
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "event": "chromadb_search_executed",
-                "videos_searched": videos_searched,
-                "results_found": results_found,
-                "duration_ms": round(duration_ms, 1),
-            }
-        )
+        payload = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "event": "chromadb_search_executed",
+            "videos_searched": videos_searched,
+            "results_found": results_found,
+            "duration_ms": round(duration_ms, 1),
+        }
+        if trace_id:
+            payload["trace_id"] = trace_id[:128]
+        SearchEventLogger._log_event(payload)

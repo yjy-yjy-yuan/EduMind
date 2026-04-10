@@ -58,6 +58,7 @@ def verify_user_video_access(user_id: int, video_id: int, db: Session) -> Video:
 
 @router.post("/semantic/search")
 async def semantic_search(
+    http_request: Request,
     request: SemanticSearchRequest,
     db: Session = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
@@ -79,6 +80,9 @@ async def semantic_search(
         raise HTTPException(status_code=400, detail="查询内容不能为空")
     if len(request.query) > 500:
         raise HTTPException(status_code=400, detail="查询内容过长（最多 500 字符）")
+
+    trace_header = http_request.headers.get("X-Trace-Id") or http_request.headers.get("X-Request-Id")
+    trace_id = trace_header.strip()[:128] if trace_header and trace_header.strip() else None
 
     is_global_request = is_global_semantic_search_request(request.video_ids)
     query_stripped = request.query.strip()
@@ -130,6 +134,7 @@ async def semantic_search(
             limit=request.limit,
             threshold=request.threshold,
             db=db,
+            trace_id=trace_id,
         )
 
         elapsed_ms = int((time.time() - start_time) * 1000)
