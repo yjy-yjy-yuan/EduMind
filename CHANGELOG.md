@@ -2,6 +2,24 @@
 
 ## 2026-04-11
 
+### 智能体编排：学习流治理管道与预算硬限流
+- **backend_fastapi**：新增 `app/agents/` 编排域模块：`learning_flow_pipeline` 固定 Planner → Executor → Validator；`governance/gateway.py` 作为学习流唯一工具执行入口，`lf_*` 白名单与参数校验落地，异常统一归一为治理错误。
+- **backend_fastapi**：`TokenBudget` 增加超额中断能力，预算不足时抛出 `BudgetExceededError`（继承 `GovernanceError`）；`/api/agent/execute` 统一把治理错误映射为 HTTP 400，返回结构保持稳定。
+- **backend_fastapi**：`learning_flow_agent.execute_learning_flow_agent` 收敛为薄委托编排入口，写库与摘要副作用只经治理工具执行，减少路由/服务散落副作用。
+- **tests**：新增 `backend_fastapi/tests/unit/test_agent_budget.py`、`backend_fastapi/tests/unit/test_agent_governance_gateway.py`；`backend_fastapi/tests/api/test_agent_api.py` 增补 `pipeline_meta` 与治理错误回归。
+- **docs**：`docs/PROJECT_AGENT_ORCHESTRATION_PROMPT.md` 第七节补充阶段性落地状态与边界。
+
+### 视频推荐：鉴权隔离与 import-external 负向回归补齐
+- **backend_fastapi**：`resolve_user_from_request` 默认仅信任 Bearer；仅在 `AUTH_ALLOW_LEGACY_USER_ID_ONLY=True` 且请求未携带 Bearer 时允许 legacy `user_id`，避免无效 Bearer 回退造成冒用。
+- **backend_fastapi**：链接导入与上传链路按用户隔离：远程 URL 去重按 `url + user_id`，本地上传 MD5 去重按 `md5 + user_id`，离线同步命中按 `task_id + user_id + processing_origin`。
+- **backend_fastapi**：推荐遥测补强：`/api/recommendations/scenes` 发射 `recommendation_scenes_served`（含 `scene_count`）；`recommendation_import_external_requested.metadata.url_host` 使用真实 hostname。
+- **tests**：`backend_fastapi/tests/api/test_recommendation_api.py` 新增 `import-external` 负向 API 用例：`AUTH_ALLOW_LEGACY_USER_ID_ONLY=True + Authorization: Bearer <invalid> + user_id` 必须返回 401；并补齐 scenes/url_host 遥测断言。
+- **tests**：`backend_fastapi/tests/api/test_video_api.py` 与 `backend_fastapi/tests/unit/test_auth_deps.py` 同步 Bearer/legacy 规则与跨用户去重回归。
+
+### 移动推荐页可访问性与 iOS WebAssets 同步
+- **mobile-frontend**：`Recommendations.vue` 增加移动端基础可访问性语义：主区域 `role="main"`、错误态 `role="alert"`、加载态 `aria-busy/aria-live`、空态 `role="status"`。
+- **ios-app**：同步 `ios-app/EduMindIOS/EduMindIOS/WebAssets/` 产物，确保 `WKWebView` 运行时与最新推荐页交互一致。
+
 ### 视频推荐：契约 v1 对齐（contract_version、Trace、telemetry）
 - **backend_fastapi**：`VideoRecommendationResponse` 增加 `contract_version`；`recommend_videos` 写入 `settings.RECOMMENDATION_CONTRACT_VERSION`；`/api/recommendations/scenes|videos|import-external` 回传 `X-Trace-Id`/`X-Request-Id`（支持上游透传）；`RECOMMENDATION_TELEMETRY_ENABLED` 为真时通过 `app.analytics.telemetry` 发射推荐域事件（请求、排序完成、站外抓取、fallback、import 等）。
 - **backend_fastapi**：`Settings` 新增 `RECOMMENDATION_CONTRACT_VERSION`、`RECOMMENDATION_TELEMETRY_ENABLED`；CORS `expose_headers` 暴露 trace 响应头。

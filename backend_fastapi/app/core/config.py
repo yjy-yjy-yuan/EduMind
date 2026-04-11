@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # 认证 token（HMAC，与 app/utils/auth_token.py 一致）
     AUTH_TOKEN_TTL_SECONDS: int = 604800  # 默认 7 天
     AUTH_TOKEN_CLOCK_SKEW_SECONDS: int = 120  # 校验过期时允许的时钟偏差（秒）
+    # 为 True 时允许仅凭 query/body 的 user_id 识别用户（迁移/联调）；生产环境应为 False，仅信任 Bearer
+    AUTH_ALLOW_LEGACY_USER_ID_ONLY: bool = False
+    # 智能体编排：学习流 token 预算（估算）、治理审计开关
+    AGENT_LEARNING_FLOW_TOKEN_BUDGET: int = 8000
+    AGENT_GOVERNANCE_AUDIT_ENABLED: bool = True
     AUTO_CREATE_TABLES: bool = False
     BACKGROUND_TASK_EXECUTOR: str = "auto"
     BACKGROUND_TASK_WORKERS: int = 2

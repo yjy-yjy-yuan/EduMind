@@ -74,6 +74,7 @@ class OfflineTranscriptSegment(BaseModel):
 class OfflineTranscriptSyncRequest(BaseModel):
     """本地离线转录结果同步到 videos 表"""
 
+    user_id: Optional[int] = Field(default=None, description="关联用户 ID；也可通过 Bearer 解析")
     task_id: str = Field(..., description="本地离线任务 ID")
     file_name: str = Field(default="本地视频", description="本地视频文件名")
     file_ext: str = Field(default="", description="本地视频扩展名")

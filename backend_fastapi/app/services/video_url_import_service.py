@@ -81,11 +81,15 @@ def detect_remote_video_source(video_url: str) -> tuple[str, str]:
     raise HTTPException(status_code=400, detail="目前仅支持B站、YouTube和中国大学慕课视频")
 
 
-def find_existing_remote_video(db: Session, video_url: str) -> Optional[Video]:
-    """查找同 URL 的现有视频记录。"""
+def find_existing_remote_video(db: Session, video_url: str, user_id: int) -> Optional[Video]:
+    """查找当前用户下同 URL 的现有视频记录（跨用户不复用）。"""
     return (
         db.query(Video)
-        .filter(Video.url == video_url, Video.status != VideoStatus.FAILED)
+        .filter(
+            Video.url == video_url,
+            Video.user_id == user_id,
+            Video.status != VideoStatus.FAILED,
+        )
         .order_by(Video.upload_time.desc())
         .first()
     )
@@ -94,6 +98,7 @@ def find_existing_remote_video(db: Session, video_url: str) -> Optional[Video]:
 def create_remote_video_record(
     db: Session,
     *,
+    user_id: int,
     video_url: str,
     placeholder_title: str,
     preferred_title: str = "",
@@ -105,6 +110,7 @@ def create_remote_video_record(
     record_summary = str(preferred_summary or "").strip() or None
     record_tags = normalize_prefilled_tags(title=record_title, summary=record_summary or "", tags=preferred_tags)
     video = Video(
+        user_id=user_id,
         title=record_title,
         url=video_url,
         status=VideoStatus.DOWNLOADING,
@@ -155,6 +161,7 @@ def mark_remote_video_submit_failed(db: Session, video: Video, error_message: st
 def import_remote_video_from_url(
     db: Session,
     *,
+    user_id: int,
     video_url: str,
     process_options: dict,
     preferred_title: str = "",
@@ -165,7 +172,7 @@ def import_remote_video_from_url(
     """通过共享导入链路提交远程视频下载并入库。"""
     normalized_url = str(video_url or "").strip()
     source_type, placeholder_title = detect_remote_video_source(normalized_url)
-    existing_video = find_existing_remote_video(db, normalized_url)
+    existing_video = find_existing_remote_video(db, normalized_url, user_id)
     if existing_video:
         status = existing_video.status.value if hasattr(existing_video.status, "value") else str(existing_video.status)
         return VideoURLImportResult(
@@ -177,6 +184,7 @@ def import_remote_video_from_url(
 
     video = create_remote_video_record(
         db,
+        user_id=user_id,
         video_url=normalized_url,
         placeholder_title=placeholder_title,
         preferred_title=preferred_title,

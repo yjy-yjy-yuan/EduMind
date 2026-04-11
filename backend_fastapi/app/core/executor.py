@@ -64,7 +64,7 @@ def shutdown_executor():
     with _executor_lock:
         if _executor is not None:
             _executor.shutdown(wait=False)
-            logger.info("后台执行器已关闭 | type=%s", _executor_kind or "unknown")
+            # 不在此处写日志：atexit/pytest 收尾时 stderr 可能已关闭，logging 会打出 Logging error 噪声
             _executor = None
             _executor_kind = None
             _running_tasks.clear()

@@ -1,5 +1,5 @@
 <template>
-  <div class="ios-page recommendations-page">
+  <div class="ios-page recommendations-page" role="main" aria-label="推荐学习中枢">
     <header class="hero ios-card">
       <div class="hero__copy">
         <p class="hero__eyebrow">Recommendation Hub</p>
@@ -31,7 +31,7 @@
         </div>
         <span class="pill">{{ activeSceneOption.label }}</span>
       </div>
-      <div v-if="pageError" class="message message--error">
+      <div v-if="pageError" class="message message--error" role="alert">
         <span>{{ pageError }}</span>
         <button type="button" class="panel-link" @click="reloadAll">重试</button>
       </div>
@@ -82,14 +82,19 @@
       <div v-if="filteredSceneExternalCount > 0" class="message message--hint">
         当前场景里含 {{ filteredSceneExternalCount }} 条站外候选。点击后会继续走导入学习，不会直接当作站内视频播放。
       </div>
-      <div v-if="activeSceneError" class="message message--error">
+      <div v-if="activeSceneError" class="message message--error" role="alert">
         <span>{{ activeSceneError }}</span>
         <button type="button" class="panel-link" @click="refreshActiveScene">重试</button>
       </div>
-      <div v-else-if="activeSceneLoading && filteredSceneItems.length === 0" class="skeleton-list">
+      <div
+        v-else-if="activeSceneLoading && filteredSceneItems.length === 0"
+        class="skeleton-list"
+        aria-busy="true"
+        aria-live="polite"
+      >
         <div v-for="index in 3" :key="`scene-skeleton-${index}`" class="skeleton-card"></div>
       </div>
-      <div v-else-if="filteredSceneItems.length === 0" class="message">
+      <div v-else-if="filteredSceneItems.length === 0" class="message" role="status">
         {{ selectedTag ? `当前场景下暂时没有命中“${selectedTag}”的推荐。` : '当前场景还没有可展示的推荐项。' }}
       </div>
       <div v-else class="card-list">

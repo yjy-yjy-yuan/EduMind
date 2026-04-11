@@ -3,13 +3,13 @@
 import time
 import uuid
 from typing import Optional
+from urllib.parse import urlparse
 
 from app.analytics.pipeline import get_telemetry
 from app.analytics.schema import AnalyticsEvent
 from app.analytics.schema import AnalyticsStatus
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.user import User
 from app.models.video import Video
 from app.schemas.recommendation import RecommendationSceneListResponse
 from app.schemas.recommendation import VideoRecommendationResponse
@@ -23,8 +23,7 @@ from app.services.video_recommendation_service import load_candidate_videos_for_
 from app.services.video_recommendation_service import normalize_scene
 from app.services.video_recommendation_service import recommend_videos
 from app.services.video_url_import_service import import_remote_video_from_url
-from app.utils.auth_token import parse_auth_token
-from app.utils.auth_token import parse_bearer_token
+from app.utils.auth_deps import resolve_user_from_request
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import Header
@@ -85,13 +84,13 @@ def parse_exclude_ids(raw_value: Optional[str]) -> set[int]:
     return values
 
 
-def resolve_user_from_request(db: Session, user_id: Optional[int], authorization: Optional[str]) -> Optional[User]:
-    """优先从 Bearer token 解析用户，兼容旧 query 参数。"""
-    token = parse_bearer_token(authorization)
-    resolved_user_id = parse_auth_token(token) or user_id
-    if not resolved_user_id:
-        return None
-    return db.query(User).filter(User.id == resolved_user_id).first()
+def _url_host(url: str) -> str:
+    """Extract hostname for telemetry (not a truncated URL)."""
+    try:
+        host = urlparse(url or "").hostname or ""
+    except ValueError:
+        host = ""
+    return (host or "")[:120]
 
 
 @router.get("/scenes", response_model=RecommendationSceneListResponse)
@@ -99,7 +98,17 @@ async def get_recommendation_scenes(request: Request, response: Response):
     """返回前端可直接渲染的推荐场景配置。"""
     trace_id = _resolve_trace_id(request)
     _attach_trace_headers(response, trace_id)
-    return {"message": "获取推荐场景成功", "scenes": list_recommendation_scenes()}
+    t0 = time.perf_counter()
+    scenes = list_recommendation_scenes()
+    latency_ms = (time.perf_counter() - t0) * 1000.0
+    _emit_recommendation_event(
+        trace_id=trace_id,
+        event_type="recommendation_scenes_served",
+        status=AnalyticsStatus.OK.value,
+        latency_ms=latency_ms,
+        metadata={"scene_count": len(scenes)},
+    )
+    return {"message": "获取推荐场景成功", "scenes": scenes}
 
 
 @router.get("/videos", response_model=VideoRecommendationResponse)
@@ -207,17 +216,22 @@ async def import_external_recommendation(
     request: Request,
     response: Response,
     data: VideoUploadURL,
+    user_id: Optional[int] = Query(default=None, description="兼容旧链路的用户 ID"),
+    authorization: Optional[str] = Header(default=None),
     db: Session = Depends(get_db),
 ):
     """将推荐页中的站外候选直接提交到现有链接下载入库链路。"""
     trace_id = _resolve_trace_id(request)
     _attach_trace_headers(response, trace_id)
     t0 = time.perf_counter()
+    user = resolve_user_from_request(db, user_id, authorization)
+    if user is None:
+        raise HTTPException(status_code=401, detail="请先登录后再导入站外视频")
     _emit_recommendation_event(
         trace_id=trace_id,
         event_type="recommendation_import_external_requested",
         status=AnalyticsStatus.STARTED.value,
-        metadata={"url_host": (data.url or "")[:120]},
+        metadata={"url_host": _url_host(data.url or "")},
     )
     process_options = build_processing_options(
         language=data.language,
@@ -229,6 +243,7 @@ async def import_external_recommendation(
     try:
         result = import_remote_video_from_url(
             db,
+            user_id=user.id,
             video_url=data.url,
             process_options=process_options,
             preferred_title=data.title,

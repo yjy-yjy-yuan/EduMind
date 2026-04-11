@@ -1,5 +1,8 @@
 """API 测试 - 推荐接口。"""
 
+import json
+import logging
+
 import pytest
 from app.services import video_recommendation_service as recommendation_service
 from app.services.external_candidate_service import ExternalCandidate
@@ -81,6 +84,7 @@ class TestRecommendationAPI:
         db.commit()
 
         processing_video = Video(
+            user_id=sample_user.id,
             title="导数应用串讲",
             filename="processing.mp4",
             filepath="/tmp/processing.mp4",
@@ -91,6 +95,7 @@ class TestRecommendationAPI:
             tags='["导数","真题"]',
         )
         completed_video = Video(
+            user_id=sample_user.id,
             title="英语写作结构梳理",
             filename="english.mp4",
             filepath="/tmp/english.mp4",
@@ -101,6 +106,7 @@ class TestRecommendationAPI:
             tags='["英语","写作"]',
         )
         related_interest_video = Video(
+            user_id=sample_user.id,
             title="函数极限与导数复盘",
             filename="math-review.mp4",
             filepath="/tmp/math-review.mp4",
@@ -136,12 +142,13 @@ class TestRecommendationAPI:
         assert response.status_code == 422
         assert response.json()["detail"] == "scene=related 时必须传入 seed_video_id"
 
-    def test_related_recommendations_rank_overlap_video_first(self, client, db):
+    def test_related_recommendations_rank_overlap_video_first(self, client, db, sample_user):
         """相关推荐优先返回与 seed 视频主题重合度更高的视频。"""
         from app.models.video import Video
         from app.models.video import VideoStatus
 
         seed_video = Video(
+            user_id=sample_user.id,
             title="导数与单调性",
             filename="seed.mp4",
             filepath="/tmp/seed.mp4",
@@ -152,6 +159,7 @@ class TestRecommendationAPI:
             tags='["导数","单调性","函数"]',
         )
         best_match = Video(
+            user_id=sample_user.id,
             title="函数单调性题型精讲",
             filename="best-match.mp4",
             filepath="/tmp/best-match.mp4",
@@ -162,6 +170,7 @@ class TestRecommendationAPI:
             tags='["导数","函数","题型"]',
         )
         other_video = Video(
+            user_id=sample_user.id,
             title="英语听力技巧",
             filename="english-listening.mp4",
             filepath="/tmp/english-listening.mp4",
@@ -188,12 +197,13 @@ class TestRecommendationAPI:
         assert payload["items"][0]["tags"][0] == "数学"
         assert all(item["id"] != seed_video.id for item in payload["items"])
 
-    def test_related_recommendations_infer_subject_from_title_only(self, client, db):
+    def test_related_recommendations_infer_subject_from_title_only(self, client, db, sample_user):
         """即使原始标签为空，相关推荐也应能根据科目归一返回同科目内容。"""
         from app.models.video import Video
         from app.models.video import VideoStatus
 
         seed_video = Video(
+            user_id=sample_user.id,
             title="牛顿第二定律串讲",
             filename="seed-physics.mp4",
             filepath="/tmp/seed-physics.mp4",
@@ -204,6 +214,7 @@ class TestRecommendationAPI:
             tags=None,
         )
         physics_match = Video(
+            user_id=sample_user.id,
             title="受力分析复习",
             filename="physics-match.mp4",
             filepath="/tmp/physics-match.mp4",
@@ -214,6 +225,7 @@ class TestRecommendationAPI:
             tags=None,
         )
         english_video = Video(
+            user_id=sample_user.id,
             title="英语听力技巧",
             filename="english-listening.mp4",
             filepath="/tmp/english-listening.mp4",
@@ -237,12 +249,13 @@ class TestRecommendationAPI:
         assert payload["items"][0]["tags"][0] == "物理"
         assert payload["items"][0]["reason_code"] in {"related", "subject"}
 
-    def test_home_recommendations_include_external_candidates(self, client, db, monkeypatch):
+    def test_home_recommendations_include_external_candidates(self, client, db, sample_user, monkeypatch):
         """推荐接口应支持在返回中混入站外候选元数据。"""
         from app.models.video import Video
         from app.models.video import VideoStatus
 
         internal_video = Video(
+            user_id=sample_user.id,
             title="高数导数专题",
             filename="math.mp4",
             filepath="/tmp/math.mp4",
@@ -290,9 +303,10 @@ class TestRecommendationAPI:
         assert external_item["action_type"] == "import_external_url"
         assert external_item["action_target"].startswith("/upload?mode=url&url=")
 
-    def test_import_external_recommendation_creates_downloading_record(self, client, db, monkeypatch):
+    def test_import_external_recommendation_creates_downloading_record(self, client, db, sample_user, monkeypatch):
         """推荐候选应能直接走后端链接下载入库链路。"""
         from app.models.video import Video
+        from app.utils.auth_token import build_auth_token
 
         submitted = {}
 
@@ -313,6 +327,7 @@ class TestRecommendationAPI:
                 "tags": ["数学", "导数", "函数"],
                 "model": "small",
             },
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
         )
         assert response.status_code == 200
 
@@ -330,3 +345,57 @@ class TestRecommendationAPI:
         assert submitted["name"] == "download_video_from_url_task"
         assert submitted["args"][0] == video.id
         assert submitted["kwargs"]["model"] == "small"
+
+    def test_import_external_requires_bearer_token(self, client):
+        """未携带 Bearer 时不得仅凭 body/query 冒用 user_id（应 401）。"""
+        response = client.post(
+            "/api/recommendations/import-external",
+            json={"url": "https://www.bilibili.com/video/BV1xx411c7mD", "model": "small"},
+        )
+        assert response.status_code == 401
+        assert response.json()["detail"] == "请先登录后再导入站外视频"
+
+    def test_import_external_invalid_bearer_does_not_fallback_to_legacy_user_id(self, client, sample_user, monkeypatch):
+        """legacy 开启时，若 Bearer 无效也不得回退到 user_id（应 401）。"""
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "AUTH_ALLOW_LEGACY_USER_ID_ONLY", True)
+        response = client.post(
+            "/api/recommendations/import-external",
+            params={"user_id": sample_user.id},
+            json={"url": "https://www.bilibili.com/video/BV1xx411c7mD", "model": "small"},
+            headers={"Authorization": "Bearer invalid.token.signature"},
+        )
+        assert response.status_code == 401
+        assert response.json()["detail"] == "请先登录后再导入站外视频"
+
+    def test_recommendation_scenes_emits_telemetry_scene_count(self, client, caplog):
+        """GET /scenes 发射 recommendation_scenes_served，metadata.scene_count 与返回条数一致。"""
+        caplog.set_level(logging.INFO, logger="app.analytics.telemetry")
+        response = client.get("/api/recommendations/scenes", headers={"X-Trace-Id": "trace-scenes-tel"})
+        assert response.status_code == 200
+        scene_count = len(response.json()["scenes"])
+        lines = [r.message for r in caplog.records if r.name == "app.analytics.telemetry"]
+        payloads = [json.loads(line) for line in lines]
+        served = [p for p in payloads if p.get("event_type") == "recommendation_scenes_served"]
+        assert len(served) >= 1
+        assert served[0]["module"] == "recommendation"
+        assert served[0]["metadata"].get("scene_count") == scene_count
+
+    def test_import_external_telemetry_url_host_is_hostname(self, client, db, sample_user, monkeypatch, caplog):
+        """import-external 遥测 metadata.url_host 为 hostname，非截断 URL。"""
+        caplog.set_level(logging.INFO, logger="app.analytics.telemetry")
+        monkeypatch.setattr("app.core.executor.submit_task", lambda *args, **kwargs: None)
+        from app.utils.auth_token import build_auth_token
+
+        response = client.post(
+            "/api/recommendations/import-external",
+            json={"url": "https://www.bilibili.com/video/BV1xx411c7mD", "model": "small"},
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
+        )
+        assert response.status_code == 200
+        lines = [r.message for r in caplog.records if r.name == "app.analytics.telemetry"]
+        payloads = [json.loads(line) for line in lines]
+        requested = [p for p in payloads if p.get("event_type") == "recommendation_import_external_requested"]
+        assert len(requested) >= 1
+        assert requested[0]["metadata"].get("url_host") == "www.bilibili.com"
