@@ -153,7 +153,7 @@
    - `backend_fastapi/scripts/mysql_managed_schema.sql`
    - 后端测试
    - `README.md`
-   - `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`
+   - `docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`
    - `CHANGELOG.md`
 4. 新增后端能力必须补测试，至少覆盖 API 主路径和关键失败路径。
 5. 前端改动完成后，至少要跑：

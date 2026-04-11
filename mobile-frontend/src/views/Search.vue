@@ -34,10 +34,6 @@
           <span>{{ searchCopyAllScopeHint }}</span>
         </label>
       </div>
-      <div v-else class="search-scope-locked">
-        <span class="search-scope-locked__text">{{ searchCopyAllScopeHint }}</span>
-        <span class="search-scope-locked__badge">{{ searchCopyScopeLockedBadge }}</span>
-      </div>
     </div>
 
     <div class="search-results-container">
@@ -174,6 +170,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { semanticSearch } from '@/api/search'
+import { getVideo } from '@/api/video'
 import {
   DEFAULT_SEARCH_LIMIT,
   DEFAULT_SEARCH_SCOPE,
@@ -194,7 +191,6 @@ import {
   SEARCH_COPY_RETRY,
   SEARCH_COPY_RESULTS_HEADER_ALL,
   SEARCH_COPY_RESULTS_HEADER_CURRENT,
-  SEARCH_COPY_SCOPE_LOCKED_BADGE,
   SEARCH_COPY_SEARCHING,
   SEARCH_COPY_SEARCH_BUTTON,
   SEARCH_ROUTE_PREFILL_QUERY,
@@ -313,6 +309,19 @@ export default {
         return result.preview_text
       }
       return SEARCH_COPY_PREVIEW_FALLBACK
+    }
+
+    const extractErrorMessage = (err, fallback) => {
+      const detail = err?.response?.data?.detail
+      if (Array.isArray(detail)) {
+        const first = detail.find(Boolean)
+        if (typeof first === 'string') return first
+        if (first?.msg) return first.msg
+      }
+      if (typeof detail === 'string' && detail.trim()) return detail.trim()
+      const messageText = err?.response?.data?.message || err?.response?.data?.msg
+      if (typeof messageText === 'string' && messageText.trim()) return messageText.trim()
+      return err?.message || fallback
     }
 
     const persistSearchState = () => {
@@ -447,7 +456,28 @@ export default {
       }
     }
 
-    const handleResultClick = (result) => {
+    const handleResultClick = async (result) => {
+      const targetVideoId = Number(result?.video_id || 0)
+      if (!Number.isFinite(targetVideoId) || targetVideoId <= 0) {
+        error.value = '当前搜索结果无有效视频 ID，请重新搜索。'
+        return
+      }
+
+      try {
+        await getVideo(targetVideoId)
+      } catch (err) {
+        const status = Number(err?.response?.status || 0)
+        if (status === 404) {
+          results.value = results.value.filter((item) => Number(item?.video_id) !== targetVideoId)
+          error.value = `视频 ${targetVideoId} 已不存在，已从当前结果中移除，请重新搜索。`
+          indexEmptyHint.value = ''
+          persistSearchState()
+          return
+        }
+        error.value = extractErrorMessage(err, '视频详情校验失败，请稍后重试。')
+        return
+      }
+
       persistSearchState()
       router.push({
         path: `/player/${result.video_id}`,
@@ -509,7 +539,6 @@ export default {
       searchCopyNoIndexGuide: SEARCH_COPY_NO_INDEX_GUIDE,
       searchCopyPlayHint: SEARCH_COPY_PLAY_HINT,
       searchCopyRetry: SEARCH_COPY_RETRY,
-      searchCopyScopeLockedBadge: SEARCH_COPY_SCOPE_LOCKED_BADGE,
       searchCopySearching: SEARCH_COPY_SEARCHING,
       searchCopySearchButton: SEARCH_COPY_SEARCH_BUTTON,
       searchInputPlaceholder,
@@ -608,33 +637,6 @@ export default {
 .search-scope {
   display: flex;
   gap: 20px;
-}
-
-.search-scope-locked {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: #e3f2fd;
-  border: 1px solid #90caf9;
-}
-
-.search-scope-locked__text {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1565c0;
-}
-
-.search-scope-locked__badge {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #1976d2;
-  color: #fff;
 }
 
 .scope-option {

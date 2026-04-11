@@ -144,6 +144,36 @@ class TestVideoAPI:
         assert response.headers["content-range"] == f"bytes 2-7/{len(content)}"
         assert response.headers["content-length"] == "6"
 
+    def test_stream_video_file_supports_head_requests(self, client, db, sample_video, tmp_path):
+        """测试视频流接口支持 HEAD，兼容 iOS/WKWebView 预检。"""
+        content = b"0123456789abcdef"
+        video_path = tmp_path / "stream-head.mp4"
+        video_path.write_bytes(content)
+
+        sample_video.filepath = str(video_path)
+        sample_video.filename = "stream-head.mp4"
+        db.commit()
+
+        response = client.head(f"/api/videos/{sample_video.id}/stream")
+        assert response.status_code == 200
+        assert response.headers["accept-ranges"] == "bytes"
+        assert response.headers["content-length"] == str(len(content))
+
+    def test_stream_video_file_fallbacks_to_processed_path(self, client, db, sample_video, tmp_path):
+        """测试流式播放优先读取 processed_filepath，避免原文件缺失时不可播。"""
+        content = b"abcdef012345"
+        processed_path = tmp_path / "stream-processed.mp4"
+        processed_path.write_bytes(content)
+
+        sample_video.filepath = str(tmp_path / "missing-original.mp4")
+        sample_video.processed_filepath = str(processed_path)
+        sample_video.filename = "stream-processed.mp4"
+        db.commit()
+
+        response = client.get(f"/api/videos/{sample_video.id}/stream")
+        assert response.status_code == 200
+        assert response.content == content
+
     def test_get_video_subtitles_returns_rows_sorted_by_start_time(self, client, db, sample_video):
         """测试字幕接口返回的数据库字幕按时间顺序排序"""
         from app.models.subtitle import Subtitle

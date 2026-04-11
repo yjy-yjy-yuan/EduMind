@@ -26,6 +26,7 @@ from app.models import Subtitle
 from app.models import User
 from app.models import Video
 from app.models.note import NoteTimestamp
+from app.models.similarity_audit_log import SimilarityAuditLogModel
 
 TABLE_DESCRIPTIONS = {
     "users": "用户信息表",
@@ -35,6 +36,7 @@ TABLE_DESCRIPTIONS = {
     "note_timestamps": "笔记时间戳关联表",
     "questions": "问答记录表",
     "semantic_search_logs": "语义搜索全局检索日志表",
+    "similarity_audit_logs": "标签相似度 LLM 审计日志表",
 }
 
 MANAGED_TABLE_NAMES = {
@@ -45,6 +47,7 @@ MANAGED_TABLE_NAMES = {
     NoteTimestamp.__tablename__,
     Question.__tablename__,
     SemanticSearchLog.__tablename__,
+    SimilarityAuditLogModel.__tablename__,
 }
 
 

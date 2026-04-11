@@ -1,5 +1,117 @@
 # 变更日志
 
+## 2026-04-11
+
+### iOS 真机播放链路修复：搜索卡片跳转后视频流加载失败
+- **backend_fastapi**：更新 `app/routers/video.py`，新增 `HEAD /api/videos/{video_id}/stream`，兼容 iOS/WKWebView 在播放前的预检请求；并将流文件解析改为“优先 `processed_filepath`，回退 `filepath`”，避免原始文件缺失时误报不可播放。
+- **backend_fastapi**：更新 `tests/api/test_video_api.py`，补充视频流 `HEAD` 预检与 `processed_filepath` 回退播放测试用例，覆盖真机播放关键路径。
+- **mobile-frontend**：更新 `src/views/Search.vue`，点击搜索结果前先校验目标视频是否存在；若后端返回 404，则自动从当前结果移除该卡片并提示重新搜索，避免进入播放器后才失败。
+- **mobile-frontend**：更新 `src/views/Player.vue`，播放器出错时增加一次 `Range bytes=0-1` 诊断探测，优先展示后端返回的真实错误原因（例如 404/网络不可达），减少“统一报错文案”造成的排障成本。
+- **ios-app**：同步 `ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js` 与 `index.css`，确保 `WKWebView` 真机加载到本次前端修复产物。
+- **validation**：`python scripts/validate_backend_smoke.py`、`npm run build:ios`、`bash ios-app/sync_ios_web_assets.sh`、`pre-commit run --all-files`、`bash scripts/hooks/pre_push.sh`。
+
+## 2026-04-10
+
+### 语义搜索后端韧性增强与无效视频清理对齐
+- **backend_fastapi**：`app/services/search/search.py` 新增 `SemanticSearchBackendUnavailableError`；当一次检索中“目标视频全部查询失败”时不再伪装成空结果，统一由路由返回 `503` 并提示先重建索引。
+- **backend_fastapi**：`app/services/search/store.py` 增加 Chroma 集合损坏探测与恢复（`_decode_seq_id` / `max_seqid` / `object of type 'int' has no len()` 等典型错误），并通过 `SEARCH_CHROMA_ANONYMIZED_TELEMETRY` 默认关闭匿名遥测噪声；新增 `app/services/search/chroma_telemetry.py` no-op 遥测适配器。
+- **backend_fastapi**：`app/tasks/vector_indexing.py` 支持“视频文件缺失但字幕可用”时的字幕降级索引，并统一索引失败错误信息为可观测结构。
+- **backend_fastapi**：当前运行库已清理历史不可恢复视频 `id=1/11/12` 及关联索引数据，避免继续出现在视频列表和检索候选中。
+- **docs**：`backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md` 更新到 2026-04-10，移除过时示例口径并同步上述行为说明。
+
+### Compounding 闭环 MVP（P1-3）— 轨迹导出与反馈管道
+- **backend_fastapi**：新增 `app/compounding`（`formats` 反馈 JSON schema、`sanitization` 脱敏裁剪、`quality` 质检标记、`export_service` 按日导出 JSONL/CSV、`report` 质量报告含 error_rate 与相似度 batch 统计摘要）。
+- **scripts**：`scripts/export_compounding_trajectories.py` 离线调度（**幂等**、**重试**、不走路由）。
+- **docs**：`docs/COMPOUNDING_FEEDBACK_MVP.md`（已完成/未完成能力边界）。
+- **tests**：`tests/unit/test_compounding_export.py`。
+- **validation**：`pytest tests/unit/test_compounding_export.py`；`black`/`isort`/`flake8`；`validate_backend_smoke.py`。
+
+### Compounding 闭环 MVP（P1-3）补强：配置化脱敏与质量校验增强
+- **backend_fastapi**：`app/compounding/sanitization.py` 新增 `default_sanitizer_config()`，脱敏盐与裁剪阈值改为优先读取 `Settings`（`COMPOUNDING_*`）；`search` 导出特征补充 `trace_id` 与 `trace_id_present`，为后续 search/similarity 跨域关联预留字段。
+- **backend_fastapi**：`app/compounding/export_service.py` 的日界计算显式为“UTC 语义的 naive 边界”，并在反馈质检前统一构建完整 `FeedbackRecordV1`（含 `meta.date_key`）再校验。
+- **backend_fastapi**：`app/compounding/quality.py` 的 `validate_feedback_dict()` 增强 `trace_id` 字段存在性与 `meta.date_key` 一致性检查。
+- **backend_fastapi**：`app/core/config.py` 新增 `COMPOUNDING_USER_ID_HASH_SALT`、`COMPOUNDING_QUERY_TEXT_MAX_CHARS`、`COMPOUNDING_TAG_MAX_CHARS`、`COMPOUNDING_ERROR_MESSAGE_MAX_CHARS`。
+- **tests/docs**：`tests/unit/test_compounding_export.py` 补充设置注入与质量校验用例；`docs/COMPOUNDING_FEEDBACK_MVP.md` 同步更新。
+
+### 对「集中式遥测」测试条数口径的更正说明
+- **计数规则**：遥测专项以 `pytest tests/unit/test_analytics_*.py` 的实际 `collected` 为准；同日较早「14 项」「19 passed」等表述为历史快照。与 `test_similarity_analytics.py` 一并执行时，合计条数按两者当次 `collected` 相加，**一律以命令行输出为准**。
+- **tests**：补充 `duration_ms` 超过 **1e12** 时降级并写入 `parse_error` 的用例。
+
+### 集中式遥测：duration 非有限值与负值统一降级（P0）
+- **backend_fastapi**：`_parse_duration_ms` 经 `_finalize_duration_value` 统一拒绝 nan/inf/负值/超上限，写入 `metadata.parse_error`，**不丢事件**；`validate_analytics_event` 对 `latency_ms` 增加 **`math.isfinite`** 校验。
+- **tests**：`duration_ms` 为 `'nan'`、`'inf'`、`'-1'` 及 schema 层 nan/inf 拒绝用例。
+
+### 集中式遥测管道改进（duration 容错 / 状态推断 / 告警节流 / trace 透传）
+- **backend_fastapi**：`legacy_search_dict_to_event` 对 `duration_ms` 容错解析，失败写入 `metadata.parse_error`，事件仍落库；`event` 名补充 **timeout / degraded / error** 等关键字映射。
+- **backend_fastapi**：`AnalyticsAlertEngine` 对 `failure_rate:<module>`、`timeout_or_slow:<module>` 做 **最小间隔节流**（`ANALYTICS_ALERT_MIN_INTERVAL_SEC`）。
+- **backend_fastapi**：未带 `trace_id` 时使用 **`ANALYTICS_TRACE_ID_PLACEHOLDER`**，并标注 `metadata.trace_id_source`；语义搜索 API 从 **`X-Trace-Id` / `X-Request-Id`** 透传至 `semantic_search_videos` 与相关 `SearchEventLogger` 调用。
+- **docs**：`ANALYTICS_PIPELINE_MIGRATION.md` 同步；**tests**：适配器与告警单测补充。
+
+### 集中式遥测管道（P1-2）— `app.analytics`
+- **backend_fastapi**：新增 `app/analytics`（`schema` 统一字段、`pipeline` 写入入口、`alerting` 失败率/超时率/漂移提示、`adapters/search` 与 `adapters/similarity` 模块化映射）；配置项 `ANALYTICS_*` 控制日志级别与告警阈值。
+- **backend_fastapi**：`SearchEventLogger` 经 `emit_search_legacy_event` 写入管道；`SimilarityAuditLogger` 经 `emit_similarity_audit_event` 输出统一 JSON（原 `[START]/[SUCCESS]` 前缀行不再输出）；异常时 DEBUG 记录，不阻断主业务。
+- **tests**：新增 `test_analytics_schema.py`、`test_analytics_pipeline.py`、`test_analytics_alerting.py`、`test_analytics_adapters.py`（初版 14 项；**当前遥测四文件合计以 `pytest tests/unit/test_analytics_*.py` 收集为准**，见同日 **「对『集中式遥测』测试条数口径的更正说明」**）。
+- **docs**：新增 `docs/ANALYTICS_PIPELINE_MIGRATION.md`（旧入口→新入口映射、迁移清单、残留风险）。
+- **validation**：`pytest` 遥测四文件 + `test_similarity_analytics.py`；`black` / `isort` / `flake8`（pre-commit）对变更文件通过。
+
+> **读数先看这里（避免误读旧条目）**：同日期内凡出现「**12 个索引**」「**16 个测试**」「**16/16**」「**80/80**」等字样的**较早小节**，数字与迁移细节均已由下方 **「对同日『相似度审计日志持久化（P1-1）』记录的口径更正说明」** 取代；**一律以该更正小节为准**，较早小节正文保留不改，仅作变更考古。
+
+### 对同日「相似度审计日志持久化（P1-1）」记录的口径更正说明
+- **数字与迁移**：`add_similarity_audit_logs.sql` 实际为 **4 个二级索引**（`idx_trace_id`、`idx_date_key`、`idx_date_trace`、`idx_created_at`）及主键；同日旧条目中的「12 个索引」「16 个测试」「16/16」及「80/80」类合计口径以本说明为准：**持久化专项单元测试 17 项**，与相似度域 **64 项** 一并执行时合计 **81/81**。历史条目正文不删改，便于变更考古。
+- **docs**：`SIMILARITY_AUDIT_LOG_PERSISTENCE.md` 检查清单拆为「代码与仓库侧 / 目标环境侧」，已完成项与 `[x]` 一致；测试计数等与实现同步；`_record_similarity_audit_log` 增加会话/DB 极端异常时回退 `SimilarityMetrics`，避免影响相似度主路径。
+
+> **再次提示**：其后的 **「相似度审计日志持久化（P1-1）- TDD 完整实现」** 等较早条目中的索引数、测试数等**未改原文**；若与更正说明冲突，**以更正说明为准**。
+
+### 相似度审计：检查清单分栏与 CHANGELOG 醒目提示（可读性）
+- **docs**：`SIMILARITY_AUDIT_LOG_PERSISTENCE.md` 将检查清单分为「代码与仓库侧（全 [x]）」与「目标环境侧（部署自验）」，与「已完成」表述一致。
+- **CHANGELOG**：在 **2026-04-10** 日期下增加顶部 blockquote，并在「P1-1 - TDD 完整实现」小节增加旁注，强化「数字以同日口径更正说明为准」。
+
+### 相似度审计持久化主链路接入与行为校准
+- **backend_fastapi**：`lifespan` 中调用 `init_persistence_service()`；`llm_similarity_service` 经 `_record_similarity_audit_log` 写入全局持久化服务（未初始化时回退 `SimilarityMetrics`），`get_metrics_for_day` / `check_score_drift` 与持久化统计对齐。
+- **backend_fastapi**：`scripts/init_db.py` 将 `similarity_audit_logs` 纳入 `MANAGED_TABLE_NAMES` 与表说明，与 `init_db.py --create` 文档一致。
+- **backend_fastapi**：`SimilarityAuditLogPersistenceService` 中 `record_log` 失败时 `rollback`；`persist_from_memory` 成功后从内存 deque 移除已落库项并加入指数退避重试；`_compute_stats` 的 `date` 与查询日一致。
+- **backend_fastapi**：`app/models/__init__.py` 导出 `SimilarityAuditLogModel`。
+- **docs**：`SIMILARITY_AUDIT_LOG_PERSISTENCE.md` 与实现一致（同步持久化、`SessionLocal` 示例、`main.py` lifespan、运维段修正）。
+
+### 相似度审计日志持久化（P1-1）- TDD 完整实现
+
+> **归档原文**：索引数、测试数、验证合计等若与同日 **「口径更正说明」** 不一致，**以更正说明为准**。
+
+- **backend_fastapi**：新增持久化层完整实现，转变内存专用的审计日志为可复用的 DB + 内存混合架构：
+  - `app/models/similarity_audit_log.py`：ORM 模型定义，与内存 `SimilarityAuditLog` 双向转换；索引策略支持 `trace_id`、`date_key` 快速查询。
+  - `app/repositories/similarity_audit_log_repository.py`：Repository 层提供 CRUD、batch 保存、按日期范围查询、按 `trace_id` 单行查询等接口。
+  - `app/services/similarity_audit_log_service.py`：Service 层实现"内存 + DB 可用性优先"设计——DB 故障自动降级到内存，失败重试策略，内存缓冲大小管理，支持从内存二次持久化恢复。
+  - `app/services/similarity_service_container.py`：全局 Service Locator，便于应用启动初始化和依赖注入。
+- **migrations**：新增 `add_similarity_audit_logs.sql`，含 12 个精心设计的索引和字段注释；支持快速回滚（显式 `DROP TABLE IF EXISTS`）。
+- **tests**：新增 `tests/unit/test_similarity_audit_log_persistence.py`，16 个 TDD 单元测试全部通过：
+  - Repository 层 6 项：单条/批量保存、按日期/trace_id 查询、查询一致性。
+  - Service 层 5 项：初始化、内存+DB 并行、DB 故障降级、从 DB 恢复、trace_id 溯源。
+  - 降级与重试 3 项：DB 错误容错、初始失败重试、缓冲大小限制。
+  - 集成 2 项：端到端保存查询、重启恢复验证。
+- **docs**：新增 `docs/SIMILARITY_AUDIT_LOG_PERSISTENCE.md`，详细说明架构、部署、运维、故障排除、性能指标、配置优化等。
+- **validation**：
+  - 单元测试：16/16 新增测试通过；原有 64 个相似度测试无回归。
+  - 编译检查：`python -m compileall` 通过。
+  - 烟雾测试：`validate_backend_smoke.py` 通过。
+  - Pre-commit 钩子：black、isort、flake8、bash 等全部通过。
+
+### 相似度审计日志持久化的设计原则
+1. **可用性优先**：DB 连接失败不阻断主流程，自动降级到内存缓冲。
+2. **一致性保证**：查询时优先读 DB（支持重启恢复），降级到内存。
+3. **内存安全**：缓冲区采用 FIFO 队列，大小可配置（默认 1000），防止无限增长。
+4. **索引优化**：trace_id、date_key、联合索引支持快速查询，避免全表扫描。
+
+## 2026-04-10
+
+### 智能体编排与能力强化统一提示词
+- **docs**：新增根目录 `PROJECT_AGENT_ORCHESTRATION_PROMPT.md`，固化已定决策（编排仅在 `backend_fastapi` 内模块化、未来可拆 `agent-service`；业务优先强化视频学习/搜索/问答）、系统七条要求、TDD 与里程碑提交约定、建议目录结构与遥测/治理边界，供研发与自动化助手对齐。
+
+### 关键词搜索（标签相似度）P0 收尾与文档校准
+- **backend_fastapi**：`app/services/llm_similarity_service.py` 完成 P0 收尾校准：provider 侧耗时测量使用 `time.perf_counter()`，并将 `provider_latency_ms` 改为 `max(0.0, total-parse)` 下限保护，避免浮点精度导致的负值噪声。
+- **tests**：新增并收敛 `backend_fastapi/tests/unit/test_llm_similarity_service.py`（7 项），补齐重试链路、返回值解包、延迟拆分、配置注入与主流程联通验证；移除恒真断言并改为精确/近似断言，和生产逻辑保持一致。
+- **docs**：重写 `docs/KEYWORD_SEARCH_OPTIMIZATION.md` 与 `KEYWORD_SEARCH_DELIVERY_SUMMARY.md`，修正过度承诺与过时描述，明确当前已完成项与 P1 未闭环项（持久化遥测、训练闭环等）；更新 `docs/SENTRYSEARCH_INTEGRATION_PROMPT.md`，更正“local embedder 占位”等历史陈述。
+- **validation**：本地复验通过：`pytest tests/unit/test_llm_similarity_service.py`、`pytest tests/unit/test_similarity_score_parser.py tests/unit/test_similarity_analytics.py`、`pytest tests/smoke`。
+
 ## 2026-04-09
 
 ### 首页搜索入口直达执行与前端提示词同步

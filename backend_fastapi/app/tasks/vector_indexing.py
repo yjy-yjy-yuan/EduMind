@@ -3,6 +3,7 @@
 import logging
 import os
 from datetime import datetime
+from typing import Optional
 
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -12,6 +13,16 @@ from app.models.video import Video
 from app.models.video import VideoStatus
 
 logger = logging.getLogger(__name__)
+
+
+def _missing_assets_error(
+    video_id: int, *, video_path: Optional[str], subtitle_path: Optional[str], status: str
+) -> str:
+    """统一构造索引失败的可观测错误信息。"""
+    return (
+        f"Index source unavailable | video_id={video_id} | status={status} | "
+        f"video_path={video_path or 'None'} | subtitle_path={subtitle_path or 'None'}"
+    )[:500]
 
 
 def index_video_for_search(video_id: int, user_id: int, embedding_backend: str = None):
@@ -70,8 +81,10 @@ def index_video_for_search(video_id: int, user_id: int, embedding_backend: str =
                 db.commit()
             return
 
-        # 检查视频是否已处理
-        if video.status != VideoStatus.COMPLETED:
+        subtitle_available = bool(video.subtitle_filepath and os.path.exists(video.subtitle_filepath))
+
+        # 手动索引默认要求视频处理完成；但若字幕可用，则允许降级为“字幕索引”继续执行。
+        if video.status != VideoStatus.COMPLETED and not subtitle_available:
             logger.warning(f"Video not fully processed: {video_id}, status={video.status}")
             if vector_index:
                 vector_index.status = VectorIndexStatus.FAILED
@@ -81,23 +94,25 @@ def index_video_for_search(video_id: int, user_id: int, embedding_backend: str =
             db.commit()
             return
 
-        # 优先使用处理后文件，若没有则回退到原始上传文件
+        # 优先使用处理后文件，若没有则回退到原始上传文件。
+        # 若视频文件缺失但字幕存在，使用稳定的逻辑 source 标识继续构建字幕索引。
         video_source_path = video.processed_filepath or video.filepath
-        if not video_source_path:
-            logger.error(f"No available video file for indexing: {video_id}")
-            if vector_index:
-                vector_index.status = VectorIndexStatus.FAILED
-                vector_index.error_message = "No available video file for indexing"
-            video.has_semantic_index = False
-            video.vector_index_id = None
-            db.commit()
-            return
+        has_video_file = bool(video_source_path and os.path.exists(video_source_path))
+        if not has_video_file and subtitle_available:
+            logger.warning("Video file missing for video %s, fallback to subtitle-only indexing.", video_id)
+            video_source_path = f"video://{user_id}/{video_id}"
+            has_video_file = True
 
-        if not os.path.exists(video_source_path):
-            logger.error(f"Video file does not exist: {video_source_path}")
+        if not has_video_file:
+            logger.error(f"No available video source for indexing: video_id={video_id}")
             if vector_index:
                 vector_index.status = VectorIndexStatus.FAILED
-                vector_index.error_message = f"Video file missing: {video_source_path}"
+                vector_index.error_message = _missing_assets_error(
+                    video_id,
+                    video_path=video_source_path,
+                    subtitle_path=video.subtitle_filepath,
+                    status=str(video.status),
+                )
             video.has_semantic_index = False
             video.vector_index_id = None
             db.commit()
@@ -209,7 +224,8 @@ def index_video_inline(video_id: int, user_id: int, subtitle_path: str, embeddin
 
         # 内嵌模式下，允许在 PROCESSING 阶段执行
         # 但仍需检查基本可用性
-        if video.status not in (VideoStatus.PROCESSING, VideoStatus.COMPLETED):
+        subtitle_available = bool(subtitle_path and os.path.exists(subtitle_path))
+        if video.status not in (VideoStatus.PROCESSING, VideoStatus.COMPLETED) and not subtitle_available:
             logger.warning(
                 f"Video in unexpected state for inline indexing: " f"video_id={video_id}, status={video.status}"
             )
@@ -220,28 +236,31 @@ def index_video_inline(video_id: int, user_id: int, subtitle_path: str, embeddin
             db.commit()
             return
 
-        # 优先使用处理后文件，若没有则回退到原始上传文件
+        # 优先使用处理后文件，若没有则回退到原始上传文件。
+        # 若视频文件缺失但字幕已存在，则降级为字幕索引。
         video_source_path = video.processed_filepath or video.filepath
-        if not video_source_path:
-            logger.error(f"No available video file for indexing: {video_id}")
-            vector_index.status = VectorIndexStatus.FAILED
-            vector_index.error_message = "No available video file for indexing"
-            video.has_semantic_index = False
-            video.vector_index_id = None
-            db.commit()
-            return
+        has_video_file = bool(video_source_path and os.path.exists(video_source_path))
+        if not has_video_file and subtitle_available:
+            logger.warning("Inline indexing fallback to subtitle-only mode | video_id=%s", video_id)
+            video_source_path = f"video://{user_id}/{video_id}"
+            has_video_file = True
 
-        if not os.path.exists(video_source_path):
-            logger.error(f"Video file does not exist: {video_source_path}")
+        if not has_video_file:
+            logger.error(f"No available video source for inline indexing: {video_id}")
             vector_index.status = VectorIndexStatus.FAILED
-            vector_index.error_message = f"Video file missing: {video_source_path}"
+            vector_index.error_message = _missing_assets_error(
+                video_id,
+                video_path=video_source_path,
+                subtitle_path=subtitle_path,
+                status=str(video.status),
+            )
             video.has_semantic_index = False
             video.vector_index_id = None
             db.commit()
             return
 
         # 验证字幕文件可用性
-        if not subtitle_path or not os.path.exists(subtitle_path):
+        if not subtitle_available:
             logger.warning(
                 f"Subtitle file not available for inline indexing: "
                 f"video_id={video_id}, subtitle_path={subtitle_path}"

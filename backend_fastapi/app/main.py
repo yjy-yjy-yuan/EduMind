@@ -13,6 +13,7 @@ from app.models.semantic_search_log import SemanticSearchLog  # noqa: F401
 from app.models.video import Video
 from app.models.video import VideoStatus
 from app.services.ollama_runtime import get_ollama_runtime_status
+from app.services.similarity_service_container import init_persistence_service
 from app.services.whisper_runtime import get_whisper_runtime_status
 from app.services.whisper_runtime import shutdown_whisper_runtime
 from app.services.whisper_runtime import start_whisper_background_preload
@@ -103,6 +104,8 @@ async def lifespan(app: FastAPI):
         logger.info("已跳过自动建表；如需初始化数据库，请运行 backend_fastapi/scripts/init_db.py")
 
     recover_interrupted_video_tasks()
+
+    init_persistence_service()
 
     # 确保上传目录存在
     os.makedirs(settings.UPLOAD_FOLDER, exist_ok=True)

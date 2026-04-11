@@ -31,6 +31,64 @@ DROP TABLE IF EXISTS videos;
 
 DROP TABLE IF EXISTS users;
 
+-- Drop table: similarity_audit_logs
+
+DROP TABLE IF EXISTS similarity_audit_logs;
+
+-- Drop table: semantic_search_logs
+
+DROP TABLE IF EXISTS semantic_search_logs;
+
+-- Create table: semantic_search_logs
+
+CREATE TABLE semantic_search_logs (
+	id INTEGER NOT NULL AUTO_INCREMENT,
+	user_id INTEGER NOT NULL,
+	query_text VARCHAR(500) NOT NULL,
+	is_global BOOL NOT NULL,
+	video_ids_searched JSON,
+	result_count INTEGER NOT NULL,
+	total_time_ms INTEGER NOT NULL,
+	limit_used INTEGER NOT NULL,
+	threshold_used NUMERIC(4, 3) NOT NULL,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (id)
+);
+CREATE INDEX ix_semantic_search_logs_user_id ON semantic_search_logs (user_id);
+
+-- Create table: similarity_audit_logs
+
+CREATE TABLE similarity_audit_logs (
+	id INTEGER NOT NULL AUTO_INCREMENT,
+	trace_id VARCHAR(50) NOT NULL,
+	date_key VARCHAR(10) NOT NULL,
+	tag1 VARCHAR(255) NOT NULL,
+	tag2 VARCHAR(255) NOT NULL,
+	event_type VARCHAR(50) NOT NULL,
+	provider VARCHAR(50) NOT NULL,
+	model VARCHAR(100),
+	prompt_version VARCHAR(50) NOT NULL,
+	success BOOL NOT NULL,
+	score FLOAT,
+	score_raw TEXT,
+	score_normalized FLOAT,
+	latency_ms FLOAT NOT NULL,
+	provider_latency_ms FLOAT NOT NULL,
+	parse_latency_ms FLOAT NOT NULL,
+	parse_ok BOOL NOT NULL,
+	parse_error_type VARCHAR(50),
+	retry_count INTEGER NOT NULL,
+	retry_failed BOOL NOT NULL,
+	fallback_reason VARCHAR(255),
+	error_message TEXT,
+	extra_metadata JSON,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (id)
+);
+CREATE INDEX ix_similarity_audit_logs_created_at ON similarity_audit_logs (created_at);
+CREATE INDEX ix_similarity_audit_logs_date_key ON similarity_audit_logs (date_key);
+CREATE INDEX ix_similarity_audit_logs_trace_id ON similarity_audit_logs (trace_id);
+
 -- Create table: users
 
 CREATE TABLE users (
@@ -60,6 +118,7 @@ CREATE UNIQUE INDEX ix_users_username ON users (username);
 
 CREATE TABLE videos (
 	id INTEGER NOT NULL AUTO_INCREMENT,
+	user_id INTEGER NOT NULL,
 	title VARCHAR(255),
 	filename VARCHAR(255),
 	filepath VARCHAR(255),
@@ -84,8 +143,12 @@ CREATE TABLE videos (
 	frame_count INTEGER,
 	summary TEXT,
 	tags TEXT,
+	processing_origin ENUM('ONLINE_BACKEND','IOS_OFFLINE') NOT NULL,
+	has_semantic_index BOOL NOT NULL,
+	vector_index_id INTEGER,
 	PRIMARY KEY (id)
 );
+CREATE INDEX ix_videos_user_id ON videos (user_id);
 
 -- Create table: notes
 

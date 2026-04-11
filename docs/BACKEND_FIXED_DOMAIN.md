@@ -109,7 +109,7 @@ server {
 以下提示词可直接复制使用，用于在项目中落实「后端固定域名」配置：
 
 ```
-你正在为 EduMind 项目落实「后端使用固定域名」方案，以便换 Wi‑Fi、换地点后小程序/App 不因本机 IP 变化而请求失败。请严格按仓库内 docs/BACKEND_FIXED_DOMAIN.md 执行，并遵守 AGENTS.md、PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md 的规范。
+你正在为 EduMind 项目落实「后端使用固定域名」方案，以便换 Wi‑Fi、换地点后小程序/App 不因本机 IP 变化而请求失败。请严格按仓库内 docs/BACKEND_FIXED_DOMAIN.md 执行，并遵守 AGENTS.md、docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md 的规范。
 
 一、要求
 1. 后端：不要求你部署服务器或配置 Nginx，只需在 backend_fastapi/.env.example 中增加注释说明：生产/固定域名环境下应设置 HOST、CORS_ORIGINS 为允许前端固定域名来源；若使用 Nginx 反向代理，给出示例片段（可引用 docs/BACKEND_FIXED_DOMAIN.md）。

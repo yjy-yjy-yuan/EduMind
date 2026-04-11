@@ -12,6 +12,7 @@ from app.schemas.search import IndexingStatusResponse
 from app.schemas.search import SearchResultChunk
 from app.schemas.search import SemanticSearchRequest
 from app.schemas.search import SemanticSearchResponse
+from app.services.search.search import SemanticSearchBackendUnavailableError
 from app.services.search.search import semantic_search_videos
 from app.services.search.search_log import is_global_semantic_search_request
 from app.services.search.search_log import maybe_record_global_semantic_search
@@ -58,6 +59,7 @@ def verify_user_video_access(user_id: int, video_id: int, db: Session) -> Video:
 
 @router.post("/semantic/search")
 async def semantic_search(
+    http_request: Request,
     request: SemanticSearchRequest,
     db: Session = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
@@ -79,6 +81,9 @@ async def semantic_search(
         raise HTTPException(status_code=400, detail="查询内容不能为空")
     if len(request.query) > 500:
         raise HTTPException(status_code=400, detail="查询内容过长（最多 500 字符）")
+
+    trace_header = http_request.headers.get("X-Trace-Id") or http_request.headers.get("X-Request-Id")
+    trace_id = trace_header.strip()[:128] if trace_header and trace_header.strip() else None
 
     is_global_request = is_global_semantic_search_request(request.video_ids)
     query_stripped = request.query.strip()
@@ -130,6 +135,7 @@ async def semantic_search(
             limit=request.limit,
             threshold=request.threshold,
             db=db,
+            trace_id=trace_id,
         )
 
         elapsed_ms = int((time.time() - start_time) * 1000)
@@ -150,6 +156,12 @@ async def semantic_search(
             query=request.query,
             results=results,
             total_time_ms=elapsed_ms,
+        )
+    except SemanticSearchBackendUnavailableError as e:
+        logger.error("Semantic search backend unavailable for user %s: %s", current_user_id, e, exc_info=True)
+        raise HTTPException(
+            status_code=503,
+            detail="语义索引暂不可用，请在视频库重建索引后重试（可先触发“重建索引”）。",
         )
     except Exception as e:
         logger.error(f"Search failed for user {current_user_id}: {e}", exc_info=True)

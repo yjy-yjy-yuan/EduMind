@@ -14,7 +14,7 @@ export const SEARCH_ROUTE_PREFILL_QUERY = 'q'
 /** 首页点击搜索后，搜索页据此直接自动触发一次检索 */
 export const SEARCH_ROUTE_AUTO_SEARCH_QUERY = 'autoSearch'
 
-/** 跨视频范围一句说明（首页说明、搜索页范围选项与锁定条共用；仅覆盖已建立语义索引的内容） */
+/** 跨视频范围一句说明（首页说明与搜索页范围选项共用；仅覆盖已建立语义索引的内容） */
 export const SEARCH_COPY_ALL_SCOPE_HINT = '在我的全部已索引视频中搜索'
 
 /** 首页：跨视频语义搜索卡片 */
@@ -27,8 +27,6 @@ export const SEARCH_COPY_PAGE_INPUT_PLACEHOLDER_ALL = SEARCH_COPY_HOME_INPUT_PLA
 export const SEARCH_COPY_PAGE_INPUT_PLACEHOLDER_CURRENT = '输入关键词，在当前视频中搜索…'
 /** 搜索页：未锁定「全部已索引」且尚未搜索时的空态 */
 export const SEARCH_COPY_EMPTY_STATE_GENERIC = '输入关键词开始搜索'
-/** 搜索页：锁定跨视频范围时角标（与已索引语义一致） */
-export const SEARCH_COPY_SCOPE_LOCKED_BADGE = '全部已索引视频'
 
 /** 搜索页：操作与状态文案 */
 export const SEARCH_COPY_SEARCH_BUTTON = '搜索'

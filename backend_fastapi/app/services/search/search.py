@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 _SEARCH_TEXT_CLEAN_RE = re.compile(r"[^\w\u4e00-\u9fff]+")
 
 
+class SemanticSearchBackendUnavailableError(RuntimeError):
+    """语义搜索后端不可用（例如索引存储损坏或读取失败）。"""
+
+
 def _normalize_search_text(text: Optional[str]) -> str:
     """归一化文本，提升关键词重排稳定性。"""
     raw = str(text or "").strip().lower()
@@ -346,6 +350,7 @@ def semantic_search_videos(
     limit: int = 10,
     threshold: float = 0.5,
     db: Optional[Session] = None,
+    trace_id: Optional[str] = None,
 ) -> List[SearchResultChunk]:
     """
     语义搜索视频
@@ -357,6 +362,7 @@ def semantic_search_videos(
         limit: 返回结果数
         threshold: 相似度阈值
         db: 数据库会话
+        trace_id: 上游追踪 ID（如请求头 X-Trace-Id），便于与遥测关联
 
     Returns:
         搜索结果列表
@@ -366,7 +372,12 @@ def semantic_search_videos(
 
     # 记录搜索请求
     SearchEventLogger.log_search_request(
-        user_id=user_id, query_text=query, video_ids=video_ids, threshold=threshold, limit=limit
+        user_id=user_id,
+        query_text=query,
+        video_ids=video_ids,
+        threshold=threshold,
+        limit=limit,
+        trace_id=trace_id,
     )
 
     if not video_ids:
@@ -396,6 +407,8 @@ def semantic_search_videos(
         all_results = []
         chromadb_start_time = time.time()
         per_video_candidate_limit = max(limit * 4, 12)
+        failed_video_count = 0
+        first_failure_message: Optional[str] = None
         for video_id in video_ids:
             try:
                 # 构建集合名
@@ -441,13 +454,23 @@ def semantic_search_videos(
 
             except Exception as e:
                 logger.warning(f"Failed to search video {video_id}: {e}")
-                SearchEventLogger.log_search_failed(user_id=user_id, error_message=str(e))
+                SearchEventLogger.log_search_failed(user_id=user_id, error_message=str(e), trace_id=trace_id)
+                failed_video_count += 1
+                if first_failure_message is None:
+                    first_failure_message = str(e)
                 continue
+
+        if failed_video_count == len(video_ids) and len(video_ids) > 0:
+            detail = first_failure_message or "unknown backend error"
+            raise SemanticSearchBackendUnavailableError(
+                f"All indexed videos failed during semantic search | videos={len(video_ids)} | detail={detail}"
+            )
 
         SearchEventLogger.log_chromadb_search_executed(
             videos_searched=len(video_ids),
             results_found=len(all_results),
             duration_ms=(time.time() - chromadb_start_time) * 1000,
+            trace_id=trace_id,
         )
 
         # 按相似度排序并限制结果数
@@ -462,6 +485,7 @@ def semantic_search_videos(
             result_count=len(all_results),
             duration_ms=(time.time() - total_start_time) * 1000,
             max_similarity=max_similarity,
+            trace_id=trace_id,
         )
 
         logger.info(f"Found {len(all_results)} results")
@@ -469,5 +493,5 @@ def semantic_search_videos(
 
     except Exception as e:
         logger.error(f"Search failed: {e}", exc_info=True)
-        SearchEventLogger.log_search_failed(user_id=user_id, error_message=str(e))
+        SearchEventLogger.log_search_failed(user_id=user_id, error_message=str(e), trace_id=trace_id)
         raise
