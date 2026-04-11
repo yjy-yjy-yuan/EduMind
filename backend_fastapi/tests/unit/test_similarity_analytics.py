@@ -6,14 +6,11 @@
 """
 
 from datetime import datetime
-from datetime import timedelta
 
-import pytest
 from app.services.similarity_analytics import SimilarityAuditLog
 from app.services.similarity_analytics import SimilarityAuditLogger
 from app.services.similarity_analytics import SimilarityEventType
 from app.services.similarity_analytics import SimilarityMetrics
-from app.services.similarity_analytics import SimilarityProvider
 
 
 class TestSimilarityAuditLog:

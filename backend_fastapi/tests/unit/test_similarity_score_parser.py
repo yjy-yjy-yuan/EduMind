@@ -141,7 +141,7 @@ class TestSimilarityScoreParserErrors:
 
     def test_parse_non_float_number(self):
         """测试非浮点数的数字（例如版本号）"""
-        result = SimilarityScoreParser.parse("v1.0 released")
+        SimilarityScoreParser.parse("v1.0 released")
         # v1.0 会被识别为 1.0，但由于前面有 v，应该先尝试其他格式
         # 实际行为：应该返回失败（多个数字或格式不对）
         # 根据实现细节，可能成功也可能失败
