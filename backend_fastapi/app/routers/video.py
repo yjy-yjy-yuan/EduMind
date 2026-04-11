@@ -137,6 +137,14 @@ def resolve_video_media_type(video: Video) -> str:
     return media_type or "video/mp4"
 
 
+def resolve_video_stream_path(video: Video) -> Optional[str]:
+    """解析可用于播放的视频文件路径（优先处理后文件，回退原文件）。"""
+    for path in (video.processed_filepath, video.filepath):
+        if path and os.path.exists(path):
+            return path
+    return None
+
+
 def parse_byte_range(range_header: Optional[str], file_size: int) -> Optional[tuple[int, int]]:
     """解析 HTTP Range 头，支持 bytes=start-end 与 bytes=-suffix。"""
     if not range_header:
@@ -778,10 +786,11 @@ async def get_video_stream(video_id: int, request: Request, db: Session = Depend
     if not video:
         raise HTTPException(status_code=404, detail="视频不存在")
 
-    if not video.filepath or not os.path.exists(video.filepath):
+    stream_path = resolve_video_stream_path(video)
+    if not stream_path:
         raise HTTPException(status_code=404, detail="视频文件不存在")
 
-    file_size = os.path.getsize(video.filepath)
+    file_size = os.path.getsize(stream_path)
     media_type = resolve_video_media_type(video)
     byte_range = parse_byte_range(request.headers.get("range"), file_size)
 
@@ -789,7 +798,7 @@ async def get_video_stream(video_id: int, request: Request, db: Session = Depend
     if byte_range is None:
         headers["Content-Length"] = str(file_size)
         return StreamingResponse(
-            iter_file_chunk(video.filepath),
+            iter_file_chunk(stream_path),
             media_type=media_type,
             headers=headers,
         )
@@ -803,11 +812,44 @@ async def get_video_stream(video_id: int, request: Request, db: Session = Depend
         }
     )
     return StreamingResponse(
-        iter_file_chunk(video.filepath, start=start, end=end),
+        iter_file_chunk(stream_path, start=start, end=end),
         media_type=media_type,
         status_code=206,
         headers=headers,
     )
+
+
+@router.head("/{video_id}/stream")
+async def head_video_stream(video_id: int, request: Request, db: Session = Depends(get_db)):
+    """返回视频流元信息，兼容 iOS/WKWebView 在播放前的 HEAD 预检。"""
+    video = db.query(Video).filter(Video.id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="视频不存在")
+
+    stream_path = resolve_video_stream_path(video)
+    if not stream_path:
+        raise HTTPException(status_code=404, detail="视频文件不存在")
+
+    file_size = os.path.getsize(stream_path)
+    media_type = resolve_video_media_type(video)
+    byte_range = parse_byte_range(request.headers.get("range"), file_size)
+    headers = {"Accept-Ranges": "bytes"}
+
+    status_code = 200
+    if byte_range is None:
+        headers["Content-Length"] = str(file_size)
+    else:
+        start, end = byte_range
+        content_length = end - start + 1
+        headers.update(
+            {
+                "Content-Length": str(content_length),
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+            }
+        )
+        status_code = 206
+
+    return Response(status_code=status_code, media_type=media_type, headers=headers)
 
 
 @router.get("/{video_id}/preview")

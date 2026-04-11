@@ -170,6 +170,7 @@ const selectedThoughts = ref(['需要回看'])
 const noteBusy = ref(false)
 const noteResult = ref(null)
 const pendingSeekSeconds = ref(null)
+const streamProbeBusy = ref(false)
 const noteTagOptions = ['再思考', '很重要', '待复习', '需要查证', '想再看一遍']
 const thoughtOptions = ['需要回看', '需要查证', '要补充例子', '容易忘', '和前面有关']
 
@@ -307,9 +308,37 @@ const handleWaiting = () => {
   playerState.value = '缓冲中'
 }
 
-const handleVideoError = () => {
+const probeStreamAvailability = async () => {
+  if (useMockPlayer.value) return ''
+  try {
+    const response = await fetch(withBase(`/api/videos/${id.value}/stream`), {
+      method: 'GET',
+      headers: { Range: 'bytes=0-1' }
+    })
+    if (response.ok || response.status === 206) return ''
+    try {
+      const payload = await response.json()
+      if (typeof payload?.detail === 'string' && payload.detail.trim()) {
+        return payload.detail.trim()
+      }
+    } catch {
+      // ignore json parse failure for non-json stream errors
+    }
+    return `视频流请求失败（HTTP ${response.status}）`
+  } catch (err) {
+    return extractErrorMessage(err, '视频流请求失败，请检查网络与后端地址。')
+  }
+}
+
+const handleVideoError = async () => {
   playerState.value = '播放失败'
-  pageError.value = '视频流加载失败。请确认后端服务在线、手机与 Mac 在同一网络，并且该视频文件仍存在。'
+  if (streamProbeBusy.value) return
+  streamProbeBusy.value = true
+  const probeDetail = await probeStreamAvailability()
+  streamProbeBusy.value = false
+  pageError.value = probeDetail
+    ? `视频流加载失败：${probeDetail}`
+    : '视频流加载失败。请确认后端服务在线、手机与 Mac 在同一网络，并且该视频文件仍存在。'
 }
 
 const applyPendingSeek = (element) => {

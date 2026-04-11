@@ -9,6 +9,7 @@
 ### 代码入口
 
 - 路由：`app/routers/search.py`
+- 视频流路由：`app/routers/video.py`
 - Schema：`app/schemas/search.py`
 - 搜索服务：`app/services/search/search.py`
 - 分片：`app/services/search/chunker.py`
@@ -30,6 +31,7 @@
 - 支持本地 `local` 后端对字幕时间窗分块做文本向量索引与搜索。
 - 支持按 `user_{user_id}_video_{video_id}_chunks` 规则隔离集合。
 - 支持搜索接口、手动触发索引接口、索引状态接口。
+- 支持 iOS/WKWebView 播放预检：`/api/videos/{video_id}/stream` 同时支持 `HEAD` 与 `Range`（206）响应。
 - 支持后台索引任务状态流转：`pending -> processing -> completed/failed`。
 - 支持在视频处理完成后按配置自动提交索引任务。
 - 搜索结果已回填字幕预览文本 `preview_text`。
@@ -161,6 +163,12 @@ python -m compileall backend_fastapi/app backend_fastapi/scripts scripts/hooks s
 ### 查看索引状态
 
 `GET /api/search/videos/{video_id}/index/status`
+
+### 视频流播放（iOS/WKWebView 关键链路）
+
+- `GET /api/videos/{video_id}/stream`
+- `HEAD /api/videos/{video_id}/stream`
+- 支持 `Range: bytes=start-end`，返回 `206 Partial Content` 与 `Content-Range`，兼容拖动与分段加载。
 
 ## 验收建议
 

@@ -1,5 +1,15 @@
 # 变更日志
 
+## 2026-04-11
+
+### iOS 真机播放链路修复：搜索卡片跳转后视频流加载失败
+- **backend_fastapi**：更新 `app/routers/video.py`，新增 `HEAD /api/videos/{video_id}/stream`，兼容 iOS/WKWebView 在播放前的预检请求；并将流文件解析改为“优先 `processed_filepath`，回退 `filepath`”，避免原始文件缺失时误报不可播放。
+- **backend_fastapi**：更新 `tests/api/test_video_api.py`，补充视频流 `HEAD` 预检与 `processed_filepath` 回退播放测试用例，覆盖真机播放关键路径。
+- **mobile-frontend**：更新 `src/views/Search.vue`，点击搜索结果前先校验目标视频是否存在；若后端返回 404，则自动从当前结果移除该卡片并提示重新搜索，避免进入播放器后才失败。
+- **mobile-frontend**：更新 `src/views/Player.vue`，播放器出错时增加一次 `Range bytes=0-1` 诊断探测，优先展示后端返回的真实错误原因（例如 404/网络不可达），减少“统一报错文案”造成的排障成本。
+- **ios-app**：同步 `ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js` 与 `index.css`，确保 `WKWebView` 真机加载到本次前端修复产物。
+- **validation**：`python scripts/validate_backend_smoke.py`、`npm run build:ios`、`bash ios-app/sync_ios_web_assets.sh`、`pre-commit run --all-files`、`bash scripts/hooks/pre_push.sh`。
+
 ## 2026-04-10
 
 ### 语义搜索后端韧性增强与无效视频清理对齐
