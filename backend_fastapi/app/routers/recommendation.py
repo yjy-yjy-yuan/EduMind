@@ -22,6 +22,7 @@ from app.services.video_recommendation_service import list_recommendation_scenes
 from app.services.video_recommendation_service import load_candidate_videos_for_recommendation
 from app.services.video_recommendation_service import normalize_scene
 from app.services.video_recommendation_service import recommend_videos
+from app.services.video_recommendation_service import summarize_recommendation_sources
 from app.services.video_url_import_service import import_remote_video_from_url
 from app.utils.auth_deps import resolve_user_from_request
 from fastapi import APIRouter
@@ -91,6 +92,164 @@ def _url_host(url: str) -> str:
     except ValueError:
         host = ""
     return (host or "")[:120]
+
+
+def _is_external_import_candidate(item: dict) -> bool:
+    """判断是否为可自动入库的站外候选。"""
+    if not isinstance(item, dict):
+        return False
+    if not bool(item.get("is_external")):
+        return False
+    if str(item.get("item_type") or "").strip().lower() != "external_candidate":
+        return False
+    if not bool(item.get("can_import")):
+        return False
+    return bool(str(item.get("external_url") or "").strip())
+
+
+def _serialize_materialized_recommendation_item(*, source_item: dict, video: Video, duplicate: bool) -> dict:
+    """把站外候选自动入库结果转成可直接打开的视频推荐项。"""
+    payload = serialize_video(video)
+    tags = payload.get("tags") if isinstance(payload.get("tags"), list) else []
+    external_source_label = str(
+        source_item.get("source_label") or source_item.get("external_source_label") or "站外推荐"
+    ).strip()
+    source_label = f"已入库·{external_source_label}" if external_source_label else "已入库·站外推荐"
+    status = str(payload.get("status") or "")
+    processing_origin = payload.get("processing_origin")
+    return {
+        "id": video.id,
+        "title": payload.get("title") or source_item.get("title"),
+        "status": status,
+        "upload_time": video.upload_time,
+        "summary": payload.get("summary") or source_item.get("summary"),
+        "tags": tags or list(source_item.get("tags") or []),
+        "process_progress": float(payload.get("process_progress") or 0),
+        "current_step": str(payload.get("current_step") or ""),
+        "processing_origin": processing_origin,
+        "processing_origin_label": payload.get("processing_origin_label"),
+        "upload_source": payload.get("upload_source"),
+        "upload_source_label": payload.get("upload_source_label"),
+        "recommendation_score": float(source_item.get("recommendation_score") or 0),
+        "reason_code": str(source_item.get("reason_code") or "external_discovery"),
+        "reason_label": str(source_item.get("reason_label") or "已导入"),
+        "reason_text": str(source_item.get("reason_text") or "已自动导入到视频库，可直接继续处理链路。"),
+        "is_external": False,
+        "item_type": "video",
+        "source_label": source_label,
+        "external_source_label": external_source_label or None,
+        "external_url": str(source_item.get("external_url") or "").strip() or None,
+        "subject": source_item.get("subject"),
+        "cluster_key": source_item.get("cluster_key"),
+        "author": source_item.get("author"),
+        "provider": "internal",
+        "can_import": False,
+        "import_hint": (
+            "该推荐已存在于你的视频库中，已直接对齐到现有记录。"
+            if duplicate
+            else "该推荐已自动入库，可直接打开详情继续处理。"
+        ),
+        "action_type": "open_video_detail",
+        "action_label": "打开详情",
+        "action_target": f"/videos/{video.id}",
+        "action_api": None,
+        "action_method": None,
+        "materialized_from_external": True,
+        "materialization_status": "reused" if duplicate else "created",
+    }
+
+
+def _refresh_payload_counters(payload: dict) -> None:
+    """在条目被自动入库替换后，刷新计数与来源摘要。"""
+    items = list(payload.get("items") or [])
+    payload["internal_item_count"] = sum(1 for item in items if not bool(item.get("is_external")))
+    payload["external_item_count"] = sum(1 for item in items if bool(item.get("is_external")))
+    payload["sources"] = summarize_recommendation_sources(items)
+
+
+def _auto_import_external_recommendations(
+    *,
+    payload: dict,
+    db: Session,
+    user_id: Optional[int],
+    trace_id: str,
+) -> dict:
+    """对登录用户把可导入站外候选自动写入 videos，再返回可打开的视频条目。"""
+    payload["flow_version"] = "recommendation_flow_v2"
+    payload["auto_materialized_external_count"] = 0
+    payload["auto_materialization_failed_count"] = 0
+
+    if not getattr(settings, "RECOMMENDATION_AUTO_IMPORT_EXTERNAL", True):
+        return payload
+    if not user_id:
+        return payload
+
+    max_items = max(0, int(getattr(settings, "RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS", 2)))
+    if max_items <= 0:
+        return payload
+
+    process_options = build_processing_options()
+    materialized_count = 0
+    failed_count = 0
+    attempted_count = 0
+    updated_items: list[dict] = []
+    for item in list(payload.get("items") or []):
+        if attempted_count >= max_items or not _is_external_import_candidate(item):
+            updated_items.append(item)
+            continue
+
+        attempted_count += 1
+        video_url = str(item.get("external_url") or "").strip()
+        try:
+            result = import_remote_video_from_url(
+                db,
+                user_id=user_id,
+                video_url=video_url,
+                process_options=process_options,
+                preferred_title=str(item.get("title") or "").strip(),
+                preferred_summary=str(item.get("summary") or "").strip(),
+                preferred_tags=list(item.get("tags") or []),
+                request_source="recommendation_auto_materialize",
+            )
+            updated_items.append(
+                _serialize_materialized_recommendation_item(
+                    source_item=item,
+                    video=result.video,
+                    duplicate=result.duplicate,
+                )
+            )
+            materialized_count += 1
+        except Exception as exc:
+            failed_count += 1
+            updated_items.append(item)
+            _emit_recommendation_event(
+                trace_id=trace_id,
+                event_type="recommendation_external_materialization_failed",
+                status=AnalyticsStatus.DEGRADED.value,
+                latency_ms=None,
+                metadata={
+                    "url_host": _url_host(video_url),
+                    "error": str(exc)[:160],
+                },
+            )
+
+    payload["items"] = updated_items
+    payload["auto_materialized_external_count"] = materialized_count
+    payload["auto_materialization_failed_count"] = failed_count
+    _refresh_payload_counters(payload)
+    if attempted_count > 0:
+        _emit_recommendation_event(
+            trace_id=trace_id,
+            event_type="recommendation_external_materialization_completed",
+            status=AnalyticsStatus.OK.value if failed_count == 0 else AnalyticsStatus.DEGRADED.value,
+            latency_ms=None,
+            metadata={
+                "attempted_count": attempted_count,
+                "materialized_count": materialized_count,
+                "failed_count": failed_count,
+            },
+        )
+    return payload
 
 
 @router.get("/scenes", response_model=RecommendationSceneListResponse)
@@ -164,6 +323,17 @@ async def get_video_recommendations(
         include_external=include_external,
         coach=coach,
     )
+    if include_external:
+        payload = _auto_import_external_recommendations(
+            payload=payload,
+            db=db,
+            user_id=user.id if user is not None else None,
+            trace_id=trace_id,
+        )
+    else:
+        payload["flow_version"] = "recommendation_flow_v1"
+        payload["auto_materialized_external_count"] = 0
+        payload["auto_materialization_failed_count"] = 0
     payload["message"] = "获取推荐视频成功"
     latency_ms = (time.perf_counter() - t0) * 1000.0
     _emit_recommendation_event(

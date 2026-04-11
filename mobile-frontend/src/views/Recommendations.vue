@@ -19,7 +19,7 @@
       </div>
       <div class="hero__notice">
         <strong>这一页只保留推荐决策本身。</strong>
-        <span>站内内容可直接打开详情；站外候选会继续走导入学习链路，不再单独拆成说明卡片。</span>
+        <span>登录状态下，站外可导入候选会优先自动入库，再返回可直接打开详情的学习条目。</span>
       </div>
     </header>
 
@@ -51,6 +51,9 @@
       <div v-if="activeExternalFetchBanner" class="message message--warn">
         <span>{{ activeExternalFetchBanner }}</span>
       </div>
+      <div v-if="activeAutoMaterializeBanner" class="message message--hint">
+        <span>{{ activeAutoMaterializeBanner }}</span>
+      </div>
     </section>
 
     <section class="panel ios-card">
@@ -80,7 +83,7 @@
         </button>
       </div>
       <div v-if="filteredSceneExternalCount > 0" class="message message--hint">
-        当前场景里含 {{ filteredSceneExternalCount }} 条站外候选。点击后会继续走导入学习，不会直接当作站内视频播放。
+        当前场景里仍有 {{ filteredSceneExternalCount }} 条站外候选未自动入库；点击后会继续走导入学习链路。
       </div>
       <div v-if="activeSceneError" class="message message--error" role="alert">
         <span>{{ activeSceneError }}</span>
@@ -198,7 +201,6 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getRecommendationScenes, getVideoRecommendations } from '@/api/recommendation'
-import { shouldIncludeExternalRecommendationsByDefault } from '@/config'
 import {
   isRecommendationPrimaryActionDisabled,
   parseRecommendationActionTarget,
@@ -250,7 +252,10 @@ const createRecommendationMeta = () => ({
   internalItemCount: 0,
   externalItemCount: 0,
   externalFailedProviderCount: 0,
-  externalFetchFailed: false
+  externalFetchFailed: false,
+  flowVersion: 'recommendation_flow_v1',
+  autoMaterializedExternalCount: 0,
+  autoMaterializationFailedCount: 0
 })
 const buildRecommendationMeta = (payload) => ({
   sources: normalizeRecommendationSources(payload),
@@ -259,7 +264,10 @@ const buildRecommendationMeta = (payload) => ({
   internalItemCount: normalizeRecommendationCount(payload, 'internal_item_count'),
   externalItemCount: normalizeRecommendationCount(payload, 'external_item_count'),
   externalFailedProviderCount: normalizeRecommendationCount(payload, 'external_failed_provider_count'),
-  externalFetchFailed: Boolean(payload?.external_fetch_failed ?? payload?.data?.external_fetch_failed ?? false)
+  externalFetchFailed: Boolean(payload?.external_fetch_failed ?? payload?.data?.external_fetch_failed ?? false),
+  flowVersion: String(payload?.flow_version ?? payload?.data?.flow_version ?? 'recommendation_flow_v1'),
+  autoMaterializedExternalCount: normalizeRecommendationCount(payload, 'auto_materialized_external_count'),
+  autoMaterializationFailedCount: normalizeRecommendationCount(payload, 'auto_materialization_failed_count')
 })
 
 const formatTimeText = (rawValue) => {
@@ -393,7 +401,15 @@ const setSceneMeta = (scene, payload) => { sceneMetaMap.value = { ...sceneMetaMa
 const toggleTag = (tag) => { selectedTag.value = selectedTag.value === tag ? '' : tag }
 const activeExternalFetchBanner = computed(() => {
   if (!activeSceneMeta.value.externalFetchFailed) return ''
-  return '部分站外来源未返回结果，站内推荐仍可使用。可检查网络后刷新，或通过环境变量 VITE_RECOMMENDATION_INCLUDE_EXTERNAL 控制是否默认拉取站外。'
+  return '部分站外来源未返回结果，站内推荐仍可使用。可检查网络后刷新本场景重试。'
+})
+const activeAutoMaterializeBanner = computed(() => {
+  const count = Number(activeSceneMeta.value.autoMaterializedExternalCount || 0)
+  const failed = Number(activeSceneMeta.value.autoMaterializationFailedCount || 0)
+  if (count > 0 && failed > 0) return `已自动入库 ${count} 条站外推荐，另有 ${failed} 条入库失败，可稍后刷新重试。`
+  if (count > 0) return `已自动入库 ${count} 条站外推荐，可直接打开详情并继续视频处理链路。`
+  if (failed > 0) return `本场景有 ${failed} 条站外推荐自动入库失败，保留为候选链接。`
+  return ''
 })
 
 const scoreRelatedFallbackCandidate = (seedItem, candidate) => {
@@ -468,7 +484,7 @@ const loadScene = async (scene, { force = false } = {}) => {
     const res = await getVideoRecommendations({
       scene,
       limit: 6,
-      include_external: shouldIncludeExternalRecommendationsByDefault()
+      include_external: true
     })
     const payload = res?.data || {}
     const items = normalizeRecommendationItems(payload)
@@ -503,7 +519,7 @@ const loadRelatedByItem = async (item) => {
       scene: 'related',
       seed_video_id: item.id,
       limit: 4,
-      include_external: shouldIncludeExternalRecommendationsByDefault()
+      include_external: true
     })
     const payload = res?.data || {}
     relatedExternalFetchFailed.value = Boolean(payload?.external_fetch_failed)

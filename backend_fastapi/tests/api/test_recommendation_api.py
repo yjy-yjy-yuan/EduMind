@@ -303,6 +303,66 @@ class TestRecommendationAPI:
         assert external_item["action_type"] == "import_external_url"
         assert external_item["action_target"].startswith("/upload?mode=url&url=")
 
+    def test_home_recommendations_auto_materialize_external_for_authenticated_user(
+        self, client, db, sample_user, monkeypatch
+    ):
+        """登录用户命中站外可导入候选时，应先入库再返回可打开详情的推荐项。"""
+        from app.core.config import settings
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+        from app.utils.auth_token import build_auth_token
+
+        internal_video = Video(
+            user_id=sample_user.id,
+            title="高数导数专题",
+            filename="math.mp4",
+            filepath="/tmp/math.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="围绕导数定义与函数单调性做复盘。",
+            tags='["导数","函数"]',
+        )
+        db.add(internal_video)
+        db.commit()
+
+        monkeypatch.setattr(settings, "RECOMMENDATION_AUTO_IMPORT_EXTERNAL", True)
+        monkeypatch.setattr(settings, "RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS", 1)
+        monkeypatch.setattr(
+            recommendation_service,
+            "fetch_external_candidates_report",
+            fake_fetch_external_candidates_report,
+        )
+        monkeypatch.setattr("app.core.executor.submit_task", lambda *args, **kwargs: None)
+
+        response = client.get(
+            "/api/recommendations/videos",
+            params={"scene": "home", "limit": 4, "include_external": True},
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["flow_version"] == "recommendation_flow_v2"
+        assert payload["auto_materialized_external_count"] == 1
+        assert payload["auto_materialization_failed_count"] == 0
+        assert payload["external_item_count"] == 0
+        assert payload["internal_item_count"] >= 2
+        materialized_item = next(item for item in payload["items"] if item.get("materialized_from_external") is True)
+        assert materialized_item["is_external"] is False
+        assert materialized_item["item_type"] == "video"
+        assert materialized_item["action_type"] == "open_video_detail"
+        assert materialized_item["action_target"].startswith("/videos/")
+        assert materialized_item["materialization_status"] in {"created", "reused"}
+
+        created = (
+            db.query(Video)
+            .filter(Video.user_id == sample_user.id, Video.url == "https://www.youtube.com/watch?v=abc123")
+            .first()
+        )
+        assert created is not None
+        assert created.status.value == "downloading"
+
     def test_import_external_recommendation_creates_downloading_record(self, client, db, sample_user, monkeypatch):
         """推荐候选应能直接走后端链接下载入库链路。"""
         from app.models.video import Video

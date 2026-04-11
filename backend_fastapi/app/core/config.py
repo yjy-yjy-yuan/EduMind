@@ -93,6 +93,9 @@ class Settings(BaseSettings):
     RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS: float = 8.0
     RECOMMENDATION_EXTERNAL_FETCH_PARALLEL: bool = True
     RECOMMENDATION_EXTERNAL_FETCH_RETRIES: int = 1
+    # 推荐页对站外候选自动入库（仅登录用户生效），入库后返回可直接打开的视频详情项
+    RECOMMENDATION_AUTO_IMPORT_EXTERNAL: bool = True
+    RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS: int = 2
     # 推荐 API 契约版本（响应体 contract_version，与 docs 中 Recommendation Contract 对齐）
     RECOMMENDATION_CONTRACT_VERSION: str = "1"
     # 推荐域是否写入 app.analytics.telemetry（结构化 JSON 行）

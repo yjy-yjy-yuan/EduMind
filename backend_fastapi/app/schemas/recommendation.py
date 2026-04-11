@@ -60,6 +60,8 @@ class RecommendationVideoItem(BaseModel):
     action_target: Optional[str] = None
     action_api: Optional[str] = None
     action_method: Optional[str] = None
+    materialized_from_external: bool = False
+    materialization_status: Optional[str] = None
 
 
 class RecommendationSourceItem(BaseModel):
@@ -108,6 +110,9 @@ class VideoRecommendationResponse(BaseModel):
     external_item_count: int = 0
     external_failed_provider_count: int = 0
     external_fetch_failed: bool = False
+    flow_version: str = "recommendation_flow_v1"
+    auto_materialized_external_count: int = 0
+    auto_materialization_failed_count: int = 0
     coach_summary: Optional[str] = Field(default=None, description="可选：模板或 LLM 一句话说明，默认不返回")
     sources: List[RecommendationSourceItem] = Field(default_factory=list)
     external_query: Optional[RecommendationExternalQuery] = None

@@ -2,6 +2,13 @@
 
 ## 2026-04-11
 
+### 视频推荐闭环 v2：站外候选自动入库后返回可打开条目
+- **backend_fastapi**：`GET /api/recommendations/videos` 在登录态、开启站外推荐时，会优先把可导入站外候选自动写入 `videos` 并提交下载处理，再返回可直接打开详情的推荐项（`action_type=open_video_detail`），减少“看得到推荐却找不到视频”的断层。
+- **backend_fastapi**：新增配置 `RECOMMENDATION_AUTO_IMPORT_EXTERNAL`、`RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS`；响应补充 `flow_version`、`auto_materialized_external_count`、`auto_materialization_failed_count`，并新增自动入库成功/失败遥测事件。
+- **tests**：`backend_fastapi/tests/api/test_recommendation_api.py` 新增登录态自动入库回归用例；继续覆盖无 Bearer 401 与无效 Bearer 不回退 legacy 的负向路径。
+- **mobile-frontend**：`Recommendations.vue` 增加“自动入库结果”提示文案，明确当前场景已自动导入多少条站外推荐，失败多少条；推荐中心页固定请求站外候选（`include_external=true`），避免用户进入推荐页却看不到站外推荐结果。
+- **docs**：`README.md` 与 `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 同步闭环 v2 行为说明；`README.md` 内文档链接改为仓库相对路径；契约 §9 增补 P1-C095（`flow_version`、自动入库计数与条目字段）、闭环 v2 配置与遥测事件说明。
+
 ### 智能体编排：学习流治理管道与预算硬限流
 - **backend_fastapi**：新增 `app/agents/` 编排域模块：`learning_flow_pipeline` 固定 Planner → Executor → Validator；`governance/gateway.py` 作为学习流唯一工具执行入口，`lf_*` 白名单与参数校验落地，异常统一归一为治理错误。
 - **backend_fastapi**：`TokenBudget` 增加超额中断能力，预算不足时抛出 `BudgetExceededError`（继承 `GovernanceError`）；`/api/agent/execute` 统一把治理错误映射为 HTTP 400，返回结构保持稳定。
