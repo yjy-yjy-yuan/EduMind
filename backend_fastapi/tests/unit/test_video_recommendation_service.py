@@ -221,6 +221,7 @@ def test_recommend_videos_include_external_candidates(monkeypatch):
         include_external=True,
     )
 
+    assert payload["contract_version"] == "1"
     assert any(item["id"] == internal_video.id for item in payload["items"])
     assert any(item.get("is_external") is True for item in payload["items"])
     external_item = next(item for item in payload["items"] if item.get("is_external") is True)

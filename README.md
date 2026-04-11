@@ -296,6 +296,7 @@ POST /api/videos/{video_id}/generate-tags
    - 暂不可直接导入：打开原始来源页，而不是伪装成已入库视频
 5. 推荐页里的“看同主题”会围绕当前站内视频加载 `related` 推荐；若接口暂无结果或请求失败，前端会用当前页已加载的站内内容做同主题兜底，并在当前页“相关推荐”区域内展示结果。
 6. `related` 场景在扩站外候选时，会优先继承 seed 视频的原始来源平台语境；例如当前视频来自 YouTube 时，同主题站外候选会优先同来源 provider。
+7. 推荐 API 响应体包含 `contract_version`（默认 `"1"`，与 `RECOMMENDATION_CONTRACT_VERSION` 一致）；推荐相关请求支持 `X-Trace-Id` / `X-Request-Id` 透传，响应头回传相同 trace 便于前后端对账。完整可测试清单见 `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 第九节（Recommendation Contract v1）。
 
 ## 视频上下文问答
 

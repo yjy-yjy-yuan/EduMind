@@ -97,6 +97,7 @@ class VideoRecommendationResponse(BaseModel):
     """推荐视频列表响应。"""
 
     message: str
+    contract_version: str = Field(default="1", description="Recommendation Contract 版本号，用于渐进升级与灰度观测")
     scene: str
     strategy: str
     personalized: bool = False

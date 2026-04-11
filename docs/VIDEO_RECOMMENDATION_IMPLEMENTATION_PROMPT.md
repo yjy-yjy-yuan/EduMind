@@ -266,3 +266,91 @@
 3. 不是只推站内视频，而是能返回外部候选源结果，且来源清晰可辨。
 4. 不是把外部结果停留在浏览，而是能接回现有“链接导入 -> 处理 -> 学习”的主链路。
 5. 不是只在浏览器里看起来正常，而是在 iOS `WKWebView` 中也可正常使用。
+
+## 九、Recommendation Contract v1（冻结，基线：2026-04-11）
+
+本节为推荐子系统的**单一事实源（SSOT）**：工单拆分、测试用例与渐进升级应与本节对齐；与 `AGENTS.md` 冲突时以仓库规范为准，并在此节追加「更正说明」。
+
+### 架构与交付角色（执行提示词摘要）
+
+以高级系统架构师 / 技术负责人身份推进「相似性视频推荐」重构：需求澄清 → 方案 → 实现 → 测试 → `WKWebView` 验证 → 演示交付。UI 须与现有 `mobile-frontend/` 一致、简洁可信；业务与排序**仅在后端**；遵守增量 TDD、可回滚提交、`CHANGELOG.md` 仅追加等仓库规则。
+
+### 契约分级说明
+
+- **P0**：上线与互操作性底线，未满足不得标为完成。
+- **P1**：可观测、对账、渐进升级与治理增强。
+- **P2**：实验、解释接口、弱网/A-B 等增强项。
+
+### A. API 契约（后端对外）
+
+| ID | 要求 |
+|----|------|
+| P0-C001 | `GET /api/recommendations/scenes` 必须返回 200，响应体包含 `message` 与 `scenes[]`。 |
+| P0-C002 | `scenes[].value` 只允许 `home\|continue\|review\|related`。 |
+| P0-C003 | `scenes[].requires_seed=true` 仅允许出现在 `related`。 |
+| P0-C004 | `GET /api/recommendations/videos` 支持参数：`scene`、`limit`(1..12)、`include_external`、`coach`、`seed_video_id`、`exclude_video_ids`、`user_id`(legacy)。 |
+| P0-C005 | `scene=related` 且缺少 `seed_video_id` 必须返回 422，`detail="scene=related 时必须传入 seed_video_id"`。 |
+| P0-C006 | `seed_video_id` 不存在必须返回 404，`detail="seed 视频不存在"`。 |
+| P0-C007 | `scene` 非法值必须自动归一到 `home`，不得 500。 |
+| P0-C008 | `exclude_video_ids` 必须支持逗号分隔整数，非法片段忽略，不得 500。 |
+| P0-C009 | `Authorization: Bearer <token>` 有效时，`personalized=true/false` 按真实兴趣信号计算。 |
+| P0-C010 | 无 token 时接口仍可用，降级为非个性化推荐，不返回 401。 |
+| P0-C011 | `message` 固定为「获取推荐视频成功」。 |
+| P0-C012 | `strategy` 必须可追踪：`video_status_interest_v1`（无站外）或 `video_status_interest_external_v2`（含站外）。 |
+| P0-C013 | `POST /api/recommendations/import-external` 入参沿用 `VideoUploadURL` 契约，至少包含 `url`。 |
+| P0-C014 | `import-external` 成功返回 `VideoUploadResponse`，且 `status` 为 `downloading\|pending\|processing` 之一。 |
+| P0-C015 | 重复导入须走现有去重语义（`duplicate=true`），不得重复造脏数据。 |
+| P1-C016 | 新增 `request_id`/`trace_id` 回传头（如 `X-Trace-Id`），便于前后端对账。 |
+| P1-C017 | `videos` 接口增加 `contract_version` 字段，便于渐进升级。 |
+| P2-C018 | 可选 `POST /api/recommendations/explain`，默认模板，不依赖强制 LLM。 |
+
+### B. 响应字段契约（`/api/recommendations/videos`）
+
+| ID | 要求 |
+|----|------|
+| P0-C019 | 顶层字段稳定：`scene`、`strategy`、`personalized`、`fallback_used`、`seed_video_id`、`seed_video_title`、`internal_item_count`、`external_item_count`、`external_failed_provider_count`、`external_fetch_failed`、`sources`、`external_query`、`external_providers`、`items`、`coach_summary`；以及 **`contract_version`**（P1-C017）。 |
+| P0-C020～C030 | `items` 永不为 `null`；计数一致；`sources` / `external_query` / `external_providers` / 单条 `item` 字段与站内外动作语义见原冻结清单（`reason_code`、`action_type`、可导入与不可导入分支等）。 |
+| P1-C031 | `reason_code` 枚举白名单文档化（见 D 段）。 |
+| P1-C032 | `recommendation_score` 保留 2 位小数，禁止字符串化。 |
+| P2-C033 | 可选 `rank_index` 字段，便于 A/B 与回放。 |
+
+### C. 请求参数与输入校验
+
+P0-C034～C038：limit 边界、`RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT`、`RECOMMENDATION_MAX_CANDIDATES_SCAN`、`related` 排除 seed、`exclude_video_ids` 对站内与 fallback 同时生效。P1：scene 大小写兼容、`user_id` 仅 legacy。P2：locale/lang 预留。
+
+### D. 排序、理由、降级
+
+P0-C042～C048：主题信号优先、四场景差异化、`related` 同主题优先、站外同 provider 语境、`fallback_used` 触发条件唯一、站外失败不拖垮主接口、空结果合法。P1-C049：`reason_code` 白名单。P1-C050：`coach_summary` 不阻塞主链路。P2-C051：冷启动策略版本号。
+
+### E. 外部来源与合规（治理）
+
+P0-C052～C057：轻量元数据、域名白名单集中配置、超时/重试/并行可开关、失败可见、缓存键维度。P1-C058～C059：import 前 URL 校验、治理执行入口不可绕过。P2-C060：版权与外链分地区配置。
+
+### F. 可观测性与复利
+
+P0-C061～C063：接入 `app.analytics.telemetry`；事件含 `event_type`、`trace_id`、`module`、`status`、`latency_ms`、`metadata`；建议事件集：`recommendation_request_received`、`recommendation_ranking_completed`、`recommendation_external_fetch_completed`、`recommendation_external_fetch_failed`、`recommendation_fallback_used`、`recommendation_import_external_*`。P1-C064～C066：Trace 透传、告警阈值、轨迹导出。P2-C067：效果指标沉淀。
+
+### G. 前端与 iOS
+
+P0-C068～C073：四态 UI、related loading 与 seed 固定、站内外区分、动作跟随后端 `action_type`、`WKWebView` 验证。P1-C074 / P2-C075：可访问性与弱网。
+
+### H. 兼容、发布、回滚
+
+P0-C076～C078：不破坏现有解析；新增字段向后兼容；可回退站内-only + recent fallback。P1-C079～C080：特性开关与版本化灰度。P2-C081：A/B 归档。
+
+### I. 测试契约
+
+P0-C082～C087：API/排序/站外隔离/fallback/import/本地验证链（`validate_backend_smoke`、`compileall`、`build:ios`、`sync_ios_web_assets`、`validate_ios_build`）。P1-C088～C089：遥测与轨迹导出。P2-C090：离线策略对比。
+
+### J. 文档与变更记录
+
+P0-C091～C092：API/行为变化同步 `README.md` 与 `docs/*recommendation*`；`CHANGELOG.md` 仅追加。P1-C093：以**本节**为 SSOT，避免 prompt 分叉。P2-C094：运行手册。
+
+### 实现状态速查（维护时请更新）
+
+| 条目 | 说明 |
+|------|------|
+| P1-C016 / P1-C064 | `GET/POST /api/recommendations/*` 回传 `X-Trace-Id` 与 `X-Request-Id`（与上游透传一致时可对账）。 |
+| P1-C017 | 响应体含 `contract_version`，默认与 `settings.RECOMMENDATION_CONTRACT_VERSION` 一致。 |
+| P0-C061～C063 | `RECOMMENDATION_TELEMETRY_ENABLED` 为真时写入推荐域 telemetry 事件（见路由层）。 |
+| 其余 P0 | 以现有 `recommendation` 路由、`video_recommendation_service`、`Recommendations.vue` 为准持续对齐；缺口在 issue/下一迭代关闭。 |

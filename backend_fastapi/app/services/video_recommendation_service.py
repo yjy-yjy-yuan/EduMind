@@ -12,6 +12,7 @@ from typing import Optional
 from urllib.parse import urlencode
 from urllib.parse import urlparse
 
+from app.core.config import settings
 from app.models.user import User
 from app.models.video import Video
 from app.models.video import VideoStatus
@@ -1035,6 +1036,7 @@ def recommend_videos(
         else None
     )
     return {
+        "contract_version": settings.RECOMMENDATION_CONTRACT_VERSION,
         "scene": normalized_scene,
         "strategy": "video_status_interest_external_v2" if include_external else "video_status_interest_v1",
         "personalized": bool(user_tokens),

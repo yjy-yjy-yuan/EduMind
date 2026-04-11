@@ -2,6 +2,13 @@
 
 ## 2026-04-11
 
+### 视频推荐：契约 v1 对齐（contract_version、Trace、telemetry）
+- **backend_fastapi**：`VideoRecommendationResponse` 增加 `contract_version`；`recommend_videos` 写入 `settings.RECOMMENDATION_CONTRACT_VERSION`；`/api/recommendations/scenes|videos|import-external` 回传 `X-Trace-Id`/`X-Request-Id`（支持上游透传）；`RECOMMENDATION_TELEMETRY_ENABLED` 为真时通过 `app.analytics.telemetry` 发射推荐域事件（请求、排序完成、站外抓取、fallback、import 等）。
+- **backend_fastapi**：`Settings` 新增 `RECOMMENDATION_CONTRACT_VERSION`、`RECOMMENDATION_TELEMETRY_ENABLED`；CORS `expose_headers` 暴露 trace 响应头。
+- **docs**：`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 第九节收录冻结版 Recommendation Contract v1（SSOT）与实现速查。
+- **README**：「视频推荐当前行为」补充 `contract_version` 与 trace 对账说明。
+- **tests**：推荐 API/单测断言 `contract_version` 与 `X-Trace-Id`。
+
 ### iOS 真机播放链路修复：搜索卡片跳转后视频流加载失败
 - **backend_fastapi**：更新 `app/routers/video.py`，新增 `HEAD /api/videos/{video_id}/stream`，兼容 iOS/WKWebView 在播放前的预检请求；并将流文件解析改为“优先 `processed_filepath`，回退 `filepath`”，避免原始文件缺失时误报不可播放。
 - **backend_fastapi**：更新 `tests/api/test_video_api.py`，补充视频流 `HEAD` 预检与 `processed_filepath` 回退播放测试用例，覆盖真机播放关键路径。

@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS: float = 8.0
     RECOMMENDATION_EXTERNAL_FETCH_PARALLEL: bool = True
     RECOMMENDATION_EXTERNAL_FETCH_RETRIES: int = 1
+    # 推荐 API 契约版本（响应体 contract_version，与 docs 中 Recommendation Contract 对齐）
+    RECOMMENDATION_CONTRACT_VERSION: str = "1"
+    # 推荐域是否写入 app.analytics.telemetry（结构化 JSON 行）
+    RECOMMENDATION_TELEMETRY_ENABLED: bool = True
 
     # 语义搜索配置
     SEARCH_ENABLED: bool = False

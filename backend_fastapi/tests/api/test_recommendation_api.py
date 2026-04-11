@@ -50,12 +50,26 @@ class TestRecommendationAPI:
 
     def test_get_recommendation_scenes(self, client):
         """测试获取推荐场景列表。"""
-        response = client.get("/api/recommendations/scenes")
+        response = client.get("/api/recommendations/scenes", headers={"X-Trace-Id": "upstream-trace-1"})
         assert response.status_code == 200
+        assert response.headers.get("X-Trace-Id") == "upstream-trace-1"
 
         payload = response.json()
         assert payload["message"] == "获取推荐场景成功"
         assert {item["value"] for item in payload["scenes"]} >= {"home", "continue", "review", "related"}
+
+    def test_videos_contract_version_and_trace_headers(self, client):
+        """P1-C017 / P1-C016：响应含 contract_version，响应头含 X-Trace-Id。"""
+        response = client.get(
+            "/api/recommendations/videos",
+            params={"scene": "home", "limit": 1},
+            headers={"X-Trace-Id": "reco-trace-2"},
+        )
+        assert response.status_code == 200
+        assert response.headers.get("X-Trace-Id") == "reco-trace-2"
+        payload = response.json()
+        assert payload.get("contract_version") == "1"
+        assert payload.get("message") == "获取推荐视频成功"
 
     def test_home_recommendations_prioritize_active_video(self, client, db, sample_user):
         """首页推荐优先返回当前需要继续跟进的处理中视频。"""
