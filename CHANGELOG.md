@@ -2,6 +2,28 @@
 
 ## 2026-04-11
 
+### 视频推荐链路澄清修复：默认值对齐、首页兜底可见、前端分包
+
+- **docs**：修正文档默认值不一致：`README.md` 与 `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 中 `RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS` 默认值从 `4` 更正为 `2`，与后端 `Settings` 一致。
+- **docs**：`backend_fastapi/.env.example` 补充 `RECOMMENDATION_AUTO_IMPORT_EXTERNAL`、`RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS` 示例项，避免本地配置与实现默认值脱节。
+- **mobile-frontend**：`Home.vue` 在推荐接口失败但已回退到视频库兜底时，新增轻提示「当前展示的是兜底结果」，避免用户误以为是实时推荐结果；并区分“空结果兜底”和“接口失败兜底”。
+- **mobile-frontend**：`src/router/index.js` 改为路由级懒加载，减少首包体积、缓解 `index.js` 过大告警风险（不改变路由行为）。
+- **mobile-frontend**：`vite.config.js` 为 iOS 单文件构建（`iife + inlineDynamicImports`）补充 `chunkSizeWarningLimit` 与注释，避免该模式下持续出现误导性 500KB 告警。
+
+### 推荐运营聚合持久化（P2）：跨进程与重启后口径稳定
+
+- **backend_fastapi**：新增 `recommendation_ops_events` 持久化表（模型 `app/models/recommendation_ops_event.py`、迁移 `migrations/add_recommendation_ops_events.sql`、`init_db.py` 与 `mysql_managed_schema.sql` 同步）。
+- **backend_fastapi**：`app/services/recommendation_ops_service.py` 改为“DB 优先 + 内存降级”聚合：`/api/recommendations/ops/metrics` 默认读数据库，返回 `data_source=database`；表缺失/DB 异常时自动回退 `memory_fallback`，不阻断主链路。
+- **backend_fastapi**：推荐路由 `_emit_recommendation_event` 在写 telemetry 的同时持久化事件（`trace_id`、`event_type`、`status`、`metadata_json`），并新增 `recommendation_ops_metrics_served` 的 `data_source` 元数据。
+- **tests**：`tests/api/test_recommendation_api.py` 增加“清空内存缓冲后仍可从 DB 恢复口径”回归用例，验证“第二天可继续工作”能力。
+- **docs**：`README.md` 与 `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 同步更新 `ops/metrics` 与 `P1-C096` 说明，补充 `data_source` 语义和 `RECOMMENDATION_OPS_EVENT_BUFFER_SIZE` 降级配置。
+
+### 视频推荐：首页与推荐页对齐入库闭环与动线说明
+
+- **mobile-frontend**：首页默认 `include_external=true`（`shouldIncludeExternalRecommendationsOnHome`，可由 `VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL` 关闭）；先加载视频列表再请求推荐，避免兜底竞态；展示自动入库条数提示、未登录空态引导登录；精简首页推荐摘要卡片并仅在无结果时展示 provider 诊断。
+- **mobile-frontend**：`Recommendations.vue` 补充三步流程说明与「与首页同一后端」提示。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 第七节半「用户动线」；`mobile-frontend/.env.example` 补充 `VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL`。
+
 ### 视频推荐闭环 v2：站外候选自动入库后返回可打开条目
 - **backend_fastapi**：`GET /api/recommendations/videos` 在登录态、开启站外推荐时，会优先把可导入站外候选自动写入 `videos` 并提交下载处理，再返回可直接打开详情的推荐项（`action_type=open_video_detail`），减少“看得到推荐却找不到视频”的断层。
 - **backend_fastapi**：新增配置 `RECOMMENDATION_AUTO_IMPORT_EXTERNAL`、`RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS`；响应补充 `flow_version`、`auto_materialized_external_count`、`auto_materialization_failed_count`，并新增自动入库成功/失败遥测事件。

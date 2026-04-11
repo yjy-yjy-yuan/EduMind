@@ -47,6 +47,9 @@ export default defineConfig(({ command, mode }) => {
       ? {
           modulePreload: false,
           cssCodeSplit: false,
+          // iOS WKWebView 采用单文件 iife 输出（inlineDynamicImports=true），
+          // 路由懒加载不会生成独立 chunk，默认 500KB 告警在该模式下噪声较大。
+          chunkSizeWarningLimit: 700,
           // Xcode may flatten copied resource paths; place hashed assets at bundle root for iOS build.
           assetsDir: '',
           rollupOptions: {

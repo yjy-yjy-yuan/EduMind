@@ -11,10 +11,13 @@ from app.analytics.schema import AnalyticsStatus
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.video import Video
+from app.schemas.recommendation import RecommendationOpsMetricsResponse
 from app.schemas.recommendation import RecommendationSceneListResponse
 from app.schemas.recommendation import VideoRecommendationResponse
 from app.schemas.video import VideoUploadResponse
 from app.schemas.video import VideoUploadURL
+from app.services.recommendation_ops_service import build_recommendation_ops_metrics
+from app.services.recommendation_ops_service import record_recommendation_event
 from app.services.video_api_service import build_processing_options
 from app.services.video_api_service import serialize_video
 from app.services.video_recommendation_service import SCENE_MAP
@@ -56,7 +59,18 @@ def _emit_recommendation_event(
     status: str,
     latency_ms: Optional[float] = None,
     metadata: Optional[dict] = None,
+    db: Optional[Session] = None,
 ) -> None:
+    try:
+        record_recommendation_event(
+            event_type=event_type,
+            status=status,
+            trace_id=trace_id,
+            metadata=dict(metadata or {}),
+            db=db,
+        )
+    except Exception:
+        pass
     if not getattr(settings, "RECOMMENDATION_TELEMETRY_ENABLED", True):
         return
     tid = (trace_id or "").strip() or settings.ANALYTICS_TRACE_ID_PLACEHOLDER
@@ -231,6 +245,7 @@ def _auto_import_external_recommendations(
                     "url_host": _url_host(video_url),
                     "error": str(exc)[:160],
                 },
+                db=db,
             )
 
     payload["items"] = updated_items
@@ -248,12 +263,13 @@ def _auto_import_external_recommendations(
                 "materialized_count": materialized_count,
                 "failed_count": failed_count,
             },
+            db=db,
         )
     return payload
 
 
 @router.get("/scenes", response_model=RecommendationSceneListResponse)
-async def get_recommendation_scenes(request: Request, response: Response):
+async def get_recommendation_scenes(request: Request, response: Response, db: Session = Depends(get_db)):
     """返回前端可直接渲染的推荐场景配置。"""
     trace_id = _resolve_trace_id(request)
     _attach_trace_headers(response, trace_id)
@@ -266,6 +282,7 @@ async def get_recommendation_scenes(request: Request, response: Response):
         status=AnalyticsStatus.OK.value,
         latency_ms=latency_ms,
         metadata={"scene_count": len(scenes)},
+        db=db,
     )
     return {"message": "获取推荐场景成功", "scenes": scenes}
 
@@ -299,6 +316,7 @@ async def get_video_recommendations(
         event_type="recommendation_request_received",
         status=AnalyticsStatus.OK.value,
         metadata={"scene": normalized_scene, "limit": limit, "include_external": include_external},
+        db=db,
     )
 
     if scene_option["requires_seed"] and not seed_video_id:
@@ -350,6 +368,7 @@ async def get_video_recommendations(
             "external_item_count": payload.get("external_item_count"),
             "contract_version": payload.get("contract_version"),
         },
+        db=db,
     )
     if payload.get("fallback_used"):
         _emit_recommendation_event(
@@ -358,6 +377,7 @@ async def get_video_recommendations(
             status=AnalyticsStatus.DEGRADED.value,
             latency_ms=None,
             metadata={"scene": payload.get("scene")},
+            db=db,
         )
     if include_external:
         if payload.get("external_fetch_failed"):
@@ -369,6 +389,7 @@ async def get_video_recommendations(
                 metadata={
                     "external_failed_provider_count": payload.get("external_failed_provider_count"),
                 },
+                db=db,
             )
         else:
             _emit_recommendation_event(
@@ -377,7 +398,45 @@ async def get_video_recommendations(
                 status=AnalyticsStatus.OK.value,
                 latency_ms=None,
                 metadata={"external_item_count": payload.get("external_item_count")},
+                db=db,
             )
+    return payload
+
+
+@router.get("/ops/metrics", response_model=RecommendationOpsMetricsResponse)
+async def get_recommendation_ops_metrics(
+    request: Request,
+    response: Response,
+    days: int = Query(default=7, ge=1, le=30, description="统计窗口（天）"),
+    user_id: Optional[int] = Query(default=None, description="兼容旧链路的用户 ID"),
+    authorization: Optional[str] = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    """推荐运营聚合指标：导入成功率与处理完成率。"""
+    trace_id = _resolve_trace_id(request)
+    _attach_trace_headers(response, trace_id)
+    t0 = time.perf_counter()
+    user = resolve_user_from_request(db, user_id, authorization)
+    if user is None:
+        raise HTTPException(status_code=401, detail="请先登录后查看推荐运营指标")
+
+    payload = build_recommendation_ops_metrics(db, window_days=days)
+    payload["message"] = "获取推荐运营指标成功"
+    latency_ms = (time.perf_counter() - t0) * 1000.0
+    _emit_recommendation_event(
+        trace_id=trace_id,
+        event_type="recommendation_ops_metrics_served",
+        status=AnalyticsStatus.OK.value,
+        latency_ms=latency_ms,
+        metadata={
+            "data_source": payload.get("data_source"),
+            "window_days": payload.get("window_days"),
+            "import_requested_count": payload.get("recommendation_import", {}).get("requested_count", 0),
+            "import_completed_count": payload.get("recommendation_import", {}).get("completed_count", 0),
+            "processing_tracked_count": payload.get("processing", {}).get("tracked_video_count", 0),
+        },
+        db=db,
+    )
     return payload
 
 
@@ -402,6 +461,7 @@ async def import_external_recommendation(
         event_type="recommendation_import_external_requested",
         status=AnalyticsStatus.STARTED.value,
         metadata={"url_host": _url_host(data.url or "")},
+        db=db,
     )
     process_options = build_processing_options(
         language=data.language,
@@ -429,6 +489,7 @@ async def import_external_recommendation(
             status=AnalyticsStatus.ERROR.value,
             latency_ms=latency_ms,
             metadata={"error": str(exc)[:200]},
+            db=db,
         )
         raise
     latency_ms = (time.perf_counter() - t0) * 1000.0
@@ -442,6 +503,7 @@ async def import_external_recommendation(
             "status": result.status,
             "duplicate": result.duplicate,
         },
+        db=db,
     )
     return VideoUploadResponse(
         id=result.video.id,

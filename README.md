@@ -290,7 +290,7 @@ POST /api/videos/{video_id}/generate-tags
 
 1. 后端按受限候选集扫描站内视频，不再无上限全表加载。
 2. 推荐接口支持 `home / continue / review / related` 四种场景。
-3. 首页默认通过 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 控制是否带站外候选（优先首屏稳定）；推荐中心页固定请求站外候选，用于保证推荐多样性与后续自动入库闭环。
+3. 首页「为你推荐」默认通过 `VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL`（默认 `true`）请求站外候选并与推荐中枢同一套入库闭环；弱网可改为 `false` 仅拉站内。历史变量 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 仍可在其它构建中复用。
 4. 站外候选会明确区分两类动作：
    - 可直接导入：进入现有 URL 导入链路
    - 暂不可直接导入：打开原始来源页，而不是伪装成已入库视频
@@ -299,6 +299,10 @@ POST /api/videos/{video_id}/generate-tags
 7. 推荐 API 响应体包含 `contract_version`（默认 `"1"`，与 `RECOMMENDATION_CONTRACT_VERSION` 一致）；推荐相关请求支持 `X-Trace-Id` / `X-Request-Id` 透传，响应头回传相同 trace 便于前后端对账。完整可测试清单见 `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 第九节（Recommendation Contract v1）。
 8. 在登录态且开启站外推荐时，后端会优先把可导入站外候选自动入库（`videos`）后再返回给前端；用户拿到的是可直接打开详情、可继续走“下载/处理/复盘”链路的条目，而不是只能二次跳转的占位候选。
 9. 自动入库由后端开关控制：`RECOMMENDATION_AUTO_IMPORT_EXTERNAL`（默认 `true`）与 `RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS`（默认 `2`，单次请求最多尝试入库的站外条数）；关闭前者则行为退化为仅返回站外候选、不自动写库。
+10. **用户动线（闭环）**：已登录且 Bearer 有效 → 前端带 `include_external=true` 请求推荐 → 后端对可导入站外候选调用链接导入并写入 `videos` → 返回项为站内视频（可打开详情、走下载/转写/摘要）。未登录时仍可能看到站外候选卡片，需走「链接导入」或先登录后再刷出已入库条目。
+11. 推荐运营聚合接口 `GET /api/recommendations/ops/metrics`（需登录）返回 `recommendation_import.success_rate` 与 `processing.completion_rate`；口径默认从 MySQL `recommendation_ops_events` 聚合，DB 不可用时降级到进程内缓冲（`data_source=memory_fallback`）。
+12. 首页在推荐接口失败或当前场景暂无命中时，会显式展示“当前为兜底结果”的轻提示，避免把视频库兜底误判为实时推荐结果。
+13. iOS `WKWebView` 构建使用单文件 `iife + inlineDynamicImports`；该模式下路由懒加载不会拆分独立 chunk，前端已通过 `chunkSizeWarningLimit` 与注释避免误导性体积告警。
 
 ## 视频上下文问答
 

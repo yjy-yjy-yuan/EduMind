@@ -4,8 +4,13 @@
       <div class="hero__copy">
         <p class="hero__eyebrow">Recommendation Hub</p>
         <h1 class="hero__title">推荐学习中枢</h1>
-        <p class="hero__desc">先选学习场景，再直接决定下一步看什么；如果需要延展，就从当前卡片继续展开同主题内容。</p>
+        <p class="hero__desc">选场景 → 看卡片 → 打开详情。登录后，站外链接会先写入你的视频库再展示，保证能走完整处理链路。</p>
       </div>
+      <ol class="hero__flow" aria-label="推荐使用步骤">
+        <li>选场景（首页/继续/复盘/相似）</li>
+        <li>点卡片：已入库视频进详情；未入库站外链接先导入再学习</li>
+        <li>站内视频可点「同主题」延展</li>
+      </ol>
       <div class="hero__actions">
         <button type="button" class="hero-btn hero-btn--ghost" @click="go('/upload')">去上传</button>
         <button type="button" class="hero-btn hero-btn--primary" @click="reloadAll" :disabled="pageLoading">
@@ -18,8 +23,8 @@
         <div class="hero-stat"><span>同主题</span><strong>{{ filteredRelatedItems.length }}</strong></div>
       </div>
       <div class="hero__notice">
-        <strong>这一页只保留推荐决策本身。</strong>
-        <span>登录状态下，站外可导入候选会优先自动入库，再返回可直接打开详情的学习条目。</span>
+        <strong>与首页「为你推荐」同一后端。</strong>
+        <span>登录后，可导入的站外候选会自动写入视频库，列表里出现的是真实视频 ID，可播放与继续处理。</span>
       </div>
     </header>
 
@@ -625,6 +630,7 @@ onMounted(reloadAll)
 }
 
 .hero__copy,
+.hero__flow,
 .hero__actions,
 .hero__stats,
 .hero__notice {
@@ -701,6 +707,19 @@ onMounted(reloadAll)
   font-size: 14px;
   line-height: 1.65;
   max-width: 32rem;
+}
+
+.hero__flow {
+  margin: 12px 0 0;
+  padding-left: 1.25rem;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #5b5268;
+  max-width: 36rem;
+}
+
+.hero__flow li {
+  margin-bottom: 4px;
 }
 
 .hero__actions,

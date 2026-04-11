@@ -100,6 +100,8 @@ class Settings(BaseSettings):
     RECOMMENDATION_CONTRACT_VERSION: str = "1"
     # 推荐域是否写入 app.analytics.telemetry（结构化 JSON 行）
     RECOMMENDATION_TELEMETRY_ENABLED: bool = True
+    # 推荐运营聚合 API 的内存事件缓冲上限（DB 异常时作为降级来源）
+    RECOMMENDATION_OPS_EVENT_BUFFER_SIZE: int = 5000
 
     # 语义搜索配置
     SEARCH_ENABLED: bool = False

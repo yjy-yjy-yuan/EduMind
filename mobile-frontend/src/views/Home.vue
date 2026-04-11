@@ -60,7 +60,7 @@
       </div>
 
       <div class="welcome__subnote">
-        <span>推荐页会继续承接站内学习与站外导入，首页只保留最重要的下一步。</span>
+        <span>登录后，站外可导入推荐会先写入你的视频库，再出现在下方卡片里，点进去即可走下载与处理全流程。</span>
       </div>
 
       <div class="stats">
@@ -153,34 +153,33 @@
     <section class="recommend-panel ios-card">
       <div class="section-head">
         <div>
-          <h2>推荐中枢预览</h2>
-          <p>首页只预览最值得继续的方向，真正的相关推荐和站外导入放进推荐页里完成。</p>
+          <h2>为你推荐</h2>
+          <p>与「推荐」页同一套接口：优先可继续学习的站内视频；有站外来源时，登录后会自动入库再展示，点开即可处理。</p>
         </div>
         <button class="overview-link" @click="reloadRecommendations" :disabled="recommendationLoading">
           {{ recommendationLoading ? '刷新中…' : '刷新推荐' }}
         </button>
       </div>
 
-      <div v-if="recommendations.length > 0" class="recommend-summary">
+      <div v-if="recommendations.length > 0" class="recommend-summary recommend-summary--compact">
         <article class="recommend-summary__card">
-          <span class="recommend-summary__label">当前预览</span>
+          <span class="recommend-summary__label">本页条数</span>
           <strong class="recommend-summary__value">{{ recommendations.length }}</strong>
-          <span class="recommend-summary__note">首页先看最值得继续的 {{ recommendations.length }} 条内容</span>
-        </article>
-        <article class="recommend-summary__card recommend-summary__card--soft">
-          <span class="recommend-summary__label">结果构成</span>
-          <strong class="recommend-summary__value">{{ recommendationMixValue }}</strong>
           <span class="recommend-summary__note">{{ recommendationMixNote }}</span>
         </article>
         <article class="recommend-summary__card recommend-summary__card--action">
-          <span class="recommend-summary__label">下一步</span>
-          <strong class="recommend-summary__value">进推荐页</strong>
-          <span class="recommend-summary__note">继续筛场景、看相关推荐或导入站外候选</span>
+          <span class="recommend-summary__label">更多场景</span>
+          <strong class="recommend-summary__value">推荐页</strong>
+          <span class="recommend-summary__note">继续学习 / 复盘 / 相似内容</span>
         </article>
       </div>
 
       <div v-if="recommendationQuerySummary" class="message message--hint">
-        <span>本轮站外检索围绕：{{ recommendationQuerySummary }}</span>
+        <span>检索主题：{{ recommendationQuerySummary }}</span>
+      </div>
+
+      <div v-if="homeAutoMaterializeBanner" class="message message--hint">
+        <span>{{ homeAutoMaterializeBanner }}</span>
       </div>
 
       <div v-if="recommendationExternalFetchBanner" class="message message--warn">
@@ -188,7 +187,11 @@
         <button type="button" class="overview-link" @click="go('/recommendations')">去推荐页</button>
       </div>
 
-      <div v-if="recommendationProviderReports.length > 0" class="recommend-provider-list">
+      <div v-if="homeRecommendationFallbackBanner" class="message message--hint">
+        <span>{{ homeRecommendationFallbackBanner }}</span>
+      </div>
+
+      <div v-if="showHomeProviderDiagnostics" class="recommend-provider-list">
         <article
           v-for="provider in recommendationProviderReports"
           :key="provider.provider"
@@ -212,7 +215,9 @@
 
       <div v-else-if="recommendations.length === 0" class="message">
         {{ recommendationEmptyText }}
-        <button class="overview-link" @click="go('/videos')">查看视频库</button>
+        <button v-if="!hasAuthToken" type="button" class="overview-link" @click="go('/login')">去登录</button>
+        <button type="button" class="overview-link" @click="go('/videos')">视频库</button>
+        <button type="button" class="overview-link" @click="go('/recommendations')">推荐页</button>
       </div>
 
       <div v-else class="recommend-list">
@@ -254,7 +259,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BrandLogo from '@/components/BrandLogo.vue'
 import { getVideoRecommendations } from '@/api/recommendation'
-import { shouldIncludeExternalRecommendationsByDefault } from '@/config'
+import { shouldIncludeExternalRecommendationsOnHome } from '@/config'
+import { storageGet } from '@/utils/storage'
 import {
   DEFAULT_SEARCH_SCOPE,
   SEARCH_ROUTE_AUTO_SEARCH_QUERY,
@@ -281,6 +287,7 @@ const loading = ref(false)
 const recommendationLoading = ref(false)
 const error = ref('')
 const recommendationError = ref('')
+const recommendationFallbackMode = ref('none')
 const allVideos = ref([])
 const localTranscriptCount = ref(0)
 const recommendations = ref([])
@@ -291,7 +298,10 @@ const recommendationMeta = ref({
   internalItemCount: 0,
   externalItemCount: 0,
   externalFailedProviderCount: 0,
-  externalFetchFailed: false
+  externalFetchFailed: false,
+  flowVersion: 'recommendation_flow_v1',
+  autoMaterializedExternalCount: 0,
+  autoMaterializationFailedCount: 0
 })
 
 const normalizeList = (payload) => {
@@ -317,7 +327,10 @@ const createRecommendationMeta = () => ({
   internalItemCount: 0,
   externalItemCount: 0,
   externalFailedProviderCount: 0,
-  externalFetchFailed: false
+  externalFetchFailed: false,
+  flowVersion: 'recommendation_flow_v1',
+  autoMaterializedExternalCount: 0,
+  autoMaterializationFailedCount: 0
 })
 const buildRecommendationMeta = (payload) => ({
   sources: normalizeRecommendationSources(payload),
@@ -326,7 +339,10 @@ const buildRecommendationMeta = (payload) => ({
   internalItemCount: normalizeRecommendationCount(payload, 'internal_item_count'),
   externalItemCount: normalizeRecommendationCount(payload, 'external_item_count'),
   externalFailedProviderCount: normalizeRecommendationCount(payload, 'external_failed_provider_count'),
-  externalFetchFailed: Boolean(payload?.external_fetch_failed || false)
+  externalFetchFailed: Boolean(payload?.external_fetch_failed || false),
+  flowVersion: String(payload?.flow_version || 'recommendation_flow_v1'),
+  autoMaterializedExternalCount: normalizeRecommendationCount(payload, 'auto_materialized_external_count'),
+  autoMaterializationFailedCount: normalizeRecommendationCount(payload, 'auto_materialization_failed_count')
 })
 
 const formatTimeText = (rawValue) => {
@@ -431,19 +447,27 @@ const reload = async () => {
 const reloadRecommendations = async () => {
   recommendationLoading.value = true
   recommendationError.value = ''
+  recommendationFallbackMode.value = 'none'
   try {
     const res = await getVideoRecommendations({
       scene: 'home',
       limit: 4,
-      include_external: shouldIncludeExternalRecommendationsByDefault()
+      include_external: shouldIncludeExternalRecommendationsOnHome()
     })
     const payload = res?.data || {}
     const items = normalizeRecommendationItems(payload)
-    recommendations.value = items.length > 0 ? items : fallbackRecommendations(allVideos.value)
+    if (items.length > 0) {
+      recommendations.value = items
+      recommendationFallbackMode.value = 'none'
+    } else {
+      recommendations.value = fallbackRecommendations(allVideos.value)
+      recommendationFallbackMode.value = recommendations.value.length > 0 ? 'empty_result' : 'none'
+    }
     recommendationMeta.value = buildRecommendationMeta(payload)
   } catch (e) {
     recommendationError.value = e?.message || '推荐加载失败'
     recommendations.value = fallbackRecommendations(allVideos.value)
+    recommendationFallbackMode.value = recommendations.value.length > 0 ? 'api_error' : 'none'
     recommendationMeta.value = createRecommendationMeta()
   } finally {
     recommendationLoading.value = false
@@ -477,9 +501,30 @@ const openVideo = (video) => {
   router.push(`/videos/${current.id}`)
 }
 
+const hasAuthToken = computed(() => Boolean(String(storageGet('m_token') || '').trim()))
+
+const homeAutoMaterializeBanner = computed(() => {
+  const count = Number(recommendationMeta.value.autoMaterializedExternalCount || 0)
+  const failed = Number(recommendationMeta.value.autoMaterializationFailedCount || 0)
+  if (count > 0 && failed > 0) return `已自动入库 ${count} 条站外推荐，另有 ${failed} 条未入库，可稍后在推荐页重试。`
+  if (count > 0) return `已将 ${count} 条站外推荐写入视频库，可直接打开继续处理。`
+  if (failed > 0) return `有 ${failed} 条站外推荐未能自动入库，仍可作为链接在推荐页导入。`
+  return ''
+})
+
+/** 仅有结果时不展示各 provider 技术卡片，减少首页噪音；无结果时再展示便于排障 */
+const showHomeProviderDiagnostics = computed(
+  () =>
+    recommendations.value.length === 0 &&
+    recommendationProviderReports.value.length > 0
+)
+
 const recommendationEmptyText = computed(() => {
   if (recommendationError.value) return recommendationError.value
-  return '上传更多视频后，这里会按处理状态和内容相关度给你推荐下一步。'
+  if (!hasAuthToken.value) {
+    return '登录后，系统才能把站外可导入推荐先写入你的视频库并出现在这里；也可先到推荐页浏览。'
+  }
+  return '上传或导入视频后，这里会按学习进度与主题推荐下一步。'
 })
 const decorateRecommendationItem = (item) => ({
   ...item,
@@ -509,15 +554,11 @@ const recommendationQuerySummary = computed(() => {
   }
   return parts.join(' · ')
 })
-const recommendationMixValue = computed(() => {
-  if (externalRecommendationCount.value === 0) return `站内 ${internalRecommendationCount.value}`
-  return `${internalRecommendationCount.value} / ${externalRecommendationCount.value}`
-})
 const recommendationMixNote = computed(() => {
-  if (recommendations.value.length === 0) return '当前还没有推荐结果。'
-  if (externalRecommendationCount.value === 0) return '当前首页预览以站内学习内容为主。'
-  if (internalRecommendationCount.value === 0) return '当前首页预览以站外候选为主。'
-  return `站内 ${internalRecommendationCount.value} 条，站外 ${externalRecommendationCount.value} 条。`
+  if (recommendations.value.length === 0) return '暂无条目'
+  if (externalRecommendationCount.value === 0) return '以站内视频为主'
+  if (internalRecommendationCount.value === 0) return '含站外来源（登录后可自动入库）'
+  return `站内 ${internalRecommendationCount.value} · 站外候选 ${externalRecommendationCount.value}`
 })
 const providerStatusText = (provider) => {
   if (provider?.status === 'failed') return '抓取失败'
@@ -526,7 +567,16 @@ const providerStatusText = (provider) => {
 }
 const recommendationExternalFetchBanner = computed(() => {
   if (!recommendationMeta.value.externalFetchFailed) return ''
-  return '部分站外来源未返回结果，站内推荐仍可使用。可检查网络后刷新本页，或前往推荐页重试；若需加快首屏，请保持关闭站外（环境变量 VITE_RECOMMENDATION_INCLUDE_EXTERNAL）。'
+  return '部分站外来源暂时不可用，站内推荐仍有效。可检查网络后刷新，或到推荐页查看其它场景。'
+})
+const homeRecommendationFallbackBanner = computed(() => {
+  if (recommendationFallbackMode.value === 'api_error' && recommendations.value.length > 0) {
+    return '推荐服务暂时不可用，当前展示的是视频库兜底结果。可稍后刷新重试。'
+  }
+  if (recommendationFallbackMode.value === 'empty_result' && recommendations.value.length > 0) {
+    return '当前暂无命中的个性化推荐，先为你展示视频库近期内容。'
+  }
+  return ''
 })
 
 const providerStatusDetail = (provider) => {
@@ -599,7 +649,8 @@ const openRecommendation = (item) => {
 }
 
 const reloadDashboard = async () => {
-  await Promise.all([reload(), reloadRecommendations()])
+  await reload()
+  await reloadRecommendations()
 }
 
 onMounted(reloadDashboard)
@@ -1042,6 +1093,10 @@ onMounted(reloadDashboard)
 .recommend-summary {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.recommend-summary--compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .recommend-summary__card {

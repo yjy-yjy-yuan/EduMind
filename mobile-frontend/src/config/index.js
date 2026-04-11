@@ -198,9 +198,17 @@ export const shouldUseMockApi = () => {
   return ALLOW_UI_ONLY_IN_PROD
 }
 
-/** 推荐接口是否默认附带站外检索（首页/推荐页共用，false 可避免弱网下首屏长时间等待） */
+/** 推荐接口是否默认附带站外检索（历史名；未单独配置首页时仍可读此变量） */
 export const shouldIncludeExternalRecommendationsByDefault = () =>
   toBool(import.meta.env.VITE_RECOMMENDATION_INCLUDE_EXTERNAL, false)
+
+/**
+ * 首页「推荐预览」是否附带站外检索与后端自动入库闭环。
+ * 默认 true：与推荐中枢一致，登录态下后端可将可导入站外候选写入 videos 后再返回可打开详情的条目。
+ * 弱网/仅站内时可设 VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL=false。
+ */
+export const shouldIncludeExternalRecommendationsOnHome = () =>
+  toBool(import.meta.env.VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL, true)
 
 export const withBase = (path) => {
   const p = String(path || '')

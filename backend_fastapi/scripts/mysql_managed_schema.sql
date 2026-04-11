@@ -19,6 +19,10 @@ DROP TABLE IF EXISTS subtitles;
 
 DROP TABLE IF EXISTS questions;
 
+-- Drop table: recommendation_ops_events
+
+DROP TABLE IF EXISTS recommendation_ops_events;
+
 -- Drop table: notes
 
 DROP TABLE IF EXISTS notes;
@@ -38,6 +42,20 @@ DROP TABLE IF EXISTS similarity_audit_logs;
 -- Drop table: semantic_search_logs
 
 DROP TABLE IF EXISTS semantic_search_logs;
+
+-- Create table: recommendation_ops_events
+
+CREATE TABLE recommendation_ops_events (
+	id INTEGER NOT NULL AUTO_INCREMENT,
+	event_type VARCHAR(128) NOT NULL,
+	status VARCHAR(32) NOT NULL,
+	trace_id VARCHAR(128),
+	metadata_json JSON,
+	created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	PRIMARY KEY (id)
+);
+CREATE INDEX ix_recommendation_ops_events_event_type ON recommendation_ops_events (event_type);
+CREATE INDEX ix_recommendation_ops_events_trace_id ON recommendation_ops_events (trace_id);
 
 -- Create table: semantic_search_logs
 

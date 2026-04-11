@@ -10,6 +10,16 @@ from app.services.external_candidate_service import ExternalCandidateFetchReport
 from app.services.external_candidate_service import ExternalProviderFetchSummary
 
 
+@pytest.fixture(autouse=True)
+def reset_recommendation_ops_event_store():
+    """隔离推荐运营聚合内存缓冲，避免测试间互相污染。"""
+    from app.services.recommendation_ops_service import reset_recommendation_event_store_for_tests
+
+    reset_recommendation_event_store_for_tests()
+    yield
+    reset_recommendation_event_store_for_tests()
+
+
 def fake_fetch_external_candidates_report(*args, **kwargs):
     """返回推荐接口测试用的站外候选假数据。"""
     return ExternalCandidateFetchReport(
@@ -428,6 +438,167 @@ class TestRecommendationAPI:
         )
         assert response.status_code == 401
         assert response.json()["detail"] == "请先登录后再导入站外视频"
+
+    def test_recommendation_ops_metrics_requires_bearer_token(self, client):
+        """运营聚合接口需要登录态，避免匿名读取运营指标。"""
+        response = client.get("/api/recommendations/ops/metrics")
+        assert response.status_code == 401
+        assert response.json()["detail"] == "请先登录后查看推荐运营指标"
+
+    def test_recommendation_ops_metrics_aggregates_import_and_processing(self, client, db, sample_user):
+        """运营聚合接口返回推荐导入成功率与处理完成率。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+        from app.services.recommendation_ops_service import record_recommendation_event
+        from app.utils.auth_token import build_auth_token
+
+        completed_video = Video(
+            user_id=sample_user.id,
+            title="bilibili-BV-completed",
+            url="https://www.bilibili.com/video/BV-completed",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="处理完成",
+        )
+        processing_video = Video(
+            user_id=sample_user.id,
+            title="bilibili-BV-processing",
+            url="https://www.bilibili.com/video/BV-processing",
+            status=VideoStatus.PROCESSING,
+            process_progress=52,
+            current_step="语音识别中",
+        )
+        db.add_all([completed_video, processing_video])
+        db.commit()
+        db.refresh(completed_video)
+        db.refresh(processing_video)
+
+        record_recommendation_event(
+            event_type="recommendation_import_external_requested",
+            status="started",
+            metadata={},
+            db=db,
+        )
+        record_recommendation_event(
+            event_type="recommendation_import_external_completed",
+            status="ok",
+            metadata={"video_id": completed_video.id},
+            db=db,
+        )
+        record_recommendation_event(
+            event_type="recommendation_import_external_requested",
+            status="started",
+            metadata={},
+            db=db,
+        )
+        record_recommendation_event(
+            event_type="recommendation_import_external_completed",
+            status="ok",
+            metadata={"video_id": processing_video.id},
+            db=db,
+        )
+        record_recommendation_event(
+            event_type="recommendation_import_external_requested",
+            status="started",
+            metadata={},
+            db=db,
+        )
+        record_recommendation_event(
+            event_type="recommendation_import_external_failed",
+            status="error",
+            metadata={},
+            db=db,
+        )
+        record_recommendation_event(
+            event_type="recommendation_external_materialization_completed",
+            status="degraded",
+            metadata={"attempted_count": 3, "materialized_count": 2, "failed_count": 1},
+            db=db,
+        )
+
+        response = client.get(
+            "/api/recommendations/ops/metrics",
+            params={"days": 7},
+            headers={
+                "Authorization": f"Bearer {build_auth_token(sample_user.id)}",
+                "X-Trace-Id": "ops-trace-001",
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers.get("X-Trace-Id") == "ops-trace-001"
+
+        payload = response.json()
+        assert payload["message"] == "获取推荐运营指标成功"
+        assert payload["data_source"] in {"database", "memory_fallback"}
+        assert payload["window_days"] == 7
+        assert payload["recommendation_import"]["requested_count"] == 3
+        assert payload["recommendation_import"]["completed_count"] == 2
+        assert payload["recommendation_import"]["failed_count"] == 1
+        assert payload["recommendation_import"]["in_flight_count"] == 0
+        assert payload["recommendation_import"]["success_rate"] == pytest.approx(2 / 3, rel=1e-6)
+        assert payload["auto_materialization"]["attempted_count"] == 3
+        assert payload["auto_materialization"]["materialized_count"] == 2
+        assert payload["auto_materialization"]["failed_count"] == 1
+        assert payload["auto_materialization"]["success_rate"] == pytest.approx(2 / 3, rel=1e-6)
+        assert payload["processing"]["tracked_video_count"] == 2
+        assert payload["processing"]["completed_count"] == 1
+        assert payload["processing"]["failed_count"] == 0
+        assert payload["processing"]["in_progress_count"] == 1
+        assert payload["processing"]["completion_rate"] == pytest.approx(0.5, rel=1e-6)
+        assert payload["processing"]["status_breakdown"]["completed"] == 1
+        assert payload["processing"]["status_breakdown"]["processing"] == 1
+
+    def test_recommendation_ops_metrics_persists_beyond_memory_buffer(self, client, db, sample_user):
+        """清空内存缓冲后，聚合接口仍可从数据库恢复口径。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+        from app.services.recommendation_ops_service import record_recommendation_event
+        from app.services.recommendation_ops_service import reset_recommendation_event_store_for_tests
+        from app.utils.auth_token import build_auth_token
+
+        completed_video = Video(
+            user_id=sample_user.id,
+            title="persist-check",
+            url="https://www.youtube.com/watch?v=persist-check",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="处理完成",
+        )
+        db.add(completed_video)
+        db.commit()
+        db.refresh(completed_video)
+
+        record_recommendation_event(
+            event_type="recommendation_import_external_requested",
+            status="started",
+            trace_id="persist-001",
+            metadata={},
+            db=db,
+        )
+        record_recommendation_event(
+            event_type="recommendation_import_external_completed",
+            status="ok",
+            trace_id="persist-001",
+            metadata={"video_id": completed_video.id},
+            db=db,
+        )
+
+        reset_recommendation_event_store_for_tests()
+
+        response = client.get(
+            "/api/recommendations/ops/metrics",
+            params={"days": 7},
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["data_source"] == "database"
+        assert payload["recommendation_import"]["requested_count"] == 1
+        assert payload["recommendation_import"]["completed_count"] == 1
+        assert payload["recommendation_import"]["success_rate"] == pytest.approx(1.0, rel=1e-6)
+        assert payload["processing"]["tracked_video_count"] == 1
+        assert payload["processing"]["completed_count"] == 1
+        assert payload["processing"]["completion_rate"] == pytest.approx(1.0, rel=1e-6)
 
     def test_recommendation_scenes_emits_telemetry_scene_count(self, client, caplog):
         """GET /scenes 发射 recommendation_scenes_served，metadata.scene_count 与返回条数一致。"""
