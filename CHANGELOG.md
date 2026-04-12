@@ -2,6 +2,16 @@
 
 ## 2026-04-12
 
+### 对话功能优化：直接回答/深度思考模式，新增通义千问→DeepSeek兜底
+
+- **backend_fastapi**：`/api/qa/ask` 新增 `chat_mode` 字段（`direct`/`deep_think`），替换原有的 `provider` + `deep_thinking` 组合；新增 `/api/chat/modes` 接口返回可用模式列表。
+- **backend_fastapi**：「直接回答」模式：优先使用通义千问，失败时自动切换 DeepSeek `deepseek-chat` 兜底；「深度思考」模式：强制使用 `deepseek-reasoner`，不进行兜底。
+- **backend_fastapi**：`QASystem` 新增 `_call_model_with_fallback` 方法，统一处理模式化路由与降级逻辑。
+- **mobile-frontend**：`QA.vue` 对话模式切换 UI 改为「直接回答 / 深度思考」双按钮，移除了原有的通义千问/DeepSeek 切换 + DeepSeek 子选项的层级结构。
+- **mobile-frontend**：`api/qa.js` API 参数从 `provider + deep_thinking` 替换为 `chat_mode`；Mock 同步支持新参数。
+- **mobile-frontend**：离线内存服务（`questionCache.js`、`offlineMemorySync.js`、`contracts.js`）增加 `chat_mode` 字段支持，更新索引以按 `chat_mode` 隔离问答空间。
+- **ios-app**：Web 资源同步更新。
+
 ### 推荐数量保底提升：返回窗口 6~8（不足时自动回填）
 
 - **backend_fastapi**：`RECOMMENDATION_RETURN_MIN_ITEMS` 默认从 `5` 调整为 `6`（上限维持 `8`），推荐接口窗口升级为 `6~8`。
