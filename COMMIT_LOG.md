@@ -148,3 +148,6 @@
 
 ### 2026-04-11
 - `3beabfc5` `feat(recommendation): auto-materialize external candidates for logged-in users`
+
+### 2026-04-12
+- `54419d52` `feat(recommendation): contract v2, sanitize responses, similarity fusion, hub UX`
