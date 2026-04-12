@@ -29,7 +29,6 @@ export const resolveSourceLabel = (item) => {
   const explicit = String(item?.source_label || item?.source_platform_label || item?.external_source_label || item?.platform_label || '').trim()
   if (explicit) return explicit
   if (isExternalItem(item)) return '站外候选'
-  if (item?.processing_origin === 'ios_offline') return 'iOS 离线'
   return String(item?.upload_source_label || '站内视频')
 }
 
@@ -58,9 +57,8 @@ export const decorateRecommendationListItem = (item, index = 0) => {
     statusText: item?.status ? videoStatusText(item.status) : '',
     timeText: formatRecommendationTime(item?.upload_time || item?.updated_at || item?.created_at),
     sourceLabel,
-    sourceBadgeClass: isExternal ? 'badge--external' : item?.processing_origin === 'ios_offline' ? 'badge--mint' : 'badge--soft',
-    primaryActionLabel:
-      actionLabel || (isExternal ? '导入学习' : item?.processing_origin === 'ios_offline' ? '打开本地结果' : '打开详情'),
+    sourceBadgeClass: isExternal ? 'badge--external' : 'badge--soft',
+    primaryActionLabel: actionLabel || (isExternal ? '导入学习' : '打开详情'),
     primaryActionDisabled: isRecommendationPrimaryActionDisabled(item, isExternal),
     canImport: Boolean(item?.can_import ?? false),
     importHint,
@@ -89,10 +87,6 @@ export const resolveRecommendationNavigation = (item) => {
       type: 'route',
       location: { path: '/upload', query: { mode: 'url', url, source: resolveSourceLabel(item) || '站外推荐' } }
     }
-  }
-
-  if (item?.processing_origin === 'ios_offline' && item.task_id) {
-    return { type: 'route', location: `/local-transcripts/${item.task_id}` }
   }
 
   if (item.id) return { type: 'route', location: `/videos/${item.id}` }

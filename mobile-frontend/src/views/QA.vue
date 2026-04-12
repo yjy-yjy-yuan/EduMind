@@ -172,6 +172,12 @@ const normalizeMessageList = (items) => {
     .filter((item) => item.role && (item.text || item.loading || item.statusText))
 }
 
+const isLegacyOfflineMemoryMessage = (item) => {
+  const providerLabel = String(item?.providerLabel || '').trim().toLowerCase()
+  const model = String(item?.model || '').trim().toLowerCase()
+  return providerLabel.includes('离线记忆') || model === 'indexeddb-context'
+}
+
 const stripMessageForCache = (item) => {
   const normalized = normalizeMessage(item)
   if (normalized.role === 'ai' && normalized.loading) return null
@@ -259,7 +265,23 @@ const scrollToBottom = async () => {
 }
 
 const loadCachedSpaceMessages = (spaceKey) => {
-  return normalizeMessageList(parseJSON(storageGet(spaceKey), []))
+  const normalized = normalizeMessageList(parseJSON(storageGet(spaceKey), []))
+  return normalized.filter((item) => !isLegacyOfflineMemoryMessage(item))
+}
+
+const cleanupLegacyOfflineMemoryCache = () => {
+  if (typeof window === 'undefined' || !window.localStorage) return
+  const keys = []
+  for (let i = 0; i < window.localStorage.length; i += 1) {
+    const key = window.localStorage.key(i)
+    if (key && key.startsWith(`${QA_SPACE_CACHE_PREFIX}:`)) {
+      keys.push(key)
+    }
+  }
+  keys.forEach((key) => {
+    const filtered = loadCachedSpaceMessages(key)
+    storageSet(key, JSON.stringify(filtered.map((item) => stripMessageForCache(item)).filter(Boolean)))
+  })
 }
 
 const persistSpaceMessages = (spaceKey = currentSpaceKey.value) => {
@@ -571,6 +593,8 @@ watch(
   },
   { deep: true }
 )
+
+cleanupLegacyOfflineMemoryCache()
 </script>
 
 <style scoped>

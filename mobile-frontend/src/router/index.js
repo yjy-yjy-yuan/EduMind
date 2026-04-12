@@ -7,8 +7,6 @@ const Register = () => import('@/views/Register.vue')
 const Recommendations = () => import('@/views/Recommendations.vue')
 const Videos = () => import('@/views/Videos.vue')
 const VideoDetail = () => import('@/views/VideoDetail.vue')
-const LocalTranscripts = () => import('@/views/LocalTranscripts.vue')
-const LocalTranscriptDetail = () => import('@/views/LocalTranscriptDetail.vue')
 const Player = () => import('@/views/Player.vue')
 const Upload = () => import('@/views/Upload.vue')
 const Notes = () => import('@/views/Notes.vue')
@@ -29,9 +27,7 @@ const router = createRouter({
     { path: '/', name: 'Home', component: Home, meta: { title: '首页' } },
     { path: '/recommendations', name: 'Recommendations', component: Recommendations, meta: { title: '推荐学习' } },
     { path: '/videos', name: 'Videos', component: Videos, meta: { title: '视频' } },
-    { path: '/local-transcripts', name: 'LocalTranscripts', component: LocalTranscripts, meta: { title: '本地转录' } },
     { path: '/videos/:id', name: 'VideoDetail', component: VideoDetail, meta: { title: '视频详情' } },
-    { path: '/local-transcripts/:taskId', name: 'LocalTranscriptDetail', component: LocalTranscriptDetail, meta: { title: '本地转录详情' } },
     { path: '/player/:id', name: 'Player', component: Player, meta: { title: '播放', hideTabBar: true } },
     { path: '/upload', name: 'Upload', component: Upload, meta: { title: '上传' } },
     { path: '/notes', name: 'Notes', component: Notes, meta: { title: '笔记', requiresAuth: true } },

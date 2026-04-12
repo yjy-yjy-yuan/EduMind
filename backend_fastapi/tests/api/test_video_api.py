@@ -654,6 +654,7 @@ class TestVideoAPI:
         assert response.status_code == 400
         assert response.json()["detail"] == "转录文本为空，无法生成摘要"
 
+    @pytest.mark.skip(reason="sync-offline-transcript 已从项目移除（返回 410 Gone）")
     def test_sync_offline_transcript_writes_same_video_table(self, client, db, monkeypatch, sample_user):
         """测试 iOS 本地离线转录结果可写入 videos 表并标记离线来源。"""
         import json
@@ -714,6 +715,7 @@ class TestVideoAPI:
         assert len(subtitles) == 2
         assert subtitles[0].text == "先讲极限定义"
 
+    @pytest.mark.skip(reason="sync-offline-transcript 已从项目移除（返回 410 Gone）")
     def test_sync_offline_transcript_updates_existing_record(self, client, db, monkeypatch, sample_user):
         """测试同一 task_id 的离线结果会更新原记录而不是重复插入。"""
         import json
@@ -786,6 +788,7 @@ class TestVideoAPI:
         assert len(payload["segments"]) == 2
         assert payload["segments"][0]["duration"] == pytest.approx(1.8)
 
+    @pytest.mark.skip(reason="sync-offline-transcript 已从项目移除（返回 410 Gone）")
     def test_sync_offline_transcript_prefers_client_tags_when_present(self, client, db, monkeypatch, sample_user):
         """测试离线同步在显式传入 tags 时直接写入数据库。"""
         import json
@@ -996,6 +999,7 @@ class TestAuthRequiredEndpoints:
         assert response.status_code == 401
         assert response.json()["detail"] == "请先登录后再上传视频"
 
+    @pytest.mark.skip(reason="sync-offline-transcript 已从项目移除（返回 410 Gone）")
     def test_sync_offline_requires_bearer_token(self, client):
         response = client.post(
             "/api/videos/sync-offline-transcript",
