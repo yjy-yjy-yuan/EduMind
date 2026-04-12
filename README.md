@@ -306,7 +306,13 @@ POST /api/videos/{video_id}/generate-tags
 14. 推荐排序新增复用语义搜索的“融合相似度”策略（后端内部计算，不对前端展示相似度数值），默认阈值 `RECOMMENDATION_SIMILARITY_MIN_SCORE=0.55`。
 15. 推荐接口在移动端链路上会将请求条数规范化到 `5~8`（默认 6），并优先返回达到相似度阈值的条目；相关推荐默认 5 条，首页默认 6 条。
 16. 推荐展示口径已做“一次性去切片”收口：`/api/recommendations/videos` 与上传返回 `recommendations` 的 `items[*]` 在输出层统一清空 `summary`、`reason_text`、`tags`（v1/v2 均生效，仅保留 `reason_label/reason_code`）；`Home / Recommendations / Upload` 三入口不再渲染片段描述与内容标签 chips（卡片仍展示 `reason_label` 等轻量理由徽标）。
-17. 推荐页：切换场景会清空「相关推荐」区块；全页「刷新推荐」或错误重试加载完成后也**不会**自动展开同主题，需用户在主列表卡片上点击「看同主题」。
+17. 推荐结果支持标题黑名单关键词过滤（`RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS`，默认含 `排列组合插空法详解`）：命中关键词的条目会在后端响应收口阶段被剔除，再按剩余候选返回；前端 `Home` / `Recommendations` / `Upload` 亦做同名关键词兜底，避免缓存或 mock 残留。
+18. 推荐页：切换场景会清空「相关推荐」区块；全页「刷新推荐」或错误重试加载完成后也**不会**自动展开同主题，需用户在主列表卡片上点击「看同主题」。
+
+## 视频删除与运维脚本
+
+1. `DELETE /api/videos/{video_id}/delete` 在删除 `videos` 行之前，会依次清理关联的 **问答**（`questions`）、**字幕**（`subtitles`）、**笔记时间戳**（`note_timestamps`）与 **笔记**（`notes`），避免外键约束失败；向量索引行（`vector_indexes`）由业务侧在需要时一并处理（见仓库内脚本）。
+2. 运维可按标题查找并删除或仅重置元数据：`scripts/purge_video_recommendation_by_title.py`（需配置 `DATABASE_URL`；默认 **dry-run**，加 `--execute` 才写库）。`--delete-video` 删除整条视频及常见子表；`--reset-metadata` 仅清空摘要/标签与语义索引标记并删 `vector_indexes`，保留视频与字幕。
 
 ## 视频上下文问答
 

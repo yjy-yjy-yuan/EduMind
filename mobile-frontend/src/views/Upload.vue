@@ -467,7 +467,16 @@ const currentFileDisplayHint = computed(() => {
 const uploadRecommendationPayload = ref(null)
 const latestUploadedVideoId = ref(0)
 const latestUploadedTitle = ref('')
-const normalizeRecommendationItems = (payload) => Array.isArray(payload?.items) ? payload.items : []
+const RECOMMENDATION_TITLE_BLOCKLIST = ['排列组合插空法详解']
+const isBlockedRecommendationTitle = (item) => {
+  const title = String(item?.title || '').trim()
+  if (!title) return false
+  return RECOMMENDATION_TITLE_BLOCKLIST.some((keyword) => keyword && title.includes(keyword))
+}
+const normalizeRecommendationItems = (payload) => {
+  const items = Array.isArray(payload?.items) ? payload.items : []
+  return items.filter((item) => !isBlockedRecommendationTitle(item))
+}
 const resolveRecommendationItemKey = (item, index = 0) =>
   String(item?.id || item?.video_id || item?.external_url || item?.url || `upload-recommendation-${index}`)
 const isExternalRecommendationItem = (item) => {

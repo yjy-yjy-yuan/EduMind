@@ -476,6 +476,61 @@ class TestRecommendationAPI:
         assert payload["external_item_count"] == 0
         assert payload["sources"][0]["count"] == 1
 
+    def test_recommendations_exclude_blocked_title_keyword(self, client, db, sample_user, monkeypatch):
+        """命中黑名单标题关键词（排列组合插空法详解）时，应从最终响应中剔除并重算计数。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        kept_video = Video(
+            user_id=sample_user.id,
+            title="函数单调性题型精讲",
+            filename="kept.mp4",
+            filepath="/tmp/kept.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+        )
+        db.add(kept_video)
+        db.commit()
+        db.refresh(kept_video)
+
+        def fake_recommend_videos(**kwargs):
+            return {
+                "message": "mock",
+                "contract_version": "2",
+                "scene": "home",
+                "strategy": "mock",
+                "personalized": False,
+                "fallback_used": False,
+                "seed_video_id": None,
+                "internal_item_count": 2,
+                "external_item_count": 0,
+                "external_failed_provider_count": 0,
+                "external_fetch_failed": False,
+                "flow_version": "recommendation_flow_v1",
+                "auto_materialized_external_count": 0,
+                "auto_materialization_failed_count": 0,
+                "sources": [{"source_type": "internal", "provider": "internal", "source_label": "视频库", "count": 2}],
+                "external_query": None,
+                "external_providers": [],
+                "items": [
+                    {"id": 991, "title": "排列组合插空法详解"},
+                    {"id": kept_video.id, "title": "函数单调性题型精讲"},
+                ],
+            }
+
+        monkeypatch.setattr("app.routers.recommendation.recommend_videos", fake_recommend_videos)
+
+        response = client.get(
+            "/api/recommendations/videos",
+            params={"scene": "home", "limit": 6, "include_external": False},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert [item["id"] for item in payload["items"]] == [kept_video.id]
+        assert payload["internal_item_count"] == 1
+        assert payload["external_item_count"] == 0
+
     def test_home_recommendations_include_external_candidates(self, client, db, sample_user, monkeypatch):
         """推荐接口应支持在返回中混入站外候选元数据。"""
         from app.models.video import Video

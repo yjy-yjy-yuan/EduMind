@@ -357,6 +357,8 @@ def test_sanitize_recommendation_payload_for_client_removes_slice_fields():
     """推荐出口清洗应统一清空 summary/reason_text/tags。"""
     payload = {
         "scene": "home",
+        "internal_item_count": 2,
+        "external_item_count": 1,
         "items": [
             {
                 "id": 1,
@@ -364,7 +366,20 @@ def test_sanitize_recommendation_payload_for_client_removes_slice_fields():
                 "summary": "这是一段摘要",
                 "tags": ["数学", "导数"],
                 "reason_text": "与当前主题相关",
-            }
+                "is_external": False,
+                "provider": "internal",
+                "source_label": "站内视频",
+            },
+            {
+                "id": 2,
+                "title": "排列组合插空法详解",
+                "summary": "应被过滤",
+                "tags": ["数学"],
+                "reason_text": "应被过滤",
+                "is_external": False,
+                "provider": "internal",
+                "source_label": "站内视频",
+            },
         ],
     }
     sanitized = sanitize_recommendation_payload_for_client(payload)
@@ -372,3 +387,6 @@ def test_sanitize_recommendation_payload_for_client_removes_slice_fields():
     assert sanitized["items"][0]["summary"] == ""
     assert sanitized["items"][0]["tags"] == []
     assert sanitized["items"][0]["reason_text"] == ""
+    assert all("排列组合插空法详解" not in str(item.get("title") or "") for item in sanitized["items"])
+    assert sanitized["internal_item_count"] == 1
+    assert sanitized["external_item_count"] == 0

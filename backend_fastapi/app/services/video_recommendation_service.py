@@ -887,13 +887,41 @@ def count_internal_items(items: list[dict]) -> int:
     return sum(1 for item in items if not item.get("is_external"))
 
 
+def _normalize_excluded_title_keywords() -> list[str]:
+    """读取推荐结果标题黑名单关键词。"""
+    raw = str(getattr(settings, "RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS", "") or "").strip()
+    keywords = [part.strip() for part in raw.split(",") if part.strip()]
+    # 兜底保留强制拦截词，避免配置缺失时回归。
+    if "排列组合插空法详解" not in keywords:
+        keywords.append("排列组合插空法详解")
+    return keywords
+
+
+def _is_excluded_recommendation_title(title: str, keywords: list[str]) -> bool:
+    """判断推荐标题是否命中黑名单关键词。"""
+    text = str(title or "").strip()
+    if not text:
+        return False
+    lowered = text.lower()
+    for keyword in keywords:
+        key = str(keyword or "").strip()
+        if not key:
+            continue
+        if key in text or key.lower() in lowered:
+            return True
+    return False
+
+
 def sanitize_recommendation_items_for_client(items: list[dict]) -> list[dict]:
     """前端展示口径收口：推荐条目不暴露切片化文本与标签。"""
     sanitized: list[dict] = []
+    excluded_keywords = _normalize_excluded_title_keywords()
     for item in list(items or []):
         if not isinstance(item, dict):
             continue
         row = dict(item)
+        if _is_excluded_recommendation_title(row.get("title"), excluded_keywords):
+            continue
         row["summary"] = ""
         row["tags"] = []
         row["reason_text"] = ""
@@ -904,7 +932,11 @@ def sanitize_recommendation_items_for_client(items: list[dict]) -> list[dict]:
 def sanitize_recommendation_payload_for_client(payload: dict) -> dict:
     """统一清洗推荐响应 payload，保证多出口一致。"""
     merged = dict(payload or {})
-    merged["items"] = sanitize_recommendation_items_for_client(list(merged.get("items") or []))
+    items = sanitize_recommendation_items_for_client(list(merged.get("items") or []))
+    merged["items"] = items
+    merged["internal_item_count"] = count_internal_items(items)
+    merged["external_item_count"] = count_external_items(items)
+    merged["sources"] = summarize_recommendation_sources(items)
     return merged
 
 
@@ -1117,13 +1149,19 @@ def recommend_videos(
     user_tokens = extract_user_interest_tokens(user)
     user_subject = extract_user_subject(user)
     now = datetime.utcnow()
-    profiles = {video.id: build_recommendation_profile(video) for video in videos}
+    excluded_title_keywords = _normalize_excluded_title_keywords()
+    candidate_videos = [
+        video
+        for video in list(videos or [])
+        if not _is_excluded_recommendation_title(video.title, excluded_title_keywords)
+    ]
+    profiles = {video.id: build_recommendation_profile(video) for video in candidate_videos}
     seed_profile = profiles.get(seed_video.id) if seed_video is not None else None
     external_query_summary = None
     external_provider_summaries: list[ExternalProviderFetchSummary] = []
 
     query_context = build_external_query_context(
-        videos=videos,
+        videos=candidate_videos,
         profiles=profiles,
         scene=normalized_scene,
         seed_video=seed_video,
@@ -1137,7 +1175,7 @@ def recommend_videos(
         user_subject=user_subject,
     )
     internal_ranked_items = build_ranked_internal_items(
-        videos=videos,
+        videos=candidate_videos,
         scene=normalized_scene,
         now=now,
         seed_video=seed_video,
@@ -1173,13 +1211,13 @@ def recommend_videos(
         )
 
     fallback_used = False
-    if not items and videos:
+    if not items and candidate_videos:
         fallback_used = True
         recent_videos = []
         for video in sorted(
             (
                 video
-                for video in videos
+                for video in candidate_videos
                 if video.id not in exclude_ids and (seed_video is None or video.id != seed_video.id)
             ),
             key=lambda item: item.updated_at or item.upload_time or datetime.min,

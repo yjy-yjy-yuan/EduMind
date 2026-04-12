@@ -304,9 +304,16 @@ const normalizeList = (payload) => {
   return Array.isArray(list) ? list : []
 }
 
+const RECOMMENDATION_TITLE_BLOCKLIST = ['排列组合插空法详解']
+const isBlockedRecommendationTitle = (item) => {
+  const title = String(item?.title || '').trim()
+  if (!title) return false
+  return RECOMMENDATION_TITLE_BLOCKLIST.some((keyword) => keyword && title.includes(keyword))
+}
+
 const normalizeRecommendationItems = (payload) => {
   const items = payload?.items || payload?.recommendations || payload?.data || []
-  return Array.isArray(items) ? items : []
+  return Array.isArray(items) ? items.filter((item) => !isBlockedRecommendationTitle(item)) : []
 }
 const normalizeRecommendationSources = (payload) => Array.isArray(payload?.sources) ? payload.sources : []
 const normalizeRecommendationProviders = (payload) => Array.isArray(payload?.external_providers) ? payload.external_providers : []
@@ -401,11 +408,14 @@ const mergeVideosById = (items) => {
 }
 
 const fallbackRecommendations = (videos) =>
-  videos.slice(0, 6).map((video, index) => ({
+  videos
+    .filter((video) => !isBlockedRecommendationTitle(video))
+    .slice(0, 6)
+    .map((video, index) => ({
     ...video,
     reason_label: index === 0 ? '继续学习' : '最近内容',
     reason_text: index === 0 ? '当前最适合从这个任务继续进入。' : '最近进入视频库，适合继续学习。'
-  }))
+    }))
 
 const fetchAllVideos = async () => {
   const first = await getVideoList(1, 100)

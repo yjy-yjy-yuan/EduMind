@@ -101,6 +101,8 @@ class Settings(BaseSettings):
     # 推荐返回条数窗口：前端体验目标 5~8
     RECOMMENDATION_RETURN_MIN_ITEMS: int = 5
     RECOMMENDATION_RETURN_MAX_ITEMS: int = 8
+    # 推荐结果标题黑名单关键词（逗号分隔）；命中后将从对外推荐结果中移除
+    RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS: str = "排列组合插空法详解"
     # 推荐 API 契约版本（响应体 contract_version，与 docs 中 Recommendation Contract 对齐）
     # v2：不再返回 seed_video_title（与 seed_video_id 冗余）；设为 "1" 可恢复旧字段
     RECOMMENDATION_CONTRACT_VERSION: str = "2"

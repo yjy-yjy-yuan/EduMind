@@ -2,6 +2,21 @@
 
 ## 2026-04-12
 
+### 视频删除 API 级联与按标题运维脚本
+
+- **backend_fastapi**：`DELETE /api/videos/{video_id}/delete` 在删除视频行前，先删除关联 **字幕**、**问答**、**笔记时间戳**与**笔记**，避免 `note_timestamps` 等外键导致删除失败。
+- **scripts**：新增 `scripts/purge_video_recommendation_by_title.py`，支持按标题 `--match exact|contains` 执行 `--delete-video` 或 `--reset-metadata`（需 `--execute` 写库），便于从库中移除指定视频或仅清空推荐相关元数据以便重新生成。
+- **tests**：`tests/api/test_video_api.py` 增加删除接口级联清理回归。
+- **docs**：`README.md` 补充「视频删除与运维脚本」；`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 实现状态表同步。
+
+### 推荐结果定向剔除：`排列组合插空法详解`（并重排返回）
+
+- **backend_fastapi**：新增 `RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS`（默认包含 `排列组合插空法详解`），在推荐响应收口阶段对 `items[*].title` 做关键词过滤；命中条目直接剔除，并自动重算 `internal_item_count` / `external_item_count` / `sources`。
+- **backend_fastapi**：`sanitize_recommendation_payload_for_client()` 升级为“过滤 + 去切片 + 计数重算”统一出口，覆盖 `/api/recommendations/videos` 与上传返回 `recommendations`。
+- **mobile-frontend**：`Home.vue`、`Recommendations.vue`、`Upload.vue` 增加同关键词前端兜底过滤，避免旧缓存或 mock 数据导致残留展示。
+- **tests**：新增 API 与单测回归，覆盖“命中标题关键词后被剔除、且计数重算正确”。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`、`backend_fastapi/.env.example` 同步配置说明。
+
 ### 推荐链路“一次性去切片”全量收口（前后端双收口）
 
 - **backend_fastapi**：新增 `sanitize_recommendation_payload_for_client()`（`app/services/video_recommendation_service.py`），并在两个对外出口强制应用：

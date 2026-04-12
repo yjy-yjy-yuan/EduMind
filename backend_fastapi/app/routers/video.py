@@ -773,9 +773,16 @@ async def delete_video(video_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="视频不存在")
 
     # 删除关联的问题记录
+    from app.models.note import Note
+    from app.models.note import NoteTimestamp
     from app.models.qa import Question
 
     db.query(Question).filter(Question.video_id == video_id).delete()
+    db.query(Subtitle).filter(Subtitle.video_id == video_id).delete()
+    note_ids = [row[0] for row in db.query(Note.id).filter(Note.video_id == video_id).all()]
+    if note_ids:
+        db.query(NoteTimestamp).filter(NoteTimestamp.note_id.in_(note_ids)).delete()
+    db.query(Note).filter(Note.video_id == video_id).delete()
 
     # 提交清理任务
     try:

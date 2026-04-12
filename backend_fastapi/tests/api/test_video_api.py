@@ -103,6 +103,52 @@ class TestVideoAPI:
         response = client.get(f"/api/videos/{sample_video.id}")
         assert response.status_code == 404
 
+    def test_delete_video_cascades_subtitles_notes_and_timestamps(self, client, db, sample_user):
+        """删除视频前先清理字幕、笔记时间戳与笔记，避免外键失败。"""
+        from app.models.note import Note
+        from app.models.note import NoteTimestamp
+        from app.models.subtitle import Subtitle
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        video = Video(
+            user_id=sample_user.id,
+            filename="cascade.mp4",
+            filepath="/tmp/cascade.mp4",
+            title="级联删除测",
+            status=VideoStatus.COMPLETED,
+        )
+        db.add(video)
+        db.commit()
+        db.refresh(video)
+        db.add(
+            Subtitle(
+                video_id=video.id,
+                start_time=0.0,
+                end_time=1.0,
+                text="subtitle",
+                source="asr",
+                language="zh",
+            )
+        )
+        note = Note(title="笔记", content="内容", video_id=video.id, note_type="text")
+        db.add(note)
+        db.commit()
+        db.refresh(note)
+        db.add(NoteTimestamp(note_id=note.id, time_seconds=1.0, subtitle_text="戳"))
+        db.commit()
+
+        note_id = note.id
+        video_id = video.id
+
+        response = client.delete(f"/api/videos/{video_id}/delete")
+        assert response.status_code == 200
+
+        assert db.query(Subtitle).filter(Subtitle.video_id == video_id).count() == 0
+        assert db.query(Note).filter(Note.video_id == video_id).count() == 0
+        assert db.query(NoteTimestamp).filter(NoteTimestamp.note_id == note_id).count() == 0
+        assert db.query(Video).filter(Video.id == video_id).count() == 0
+
     def test_get_video_status(self, client, sample_video):
         """测试获取视频处理状态"""
         response = client.get(f"/api/videos/{sample_video.id}/status")

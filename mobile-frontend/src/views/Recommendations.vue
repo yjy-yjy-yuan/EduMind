@@ -208,8 +208,17 @@ const relatedLoadingItemKey = ref('')
 const relatedSectionRef = ref(null)
 
 const go = (path) => router.push(path)
+const RECOMMENDATION_TITLE_BLOCKLIST = ['排列组合插空法详解']
+const isBlockedRecommendationTitle = (item) => {
+  const title = String(item?.title || '').trim()
+  if (!title) return false
+  return RECOMMENDATION_TITLE_BLOCKLIST.some((keyword) => keyword && title.includes(keyword))
+}
 const normalizeSceneOptions = (payload) => Array.isArray(payload?.scenes) ? payload.scenes : Array.isArray(payload?.data?.scenes) ? payload.data.scenes : []
-const normalizeRecommendationItems = (payload) => Array.isArray(payload?.items) ? payload.items : Array.isArray(payload?.data?.items) ? payload.data.items : []
+const normalizeRecommendationItems = (payload) => {
+  const items = Array.isArray(payload?.items) ? payload.items : Array.isArray(payload?.data?.items) ? payload.data.items : []
+  return items.filter((item) => !isBlockedRecommendationTitle(item))
+}
 const normalizeRecommendationSources = (payload) => Array.isArray(payload?.sources) ? payload.sources : Array.isArray(payload?.data?.sources) ? payload.data.sources : []
 const normalizeExternalProviders = (payload) => Array.isArray(payload?.external_providers) ? payload.external_providers : Array.isArray(payload?.data?.external_providers) ? payload.data.external_providers : []
 const normalizeExternalQuery = (payload) => payload?.external_query || payload?.data?.external_query || null
