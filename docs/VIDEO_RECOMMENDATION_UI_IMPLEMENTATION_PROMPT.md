@@ -31,6 +31,12 @@
   - 已有推荐接口封装。
 - `mobile-frontend/src/api/mockGateway.js`
   - 已有 UI-only 模式的推荐 mock 数据。
+- `mobile-frontend/src/views/VideoDetail.vue`
+  - 视频详情：**上方**固定封面与基础信息（`.video-detail__shared`）；**下方**为「学习处理 / 相关推荐」页签与横向分页（`scroll-snap`），仅该区域随手势左右切换。
+- `mobile-frontend/src/components/videoDetail/VideoDetailRecommendPanel.vue`、`VideoDetailRecommendCard.vue`
+  - 相关推荐列表与卡片；数据来自 `scene=related` + `seed_video_id`。
+- `mobile-frontend/src/services/recommendationPresentation.js`、`videoDetailTelemetry.js`
+  - 字段映射、跳转与 `CustomEvent('edumind:telemetry')` 埋点（`detail.scope === 'video_detail'`）。
 
 当前问题不是“完全没有推荐页”，而是：
 
@@ -111,7 +117,9 @@
 4. CTA 文案是否足够明确
 5. 统计卡与推荐入口之间是否存在视觉割裂
 
-### 2. 独立推荐页
+### 2. 独立推荐页与视频详情内嵌推荐
+
+**视频详情（`/videos/:id`）**：在 **封面与基础信息固定于上方** 的前提下，在其 **下方** 用页签 + 横向分页并列 **「学习处理」** 与 **「相关推荐」**（不要把整页含封面一起滑进分页）。数据源为 `scene=related` 的真实推荐接口（`seed_video_id`、排除种子）；卡片纵向列表、教育向稳重配色，与 `Recommendations.vue` 契约一致（不展示切片化 `summary/reason_text/tags`）。分页面板避免对子层使用 `touch-action: pan-y` 锁死，以便在推荐卡片上横滑仍能切换分页。需在 iOS `WKWebView` 验证：**横滑切页发生在封面区以下**；列表纵向滚动与横向分页不互相抢手势。
 
 目标：
 
@@ -206,6 +214,12 @@ bash ios-app/validate_ios_build.sh
 - 推荐接口封装与 mock 已存在：
   - `mobile-frontend/src/api/recommendation.js`
   - `mobile-frontend/src/api/mockGateway.js`
+- 视频详情双页（学习处理 + 相关推荐）已实现：
+  - `mobile-frontend/src/views/VideoDetail.vue`
+  - `mobile-frontend/src/components/videoDetail/VideoDetailRecommendPanel.vue`
+  - `mobile-frontend/src/components/videoDetail/VideoDetailRecommendCard.vue`
+  - `mobile-frontend/src/services/recommendationPresentation.js`
+  - `mobile-frontend/src/services/videoDetailTelemetry.js`
 
 这一轮不要把重心放在推荐算法、数据库设计、爬虫调度或新后端服务上。
 请把重心放在“推荐 UI 页面要更完整、更清晰、更适合 iPhone 使用”这件事上。
@@ -248,6 +262,8 @@ bash ios-app/validate_ios_build.sh
    - 避免看起来像站内已入库视频
 4. 上传页承接：
    - 优化从推荐页跳转过来的 URL 预填和来源说明
+5. 视频详情（如需继续打磨）：
+   - 保持封面区固定、分页仅在页签下方；推荐列表与横滑切页不冲突
 
 如果你修改了前端 UI，完成后至少要执行：
 

@@ -308,6 +308,8 @@ POST /api/videos/{video_id}/generate-tags
 16. 推荐展示口径已做“一次性去切片”收口：`/api/recommendations/videos` 与上传返回 `recommendations` 的 `items[*]` 在输出层统一清空 `summary`、`reason_text`、`tags`（v1/v2 均生效，仅保留 `reason_label/reason_code`）；`Home / Recommendations / Upload` 三入口不再渲染片段描述与内容标签 chips（卡片仍展示 `reason_label` 等轻量理由徽标）。
 17. 推荐结果支持标题黑名单关键词过滤（`RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS`，默认含 `排列组合插空法详解`）：命中关键词的条目会在后端响应收口阶段被剔除，再按剩余候选返回；前端 `Home` / `Recommendations` / `Upload` 亦做同名关键词兜底，避免缓存或 mock 残留。
 18. 推荐页：切换场景会清空「相关推荐」区块；全页「刷新推荐」或错误重试加载完成后也**不会**自动展开同主题，需用户在主列表卡片上点击「看同主题」。
+19. **视频详情页**（`/videos/:id`）为横向双页：**学习处理**（Whisper、摘要、笔记、操作、重试、删除等既有流程）与 **相关推荐**（`GET /api/recommendations/videos`，`scene=related` + `seed_video_id` 并排除种子；展示口径与全站一致，不渲染切片化 `summary/reason_text/tags`）。首次仅在学习处理页加载详情；切换到推荐子页时再请求推荐；子页索引保存在 `sessionStorage`（`videoDetailSubPage:<id>`）。
+20. **视频详情布局与手势**：封面区（LIVE/占位、标题、状态、进度、「可进播放器」提示等）在 **`.video-detail__shared` 中固定在页面上方**，不随双页横向滑动；**「学习处理 / 相关推荐」页签与下方 `scroll-snap` 分页轨道**仅作用于其下区域，符合「在封面卡片下」左右切换的预期。分页下面板不使用 `touch-action: pan-y` 锁定，避免在推荐卡片上横滑无法驱动外层分页。实现文件：`mobile-frontend/src/views/VideoDetail.vue`，`mobile-frontend/src/components/videoDetail/VideoDetailRecommendPanel.vue`，`VideoDetailRecommendCard.vue`，`mobile-frontend/src/services/recommendationPresentation.js`，`videoDetailTelemetry.js`。结构化埋点通过 `CustomEvent('edumind:telemetry')`（`detail.scope === 'video_detail'`）抛出，便于 `WKWebView` 原生侧订阅。
 
 ## 视频删除与运维脚本
 

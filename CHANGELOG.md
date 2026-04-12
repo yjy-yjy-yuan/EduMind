@@ -2,6 +2,14 @@
 
 ## 2026-04-12
 
+### 视频详情页：横向双页（学习处理 + 相关推荐）
+
+- **mobile-frontend**：`VideoDetail.vue` 在「视频详情」内增加 **学习处理 / 相关推荐** 双页：横向 `scroll-snap` 滑动与页签点击切换；默认进入学习处理页；子页选择写入 `sessionStorage`（`videoDetailSubPage:<id>`）以便返回后恢复。
+- **mobile-frontend**：封面与基础信息固定在上方，横向分页仅在下方区域生效（在推荐卡片等列表区域上滑动即可切页）；分页面板内由 `touch-action: pan-y` 改为默认手势，避免横滑被子层吞掉。
+- **mobile-frontend**：相关推荐使用 `GET /api/recommendations/videos`（`scene=related`、`seed_video_id`、排除种子），仅在切换到推荐页时首次拉取；卡片纵向列表展示 `reason_label`、来源/状态、时间与主操作，**不**展示切片语义字段（与当前契约一致）。
+- **mobile-frontend**：新增 `components/videoDetail/VideoDetailRecommendPanel.vue`、`VideoDetailRecommendCard.vue`；`services/recommendationPresentation.js` 统一 API 字段映射与跳转逻辑；`services/videoDetailTelemetry.js` 通过 `CustomEvent('edumind:telemetry')` 输出结构化埋点（切页、曝光、刷新、点击）。
+- **docs**：`docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md` 补充视频详情双页说明（固定封面区、页签下分页、组件路径、手势与 `WKWebView` 验证要点）；`README.md`「视频推荐当前行为」增加视频详情布局、文件清单与埋点说明；与当前 `VideoDetail.vue` 实现一致。
+
 ### 视频删除 API 级联与按标题运维脚本
 
 - **backend_fastapi**：`DELETE /api/videos/{video_id}/delete` 在删除视频行前，先删除关联 **字幕**、**问答**、**笔记时间戳**与**笔记**，避免 `note_timestamps` 等外键导致删除失败。
