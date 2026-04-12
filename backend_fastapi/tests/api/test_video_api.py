@@ -18,6 +18,9 @@ def fake_upload_recommendations(*args, **kwargs):
                 "title": "站内导数复盘",
                 "is_external": False,
                 "source_label": "站内视频",
+                "summary": "围绕导数定义与函数单调性做复盘。",
+                "tags": ["数学", "导数"],
+                "reason_text": "与当前视频共享导数主题。",
             }
         ],
         "external_item_count": 0,
@@ -416,6 +419,25 @@ class TestVideoAPI:
         assert submitted["name"] == "download_video_from_url_task"
         assert submitted["args"][0] == video.id
         assert submitted["kwargs"]["model"] == "medium"
+
+    def test_upload_video_url_recommendations_strip_slice_fields(self, client, monkeypatch, sample_user):
+        """上传返回的 recommendations 出口也必须清空 summary/reason_text/tags。"""
+        from app.utils.auth_token import build_auth_token
+
+        monkeypatch.setattr("app.core.executor.submit_task", lambda *args, **kwargs: None)
+        monkeypatch.setattr("app.routers.video.recommend_videos", fake_upload_recommendations)
+
+        response = client.post(
+            "/api/videos/upload-url",
+            json={"url": "https://www.bilibili.com/video/BV1xx411c7mD", "model": "medium"},
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        item = payload["recommendations"]["items"][0]
+        assert item["summary"] == ""
+        assert item["tags"] == []
+        assert item["reason_text"] == ""
 
     def test_upload_video_url_persists_recommendation_metadata(self, client, db, monkeypatch, sample_user):
         """测试链接上传可预填推荐候选标题、摘要与标签。"""

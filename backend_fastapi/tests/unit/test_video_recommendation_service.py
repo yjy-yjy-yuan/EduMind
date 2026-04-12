@@ -9,6 +9,7 @@ from app.services.external_candidate_service import ExternalProviderFetchSummary
 from app.services.video_recommendation_service import build_normalized_video_tags
 from app.services.video_recommendation_service import build_recommendation_profile
 from app.services.video_recommendation_service import recommend_videos
+from app.services.video_recommendation_service import sanitize_recommendation_payload_for_client
 
 
 def fake_fetch_external_candidates_report(*args, **kwargs):
@@ -221,7 +222,7 @@ def test_recommend_videos_include_external_candidates(monkeypatch):
         include_external=True,
     )
 
-    assert payload["contract_version"] == "1"
+    assert payload["contract_version"] == "2"
     assert any(item["id"] == internal_video.id for item in payload["items"])
     assert any(item.get("is_external") is True for item in payload["items"])
     external_item = next(item for item in payload["items"] if item.get("is_external") is True)
@@ -306,3 +307,68 @@ def test_recommend_videos_internal_items_include_open_detail_action():
     assert payload["internal_item_count"] == 1
     assert payload["external_item_count"] == 0
     assert payload["sources"][0]["source_label"] == "站内视频"
+
+
+def test_recommend_videos_enforce_window_and_similarity_threshold():
+    """推荐接口窗口应收敛到 5~8，并优先保留相似度 >= 0.55 的同主题内容。"""
+    math_videos = [
+        Video(
+            id=100 + idx,
+            title=f"数学导数专题 {idx}",
+            filename=f"math-{idx}.mp4",
+            filepath=f"/tmp/math-{idx}.mp4",
+            status=VideoStatus.COMPLETED,
+            summary="围绕导数、函数与极限进行同主题复盘。",
+            tags='["数学","导数","函数"]',
+        )
+        for idx in range(6)
+    ]
+    english_videos = [
+        Video(
+            id=200 + idx,
+            title=f"英语听力技巧 {idx}",
+            filename=f"english-{idx}.mp4",
+            filepath=f"/tmp/english-{idx}.mp4",
+            status=VideoStatus.COMPLETED,
+            summary="整理英语听力高频信号词与定位方法。",
+            tags='["英语","听力","语法"]',
+        )
+        for idx in range(3)
+    ]
+
+    payload = recommend_videos(
+        videos=[*math_videos, *english_videos],
+        scene="home",
+        limit=2,
+        include_external=False,
+        enforce_return_window=True,
+    )
+
+    returned_ids = {item["id"] for item in payload["items"] if isinstance(item.get("id"), int)}
+    math_ids = {video.id for video in math_videos}
+    english_ids = {video.id for video in english_videos}
+
+    assert 5 <= len(payload["items"]) <= 8
+    assert returned_ids.issubset(math_ids)
+    assert returned_ids.isdisjoint(english_ids)
+
+
+def test_sanitize_recommendation_payload_for_client_removes_slice_fields():
+    """推荐出口清洗应统一清空 summary/reason_text/tags。"""
+    payload = {
+        "scene": "home",
+        "items": [
+            {
+                "id": 1,
+                "title": "导数专题",
+                "summary": "这是一段摘要",
+                "tags": ["数学", "导数"],
+                "reason_text": "与当前主题相关",
+            }
+        ],
+    }
+    sanitized = sanitize_recommendation_payload_for_client(payload)
+
+    assert sanitized["items"][0]["summary"] == ""
+    assert sanitized["items"][0]["tags"] == []
+    assert sanitized["items"][0]["reason_text"] == ""

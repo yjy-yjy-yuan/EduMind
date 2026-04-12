@@ -1,5 +1,52 @@
 # 变更日志
 
+## 2026-04-12
+
+### 推荐链路“一次性去切片”全量收口（前后端双收口）
+
+- **backend_fastapi**：新增 `sanitize_recommendation_payload_for_client()`（`app/services/video_recommendation_service.py`），并在两个对外出口强制应用：
+  - `GET /api/recommendations/videos`（含自动入库替换后再次收口）
+  - 上传链路返回的 `recommendations`（`build_upload_recommendations`）
+- **backend_fastapi**：自动入库替换条目 `_serialize_materialized_recommendation_item` 同步改为最小展示集，避免在替换阶段重新引入切片化字段。
+- **contract**：v1/v2 统一执行去切片展示口径，`items[*].summary=""`、`items[*].reason_text=""`、`items[*].tags=[]`，仅保留 `reason_label/reason_code` 等轻量解释信息。
+- **mobile-frontend**：
+  - `Home.vue` 推荐卡片下线 `reason_text/summary` 与 tags 行；
+  - `Recommendations.vue` 下线卡片描述、标签 chips 与顶部标签筛选（含状态逻辑移除）；
+  - `Upload.vue` 上传后推荐下线 `summary/tags` 与 query summary 文案。
+- **mock**：`mockGateway` 推荐条目输出与真实契约对齐为无切片展示字段口径。
+- **tests**：
+  - `tests/api/test_recommendation_api.py` 增加 `/videos` 出口去切片断言，并将既有推荐回归同步改为断言清洗后字段；
+  - `tests/api/test_video_api.py` 增加上传返回 `recommendations.items[*]` 去切片断言；
+  - `tests/unit/test_video_recommendation_service.py` 增加清洗函数单测。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 补充“推荐展示最小信息集”与 v1/v2 统一强制去切片规则。
+
+### 推荐页同主题区：去重兜底与场景/全页刷新行为
+
+- **mobile-frontend**：`Recommendations.vue` 在 `related` 接口无结果或失败时，本地兜底从**各场景已加载列表合并去重**的候选池选取，并**排除**种子视频 ID 与**当前场景主列表**已出现的视频 ID，避免「相关推荐」与主网格重复。
+- **mobile-frontend**：切换场景时清空同主题区；全页「刷新推荐」/重试加载完成后**不再**自动对首条推荐触发「看同主题」，由用户在上面的卡片里主动点击加载。
+
+### 视频推荐：Contract v2（默认不再返回 seed_video_title）
+
+- **backend_fastapi**：`RECOMMENDATION_CONTRACT_VERSION` 默认 `"2"`；`/api/recommendations/videos` 使用 `VideoRecommendationResponse`（无 `seed_video_title`）；`RECOMMENDATION_CONTRACT_VERSION=1` 时使用 `VideoRecommendationResponseV1` 兼容旧字段。
+- **backend_fastapi**：`recommend_videos` 仅在 `contract_version=="1"` 时写入 `seed_video_title`。
+- **tests**：推荐 API/单测更新；新增 Contract v1 回归用例；**mobile-frontend** mock 同步 `contract_version: '2'`。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` §9 P0-C019 更新。
+- **backend_fastapi（收口）**：v2 起 `items[].reason_text` 在 related/站外分支不再拼接种子视频标题；`_coerce_video_recommendation_response` 以 `Settings.RECOMMENDATION_CONTRACT_VERSION` 强制响应 `contract_version`。
+- **mobile-frontend**：mock `related` 理由与 v2 文案一致。
+- **tests**：`backend_fastapi/tests/api/test_recommendation_api.py` 新增 `test_videos_ranking_telemetry_contract_version_follows_server_setting`（约第 791 行）：`RECOMMENDATION_CONTRACT_VERSION=1` 时断言接口响应 `contract_version=="1"`，且 `recommendation_ranking_completed` 遥测 `metadata.contract_version=="1"`（与路由层强制契约一致，便于审计对账）。
+
+### 视频推荐相似性增强（关键词搜索融合）与返回窗口收敛
+
+- **backend_fastapi**：新增共享相似度模块 `app/services/search/similarity_fusion.py`，并让语义搜索与视频推荐共用融合相似度逻辑（语义信号 + 词面匹配）。
+- **backend_fastapi**：推荐链路新增后端阈值过滤（`RECOMMENDATION_SIMILARITY_MIN_SCORE=0.55`），仅返回达到阈值的推荐候选；相似度分值不对前端展示。
+- **backend_fastapi**：推荐接口新增移动端返回窗口配置 `RECOMMENDATION_RETURN_MIN_ITEMS/RECOMMENDATION_RETURN_MAX_ITEMS`（默认 `5/8`），`/api/recommendations/videos` 调用默认按窗口规范化。
+- **backend_fastapi**：`/api/recommendations/videos` 在路由收口阶段新增 seed/排除 ID 硬过滤（`seed_video_id` 与 `exclude_video_ids` 二次过滤），避免自动入库或回归改动导致“当前选中视频”回流到相关推荐结果。
+- **mobile-frontend**：首页推荐请求条数从 4 调整为 6；推荐页 `related` 场景请求条数从 4 调整为 5；本地兜底相关推荐同步提升到 5 条。
+- **mobile-frontend**：推荐页去除“当前种子视频”内容展示，不再暴露所选推荐处理视频标题/标签语义；相关推荐请求显式附带 `exclude_video_ids=<seed_id>`，并使用匿名状态文案。
+- **tests**：`backend_fastapi/tests/unit/test_video_recommendation_service.py` 新增窗口与阈值回归用例，验证“5~8 条 + 排除低相似候选”策略。
+- **tests**：`backend_fastapi/tests/api/test_recommendation_api.py` 增加路由层硬过滤回归，用例覆盖“即使服务层返回 seed/excluded 条目，最终响应仍被过滤”。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`、`backend_fastapi/.env.example` 同步新增相似度阈值与返回窗口配置说明。
+
 ## 2026-04-11
 
 ### 视频推荐链路澄清修复：默认值对齐、首页兜底可见、前端分包

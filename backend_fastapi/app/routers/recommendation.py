@@ -3,6 +3,7 @@
 import time
 import uuid
 from typing import Optional
+from typing import Union
 from urllib.parse import urlparse
 
 from app.analytics.pipeline import get_telemetry
@@ -14,6 +15,7 @@ from app.models.video import Video
 from app.schemas.recommendation import RecommendationOpsMetricsResponse
 from app.schemas.recommendation import RecommendationSceneListResponse
 from app.schemas.recommendation import VideoRecommendationResponse
+from app.schemas.recommendation import VideoRecommendationResponseV1
 from app.schemas.video import VideoUploadResponse
 from app.schemas.video import VideoUploadURL
 from app.services.recommendation_ops_service import build_recommendation_ops_metrics
@@ -25,6 +27,7 @@ from app.services.video_recommendation_service import list_recommendation_scenes
 from app.services.video_recommendation_service import load_candidate_videos_for_recommendation
 from app.services.video_recommendation_service import normalize_scene
 from app.services.video_recommendation_service import recommend_videos
+from app.services.video_recommendation_service import sanitize_recommendation_payload_for_client
 from app.services.video_recommendation_service import summarize_recommendation_sources
 from app.services.video_url_import_service import import_remote_video_from_url
 from app.utils.auth_deps import resolve_user_from_request
@@ -99,6 +102,18 @@ def parse_exclude_ids(raw_value: Optional[str]) -> set[int]:
     return values
 
 
+def _coerce_video_recommendation_response(
+    payload: dict,
+) -> Union[VideoRecommendationResponse, VideoRecommendationResponseV1]:
+    """契约版本以服务端配置为准，避免 payload 内 contract_version 漂移；v2 不序列化 seed_video_title。"""
+    cv = str(settings.RECOMMENDATION_CONTRACT_VERSION or "2").strip()
+    merged = {**payload, "contract_version": cv}
+    if cv == "1":
+        return VideoRecommendationResponseV1.model_validate(merged)
+    cleaned = {k: v for k, v in merged.items() if k != "seed_video_title"}
+    return VideoRecommendationResponse.model_validate(cleaned)
+
+
 def _url_host(url: str) -> str:
     """Extract hostname for telemetry (not a truncated URL)."""
     try:
@@ -124,7 +139,6 @@ def _is_external_import_candidate(item: dict) -> bool:
 def _serialize_materialized_recommendation_item(*, source_item: dict, video: Video, duplicate: bool) -> dict:
     """把站外候选自动入库结果转成可直接打开的视频推荐项。"""
     payload = serialize_video(video)
-    tags = payload.get("tags") if isinstance(payload.get("tags"), list) else []
     external_source_label = str(
         source_item.get("source_label") or source_item.get("external_source_label") or "站外推荐"
     ).strip()
@@ -136,8 +150,8 @@ def _serialize_materialized_recommendation_item(*, source_item: dict, video: Vid
         "title": payload.get("title") or source_item.get("title"),
         "status": status,
         "upload_time": video.upload_time,
-        "summary": payload.get("summary") or source_item.get("summary"),
-        "tags": tags or list(source_item.get("tags") or []),
+        "summary": "",
+        "tags": [],
         "process_progress": float(payload.get("process_progress") or 0),
         "current_step": str(payload.get("current_step") or ""),
         "processing_origin": processing_origin,
@@ -147,7 +161,7 @@ def _serialize_materialized_recommendation_item(*, source_item: dict, video: Vid
         "recommendation_score": float(source_item.get("recommendation_score") or 0),
         "reason_code": str(source_item.get("reason_code") or "external_discovery"),
         "reason_label": str(source_item.get("reason_label") or "已导入"),
-        "reason_text": str(source_item.get("reason_text") or "已自动导入到视频库，可直接继续处理链路。"),
+        "reason_text": "",
         "is_external": False,
         "item_type": "video",
         "source_label": source_label,
@@ -179,6 +193,32 @@ def _refresh_payload_counters(payload: dict) -> None:
     payload["internal_item_count"] = sum(1 for item in items if not bool(item.get("is_external")))
     payload["external_item_count"] = sum(1 for item in items if bool(item.get("is_external")))
     payload["sources"] = summarize_recommendation_sources(items)
+
+
+def _filter_forbidden_video_ids(payload: dict, forbidden_video_ids: set[int]) -> None:
+    """在路由收口阶段硬过滤禁止返回的视频 ID。"""
+    if not forbidden_video_ids:
+        return
+    items = list(payload.get("items") or [])
+    if not items:
+        return
+    filtered_items: list[dict] = []
+    changed = False
+    for item in items:
+        raw_id = item.get("id")
+        try:
+            item_id = int(raw_id)
+        except (TypeError, ValueError):
+            filtered_items.append(item)
+            continue
+        if item_id in forbidden_video_ids:
+            changed = True
+            continue
+        filtered_items.append(item)
+    if not changed:
+        return
+    payload["items"] = filtered_items
+    _refresh_payload_counters(payload)
 
 
 def _auto_import_external_recommendations(
@@ -287,12 +327,17 @@ async def get_recommendation_scenes(request: Request, response: Response, db: Se
     return {"message": "获取推荐场景成功", "scenes": scenes}
 
 
-@router.get("/videos", response_model=VideoRecommendationResponse)
+@router.get("/videos", response_model=Union[VideoRecommendationResponse, VideoRecommendationResponseV1])
 async def get_video_recommendations(
     request: Request,
     response: Response,
     scene: str = Query(default="home", description="推荐场景：home/continue/review/related"),
-    limit: int = Query(default=4, ge=1, le=12, description="返回条数"),
+    limit: int = Query(
+        default=6,
+        ge=1,
+        le=12,
+        description="返回条数（推荐接口会按后端窗口规范化到 5~8，用于稳定移动端体验）",
+    ),
     include_external: bool = Query(
         default=settings.RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT,
         description="是否附带站外候选；服务端默认由 RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT 控制",
@@ -328,6 +373,10 @@ async def get_video_recommendations(
         if seed_video is None:
             raise HTTPException(status_code=404, detail="seed 视频不存在")
 
+    excluded_video_ids = parse_exclude_ids(exclude_video_ids)
+    if seed_video_id is not None:
+        excluded_video_ids.add(seed_video_id)
+
     user = resolve_user_from_request(db, user_id, authorization)
     max_scan = int(settings.RECOMMENDATION_MAX_CANDIDATES_SCAN)
     videos = load_candidate_videos_for_recommendation(db, seed_video, max_scan)
@@ -337,9 +386,10 @@ async def get_video_recommendations(
         limit=limit,
         seed_video=seed_video,
         user=user,
-        exclude_ids=parse_exclude_ids(exclude_video_ids),
+        exclude_ids=excluded_video_ids,
         include_external=include_external,
         coach=coach,
+        enforce_return_window=True,
     )
     if include_external:
         payload = _auto_import_external_recommendations(
@@ -352,7 +402,10 @@ async def get_video_recommendations(
         payload["flow_version"] = "recommendation_flow_v1"
         payload["auto_materialized_external_count"] = 0
         payload["auto_materialization_failed_count"] = 0
+    _filter_forbidden_video_ids(payload, excluded_video_ids)
+    payload = sanitize_recommendation_payload_for_client(payload)
     payload["message"] = "获取推荐视频成功"
+    response_payload = _coerce_video_recommendation_response(payload)
     latency_ms = (time.perf_counter() - t0) * 1000.0
     _emit_recommendation_event(
         trace_id=trace_id,
@@ -366,7 +419,7 @@ async def get_video_recommendations(
             "fallback_used": payload.get("fallback_used"),
             "internal_item_count": payload.get("internal_item_count"),
             "external_item_count": payload.get("external_item_count"),
-            "contract_version": payload.get("contract_version"),
+            "contract_version": getattr(response_payload, "contract_version", None),
         },
         db=db,
     )
@@ -400,7 +453,7 @@ async def get_video_recommendations(
                 metadata={"external_item_count": payload.get("external_item_count")},
                 db=db,
             )
-    return payload
+    return response_payload
 
 
 @router.get("/ops/metrics", response_model=RecommendationOpsMetricsResponse)

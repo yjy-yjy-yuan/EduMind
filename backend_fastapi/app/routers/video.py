@@ -40,6 +40,7 @@ from app.services.video_processing_registry import forget_video_processing_reque
 from app.services.video_processing_registry import remember_video_processing_request
 from app.services.video_recommendation_service import load_candidate_videos_for_recommendation
 from app.services.video_recommendation_service import recommend_videos
+from app.services.video_recommendation_service import sanitize_recommendation_payload_for_client
 from app.services.video_url_import_service import import_remote_video_from_url
 from app.services.whisper_runtime import get_supported_whisper_models
 from app.services.whisper_runtime import get_whisper_model_catalog
@@ -228,13 +229,14 @@ def build_upload_recommendations(db: Session, *, video: Video, limit: int = 4) -
         videos = load_candidate_videos_for_recommendation(db, seed_video, max_scan)
         if not videos:
             return None
-        return recommend_videos(
+        payload = recommend_videos(
             videos=videos,
             scene=scene,
             limit=limit,
             seed_video=seed_video,
             include_external=False,
         )
+        return sanitize_recommendation_payload_for_client(payload)
     except Exception as exc:
         logger.debug("上传后自动获取推荐失败 | video_id=%s | error=%s", video.id, exc)
         return None

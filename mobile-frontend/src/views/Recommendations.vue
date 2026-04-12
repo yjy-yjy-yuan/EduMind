@@ -73,19 +73,6 @@
       </div>
       <div class="scene-toolbar">
         <span class="pill">{{ filteredSceneCountLabel }}</span>
-        <button v-if="selectedTag" type="button" class="panel-link" @click="selectedTag = ''">清除筛选：{{ selectedTag }}</button>
-      </div>
-      <div v-if="tagClusters.length > 0" class="mini-tags mini-tags--filter">
-        <button
-          v-for="tag in tagClusters"
-          :key="tag.name"
-          type="button"
-          class="mini-tag"
-          :class="{ 'mini-tag--active': selectedTag === tag.name }"
-          @click="toggleTag(tag.name)"
-        >
-          {{ tag.name }} · {{ tag.count }}
-        </button>
       </div>
       <div v-if="filteredSceneExternalCount > 0" class="message message--hint">
         当前场景里仍有 {{ filteredSceneExternalCount }} 条站外候选未自动入库；点击后会继续走导入学习链路。
@@ -103,7 +90,7 @@
         <div v-for="index in 3" :key="`scene-skeleton-${index}`" class="skeleton-card"></div>
       </div>
       <div v-else-if="filteredSceneItems.length === 0" class="message" role="status">
-        {{ selectedTag ? `当前场景下暂时没有命中“${selectedTag}”的推荐。` : '当前场景还没有可展示的推荐项。' }}
+        当前场景还没有可展示的推荐项。
       </div>
       <div v-else class="card-list">
         <article v-for="item in filteredSceneItems" :key="item.key" class="recommend-card">
@@ -112,18 +99,6 @@
             <span class="badge" :class="item.sourceBadgeClass">{{ item.sourceLabel }}</span>
           </div>
           <h3 class="recommend-card__title">{{ item.title }}</h3>
-          <p class="recommend-card__desc">{{ item.summaryText }}</p>
-          <div v-if="item.tags.length > 0" class="mini-tags">
-            <button
-              v-for="tag in item.tags.slice(0, 4)"
-              :key="`${item.key}-${tag}`"
-              type="button"
-              class="mini-tag"
-              @click="toggleTag(tag)"
-            >
-              {{ tag }}
-            </button>
-          </div>
           <div class="recommend-card__meta">
             <span v-if="item.timeText">{{ item.timeText }}</span>
             <span v-if="item.statusText">{{ item.statusText }}</span>
@@ -163,11 +138,6 @@
       </div>
       <div v-if="!relatedSeed" class="message">先在上面的卡片里点一次“看同主题”，这里就会加载相关推荐。</div>
       <template v-else>
-        <div class="seed-card">
-          <span class="seed-card__label">当前种子视频</span>
-          <strong class="seed-card__title">{{ relatedSeed.title }}</strong>
-          <span class="seed-card__meta">{{ relatedSeed.reasonLabel }}</span>
-        </div>
         <div v-if="relatedStatusMessage" class="message message--hint">
           {{ relatedStatusMessage }}
         </div>
@@ -182,7 +152,7 @@
           <button type="button" class="panel-link" @click="reloadRelated">重试</button>
         </div>
         <div v-else-if="filteredRelatedItems.length === 0" class="message">
-          {{ selectedTag ? `相关推荐里暂时没有命中“${selectedTag}”的内容。` : '当前还没有可展示的相关推荐。' }}
+          当前还没有可展示的相关推荐。
         </div>
         <div v-else class="card-list">
           <article v-for="item in filteredRelatedItems" :key="item.key" class="related-card">
@@ -190,7 +160,6 @@
               <span class="badge badge--reason">{{ item.reasonLabel }}</span>
               <span class="badge" :class="item.sourceBadgeClass">{{ item.sourceLabel }}</span>
               <strong class="related-card__title">{{ item.title }}</strong>
-              <p class="related-card__desc">{{ item.summaryText }}</p>
             </div>
             <button type="button" class="action-btn action-btn--primary" @click="openRecommendation(item)">
               {{ item.primaryActionLabel }}
@@ -225,7 +194,6 @@ const pageLoading = ref(false)
 const pageError = ref('')
 const scenes = ref([])
 const activeScene = ref('home')
-const selectedTag = ref('')
 const sceneItemsMap = ref({})
 const sceneMetaMap = ref({})
 const sceneErrorMap = ref({})
@@ -312,7 +280,6 @@ const decorateItem = (item, index = 0) => {
     title: String(item?.title || '未命名内容'),
     tags,
     reasonLabel: String(item?.reason_label || '推荐'),
-    summaryText: String(item?.reason_text || item?.summary || '从这里继续进入学习链路。'),
     statusText: item?.status ? videoStatusText(item.status) : '',
     timeText: formatTimeText(item?.upload_time || item?.updated_at || item?.created_at),
     sourceLabel,
@@ -349,7 +316,8 @@ const activeSceneOption = computed(
 
 const activeSceneItems = computed(() => (sceneItemsMap.value[activeScene.value] || []).map((item, index) => decorateItem(item, index)))
 
-const allLoadedItems = computed(() => {
+/** 各场景推荐列表合并去重（不含「同主题」区），供同主题兜底候选，避免与主列表重复 */
+const allSceneItemsDeduped = computed(() => {
   const map = new Map()
   displayScenes.value.forEach((scene) => {
     ;(sceneItemsMap.value[scene.value] || []).forEach((item, index) => {
@@ -357,45 +325,25 @@ const allLoadedItems = computed(() => {
       map.set(decorated.key, decorated)
     })
   })
-  relatedItems.value.forEach((item, index) => {
-    const decorated = decorateItem(item, index)
-    map.set(decorated.key, decorated)
-  })
   return Array.from(map.values())
 })
 
-const tagClusters = computed(() => {
-  const bucket = new Map()
-  allLoadedItems.value.forEach((item) => {
-    item.tags.forEach((tag) => {
-      const current = bucket.get(tag) || { name: tag, count: 0, titles: [] }
-      current.count += 1
-      if (current.titles.length < 2) current.titles.push(item.title)
-      bucket.set(tag, current)
-    })
-  })
-  return Array.from(bucket.values())
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-    .slice(0, 10)
-    .map((item) => ({ ...item, sample: item.titles.join(' / ') }))
-})
-
-const filteredSceneItems = computed(() => !selectedTag.value ? activeSceneItems.value : activeSceneItems.value.filter((item) => item.tags.includes(selectedTag.value)))
+const filteredSceneItems = computed(() => activeSceneItems.value)
 const filteredRelatedItems = computed(() => {
   const items = relatedItems.value.map((item, index) => decorateItem(item, index))
-  return !selectedTag.value ? items : items.filter((item) => item.tags.includes(selectedTag.value))
+  return items
 })
 const activeSceneMeta = computed(() => sceneMetaMap.value[activeScene.value] || createRecommendationMeta())
 const filteredSceneExternalCount = computed(() => filteredSceneItems.value.filter((item) => isExternalItem(item)).length)
 const activeSceneLoading = computed(() => Boolean(sceneLoadingMap.value[activeScene.value]))
 const activeSceneError = computed(() => String(sceneErrorMap.value[activeScene.value] || '').trim())
-const sceneDescriptionText = computed(() => selectedTag.value ? `当前已按“${selectedTag.value}”筛选 ${activeSceneOption.value.label}。` : activeSceneOption.value.description)
+const sceneDescriptionText = computed(() => activeSceneOption.value.description)
 const filteredSceneCountLabel = computed(() => `${filteredSceneItems.value.length} 条结果`)
 const relatedStatusMessage = computed(() => {
-  if (!relatedSeed.value?.title) return ''
-  if (relatedLoading.value) return `正在围绕《${relatedSeed.value.title}》加载同主题视频…`
-  if (relatedStatusMode.value === 'local') return `已显示《${relatedSeed.value.title}》的同主题推荐；当前使用的是本地兜底结果。`
-  if (filteredRelatedItems.value.length > 0) return `已为《${relatedSeed.value.title}》加载 ${filteredRelatedItems.value.length} 条同主题推荐。`
+  if (!relatedSeed.value) return ''
+  if (relatedLoading.value) return '正在加载同主题视频…'
+  if (relatedStatusMode.value === 'local') return '当前显示的是本地兜底同主题结果。'
+  if (filteredRelatedItems.value.length > 0) return `已加载 ${filteredRelatedItems.value.length} 条同主题推荐。`
   return ''
 })
 
@@ -403,7 +351,6 @@ const setSceneLoading = (scene, value) => { sceneLoadingMap.value = { ...sceneLo
 const setSceneError = (scene, value) => { sceneErrorMap.value = { ...sceneErrorMap.value, [scene]: value } }
 const setSceneItems = (scene, items) => { sceneItemsMap.value = { ...sceneItemsMap.value, [scene]: items } }
 const setSceneMeta = (scene, payload) => { sceneMetaMap.value = { ...sceneMetaMap.value, [scene]: buildRecommendationMeta(payload) } }
-const toggleTag = (tag) => { selectedTag.value = selectedTag.value === tag ? '' : tag }
 const activeExternalFetchBanner = computed(() => {
   if (!activeSceneMeta.value.externalFetchFailed) return ''
   return '部分站外来源未返回结果，站内推荐仍可使用。可检查网络后刷新本场景重试。'
@@ -432,12 +379,23 @@ const scoreRelatedFallbackCandidate = (seedItem, candidate) => {
   return score
 }
 
+const collectActiveSceneExcludeIds = () => {
+  const ids = new Set()
+  ;(sceneItemsMap.value[activeScene.value] || []).forEach((row) => {
+    if (row?.id != null && row.id !== '') ids.add(Number(row.id))
+  })
+  return ids
+}
+
 const buildFallbackRelatedItems = (seedItem) => {
-  return allLoadedItems.value
+  const exclude = collectActiveSceneExcludeIds()
+  if (seedItem?.id != null && seedItem.id !== '') exclude.add(Number(seedItem.id))
+  return allSceneItemsDeduped.value
+    .filter((candidate) => candidate.id != null && candidate.id !== '' && !exclude.has(Number(candidate.id)))
     .map((candidate) => ({ candidate, score: scoreRelatedFallbackCandidate(seedItem, candidate) }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score)
-    .slice(0, 4)
+    .slice(0, 5)
     .map((entry) => entry.candidate)
 }
 
@@ -507,6 +465,7 @@ const loadScene = async (scene, { force = false } = {}) => {
 }
 
 const activateScene = async (scene) => {
+  if (scene !== activeScene.value) clearRelated()
   activeScene.value = scene
   if ((sceneItemsMap.value[scene] || []).length === 0) await loadScene(scene)
 }
@@ -523,7 +482,8 @@ const loadRelatedByItem = async (item) => {
     const res = await getVideoRecommendations({
       scene: 'related',
       seed_video_id: item.id,
-      limit: 4,
+      exclude_video_ids: String(item.id),
+      limit: 5,
       include_external: true
     })
     const payload = res?.data || {}
@@ -570,10 +530,8 @@ const reloadAll = async () => {
     const loadedScenes = normalizeSceneOptions(sceneRes?.data || {})
     scenes.value = loadedScenes.length > 0 ? loadedScenes : FALLBACK_SCENES
     const baseScenes = (scenes.value.length > 0 ? scenes.value : FALLBACK_SCENES).filter((scene) => !scene.requires_seed)
-    const results = await Promise.all(baseScenes.map((scene) => loadScene(scene.value, { force: true })))
-    const seedSource = results.flat().find((item) => item?.id)
-    if (seedSource?.id) await loadRelatedByItem(decorateItem(seedSource))
-    else clearRelated()
+    await Promise.all(baseScenes.map((scene) => loadScene(scene.value, { force: true })))
+    clearRelated()
   } catch (error) {
     pageError.value = error?.message || '推荐页面加载失败'
     scenes.value = FALLBACK_SCENES

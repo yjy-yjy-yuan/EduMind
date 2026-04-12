@@ -81,8 +81,88 @@ class TestRecommendationAPI:
         assert response.status_code == 200
         assert response.headers.get("X-Trace-Id") == "reco-trace-2"
         payload = response.json()
-        assert payload.get("contract_version") == "1"
+        assert payload.get("contract_version") == "2"
         assert payload.get("message") == "获取推荐视频成功"
+
+    def test_videos_items_strip_slice_fields(self, client, db, sample_user, monkeypatch):
+        """推荐接口出口统一去切片：summary/reason_text/tags 必须清空。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        internal_video = Video(
+            user_id=sample_user.id,
+            title="高数导数专题",
+            filename="math.mp4",
+            filepath="/tmp/math.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="围绕导数定义与函数单调性做复盘。",
+            tags='["导数","函数"]',
+        )
+        db.add(internal_video)
+        db.commit()
+
+        monkeypatch.setattr(
+            recommendation_service,
+            "fetch_external_candidates_report",
+            fake_fetch_external_candidates_report,
+        )
+
+        response = client.get(
+            "/api/recommendations/videos",
+            params={"scene": "home", "limit": 4, "include_external": True},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["items"]
+        assert all(item["summary"] == "" for item in payload["items"])
+        assert all(item["tags"] == [] for item in payload["items"])
+        assert all(item["reason_text"] == "" for item in payload["items"])
+
+    def test_videos_contract_v1_restores_seed_video_title(self, client, db, sample_user, monkeypatch):
+        """RECOMMENDATION_CONTRACT_VERSION=1 时仍返回 seed_video_title，但切片文本字段继续清空。"""
+        from app.core.config import settings
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        seed_video = Video(
+            user_id=sample_user.id,
+            title="v1 种子标题",
+            filename="seed.mp4",
+            filepath="/tmp/seed.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="讲解导数在函数单调性判断中的应用。",
+            tags='["导数","单调性","函数"]',
+        )
+        best_match = Video(
+            user_id=sample_user.id,
+            title="函数单调性题型精讲",
+            filename="best-match.mp4",
+            filepath="/tmp/best-match.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+            summary="围绕函数、导数和单调性题型做系统复盘。",
+            tags='["导数","函数","题型"]',
+        )
+        db.add_all([seed_video, best_match])
+        db.commit()
+
+        monkeypatch.setattr(settings, "RECOMMENDATION_CONTRACT_VERSION", "1", raising=False)
+
+        response = client.get(
+            "/api/recommendations/videos",
+            params={"scene": "related", "seed_video_id": seed_video.id, "limit": 2},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["contract_version"] == "1"
+        assert payload["seed_video_title"] == seed_video.title
+        assert payload["items"][0]["reason_code"] == "related"
+        assert payload["items"][0]["reason_text"] == ""
 
     def test_home_recommendations_prioritize_active_video(self, client, db, sample_user):
         """首页推荐优先返回当前需要继续跟进的处理中视频。"""
@@ -140,11 +220,61 @@ class TestRecommendationAPI:
         assert payload["scene"] == "home"
         assert payload["strategy"] == "video_status_interest_v1"
         assert payload["personalized"] is True
-        assert len(payload["items"]) == 3
+        assert 2 <= len(payload["items"]) <= 3
         assert payload["items"][0]["id"] == processing_video.id
         assert payload["items"][0]["reason_code"] == "continue"
-        assert payload["items"][0]["tags"][0] == "数学"
+        assert payload["items"][0]["tags"] == []
+        assert payload["items"][0]["summary"] == ""
+        assert payload["items"][0]["reason_text"] == ""
         assert any(item["reason_code"] in {"interest", "continue"} for item in payload["items"])
+
+    def test_home_recommendations_enforce_similarity_threshold_and_window(self, client, db, sample_user):
+        """推荐接口应按后端阈值过滤，并将条数规范化到 5~8。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+        from app.utils.auth_token import build_auth_token
+
+        math_videos = [
+            Video(
+                user_id=sample_user.id,
+                title=f"数学导数专题 {idx}",
+                filename=f"math-{idx}.mp4",
+                filepath=f"/tmp/math-{idx}.mp4",
+                status=VideoStatus.COMPLETED,
+                summary="围绕导数、函数与极限进行同主题复盘。",
+                tags='["数学","导数","函数"]',
+            )
+            for idx in range(6)
+        ]
+        english_videos = [
+            Video(
+                user_id=sample_user.id,
+                title=f"英语听力技巧 {idx}",
+                filename=f"english-{idx}.mp4",
+                filepath=f"/tmp/english-{idx}.mp4",
+                status=VideoStatus.COMPLETED,
+                summary="整理英语听力高频信号词与定位方法。",
+                tags='["英语","听力","语法"]',
+            )
+            for idx in range(3)
+        ]
+        db.add_all([*math_videos, *english_videos])
+        db.commit()
+
+        response = client.get(
+            "/api/recommendations/videos",
+            params={"scene": "home", "limit": 2, "include_external": False},
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
+        )
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert 5 <= len(payload["items"]) <= 8
+        assert all(item["item_type"] == "video" for item in payload["items"])
+        assert all("数学导数专题" in str(item["title"]) for item in payload["items"])
+        assert all(item["summary"] == "" for item in payload["items"])
+        assert all(item["tags"] == [] for item in payload["items"])
+        assert all(item["reason_text"] == "" for item in payload["items"])
 
     def test_related_recommendations_require_seed_video(self, client):
         """相关推荐场景必须传 seed_video_id。"""
@@ -201,10 +331,12 @@ class TestRecommendationAPI:
 
         payload = response.json()
         assert payload["seed_video_id"] == seed_video.id
-        assert payload["seed_video_title"] == seed_video.title
+        assert "seed_video_title" not in payload
         assert payload["items"][0]["id"] == best_match.id
         assert payload["items"][0]["reason_code"] == "related"
-        assert payload["items"][0]["tags"][0] == "数学"
+        assert payload["items"][0]["tags"] == []
+        assert payload["items"][0]["summary"] == ""
+        assert payload["items"][0]["reason_text"] == ""
         assert all(item["id"] != seed_video.id for item in payload["items"])
 
     def test_related_recommendations_infer_subject_from_title_only(self, client, db, sample_user):
@@ -256,8 +388,93 @@ class TestRecommendationAPI:
 
         payload = response.json()
         assert payload["items"][0]["id"] == physics_match.id
-        assert payload["items"][0]["tags"][0] == "物理"
+        assert payload["items"][0]["subject"] == "物理"
+        assert payload["items"][0]["tags"] == []
+        assert payload["items"][0]["reason_text"] == ""
         assert payload["items"][0]["reason_code"] in {"related", "subject"}
+
+    def test_related_recommendations_hard_filter_seed_and_excluded_ids(self, client, db, sample_user, monkeypatch):
+        """路由层在最终响应前应硬过滤 seed 与 exclude_video_ids 指定视频。"""
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        seed_video = Video(
+            user_id=sample_user.id,
+            title="种子视频",
+            filename="seed.mp4",
+            filepath="/tmp/seed.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+        )
+        excluded_video = Video(
+            user_id=sample_user.id,
+            title="应排除视频",
+            filename="excluded.mp4",
+            filepath="/tmp/excluded.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+        )
+        kept_video = Video(
+            user_id=sample_user.id,
+            title="应保留视频",
+            filename="kept.mp4",
+            filepath="/tmp/kept.mp4",
+            status=VideoStatus.COMPLETED,
+            process_progress=100,
+            current_step="分析完成",
+        )
+        db.add_all([seed_video, excluded_video, kept_video])
+        db.commit()
+        db.refresh(seed_video)
+        db.refresh(excluded_video)
+        db.refresh(kept_video)
+
+        def fake_recommend_videos(**kwargs):
+            return {
+                "message": "mock",
+                "contract_version": "1",
+                "scene": "related",
+                "strategy": "mock",
+                "personalized": False,
+                "fallback_used": False,
+                "seed_video_id": seed_video.id,
+                "seed_video_title": seed_video.title,
+                "internal_item_count": 3,
+                "external_item_count": 0,
+                "external_failed_provider_count": 0,
+                "external_fetch_failed": False,
+                "flow_version": "recommendation_flow_v1",
+                "auto_materialized_external_count": 0,
+                "auto_materialization_failed_count": 0,
+                "sources": [{"source_type": "internal", "provider": "internal", "source_label": "视频库", "count": 3}],
+                "external_query": None,
+                "external_providers": [],
+                "items": [
+                    {"id": seed_video.id, "title": "seed"},
+                    {"id": excluded_video.id, "title": "excluded"},
+                    {"id": kept_video.id, "title": "kept"},
+                ],
+            }
+
+        monkeypatch.setattr("app.routers.recommendation.recommend_videos", fake_recommend_videos)
+
+        response = client.get(
+            "/api/recommendations/videos",
+            params={
+                "scene": "related",
+                "seed_video_id": seed_video.id,
+                "exclude_video_ids": str(excluded_video.id),
+                "include_external": False,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert [item["id"] for item in payload["items"]] == [kept_video.id]
+        assert payload["internal_item_count"] == 1
+        assert payload["external_item_count"] == 0
+        assert payload["sources"][0]["count"] == 1
 
     def test_home_recommendations_include_external_candidates(self, client, db, sample_user, monkeypatch):
         """推荐接口应支持在返回中混入站外候选元数据。"""
@@ -312,6 +529,12 @@ class TestRecommendationAPI:
         assert external_item["action_method"] == "POST"
         assert external_item["action_type"] == "import_external_url"
         assert external_item["action_target"].startswith("/upload?mode=url&url=")
+        assert external_item["summary"] == ""
+        assert external_item["tags"] == []
+        assert external_item["reason_text"] == ""
+        assert all(item["summary"] == "" for item in payload["items"])
+        assert all(item["tags"] == [] for item in payload["items"])
+        assert all(item["reason_text"] == "" for item in payload["items"])
 
     def test_home_recommendations_auto_materialize_external_for_authenticated_user(
         self, client, db, sample_user, monkeypatch
@@ -364,6 +587,9 @@ class TestRecommendationAPI:
         assert materialized_item["action_type"] == "open_video_detail"
         assert materialized_item["action_target"].startswith("/videos/")
         assert materialized_item["materialization_status"] in {"created", "reused"}
+        assert materialized_item["summary"] == ""
+        assert materialized_item["tags"] == []
+        assert materialized_item["reason_text"] == ""
 
         created = (
             db.query(Video)
@@ -612,6 +838,26 @@ class TestRecommendationAPI:
         assert len(served) >= 1
         assert served[0]["module"] == "recommendation"
         assert served[0]["metadata"].get("scene_count") == scene_count
+
+    def test_videos_ranking_telemetry_contract_version_follows_server_setting(self, client, monkeypatch, caplog):
+        """ranking 遥测 metadata.contract_version 应与服务端配置一致（不信任中间 payload）。"""
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "RECOMMENDATION_CONTRACT_VERSION", "1", raising=False)
+        caplog.set_level(logging.INFO, logger="app.analytics.telemetry")
+
+        response = client.get("/api/recommendations/videos", params={"scene": "home", "limit": 1})
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["contract_version"] == "1"
+
+        lines = [record.message for record in caplog.records if record.name == "app.analytics.telemetry"]
+        telemetry_payloads = [json.loads(line) for line in lines]
+        ranking_events = [
+            event for event in telemetry_payloads if event.get("event_type") == "recommendation_ranking_completed"
+        ]
+        assert len(ranking_events) >= 1
+        assert ranking_events[0]["metadata"].get("contract_version") == "1"
 
     def test_import_external_telemetry_url_host_is_hostname(self, client, db, sample_user, monkeypatch, caplog):
         """import-external 遥测 metadata.url_host 为 hostname，非截断 URL。"""

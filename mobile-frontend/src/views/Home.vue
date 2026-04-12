@@ -174,10 +174,6 @@
         </article>
       </div>
 
-      <div v-if="recommendationQuerySummary" class="message message--hint">
-        <span>检索主题：{{ recommendationQuerySummary }}</span>
-      </div>
-
       <div v-if="homeAutoMaterializeBanner" class="message message--hint">
         <span>{{ homeAutoMaterializeBanner }}</span>
       </div>
@@ -238,9 +234,8 @@
             </span>
           </div>
           <div class="recommend-card__title">{{ item.title || '未命名视频' }}</div>
-          <p class="recommend-card__desc">{{ item.reason_text || item.summary || '从这里继续进入学习。' }}</p>
           <div class="recommend-card__meta">
-            <span v-if="Array.isArray(item.tags) && item.tags.length > 0">{{ item.tags.slice(0, 2).join(' · ') }}</span>
+            <span>{{ item.source_label || '站内视频' }}</span>
             <span v-if="item.subjectText">{{ item.subjectText }}</span>
             <span v-if="formatTimeText(item.upload_time)">{{ formatTimeText(item.upload_time) }}</span>
           </div>
@@ -406,7 +401,7 @@ const mergeVideosById = (items) => {
 }
 
 const fallbackRecommendations = (videos) =>
-  videos.slice(0, 4).map((video, index) => ({
+  videos.slice(0, 6).map((video, index) => ({
     ...video,
     reason_label: index === 0 ? '继续学习' : '最近内容',
     reason_text: index === 0 ? '当前最适合从这个任务继续进入。' : '最近进入视频库，适合继续学习。'
@@ -451,7 +446,7 @@ const reloadRecommendations = async () => {
   try {
     const res = await getVideoRecommendations({
       scene: 'home',
-      limit: 4,
+      limit: 6,
       include_external: shouldIncludeExternalRecommendationsOnHome()
     })
     const payload = res?.data || {}
@@ -542,18 +537,6 @@ const internalRecommendationCount = computed(() => {
   return Math.max(recommendationCards.value.length - externalRecommendationCount.value, 0)
 })
 const recommendationProviderReports = computed(() => recommendationMeta.value.externalProviders || [])
-const recommendationQuerySummary = computed(() => {
-  const query = recommendationMeta.value.externalQuery
-  if (!query) return ''
-  const parts = [query.subject, query.primary_topic].filter(Boolean)
-  if (query.preferred_provider_label) {
-    parts.push(`优先来源：${query.preferred_provider_label}`)
-  }
-  if (Array.isArray(query.preferred_tags) && query.preferred_tags.length > 0) {
-    parts.push(`优先标签：${query.preferred_tags.join('、')}`)
-  }
-  return parts.join(' · ')
-})
 const recommendationMixNote = computed(() => {
   if (recommendations.value.length === 0) return '暂无条目'
   if (externalRecommendationCount.value === 0) return '以站内视频为主'

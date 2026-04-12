@@ -96,16 +96,15 @@ class RecommendationExternalProviderItem(BaseModel):
 
 
 class VideoRecommendationResponse(BaseModel):
-    """推荐视频列表响应。"""
+    """推荐视频列表响应（Contract v2 起默认形态）。"""
 
     message: str
-    contract_version: str = Field(default="1", description="Recommendation Contract 版本号，用于渐进升级与灰度观测")
+    contract_version: str = Field(default="2", description="Recommendation Contract：v2 起不再包含 seed_video_title")
     scene: str
     strategy: str
     personalized: bool = False
     fallback_used: bool = False
     seed_video_id: Optional[int] = None
-    seed_video_title: Optional[str] = None
     internal_item_count: int = 0
     external_item_count: int = 0
     external_failed_provider_count: int = 0
@@ -118,6 +117,13 @@ class VideoRecommendationResponse(BaseModel):
     external_query: Optional[RecommendationExternalQuery] = None
     external_providers: List[RecommendationExternalProviderItem] = Field(default_factory=list)
     items: List[RecommendationVideoItem] = Field(default_factory=list)
+
+
+class VideoRecommendationResponseV1(VideoRecommendationResponse):
+    """Contract v1：仍返回 seed_video_title（与 seed_video_id 冗余，仅兼容旧客户端）。"""
+
+    contract_version: str = Field(default="1", description="v1 契约标识")
+    seed_video_title: Optional[str] = None
 
 
 class RecommendationImportOpsMetrics(BaseModel):

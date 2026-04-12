@@ -96,8 +96,14 @@ class Settings(BaseSettings):
     # 推荐页对站外候选自动入库（仅登录用户生效），入库后返回可直接打开的视频详情项
     RECOMMENDATION_AUTO_IMPORT_EXTERNAL: bool = True
     RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS: int = 2
+    # 推荐相似度约束（仅后端使用，不对前端暴露分值）
+    RECOMMENDATION_SIMILARITY_MIN_SCORE: float = 0.55
+    # 推荐返回条数窗口：前端体验目标 5~8
+    RECOMMENDATION_RETURN_MIN_ITEMS: int = 5
+    RECOMMENDATION_RETURN_MAX_ITEMS: int = 8
     # 推荐 API 契约版本（响应体 contract_version，与 docs 中 Recommendation Contract 对齐）
-    RECOMMENDATION_CONTRACT_VERSION: str = "1"
+    # v2：不再返回 seed_video_title（与 seed_video_id 冗余）；设为 "1" 可恢复旧字段
+    RECOMMENDATION_CONTRACT_VERSION: str = "2"
     # 推荐域是否写入 app.analytics.telemetry（结构化 JSON 行）
     RECOMMENDATION_TELEMETRY_ENABLED: bool = True
     # 推荐运营聚合 API 的内存事件缓冲上限（DB 异常时作为降级来源）
