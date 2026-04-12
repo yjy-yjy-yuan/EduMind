@@ -151,3 +151,4 @@
 
 ### 2026-04-12
 - `54419d52` `feat(recommendation): contract v2, sanitize responses, similarity fusion, hub UX`
+- `5827f3c5` `feat(backend): recommendation title filter, delete cascade, purge script`
