@@ -269,7 +269,7 @@ class TestRecommendationAPI:
         assert response.status_code == 200
 
         payload = response.json()
-        assert 5 <= len(payload["items"]) <= 8
+        assert 6 <= len(payload["items"]) <= 8
         assert all(item["item_type"] == "video" for item in payload["items"])
         assert all("数学导数专题" in str(item["title"]) for item in payload["items"])
         assert all(item["summary"] == "" for item in payload["items"])

@@ -294,7 +294,7 @@ POST /api/videos/{video_id}/generate-tags
 4. 站外候选会明确区分两类动作：
    - 可直接导入：进入现有 URL 导入链路
    - 暂不可直接导入：打开原始来源页，而不是伪装成已入库视频
-5. 推荐页「看同主题」会围绕当前站内视频请求 `scene=related`；若接口暂无结果或请求失败，前端在内存中**各场景已加载推荐列表合并去重**后的候选池里做本地兜底，并**排除**种子视频 ID 与**当前场景主列表**里已出现的视频 ID，再在「相关推荐」区域展示，避免与主列表重复。
+5. **`scene=related`** 仍用于需要 **`seed_video_id`** 的入口（例如 **视频详情**「相关推荐」子页）：按种子做相关排序并排除种子；若接口暂无结果或失败，前端可按既有策略做兜底。**独立「推荐学习中枢」页**（`/recommendations`）当前仅请求 **`scene=home`** 的单列表推荐，不再提供多场景切换、主列表「看同主题」或页内「同主题」区块。
 6. `related` 场景在扩站外候选时，会优先继承 seed 视频的原始来源平台语境；例如当前视频来自 YouTube 时，同主题站外候选会优先同来源 provider。
 7. 推荐 API 响应体包含 `contract_version`（默认 `"2"`，与 `RECOMMENDATION_CONTRACT_VERSION` 一致；v2 起不再返回 `seed_video_title`，旧版可设环境变量为 `"1"`）；推荐相关请求支持 `X-Trace-Id` / `X-Request-Id` 透传，响应头回传相同 trace 便于前后端对账。完整可测试清单见 `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 第九节（Recommendation Contract）。
 8. 在登录态且开启站外推荐时，后端会优先把可导入站外候选自动入库（`videos`）后再返回给前端；用户拿到的是可直接打开详情、可继续走“下载/处理/复盘”链路的条目，而不是只能二次跳转的占位候选。
@@ -304,10 +304,10 @@ POST /api/videos/{video_id}/generate-tags
 12. 首页在推荐接口失败或当前场景暂无命中时，会显式展示“当前为兜底结果”的轻提示，避免把视频库兜底误判为实时推荐结果。
 13. iOS `WKWebView` 构建使用单文件 `iife + inlineDynamicImports`；该模式下路由懒加载不会拆分独立 chunk，前端已通过 `chunkSizeWarningLimit` 与注释避免误导性体积告警。
 14. 推荐排序新增复用语义搜索的“融合相似度”策略（后端内部计算，不对前端展示相似度数值），默认阈值 `RECOMMENDATION_SIMILARITY_MIN_SCORE=0.55`。
-15. 推荐接口在移动端链路上会将请求条数规范化到 `5~8`（默认 6），并优先返回达到相似度阈值的条目；相关推荐默认 5 条，首页默认 6 条。
+15. 推荐接口在移动端链路上会将请求条数规范化到 `6~8`（默认 6），并优先返回达到相似度阈值的条目；若阈值筛选后仍不足最小条数，后端会从同批排序候选中按条目身份去重**补齐至窗口下限**。相关推荐与首页默认请求条数与窗口一致（以客户端 `limit` 与后端窗口为准）。
 16. 推荐展示口径已做“一次性去切片”收口：`/api/recommendations/videos` 与上传返回 `recommendations` 的 `items[*]` 在输出层统一清空 `summary`、`reason_text`、`tags`（v1/v2 均生效，仅保留 `reason_label/reason_code`）；`Home / Recommendations / Upload` 三入口不再渲染片段描述与内容标签 chips（卡片仍展示 `reason_label` 等轻量理由徽标）。
 17. 推荐结果支持标题黑名单关键词过滤（`RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS`，默认含 `排列组合插空法详解`）：命中关键词的条目会在后端响应收口阶段被剔除，再按剩余候选返回；前端 `Home` / `Recommendations` / `Upload` 亦做同名关键词兜底，避免缓存或 mock 残留。
-18. 推荐页：切换场景会清空「相关推荐」区块；全页「刷新推荐」或错误重试加载完成后也**不会**自动展开同主题，需用户在主列表卡片上点击「看同主题」。
+18. **首页「为你推荐」**已精简为标题与推荐卡片列表：已移除标题下说明文案、首屏「刷新推荐」按钮、「本页条数 / 更多场景」统计卡片（进入首页仍会照常拉取推荐）。**推荐学习中枢页**已移除 hero 内开发者向说明卡片；页面为 **Hero + 单列表「推荐视频」** 与刷新入口，与首页共用同一推荐接口语义。
 19. **视频详情页**（`/videos/:id`）为横向双页：**学习处理**（Whisper、摘要、笔记、操作、重试、删除等既有流程）与 **相关推荐**（`GET /api/recommendations/videos`，`scene=related` + `seed_video_id` 并排除种子；展示口径与全站一致，不渲染切片化 `summary/reason_text/tags`）。首次仅在学习处理页加载详情；切换到推荐子页时再请求推荐；子页索引保存在 `sessionStorage`（`videoDetailSubPage:<id>`）。
 20. **视频详情布局与手势**：封面区（LIVE/占位、标题、状态、进度、「可进播放器」提示等）在 **`.video-detail__shared` 中固定在页面上方**，不随双页横向滑动；**「学习处理 / 相关推荐」页签与下方 `scroll-snap` 分页轨道**仅作用于其下区域，符合「在封面卡片下」左右切换的预期。分页下面板不使用 `touch-action: pan-y` 锁定，避免在推荐卡片上横滑无法驱动外层分页。实现文件：`mobile-frontend/src/views/VideoDetail.vue`，`mobile-frontend/src/components/videoDetail/VideoDetailRecommendPanel.vue`，`VideoDetailRecommendCard.vue`，`mobile-frontend/src/services/recommendationPresentation.js`，`videoDetailTelemetry.js`。结构化埋点通过 `CustomEvent('edumind:telemetry')`（`detail.scope === 'video_detail'`）抛出，便于 `WKWebView` 原生侧订阅。
 

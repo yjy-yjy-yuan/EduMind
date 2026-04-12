@@ -240,10 +240,31 @@ def normalize_similarity_threshold() -> float:
 
 
 def normalize_recommendation_limit(limit: int) -> int:
-    """将请求 limit 归一到后端推荐窗口（默认 5~8）。"""
-    min_items = max(1, int(getattr(settings, "RECOMMENDATION_RETURN_MIN_ITEMS", 5) or 5))
+    """将请求 limit 归一到后端推荐窗口（默认 6~8）。"""
+    min_items = max(1, int(getattr(settings, "RECOMMENDATION_RETURN_MIN_ITEMS", 6) or 6))
     max_items = max(min_items, int(getattr(settings, "RECOMMENDATION_RETURN_MAX_ITEMS", 8) or 8))
     return max(min_items, min(int(limit or min_items), max_items))
+
+
+def normalize_recommendation_min_items() -> int:
+    """读取推荐最小返回条数。"""
+    return max(1, int(getattr(settings, "RECOMMENDATION_RETURN_MIN_ITEMS", 6) or 6))
+
+
+def _recommendation_item_identity(item: dict) -> str:
+    """构建推荐条目标识，用于补齐时去重。"""
+    if not isinstance(item, dict):
+        return ""
+    raw_id = item.get("id")
+    if raw_id not in (None, ""):
+        return f"id:{raw_id}"
+    external_url = str(item.get("external_url") or "").strip()
+    if external_url:
+        return f"url:{external_url}"
+    title = str(item.get("title") or "").strip()
+    if title:
+        return f"title:{title}"
+    return ""
 
 
 def build_similarity_context(
@@ -1144,6 +1165,7 @@ def recommend_videos(
     contract_version = str(getattr(settings, "RECOMMENDATION_CONTRACT_VERSION", "2") or "2").strip()
     include_seed_title_in_reason = contract_version == "1"
     effective_limit = normalize_recommendation_limit(limit) if enforce_return_window else max(1, int(limit or 1))
+    target_min_items = min(normalize_recommendation_min_items(), effective_limit) if enforce_return_window else 1
     similarity_threshold = normalize_similarity_threshold()
     exclude_ids = set(exclude_ids or set())
     user_tokens = extract_user_interest_tokens(user)
@@ -1209,6 +1231,50 @@ def recommend_videos(
             external_items=external_bundle.items,
             limit=effective_limit,
         )
+
+    if enforce_return_window and len(items) < target_min_items:
+        relaxed_internal_items = build_ranked_internal_items(
+            videos=candidate_videos,
+            scene=normalized_scene,
+            now=now,
+            seed_video=seed_video,
+            user_tokens=user_tokens,
+            user_subject=user_subject,
+            profiles=profiles,
+            exclude_ids=exclude_ids,
+            similarity_context=similarity_context,
+            similarity_threshold=0.0,
+            include_seed_title_in_reason=include_seed_title_in_reason,
+        )
+        relaxed_external_items: list[tuple[float, datetime, dict]] = []
+        if include_external:
+            relaxed_external_items = build_ranked_external_items(
+                query_context=query_context,
+                scene=normalized_scene,
+                seed_video=seed_video,
+                seed_profile=seed_profile,
+                user_tokens=user_tokens,
+                user_subject=user_subject,
+                limit=max(effective_limit, target_min_items),
+                similarity_context=similarity_context,
+                similarity_threshold=0.0,
+                include_seed_title_in_reason=include_seed_title_in_reason,
+            ).items
+
+        relaxed_candidates = select_combined_items(
+            internal_items=relaxed_internal_items,
+            external_items=relaxed_external_items,
+            limit=effective_limit,
+        )
+        seen_identities = {_recommendation_item_identity(item) for item in items}
+        for candidate in relaxed_candidates:
+            identity = _recommendation_item_identity(candidate)
+            if not identity or identity in seen_identities:
+                continue
+            items.append(candidate)
+            seen_identities.add(identity)
+            if len(items) >= target_min_items:
+                break
 
     fallback_used = False
     if not items and candidate_videos:

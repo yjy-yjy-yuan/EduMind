@@ -152,26 +152,7 @@
 
     <section class="recommend-panel ios-card">
       <div class="section-head">
-        <div>
-          <h2>为你推荐</h2>
-          <p>与「推荐」页同一套接口：优先可继续学习的站内视频；有站外来源时，登录后会自动入库再展示，点开即可处理。</p>
-        </div>
-        <button class="overview-link" @click="reloadRecommendations" :disabled="recommendationLoading">
-          {{ recommendationLoading ? '刷新中…' : '刷新推荐' }}
-        </button>
-      </div>
-
-      <div v-if="recommendations.length > 0" class="recommend-summary recommend-summary--compact">
-        <article class="recommend-summary__card">
-          <span class="recommend-summary__label">本页条数</span>
-          <strong class="recommend-summary__value">{{ recommendations.length }}</strong>
-          <span class="recommend-summary__note">{{ recommendationMixNote }}</span>
-        </article>
-        <article class="recommend-summary__card recommend-summary__card--action">
-          <span class="recommend-summary__label">更多场景</span>
-          <strong class="recommend-summary__value">推荐页</strong>
-          <span class="recommend-summary__note">继续学习 / 复盘 / 相似内容</span>
-        </article>
+        <h2>为你推荐</h2>
       </div>
 
       <div v-if="homeAutoMaterializeBanner" class="message message--hint">
@@ -539,20 +520,7 @@ const decorateRecommendationItem = (item) => ({
   primaryActionDisabled: isRecommendationPrimaryActionDisabled(item, isExternalRecommendation(item))
 })
 const recommendationCards = computed(() => recommendations.value.map((item) => decorateRecommendationItem(item)))
-const externalRecommendationCount = computed(() => recommendationCards.value.filter((item) => isExternalRecommendation(item)).length)
-const internalRecommendationCount = computed(() => {
-  if (recommendationMeta.value.internalItemCount > 0 || recommendationMeta.value.externalItemCount > 0) {
-    return recommendationMeta.value.internalItemCount
-  }
-  return Math.max(recommendationCards.value.length - externalRecommendationCount.value, 0)
-})
 const recommendationProviderReports = computed(() => recommendationMeta.value.externalProviders || [])
-const recommendationMixNote = computed(() => {
-  if (recommendations.value.length === 0) return '暂无条目'
-  if (externalRecommendationCount.value === 0) return '以站内视频为主'
-  if (internalRecommendationCount.value === 0) return '含站外来源（登录后可自动入库）'
-  return `站内 ${internalRecommendationCount.value} · 站外候选 ${externalRecommendationCount.value}`
-})
 const providerStatusText = (provider) => {
   if (provider?.status === 'failed') return '抓取失败'
   if (provider?.status === 'empty') return '暂无候选'
@@ -898,7 +866,6 @@ onMounted(reloadDashboard)
 
 .hero-actions,
 .summary-grid,
-.recommend-summary,
 .video-list,
 .recommend-list,
 .skeleton-list {
@@ -1083,45 +1050,10 @@ onMounted(reloadDashboard)
   border-radius: 28px;
 }
 
-.recommend-summary {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.recommend-summary--compact {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.recommend-summary__card {
-  display: grid;
-  gap: 5px;
-  border-radius: 20px;
-  padding: 15px;
-  border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(239, 231, 247, 0.92);
-}
-
-.recommend-summary__card--soft {
-  background: rgba(232, 221, 244, 0.94);
-}
-
-.recommend-summary__card--action {
-  background: linear-gradient(180deg, rgba(223, 210, 238, 0.98), rgba(244, 238, 249, 0.96));
-}
-
-.recommend-summary__label,
-.recommend-summary__note,
 .recommend-card__next {
   font-size: 12px;
   line-height: 1.5;
   color: #6b7280;
-}
-
-.recommend-summary__value {
-  font-size: 19px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: #111827;
 }
 
 .recommend-provider-list {
@@ -1402,7 +1334,6 @@ onMounted(reloadDashboard)
   .welcome__hero,
   .hero-actions,
   .summary-grid,
-  .recommend-summary,
   .recommend-list {
     grid-template-columns: 1fr;
   }

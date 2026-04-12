@@ -46,9 +46,8 @@
 - `mobile-frontend/src/views/Home.vue`
   - 已有首页“推荐视频”区域，并接入当前推荐接口；是否默认带站外检索由 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 控制。
 - `mobile-frontend/src/views/Recommendations.vue`
-  - 已有推荐页、相关推荐区域和“看同主题”交互。
-  - “看同主题”应保持为完整闭环：可点击、可见 loading、可在当前页渲染结果；接口空结果或失败时，前端从**各场景已加载列表合并去重**的候选池做本地兜底，**排除**种子 ID 与**当前场景主列表**已出现视频 ID，避免与主列表重复。
-  - 切换场景或全页「刷新推荐」后应清空同主题区；全页加载**不**自动触发「看同主题」，由用户主动点击。
+  - 已有独立「推荐学习中枢」页（`/recommendations`）：当前为 **单列表 `scene=home`** + 刷新，与首页共用推荐接口；**不再**内嵌多场景切换、主列表「看同主题」或页内「同主题」区块。
+  - **`scene=related` + `seed_video_id`** 仍用于 **视频详情**「相关推荐」等需要种子的入口；兜底与排除规则仍由后端收口，前端按契约展示。
 - `mobile-frontend/src/views/Upload.vue`
   - 已支持链接导入，且链接校验已覆盖 B 站 / YouTube / 中国大学慕课。
 
@@ -170,7 +169,7 @@
    - 外部项必须明确展示来源平台与“导入学习链路”动作
    - 不要把外部候选伪装成已经导入成功的视频
    - 如果选择跳到上传页，优先复用现有链接导入能力并传递 URL
-   - “看同主题”按钮必须形成完整闭环：能点、点击后有 loading、能在当前页看到同主题推荐、失败时有明确 fallback 或错误提示
+   - **视频详情「相关推荐」**（`scene=related`）应在子页内完成加载、空态与错误提示；独立推荐页以 `scene=home` 单列表为主，不与该闭环混写
 
 实现时必须遵守这些硬约束：
 
@@ -266,7 +265,7 @@
 4. **首屏加载顺序**：首页应先拉齐视频列表再拉推荐，避免「推荐为空、兜底仍为空」的竞态。
 5. **兜底可见性**：当推荐接口失败或返回空集合但首页有视频库兜底时，前端应明确提示“当前为兜底结果”，避免用户误解为实时推荐。
 6. **iOS 打包约束**：`WKWebView` 构建采用单文件 `iife + inlineDynamicImports`，路由懒加载在 iOS 包内不产生独立 chunk；相关体积告警策略应结合该约束解释。
-7. **相似度与数量约束（本轮增强）**：推荐链路复用关键词搜索的融合相似度方法，后端仅保留 `>=0.55` 的候选参与返回（不在前端展示相似度数字）；移动端推荐请求条数规范化到 `5~8`。
+7. **相似度与数量约束（本轮增强）**：推荐链路复用关键词搜索的融合相似度方法，后端优先保留相似度 `>=0.55` 的候选；若阈值筛选后仍不足 `RECOMMENDATION_RETURN_MIN_ITEMS`，会从同批排序候选中按身份去重补齐至窗口下限（不在前端展示相似度数字）。移动端推荐请求条数规范化到 **`6~8`**（默认最小 6、最大 8）。
 
 ## 八、验收底线
 
@@ -332,7 +331,7 @@
 
 P0-C034～C038：limit 边界、`RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT`、`RECOMMENDATION_MAX_CANDIDATES_SCAN`、`related` 排除 seed、`exclude_video_ids` 对站内与 fallback 同时生效。P1：scene 大小写兼容、`user_id` 仅 legacy。P2：locale/lang 预留。
 
-**闭环 v2 配置（后端 Settings）**：`RECOMMENDATION_AUTO_IMPORT_EXTERNAL`（默认 `true`）控制登录态下是否对可导入站外候选自动写入 `videos`；`RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS`（默认 `2`）限制单次 `/videos` 响应前最多尝试自动入库的站外条数；`RECOMMENDATION_SIMILARITY_MIN_SCORE`（默认 `0.55`）控制融合相似度阈值；`RECOMMENDATION_RETURN_MIN_ITEMS/RECOMMENDATION_RETURN_MAX_ITEMS`（默认 `5/8`）控制移动端返回窗口；`RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS`（逗号分隔）用于在响应收口阶段剔除命中标题关键词的推荐条目（默认含 `排列组合插空法详解`）。为 `false` 或 `max_items=0` 时退化为仅返回候选、不自动写库。
+**闭环 v2 配置（后端 Settings）**：`RECOMMENDATION_AUTO_IMPORT_EXTERNAL`（默认 `true`）控制登录态下是否对可导入站外候选自动写入 `videos`；`RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS`（默认 `2`）限制单次 `/videos` 响应前最多尝试自动入库的站外条数；`RECOMMENDATION_SIMILARITY_MIN_SCORE`（默认 `0.55`）控制融合相似度阈值；`RECOMMENDATION_RETURN_MIN_ITEMS/RECOMMENDATION_RETURN_MAX_ITEMS`（默认 `6/8`）控制移动端返回窗口；`RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS`（逗号分隔）用于在响应收口阶段剔除命中标题关键词的推荐条目（默认含 `排列组合插空法详解`）。为 `false` 或 `max_items=0` 时退化为仅返回候选、不自动写库。
 
 ### D. 排序、理由、降级
 

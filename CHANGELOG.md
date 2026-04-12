@@ -2,6 +2,18 @@
 
 ## 2026-04-12
 
+### 推荐数量保底提升：返回窗口 6~8（不足时自动回填）
+
+- **backend_fastapi**：`RECOMMENDATION_RETURN_MIN_ITEMS` 默认从 `5` 调整为 `6`（上限维持 `8`），推荐接口窗口升级为 `6~8`。
+- **backend_fastapi**：推荐服务新增“阈值后回填”逻辑：先按相似度阈值筛选，若结果不足最小条数，则从同批候选按排序补齐到下限（去重后返回），避免推荐条数过少。
+- **tests**：API/单测窗口断言同步为 `6~8`，新增“高阈值过滤后仍可回填到最小条数”的回归用例。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`、`backend_fastapi/.env.example` 同步 `6/8` 默认值与说明。
+
+### 推荐 UI 与文档对齐（首页 / 推荐中枢精简）
+
+- **mobile-frontend**：`Home.vue`「为你推荐」仅保留标题与列表，已移除标题下说明文案、首屏「刷新推荐」按钮、「本页条数 / 更多场景」统计卡片；`Recommendations.vue` 已移除 hero 内开发者向说明卡片（推荐中枢为单列表 + 刷新，与首页共用接口语义）。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`、`docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md`、`mobile-frontend/README.md` 修正与当前实现不一致的表述（**`scene=related` 主要用于视频详情「相关推荐」**；独立 `/recommendations` 为 **`scene=home` 单列表**，不再描述多场景「看同主题」交互）；补充推荐条数 **阈值后回填至窗口下限** 的说明。
+
 ### 视频详情页：横向双页（学习处理 + 相关推荐）
 
 - **mobile-frontend**：`VideoDetail.vue` 在「视频详情」内增加 **学习处理 / 相关推荐** 双页：横向 `scroll-snap` 滑动与页签点击切换；默认进入学习处理页；子页选择写入 `sessionStorage`（`videoDetailSubPage:<id>`）以便返回后恢复。

@@ -98,8 +98,8 @@ class Settings(BaseSettings):
     RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS: int = 2
     # 推荐相似度约束（仅后端使用，不对前端暴露分值）
     RECOMMENDATION_SIMILARITY_MIN_SCORE: float = 0.55
-    # 推荐返回条数窗口：前端体验目标 5~8
-    RECOMMENDATION_RETURN_MIN_ITEMS: int = 5
+    # 推荐返回条数窗口：前端体验目标 6~8
+    RECOMMENDATION_RETURN_MIN_ITEMS: int = 6
     RECOMMENDATION_RETURN_MAX_ITEMS: int = 8
     # 推荐结果标题黑名单关键词（逗号分隔）；命中后将从对外推荐结果中移除
     RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS: str = "排列组合插空法详解"

@@ -310,7 +310,7 @@ def test_recommend_videos_internal_items_include_open_detail_action():
 
 
 def test_recommend_videos_enforce_window_and_similarity_threshold():
-    """推荐接口窗口应收敛到 5~8，并优先保留相似度 >= 0.55 的同主题内容。"""
+    """推荐接口窗口应收敛到 6~8，并优先保留相似度 >= 0.55 的同主题内容。"""
     math_videos = [
         Video(
             id=100 + idx,
@@ -348,9 +348,37 @@ def test_recommend_videos_enforce_window_and_similarity_threshold():
     math_ids = {video.id for video in math_videos}
     english_ids = {video.id for video in english_videos}
 
-    assert 5 <= len(payload["items"]) <= 8
+    assert 6 <= len(payload["items"]) <= 8
     assert returned_ids.issubset(math_ids)
     assert returned_ids.isdisjoint(english_ids)
+
+
+def test_recommend_videos_backfill_to_min_items_when_similarity_filtered(monkeypatch):
+    """当阈值过滤后结果不足时，应回填到最小返回条数（默认 6）。"""
+    videos = [
+        Video(
+            id=300 + idx,
+            title=f"数学导数专题回填 {idx}",
+            filename=f"backfill-{idx}.mp4",
+            filepath=f"/tmp/backfill-{idx}.mp4",
+            status=VideoStatus.COMPLETED,
+            summary="围绕导数、函数与极限进行复盘。",
+            tags='["数学","导数","函数"]',
+        )
+        for idx in range(8)
+    ]
+
+    monkeypatch.setattr(recommendation_service, "compute_internal_similarity", lambda *args, **kwargs: 0.1)
+
+    payload = recommend_videos(
+        videos=videos,
+        scene="home",
+        limit=6,
+        include_external=False,
+        enforce_return_window=True,
+    )
+
+    assert len(payload["items"]) >= 6
 
 
 def test_sanitize_recommendation_payload_for_client_removes_slice_fields():

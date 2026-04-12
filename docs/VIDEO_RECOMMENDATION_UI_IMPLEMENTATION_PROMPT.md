@@ -23,8 +23,7 @@
 - `mobile-frontend/src/views/Home.vue`
   - 已有首页推荐入口、推荐卡片和“推荐系统”入口位。
 - `mobile-frontend/src/views/Recommendations.vue`
-  - 已有独立推荐页。
-  - 已包含推荐场景切换、标签筛选、相关推荐区域、站外候选入口基础结构。
+  - 已有独立「推荐学习中枢」页：当前为 **Hero + 单列表**（`scene=home`）、刷新与卡片动作；已移除多场景切换、页内「同主题」区与 hero 开发者说明卡片。
 - `mobile-frontend/src/views/Upload.vue`
   - 已支持通过 query 参数预填 URL，适合承接“导入学习”动作。
 - `mobile-frontend/src/api/recommendation.js`
