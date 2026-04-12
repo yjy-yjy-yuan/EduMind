@@ -8,18 +8,17 @@ export function askQuestion({
   question,
   video_id,
   mode = 'free',
-  provider = 'qwen',
+  chat_mode = 'direct',
   model = '',
-  deep_thinking = false,
   history = []
 }) {
   if (shouldUseMockApi()) {
-    return mockAskQuestion({ user_id, question, video_id, mode, provider, model, deep_thinking, history, stream: false })
+    return mockAskQuestion({ user_id, question, video_id, mode, chat_mode, model, history, stream: false })
   }
   return request({
     url: '/api/qa/ask',
     method: 'post',
-    data: { user_id, question, video_id, mode, provider, model, deep_thinking, history, stream: false }
+    data: { user_id, question, video_id, mode, chat_mode, model, history, stream: false }
   })
 }
 
@@ -47,13 +46,21 @@ const parseStreamErrorBody = async (response) => {
   }
 }
 
+const resolveProviderAndThinking = (chatMode) => {
+  if (chatMode === 'deep_think') {
+    return { provider: 'deepseek', deep_thinking: true }
+  }
+  return { provider: 'qwen', deep_thinking: false }
+}
+
 const dispatchMockStream = async (payload, onEvent) => {
-  const providerText = payload.provider === 'deepseek' ? 'DeepSeek' : '通义千问'
-  const modelText =
-    payload.provider === 'deepseek'
-      ? (payload.deep_thinking ? 'deepseek-reasoner' : 'deepseek-chat')
-      : (payload.model || 'qwen-plus')
+  const { provider, deep_thinking } = resolveProviderAndThinking(payload.chat_mode || 'direct')
+  const providerText = provider === 'deepseek' ? 'DeepSeek' : '通义千问'
+  const modelText = provider === 'deepseek'
+    ? (deep_thinking ? 'deepseek-reasoner' : 'deepseek-chat')
+    : (payload.model || 'qwen-plus')
   const answerText = (await mockAskQuestion(payload)).data?.answer || '【UI 模式】暂无回答。'
+  const isDeepThink = provider === 'deepseek' && deep_thinking
   const events = [
     { type: 'status', stage: 'accepted', message: '问题已提交，等待处理', progress: 5 },
     {
@@ -61,19 +68,16 @@ const dispatchMockStream = async (payload, onEvent) => {
       stage: payload.mode === 'video' ? 'retrieving' : 'answering',
       message: payload.mode === 'video' ? '正在检索视频字幕、摘要与标签' : `正在调用 ${providerText} 回答`,
       progress: payload.mode === 'video' ? 25 : 45,
-      provider: payload.provider,
+      provider,
       provider_label: providerText,
       model: modelText
     },
     {
       type: 'status',
-      stage: payload.provider === 'deepseek' && payload.deep_thinking ? 'reasoning' : 'answering',
-      message:
-        payload.provider === 'deepseek' && payload.deep_thinking
-          ? '正在调用 DeepSeek 思考模型'
-          : `正在调用 ${providerText} 回答`,
+      stage: isDeepThink ? 'reasoning' : 'answering',
+      message: isDeepThink ? '正在调用 DeepSeek 思考模型' : `正在调用 ${providerText} 回答`,
       progress: 60,
-      provider: payload.provider,
+      provider,
       provider_label: providerText,
       model: modelText
     },
@@ -82,7 +86,7 @@ const dispatchMockStream = async (payload, onEvent) => {
       stage: 'organizing',
       message: '正在整理回答与引用片段',
       progress: 85,
-      provider: payload.provider,
+      provider,
       provider_label: providerText,
       model: modelText
     },
@@ -92,7 +96,7 @@ const dispatchMockStream = async (payload, onEvent) => {
       message: '回答已完成',
       progress: 100,
       answer: answerText,
-      provider: payload.provider,
+      provider,
       provider_label: providerText,
       model: modelText,
       references: []
@@ -109,10 +113,10 @@ const dispatchMockStream = async (payload, onEvent) => {
 }
 
 export async function askQuestionStream(
-  { user_id, question, video_id, mode = 'free', provider = 'qwen', model = '', deep_thinking = false, history = [] },
+  { user_id, question, video_id, mode = 'free', chat_mode = 'direct', model = '', history = [] },
   { onEvent } = {}
 ) {
-  const payload = { user_id, question, video_id, mode, provider, model, deep_thinking, history, stream: true }
+  const payload = { user_id, question, video_id, mode, chat_mode, model, history, stream: true }
 
   if (shouldUseMockApi()) {
     return dispatchMockStream(payload, onEvent)
@@ -187,7 +191,7 @@ export async function askQuestionStream(
   return finalEvent
 }
 
-export function getQuestionHistory({ user_id, video_id, provider, mode = 'video' }) {
+export function getQuestionHistory({ user_id, video_id, mode = 'video' }) {
   if (shouldUseMockApi()) {
     return Promise.resolve({
       data: {
@@ -204,6 +208,6 @@ export function getQuestionHistory({ user_id, video_id, provider, mode = 'video'
   return request({
     url: `/api/qa/history/${video_id}`,
     method: 'get',
-    params: { user_id, provider, mode }
+    params: { user_id, mode }
   })
 }

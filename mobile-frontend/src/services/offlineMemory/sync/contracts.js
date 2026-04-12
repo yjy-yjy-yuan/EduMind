@@ -15,7 +15,7 @@ export const OFFLINE_MEMORY_ENDPOINTS = Object.freeze({
     ask: {
       method: 'POST',
       url: '/api/qa/ask',
-      fields: ['user_id', 'video_id', 'question', 'mode', 'stream', 'provider', 'model', 'deep_thinking', 'history']
+      fields: ['user_id', 'video_id', 'question', 'mode', 'stream', 'chat_mode', 'model', 'history']
     }
   },
   subtitles: {

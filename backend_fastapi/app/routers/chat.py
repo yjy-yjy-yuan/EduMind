@@ -16,7 +16,12 @@ router = APIRouter()
 
 @router.post("/completions")
 async def chat_completions(request: ChatRequest):
-    """聊天完成接口（流式/非流式）"""
+    """聊天完成接口（流式/非流式）
+
+    对话模式:
+    - direct: 直接回答模式，优先使用通义千问，DeepSeek 兜底
+    - deep_think: 深度思考模式，强制使用 deepseek-reasoner
+    """
     try:
         if request.stream:
 
@@ -24,7 +29,9 @@ async def chat_completions(request: ChatRequest):
                 try:
                     from app.utils.chat_system import stream_chat
 
-                    for chunk in stream_chat(request.messages, provider=request.provider, model=request.model or ""):
+                    for chunk in stream_chat(
+                        request.messages, mode=request.mode, provider=request.provider, model=request.model or ""
+                    ):
                         yield chunk
                 except Exception as e:
                     logger.error(f"聊天生成出错: {str(e)}")
@@ -34,7 +41,9 @@ async def chat_completions(request: ChatRequest):
 
         from app.utils.chat_system import get_chat_response
 
-        result = get_chat_response(request.messages, provider=request.provider, model=request.model or "")
+        result = get_chat_response(
+            request.messages, mode=request.mode, provider=request.provider, model=request.model or ""
+        )
         return {"message": "success", **result}
 
     except HTTPException:
@@ -50,9 +59,32 @@ async def chat_completions(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/modes")
+async def list_modes():
+    """获取可用的对话模式列表"""
+    return {
+        "modes": [
+            {
+                "id": "direct",
+                "name": "直接回答",
+                "description": "快速响应，优先使用通义千问，DeepSeek 兜底",
+                "primary_model": "qwen-plus",
+                "fallback_model": "deepseek-chat",
+            },
+            {
+                "id": "deep_think",
+                "name": "深度思考",
+                "description": "深度推理，强制使用 DeepSeek 思考模型",
+                "primary_model": "deepseek-reasoner",
+                "fallback_model": None,
+            },
+        ]
+    }
+
+
 @router.get("/models")
 async def list_models():
-    """获取可用的模型列表"""
+    """获取可用的模型列表（向后兼容）"""
     return {
         "models": [
             {"id": "qwen-plus", "name": "通义千问 Plus", "type": "online"},

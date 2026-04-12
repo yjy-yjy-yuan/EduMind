@@ -45,7 +45,7 @@ class EduMindOfflineMemoryDB extends Dexie {
       offline_notes:
         '&local_id, server_id, video_id, updated_at, sync_status, lastAccessedAt, note_type, [video_id+updated_at], [video_id+sync_status]',
       offline_questions:
-        '&local_id, server_id, video_id, updated_at, sync_status, lastAccessedAt, mode, provider, user_id, [video_id+updated_at], [video_id+provider], [mode+provider]',
+        '&local_id, server_id, video_id, updated_at, sync_status, lastAccessedAt, mode, chat_mode, provider, user_id, [video_id+updated_at], [video_id+chat_mode], [mode+chat_mode]',
       offline_sync_queue:
         '&local_id, server_id, entity_local_id, entity_type, action, updated_at, sync_status, created_at, run_after, [entity_type+entity_local_id], [sync_status+updated_at]',
       offline_learning_state:

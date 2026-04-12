@@ -36,6 +36,7 @@ const buildQuestionRecord = (input = {}, existing = {}) => {
     video_id: normalizeIntegerId(input.video_id ?? existing.video_id),
     user_id: normalizeIntegerId(input.user_id ?? existing.user_id),
     mode: normalizeString(input.mode ?? existing.mode ?? 'video', 16) || 'video',
+    chat_mode: normalizeString(input.chat_mode ?? existing.chat_mode ?? 'direct', 16) || 'direct',
     provider: normalizeString(input.provider ?? existing.provider ?? 'qwen', 32) || 'qwen',
     model: normalizeString(input.model ?? existing.model, 64),
     question: normalizeString(input.question ?? input.content ?? existing.question, OFFLINE_MEMORY_LIMITS.MAX_QUESTION_CHARS),
@@ -88,7 +89,7 @@ export const cacheQuestionRecord = async (questionInput, { syncStatus = OFFLINE_
 export const getOfflineQuestions = async ({
   videoId = null,
   mode = '',
-  provider = '',
+  chatMode = '',
   userId = null,
   limit = OFFLINE_MEMORY_LIMITS.MAX_QUESTIONS_PER_VIDEO
 } = {}) => {
@@ -99,8 +100,8 @@ export const getOfflineQuestions = async ({
   if (mode) {
     rows = rows.filter((row) => row.mode === mode)
   }
-  if (provider) {
-    rows = rows.filter((row) => row.provider === provider)
+  if (chatMode) {
+    rows = rows.filter((row) => row.chat_mode === chatMode)
   }
   if (userId != null) {
     rows = rows.filter((row) => Number(row.user_id || 0) === Number(userId))
@@ -124,10 +125,8 @@ export const buildQuestionPayloadForSync = (question) => ({
   video_id: question?.video_id || null,
   question: question?.question || '',
   mode: question?.mode || 'video',
-  stream: false,
-  provider: question?.provider || 'qwen',
+  chat_mode: question?.chat_mode || 'direct',
   model: question?.model || '',
-  deep_thinking: Boolean(question?.deep_thinking),
   history: Array.isArray(question?.history) ? question.history : []
 })
 

@@ -15,35 +15,21 @@
       <span class="note-entry__tip">会把 videoId 传入笔记编辑页，便于与问答同一上下文整理结论。</span>
     </div>
 
-    <div class="provider-row">
-      <button
-        v-for="item in PROVIDER_OPTIONS"
-        :key="item.value"
-        class="provider-chip"
-        :class="{ 'provider-chip--active': provider === item.value }"
-        :disabled="asking"
-        @click="selectProvider(item.value)"
-      >
-        {{ item.label }}
-      </button>
-    </div>
-
-    <div v-if="isDeepSeekProvider" class="mode-panel">
-      <div class="mode-panel__label">DeepSeek 回答方式</div>
+    <div class="mode-panel">
       <div class="mode-row">
         <button
-          v-for="item in DEEPSEEK_ANSWER_MODE_OPTIONS"
+          v-for="item in CHAT_MODE_OPTIONS"
           :key="item.value"
           class="mode-chip"
-          :class="{ 'mode-chip--active': deepSeekAnswerMode === item.value }"
+          :class="{ 'mode-chip--active': chatMode === item.value }"
           :disabled="asking"
-          @click="selectDeepSeekAnswerMode(item.value)"
+          @click="selectChatMode(item.value)"
         >
           {{ item.label }}
         </button>
       </div>
       <div class="mode-panel__hint">
-        {{ deepThinkingEnabled ? '已开启深度思考，会先进行推理再组织回答，质量更稳但通常更慢。' : '优先直接回答，首字和整体返回速度更快。' }}
+        {{ chatMode === 'deep_think' ? '已开启深度思考，会先进行推理再组织回答，质量更稳但通常更慢。' : '优先直接回答，响应更快速；通义千问不可用时自动切换 DeepSeek 兜底。' }}
       </div>
     </div>
 
@@ -103,16 +89,11 @@ import {
 } from '@/services/offlineMemory'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
-const QA_PROVIDER_KEY = 'm_qa_provider'
-const DEEPSEEK_ANSWER_MODE_KEY = 'm_deepseek_answer_mode'
+const QA_CHAT_MODE_KEY = 'm_qa_chat_mode'
 const QA_SPACE_CACHE_PREFIX = 'm_qa_space'
-const PROVIDER_OPTIONS = Object.freeze([
-  { value: 'qwen', label: '通义千问' },
-  { value: 'deepseek', label: 'DeepSeek' }
-])
-const DEEPSEEK_ANSWER_MODE_OPTIONS = Object.freeze([
+const CHAT_MODE_OPTIONS = Object.freeze([
   { value: 'direct', label: '直接回答' },
-  { value: 'reasoning', label: '深度思考' }
+  { value: 'deep_think', label: '深度思考' }
 ])
 
 const parseJSON = (text, fallback = null) => {
@@ -124,14 +105,9 @@ const parseJSON = (text, fallback = null) => {
   }
 }
 
-const normalizeProvider = (value) => {
+const normalizeChatMode = (value) => {
   const text = String(value || '').trim().toLowerCase()
-  return PROVIDER_OPTIONS.some((item) => item.value === text) ? text : 'qwen'
-}
-
-const normalizeDeepSeekAnswerMode = (value) => {
-  const text = String(value || '').trim().toLowerCase()
-  return DEEPSEEK_ANSWER_MODE_OPTIONS.some((item) => item.value === text) ? text : 'direct'
+  return CHAT_MODE_OPTIONS.some((item) => item.value === text) ? text : 'direct'
 }
 
 const normalizeProgress = (value) => {
@@ -190,10 +166,10 @@ const resolveCurrentUserId = () => {
   return Number.isInteger(numericId) && numericId > 0 ? numericId : null
 }
 
-const buildQaSpaceCacheKey = ({ userId, provider, videoId, mode }) => {
+const buildQaSpaceCacheKey = ({ userId, chatMode, videoId, mode }) => {
   const scopeUser = userId == null ? 'anon' : `user_${userId}`
   const scopeVideo = videoId == null ? 'video_none' : `video_${videoId}`
-  return `${QA_SPACE_CACHE_PREFIX}:${mode}:${scopeUser}:${scopeVideo}:${provider}`
+  return `${QA_SPACE_CACHE_PREFIX}:${mode}:${scopeUser}:${scopeVideo}:${chatMode}`
 }
 
 const route = useRoute()
@@ -218,10 +194,7 @@ const currentUserId = computed(() => resolveCurrentUserId())
 const chatRef = ref(null)
 const question = ref('')
 const asking = ref(false)
-const provider = ref(normalizeProvider(storageGet(QA_PROVIDER_KEY)))
-const deepSeekAnswerMode = ref(normalizeDeepSeekAnswerMode(storageGet(DEEPSEEK_ANSWER_MODE_KEY)))
-const isDeepSeekProvider = computed(() => provider.value === 'deepseek')
-const deepThinkingEnabled = computed(() => isDeepSeekProvider.value && deepSeekAnswerMode.value === 'reasoning')
+const chatMode = ref(normalizeChatMode(storageGet(QA_CHAT_MODE_KEY)))
 const messageSpaces = ref({})
 const remoteHydratedSpaces = ref({})
 let historyRestoreSequence = 0
@@ -229,7 +202,7 @@ let historyRestoreSequence = 0
 const currentSpaceKey = computed(() =>
   buildQaSpaceCacheKey({
     userId: currentUserId.value,
-    provider: provider.value,
+    chatMode: chatMode.value,
     videoId: normalizedVideoId.value,
     mode: currentMode.value
   })
@@ -301,7 +274,7 @@ const buildHistoryPayload = () => {
 const loadOfflineSpaceMessages = async () => {
   const rows = await getOfflineQaMessages({
     videoId: normalizedVideoId.value ?? null,
-    provider: provider.value,
+    chatMode: chatMode.value,
     mode: currentMode.value,
     userId: currentUserId.value ?? null
   })
@@ -346,7 +319,6 @@ const restoreCurrentSpace = async () => {
     const res = await getQuestionHistory({
       user_id: currentUserId.value,
       video_id: normalizedVideoId.value,
-      provider: provider.value,
       mode: currentMode.value
     })
     if (requestId !== historyRestoreSequence || spaceKey !== currentSpaceKey.value) return
@@ -371,36 +343,29 @@ const restoreCurrentSpace = async () => {
   }
 }
 
-const selectProvider = (value) => {
-  const next = normalizeProvider(value)
-  provider.value = next
+const selectChatMode = (value) => {
+  const next = normalizeChatMode(value)
+  chatMode.value = next
   try {
-    storageSet(QA_PROVIDER_KEY, next)
+    storageSet(QA_CHAT_MODE_KEY, next)
   } catch {
     // ignore storage errors in restricted WebView contexts
   }
 }
 
-const selectDeepSeekAnswerMode = (value) => {
-  const next = normalizeDeepSeekAnswerMode(value)
-  deepSeekAnswerMode.value = next
-  try {
-    storageSet(DEEPSEEK_ANSWER_MODE_KEY, next)
-  } catch {
-    // ignore storage errors in restricted WebView contexts
+const buildPendingAiMessage = () => {
+  const isDeepThink = chatMode.value === 'deep_think'
+  return {
+    role: 'ai',
+    text: '',
+    providerLabel: isDeepThink ? 'DeepSeek' : '通义千问',
+    model: isDeepThink ? 'deepseek-reasoner' : 'qwen-plus',
+    references: [],
+    loading: true,
+    statusText: '问题已提交，等待处理',
+    progress: 5
   }
 }
-
-const buildPendingAiMessage = () => ({
-  role: 'ai',
-  text: '',
-  providerLabel: provider.value === 'deepseek' ? 'DeepSeek' : '通义千问',
-  model: '',
-  references: [],
-  loading: true,
-  statusText: '问题已提交，等待处理',
-  progress: 5
-})
 
 const persistQuestionToOfflineMemory = async ({ questionText, answerText, references, source, model, serverId, historyPayload }) => {
   const payload = {
@@ -412,9 +377,8 @@ const persistQuestionToOfflineMemory = async ({ questionText, answerText, refere
     video_id: normalizedVideoId.value ?? null,
     user_id: currentUserId.value ?? null,
     mode: currentMode.value,
-    provider: provider.value,
+    chat_mode: chatMode.value,
     model,
-    deep_thinking: deepThinkingEnabled.value,
     history: historyPayload,
     source
   }
@@ -502,8 +466,7 @@ const send = async () => {
         question: q,
         video_id: normalizedVideoId.value ?? undefined,
         mode: currentMode.value,
-        provider: provider.value,
-        deep_thinking: deepThinkingEnabled.value,
+        chat_mode: chatMode.value,
         history: historyPayload
       },
       {
@@ -619,29 +582,6 @@ watch(
   font-size: 12px;
   color: var(--muted);
   margin-bottom: 8px;
-}
-
-.provider-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-
-.provider-chip {
-  border: 1px solid rgba(32, 42, 55, 0.12);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.provider-chip--active {
-  color: #fff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #8b799d, #a48eb5);
 }
 
 .mode-panel {

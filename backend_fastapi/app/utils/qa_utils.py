@@ -551,6 +551,57 @@ class QASystem:
 
         return chunks
 
+    def _call_model_with_fallback(
+        self,
+        messages: list[dict],
+        *,
+        provider: str,
+        model: str,
+        deep_thinking: bool,
+        fallback_yield_fn=None,
+    ) -> tuple[str, str, str]:
+        """调用模型，支持直接回答模式的通义千问→DeepSeek 兜底。
+
+        Args:
+            fallback_yield_fn: 兜底触发时的回调函数，用于在流式输出中发出事件
+
+        Returns:
+            (answer, final_provider, final_model)
+        """
+        # 直接回答模式：优先通义千问，兜底 DeepSeek
+        if not deep_thinking:
+            primary_provider = "qwen"
+            primary_model = model or resolve_model(primary_provider, "", deep_thinking=False)
+            try:
+                return (
+                    call_provider_chat(messages, provider=primary_provider, model=primary_model),
+                    primary_provider,
+                    primary_model,
+                )
+            except Exception as primary_error:
+                logger.warning("直接回答模式-主模型(%s)调用失败，触发兜底: %s", primary_model, primary_error)
+                if fallback_yield_fn:
+                    fallback_yield_fn(primary_provider, primary_model)
+            # 兜底：切换到 DeepSeek
+            fallback_provider = "deepseek"
+            fallback_model = resolve_model(fallback_provider, "deepseek-chat", deep_thinking=False)
+            logger.info("直接回答模式-兜底模型: provider=%s, model=%s", fallback_provider, fallback_model)
+            return (
+                call_provider_chat(messages, provider=fallback_provider, model=fallback_model),
+                fallback_provider,
+                fallback_model,
+            )
+
+        # 深度思考模式：强制 deepseek-reasoner
+        resolved_provider = provider or "deepseek"
+        resolved_model = model or resolve_model(resolved_provider, "", deep_thinking=True)
+        logger.info("深度思考模式调用: provider=%s, model=%s", resolved_provider, resolved_model)
+        return (
+            call_provider_chat(messages, provider=resolved_provider, model=resolved_model),
+            resolved_provider,
+            resolved_model,
+        )
+
     def _build_result(self, answer: str, provider: str, model: str, references: list[KnowledgeChunk]) -> dict:
         normalized_provider = normalize_provider(provider, model)
         return {
@@ -572,7 +623,6 @@ class QASystem:
         history: Optional[list] = None,
     ) -> dict:
         normalized_provider = normalize_provider(provider, model)
-        resolved_model = resolve_model(normalized_provider, model, deep_thinking=deep_thinking)
         history_messages = normalize_history_messages(history)
 
         if mode == "video":
@@ -588,12 +638,16 @@ class QASystem:
                 context_text=context_text,
                 history_messages=history_messages,
             )
-            answer = call_provider_chat(messages, provider=normalized_provider, model=resolved_model)
-            return self._build_result(answer, normalized_provider, resolved_model, ranked_chunks)
+            answer, final_provider, final_model = self._call_model_with_fallback(
+                messages, provider=normalized_provider, model=model, deep_thinking=deep_thinking
+            )
+            return self._build_result(answer, final_provider, final_model, ranked_chunks)
 
         messages = build_free_qa_messages(question, history_messages=history_messages)
-        answer = call_provider_chat(messages, provider=normalized_provider, model=resolved_model)
-        return self._build_result(answer, normalized_provider, resolved_model, [])
+        answer, final_provider, final_model = self._call_model_with_fallback(
+            messages, provider=normalized_provider, model=model, deep_thinking=deep_thinking
+        )
+        return self._build_result(answer, final_provider, final_model, [])
 
     def answer_stream(
         self,
@@ -606,8 +660,6 @@ class QASystem:
         history: Optional[list] = None,
     ) -> Generator[dict, None, None]:
         normalized_provider = normalize_provider(provider, model)
-        resolved_model = resolve_model(normalized_provider, model, deep_thinking=deep_thinking)
-        provider_label = resolve_provider_label(normalized_provider)
         history_messages = normalize_history_messages(history)
         answering_stage, answering_message = resolve_answering_status(normalized_provider, deep_thinking=deep_thinking)
 
@@ -621,8 +673,8 @@ class QASystem:
                 message="正在检索视频字幕、摘要与标签",
                 progress=25,
                 provider=normalized_provider,
-                provider_label=provider_label,
-                model=resolved_model,
+                provider_label=resolve_provider_label(normalized_provider),
+                model=model or resolve_model(normalized_provider, model, deep_thinking=deep_thinking),
             )
             retrieval_query = build_retrieval_query(question, history_messages)
             ranked_chunks = rank_chunks(retrieval_query, self._chunks, top_k=max(1, int(settings.QA_TOP_K)))
@@ -640,11 +692,18 @@ class QASystem:
                 message=answering_message,
                 progress=60,
                 provider=normalized_provider,
-                provider_label=provider_label,
-                model=resolved_model,
+                provider_label=resolve_provider_label(normalized_provider),
+                model=model or resolve_model(normalized_provider, model, deep_thinking=deep_thinking),
             )
-            answer = call_provider_chat(messages, provider=normalized_provider, model=resolved_model)
-            result = self._build_result(answer, normalized_provider, resolved_model, ranked_chunks)
+
+            def fallback_yield_fn(failed_provider: str, failed_model: str):
+                logger.info("直接回答模式-兜底触发: 原模型=%s(%s) 切换到 DeepSeek", failed_provider, failed_model)
+
+            answer, final_provider, final_model = self._call_model_with_fallback(
+                messages, provider=normalized_provider, model=model, deep_thinking=deep_thinking,
+                fallback_yield_fn=fallback_yield_fn,
+            )
+            result = self._build_result(answer, final_provider, final_model, ranked_chunks)
 
             yield build_stream_event(
                 "status",
@@ -675,11 +734,18 @@ class QASystem:
             message=answering_message,
             progress=45,
             provider=normalized_provider,
-            provider_label=provider_label,
-            model=resolved_model,
+            provider_label=resolve_provider_label(normalized_provider),
+            model=model or resolve_model(normalized_provider, model, deep_thinking=deep_thinking),
         )
-        answer = call_provider_chat(messages, provider=normalized_provider, model=resolved_model)
-        result = self._build_result(answer, normalized_provider, resolved_model, [])
+
+        def fallback_yield_fn(failed_provider: str, failed_model: str):
+            logger.info("直接回答模式-兜底触发: 原模型=%s(%s) 切换到 DeepSeek", failed_provider, failed_model)
+
+        answer, final_provider, final_model = self._call_model_with_fallback(
+            messages, provider=normalized_provider, model=model, deep_thinking=deep_thinking,
+            fallback_yield_fn=fallback_yield_fn,
+        )
+        result = self._build_result(answer, final_provider, final_model, [])
 
         yield build_stream_event(
             "status",
