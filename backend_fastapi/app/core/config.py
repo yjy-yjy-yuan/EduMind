@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # 认证 token（HMAC，与 app/utils/auth_token.py 一致）
     AUTH_TOKEN_TTL_SECONDS: int = 604800  # 默认 7 天
     AUTH_TOKEN_CLOCK_SKEW_SECONDS: int = 120  # 校验过期时允许的时钟偏差（秒）
+    # 为 True 时允许仅凭 query/body 的 user_id 识别用户（迁移/联调）；生产环境应为 False，仅信任 Bearer
+    AUTH_ALLOW_LEGACY_USER_ID_ONLY: bool = False
+    # 智能体编排：学习流 token 预算（估算）、治理审计开关
+    AGENT_LEARNING_FLOW_TOKEN_BUDGET: int = 8000
+    AGENT_GOVERNANCE_AUDIT_ENABLED: bool = True
     AUTO_CREATE_TABLES: bool = False
     BACKGROUND_TASK_EXECUTOR: str = "auto"
     BACKGROUND_TASK_WORKERS: int = 2
@@ -88,6 +93,23 @@ class Settings(BaseSettings):
     RECOMMENDATION_EXTERNAL_TIMEOUT_SECONDS: float = 8.0
     RECOMMENDATION_EXTERNAL_FETCH_PARALLEL: bool = True
     RECOMMENDATION_EXTERNAL_FETCH_RETRIES: int = 1
+    # 推荐页对站外候选自动入库（仅登录用户生效），入库后返回可直接打开的视频详情项
+    RECOMMENDATION_AUTO_IMPORT_EXTERNAL: bool = True
+    RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS: int = 2
+    # 推荐相似度约束（仅后端使用，不对前端暴露分值）
+    RECOMMENDATION_SIMILARITY_MIN_SCORE: float = 0.55
+    # 推荐返回条数窗口：前端体验目标 6~8
+    RECOMMENDATION_RETURN_MIN_ITEMS: int = 6
+    RECOMMENDATION_RETURN_MAX_ITEMS: int = 8
+    # 推荐结果标题黑名单关键词（逗号分隔）；命中后将从对外推荐结果中移除
+    RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS: str = "排列组合插空法详解"
+    # 推荐 API 契约版本（响应体 contract_version，与 docs 中 Recommendation Contract 对齐）
+    # v2：不再返回 seed_video_title（与 seed_video_id 冗余）；设为 "1" 可恢复旧字段
+    RECOMMENDATION_CONTRACT_VERSION: str = "2"
+    # 推荐域是否写入 app.analytics.telemetry（结构化 JSON 行）
+    RECOMMENDATION_TELEMETRY_ENABLED: bool = True
+    # 推荐运营聚合 API 的内存事件缓冲上限（DB 异常时作为降级来源）
+    RECOMMENDATION_OPS_EVENT_BUFFER_SIZE: int = 5000
 
     # 语义搜索配置
     SEARCH_ENABLED: bool = False

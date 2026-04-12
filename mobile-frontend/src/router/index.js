@@ -1,24 +1,24 @@
 import { createMemoryHistory, createRouter, createWebHistory } from 'vue-router'
 import * as authStore from '@/store/auth'
 
-import Home from '@/views/Home.vue'
-import Login from '@/views/Login.vue'
-import Register from '@/views/Register.vue'
-import Recommendations from '@/views/Recommendations.vue'
-import Videos from '@/views/Videos.vue'
-import VideoDetail from '@/views/VideoDetail.vue'
-import LocalTranscripts from '@/views/LocalTranscripts.vue'
-import LocalTranscriptDetail from '@/views/LocalTranscriptDetail.vue'
-import Player from '@/views/Player.vue'
-import Upload from '@/views/Upload.vue'
-import Notes from '@/views/Notes.vue'
-import NoteEdit from '@/views/NoteEdit.vue'
-import QA from '@/views/QA.vue'
-import Profile from '@/views/Profile.vue'
-import LearningPath from '@/views/LearningPath.vue'
-import Guide from '@/views/Guide.vue'
-import DesignAssistant from '@/views/DesignAssistant.vue'
-import Search from '@/views/Search.vue'
+const Home = () => import('@/views/Home.vue')
+const Login = () => import('@/views/Login.vue')
+const Register = () => import('@/views/Register.vue')
+const Recommendations = () => import('@/views/Recommendations.vue')
+const Videos = () => import('@/views/Videos.vue')
+const VideoDetail = () => import('@/views/VideoDetail.vue')
+const LocalTranscripts = () => import('@/views/LocalTranscripts.vue')
+const LocalTranscriptDetail = () => import('@/views/LocalTranscriptDetail.vue')
+const Player = () => import('@/views/Player.vue')
+const Upload = () => import('@/views/Upload.vue')
+const Notes = () => import('@/views/Notes.vue')
+const NoteEdit = () => import('@/views/NoteEdit.vue')
+const QA = () => import('@/views/QA.vue')
+const Profile = () => import('@/views/Profile.vue')
+const LearningPath = () => import('@/views/LearningPath.vue')
+const Guide = () => import('@/views/Guide.vue')
+const DesignAssistant = () => import('@/views/DesignAssistant.vue')
+const Search = () => import('@/views/Search.vue')
 
 const isFileProtocol = window.location.protocol === 'file:'
 const history = isFileProtocol ? createMemoryHistory() : createWebHistory()

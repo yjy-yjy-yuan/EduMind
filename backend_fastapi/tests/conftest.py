@@ -74,12 +74,13 @@ def client(db):
 
 
 @pytest.fixture
-def sample_video(db):
+def sample_video(db, sample_user):
     """示例视频 fixture"""
     from app.models.video import Video
     from app.models.video import VideoStatus
 
     video = Video(
+        user_id=sample_user.id,
         filename="test_video.mp4",
         filepath="/tmp/test_video.mp4",
         title="测试视频",

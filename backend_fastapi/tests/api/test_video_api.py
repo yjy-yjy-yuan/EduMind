@@ -18,6 +18,9 @@ def fake_upload_recommendations(*args, **kwargs):
                 "title": "站内导数复盘",
                 "is_external": False,
                 "source_label": "站内视频",
+                "summary": "围绕导数定义与函数单调性做复盘。",
+                "tags": ["数学", "导数"],
+                "reason_text": "与当前视频共享导数主题。",
             }
         ],
         "external_item_count": 0,
@@ -56,7 +59,7 @@ class TestVideoAPI:
         response = client.get("/api/videos/99999")
         assert response.status_code == 404
 
-    def test_generate_tags_includes_subject_tag(self, client, db, monkeypatch):
+    def test_generate_tags_includes_subject_tag(self, client, db, sample_user, monkeypatch):
         """重提标签后应写回科目标签，便于视频详情页直接展示。"""
         from app.models.video import Video
         from app.models.video import VideoStatus
@@ -65,6 +68,7 @@ class TestVideoAPI:
         monkeypatch.setattr("app.services.video_content_service.call_ollama", lambda *args, **kwargs: None)
 
         video = Video(
+            user_id=sample_user.id,
             title="勾股定理详细讲解",
             filename="math.mp4",
             filepath="/tmp/math.mp4",
@@ -98,6 +102,52 @@ class TestVideoAPI:
         # 验证删除
         response = client.get(f"/api/videos/{sample_video.id}")
         assert response.status_code == 404
+
+    def test_delete_video_cascades_subtitles_notes_and_timestamps(self, client, db, sample_user):
+        """删除视频前先清理字幕、笔记时间戳与笔记，避免外键失败。"""
+        from app.models.note import Note
+        from app.models.note import NoteTimestamp
+        from app.models.subtitle import Subtitle
+        from app.models.video import Video
+        from app.models.video import VideoStatus
+
+        video = Video(
+            user_id=sample_user.id,
+            filename="cascade.mp4",
+            filepath="/tmp/cascade.mp4",
+            title="级联删除测",
+            status=VideoStatus.COMPLETED,
+        )
+        db.add(video)
+        db.commit()
+        db.refresh(video)
+        db.add(
+            Subtitle(
+                video_id=video.id,
+                start_time=0.0,
+                end_time=1.0,
+                text="subtitle",
+                source="asr",
+                language="zh",
+            )
+        )
+        note = Note(title="笔记", content="内容", video_id=video.id, note_type="text")
+        db.add(note)
+        db.commit()
+        db.refresh(note)
+        db.add(NoteTimestamp(note_id=note.id, time_seconds=1.0, subtitle_text="戳"))
+        db.commit()
+
+        note_id = note.id
+        video_id = video.id
+
+        response = client.delete(f"/api/videos/{video_id}/delete")
+        assert response.status_code == 200
+
+        assert db.query(Subtitle).filter(Subtitle.video_id == video_id).count() == 0
+        assert db.query(Note).filter(Note.video_id == video_id).count() == 0
+        assert db.query(NoteTimestamp).filter(NoteTimestamp.note_id == note_id).count() == 0
+        assert db.query(Video).filter(Video.id == video_id).count() == 0
 
     def test_get_video_status(self, client, sample_video):
         """测试获取视频处理状态"""
@@ -217,10 +267,11 @@ class TestVideoAPI:
         assert payload["subtitles"][0]["start_time"] == 2.0
         assert payload["subtitles"][1]["end_time"] == 11.0
 
-    def test_upload_video_file(self, client, db, tmp_path, monkeypatch):
+    def test_upload_video_file(self, client, db, tmp_path, monkeypatch, sample_user):
         """测试本地视频上传"""
         from app.core.config import settings
         from app.models.video import Video
+        from app.utils.auth_token import build_auth_token
 
         monkeypatch.setattr(settings, "UPLOAD_FOLDER", str(tmp_path / "uploads"))
         monkeypatch.setattr(settings, "TEMP_FOLDER", str(tmp_path / "temp"))
@@ -241,6 +292,7 @@ class TestVideoAPI:
             "/api/videos/upload",
             files={"file": ("lesson.mp4", io.BytesIO(b"fake-video-content"), "video/mp4")},
             data={"model": "small"},
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
         )
         assert response.status_code == 200
 
@@ -264,21 +316,24 @@ class TestVideoAPI:
         assert submitted["args"][0] == videos[0].id
         assert submitted["args"][2] == "small"
 
-    def test_upload_video_file_duplicate(self, client, db, tmp_path, monkeypatch):
+    def test_upload_video_file_duplicate(self, client, db, tmp_path, monkeypatch, sample_user):
         """测试重复上传同一视频"""
         from app.core.config import settings
         from app.models.video import Video
+        from app.utils.auth_token import build_auth_token
 
         monkeypatch.setattr(settings, "UPLOAD_FOLDER", str(tmp_path / "uploads"))
         monkeypatch.setattr(settings, "TEMP_FOLDER", str(tmp_path / "temp"))
 
+        auth = {"Authorization": f"Bearer {build_auth_token(sample_user.id)}"}
         files = {"file": ("duplicate.mp4", io.BytesIO(b"same-video"), "video/mp4")}
-        first = client.post("/api/videos/upload", files=files)
+        first = client.post("/api/videos/upload", files=files, headers=auth)
         assert first.status_code == 200
 
         second = client.post(
             "/api/videos/upload",
             files={"file": ("duplicate.mp4", io.BytesIO(b"same-video"), "video/mp4")},
+            headers=auth,
         )
         assert second.status_code == 200
 
@@ -287,27 +342,76 @@ class TestVideoAPI:
         assert payload["message"] == "视频已存在"
         assert db.query(Video).count() == 1
 
-    def test_upload_video_invalid_extension(self, client):
+    def test_upload_video_file_same_md5_distinct_users_not_duplicate(
+        self, client, db, tmp_path, monkeypatch, sample_user
+    ):
+        """相同 MD5 在不同用户下各自入库，不得跨用户命中 duplicate。"""
+        from app.core.config import settings
+        from app.models.user import User
+        from app.models.video import Video
+        from app.utils.auth_token import build_auth_token
+
+        monkeypatch.setattr(settings, "UPLOAD_FOLDER", str(tmp_path / "uploads"))
+        monkeypatch.setattr(settings, "TEMP_FOLDER", str(tmp_path / "temp"))
+        monkeypatch.setattr("app.core.executor.submit_task", lambda *args, **kwargs: None)
+
+        other = User(username="other_md5", email="other_md5@example.com", phone="13900139003", password="Other#7777")
+        db.add(other)
+        db.commit()
+        db.refresh(other)
+
+        body = io.BytesIO(b"identical-md5-for-local-upload")
+        auth_a = {"Authorization": f"Bearer {build_auth_token(sample_user.id)}"}
+        auth_b = {"Authorization": f"Bearer {build_auth_token(other.id)}"}
+
+        first = client.post(
+            "/api/videos/upload",
+            files={"file": ("first.mp4", body, "video/mp4")},
+            data={"model": "small"},
+            headers=auth_a,
+        )
+        body.seek(0)
+        second = client.post(
+            "/api/videos/upload",
+            files={"file": ("second.mp4", body, "video/mp4")},
+            data={"model": "small"},
+            headers=auth_b,
+        )
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert first.json()["duplicate"] is False
+        assert second.json()["duplicate"] is False
+        assert first.json()["id"] != second.json()["id"]
+        assert db.query(Video).count() == 2
+
+    def test_upload_video_invalid_extension(self, client, sample_user):
         """测试上传不支持的文件类型"""
+        from app.utils.auth_token import build_auth_token
+
         response = client.post(
             "/api/videos/upload",
             files={"file": ("document.txt", io.BytesIO(b"not-a-video"), "text/plain")},
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
         )
         assert response.status_code == 400
         assert response.json()["detail"] == "不支持的文件类型"
 
-    def test_upload_video_invalid_content_type(self, client):
+    def test_upload_video_invalid_content_type(self, client, sample_user):
         """测试伪装扩展名但非视频 MIME 会被拒绝。"""
+        from app.utils.auth_token import build_auth_token
+
         response = client.post(
             "/api/videos/upload",
             files={"file": ("fake.mp4", io.BytesIO(b"not-a-video"), "text/plain")},
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
         )
         assert response.status_code == 400
         assert response.json()["detail"] == "文件内容类型无效，请上传视频文件"
 
-    def test_upload_video_accepts_octet_stream_content_type(self, client, tmp_path, monkeypatch):
+    def test_upload_video_accepts_octet_stream_content_type(self, client, tmp_path, monkeypatch, sample_user):
         """测试兼容 iOS/浏览器可能上报的 octet-stream。"""
         from app.core.config import settings
+        from app.utils.auth_token import build_auth_token
 
         monkeypatch.setattr(settings, "UPLOAD_FOLDER", str(tmp_path / "uploads"))
         monkeypatch.setattr(settings, "TEMP_FOLDER", str(tmp_path / "temp"))
@@ -316,14 +420,16 @@ class TestVideoAPI:
         response = client.post(
             "/api/videos/upload",
             files={"file": ("octet.mp4", io.BytesIO(b"fake-video-content"), "application/octet-stream")},
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
         )
         assert response.status_code == 200
         payload = response.json()
         assert payload["duplicate"] is False
 
-    def test_upload_video_url_creates_downloading_record(self, client, db, monkeypatch):
+    def test_upload_video_url_creates_downloading_record(self, client, db, monkeypatch, sample_user):
         """测试链接上传会立即创建下载中记录"""
         from app.models.video import Video
+        from app.utils.auth_token import build_auth_token
 
         submitted = {}
 
@@ -339,6 +445,7 @@ class TestVideoAPI:
         response = client.post(
             "/api/videos/upload-url",
             json={"url": "https://www.bilibili.com/video/BV1xx411c7mD", "model": "medium"},
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
         )
         assert response.status_code == 200
 
@@ -359,9 +466,29 @@ class TestVideoAPI:
         assert submitted["args"][0] == video.id
         assert submitted["kwargs"]["model"] == "medium"
 
-    def test_upload_video_url_persists_recommendation_metadata(self, client, db, monkeypatch):
+    def test_upload_video_url_recommendations_strip_slice_fields(self, client, monkeypatch, sample_user):
+        """上传返回的 recommendations 出口也必须清空 summary/reason_text/tags。"""
+        from app.utils.auth_token import build_auth_token
+
+        monkeypatch.setattr("app.core.executor.submit_task", lambda *args, **kwargs: None)
+        monkeypatch.setattr("app.routers.video.recommend_videos", fake_upload_recommendations)
+
+        response = client.post(
+            "/api/videos/upload-url",
+            json={"url": "https://www.bilibili.com/video/BV1xx411c7mD", "model": "medium"},
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        item = payload["recommendations"]["items"][0]
+        assert item["summary"] == ""
+        assert item["tags"] == []
+        assert item["reason_text"] == ""
+
+    def test_upload_video_url_persists_recommendation_metadata(self, client, db, monkeypatch, sample_user):
         """测试链接上传可预填推荐候选标题、摘要与标签。"""
         from app.models.video import Video
+        from app.utils.auth_token import build_auth_token
 
         def fake_submit_task(task_func, *args, **kwargs):
             return None
@@ -377,6 +504,7 @@ class TestVideoAPI:
                 "tags": ["数学", "导数"],
                 "model": "medium",
             },
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
         )
         assert response.status_code == 200
 
@@ -387,20 +515,22 @@ class TestVideoAPI:
         assert video.summary == "适合配合当前数学主题继续学习。"
         assert json.loads(video.tags)[0] == "数学"
 
-    def test_upload_video_url_duplicate_reuses_existing_video(self, client, db, monkeypatch):
+    def test_upload_video_url_duplicate_reuses_existing_video(self, client, db, monkeypatch, sample_user):
         """测试重复提交同一链接时复用已有视频记录。"""
         from app.models.video import Video
+        from app.utils.auth_token import build_auth_token
 
         def fake_submit_task(task_func, *args, **kwargs):
             return None
 
         monkeypatch.setattr("app.core.executor.submit_task", fake_submit_task)
 
+        auth = {"Authorization": f"Bearer {build_auth_token(sample_user.id)}"}
         payload = {"url": "https://www.bilibili.com/video/BV1xx411c7mD", "model": "medium"}
-        first = client.post("/api/videos/upload-url", json=payload)
+        first = client.post("/api/videos/upload-url", json=payload, headers=auth)
         assert first.status_code == 200
 
-        second = client.post("/api/videos/upload-url", json=payload)
+        second = client.post("/api/videos/upload-url", json=payload, headers=auth)
         assert second.status_code == 200
 
         second_payload = second.json()
@@ -410,10 +540,11 @@ class TestVideoAPI:
         assert second_payload["id"] == first_payload["id"]
         assert db.query(Video).count() == 1
 
-    def test_upload_video_url_allows_resubmit_after_failed_record(self, client, db, monkeypatch):
+    def test_upload_video_url_allows_resubmit_after_failed_record(self, client, db, monkeypatch, sample_user):
         """测试历史失败的链接任务不会阻止重新提交。"""
         from app.models.video import Video
         from app.models.video import VideoStatus
+        from app.utils.auth_token import build_auth_token
 
         submitted = {"count": 0}
 
@@ -424,6 +555,7 @@ class TestVideoAPI:
         monkeypatch.setattr("app.core.executor.submit_task", fake_submit_task)
 
         failed_video = Video(
+            user_id=sample_user.id,
             title="旧失败链接",
             url="https://www.bilibili.com/video/BV1xx411c7mD",
             status=VideoStatus.FAILED,
@@ -436,6 +568,7 @@ class TestVideoAPI:
         response = client.post(
             "/api/videos/upload-url",
             json={"url": "https://www.bilibili.com/video/BV1xx411c7mD", "model": "medium"},
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
         )
         assert response.status_code == 200
 
@@ -521,12 +654,13 @@ class TestVideoAPI:
         assert response.status_code == 400
         assert response.json()["detail"] == "转录文本为空，无法生成摘要"
 
-    def test_sync_offline_transcript_writes_same_video_table(self, client, db, monkeypatch):
+    def test_sync_offline_transcript_writes_same_video_table(self, client, db, monkeypatch, sample_user):
         """测试 iOS 本地离线转录结果可写入 videos 表并标记离线来源。"""
         import json
 
         from app.models.subtitle import Subtitle
         from app.models.video import Video
+        from app.utils.auth_token import build_auth_token
 
         monkeypatch.setattr(
             "app.routers.video.generate_primary_topic_name",
@@ -540,6 +674,7 @@ class TestVideoAPI:
         response = client.post(
             "/api/videos/sync-offline-transcript",
             json={
+                "user_id": sample_user.id,
                 "task_id": "local-task-001",
                 "file_name": "lesson-local.mp4",
                 "file_ext": "mp4",
@@ -554,6 +689,7 @@ class TestVideoAPI:
                     {"text": "再讲连续函数判定", "start": 3.5, "duration": 4.0, "confidence": 0.9},
                 ],
             },
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
         )
         assert response.status_code == 200
 
@@ -578,11 +714,12 @@ class TestVideoAPI:
         assert len(subtitles) == 2
         assert subtitles[0].text == "先讲极限定义"
 
-    def test_sync_offline_transcript_updates_existing_record(self, client, db, monkeypatch):
+    def test_sync_offline_transcript_updates_existing_record(self, client, db, monkeypatch, sample_user):
         """测试同一 task_id 的离线结果会更新原记录而不是重复插入。"""
         import json
 
         from app.models.video import Video
+        from app.utils.auth_token import build_auth_token
 
         monkeypatch.setattr(
             "app.routers.video.generate_primary_topic_name",
@@ -590,6 +727,7 @@ class TestVideoAPI:
         )
 
         payload = {
+            "user_id": sample_user.id,
             "task_id": "local-task-002",
             "file_name": "derivative.mp4",
             "file_ext": "mp4",
@@ -601,12 +739,14 @@ class TestVideoAPI:
             "summary_style": "study",
             "segments": [],
         }
-        first = client.post("/api/videos/sync-offline-transcript", json=payload)
+        auth = {"Authorization": f"Bearer {build_auth_token(sample_user.id)}"}
+        first = client.post("/api/videos/sync-offline-transcript", json=payload, headers=auth)
         assert first.status_code == 200
 
         second = client.post(
             "/api/videos/sync-offline-transcript",
             json={**payload, "summary": "更新后的摘要", "transcript_text": "更新后的转录文本"},
+            headers=auth,
         )
         assert second.status_code == 200
         assert second.json()["duplicate"] is True
@@ -646,11 +786,12 @@ class TestVideoAPI:
         assert len(payload["segments"]) == 2
         assert payload["segments"][0]["duration"] == pytest.approx(1.8)
 
-    def test_sync_offline_transcript_prefers_client_tags_when_present(self, client, db, monkeypatch):
+    def test_sync_offline_transcript_prefers_client_tags_when_present(self, client, db, monkeypatch, sample_user):
         """测试离线同步在显式传入 tags 时直接写入数据库。"""
         import json
 
         from app.models.video import Video
+        from app.utils.auth_token import build_auth_token
 
         monkeypatch.setattr(
             "app.routers.video.generate_primary_topic_name",
@@ -660,6 +801,7 @@ class TestVideoAPI:
         response = client.post(
             "/api/videos/sync-offline-transcript",
             json={
+                "user_id": sample_user.id,
                 "task_id": "local-task-003",
                 "file_name": "function.mp4",
                 "file_ext": "mp4",
@@ -673,6 +815,7 @@ class TestVideoAPI:
                 "auto_generate_tags": False,
                 "segments": [],
             },
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
         )
         assert response.status_code == 200
         assert response.json()["video"]["tags"] == ["数学", "函数", "单调性", "最值"]
@@ -750,12 +893,13 @@ class TestNoteAPI:
         data = response.json()
         assert data["data"]["title"] == "更新后的标题"
 
-    def test_update_note_video_and_clear_tags(self, client, db, sample_note):
+    def test_update_note_video_and_clear_tags(self, client, db, sample_note, sample_video):
         """测试更新笔记的视频关联并清空标签。"""
         from app.models.video import Video
         from app.models.video import VideoStatus
 
         second_video = Video(
+            user_id=sample_video.user_id,
             filename="second_video.mp4",
             filepath="/tmp/second_video.mp4",
             title="第二个测试视频",
@@ -829,6 +973,84 @@ class TestNoteAPI:
         # 验证删除
         response = client.get(f"/api/notes/notes/{sample_note.id}")
         assert response.status_code == 404
+
+
+@pytest.mark.api
+class TestAuthRequiredEndpoints:
+    """需登录的写接口：默认仅信任 Bearer（见 AUTH_ALLOW_LEGACY_USER_ID_ONLY）。"""
+
+    def test_upload_url_requires_bearer_token(self, client):
+        response = client.post(
+            "/api/videos/upload-url",
+            json={"url": "https://www.bilibili.com/video/BV1xx411c7mD", "model": "small"},
+        )
+        assert response.status_code == 401
+        assert response.json()["detail"] == "请先登录后再通过链接导入视频"
+
+    def test_upload_file_requires_bearer_token(self, client):
+        response = client.post(
+            "/api/videos/upload",
+            files={"file": ("lesson.mp4", io.BytesIO(b"fake-video-content"), "video/mp4")},
+            data={"model": "small"},
+        )
+        assert response.status_code == 401
+        assert response.json()["detail"] == "请先登录后再上传视频"
+
+    def test_sync_offline_requires_bearer_token(self, client):
+        response = client.post(
+            "/api/videos/sync-offline-transcript",
+            json={
+                "task_id": "unauth-offline-task",
+                "transcript_text": "offline text",
+            },
+        )
+        assert response.status_code == 401
+        assert response.json()["detail"] == "请先登录后再同步离线转录结果"
+
+    def test_upload_url_invalid_bearer_does_not_fallback_to_legacy_user_id(self, client, sample_user, monkeypatch):
+        """legacy 开启时，若 Bearer 无效也不得回退到 user_id。"""
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "AUTH_ALLOW_LEGACY_USER_ID_ONLY", True)
+        response = client.post(
+            "/api/videos/upload-url",
+            params={"user_id": sample_user.id},
+            json={"url": "https://www.bilibili.com/video/BV1xx411c7mD", "model": "small"},
+            headers={"Authorization": "Bearer invalid.token.signature"},
+        )
+        assert response.status_code == 401
+        assert response.json()["detail"] == "请先登录后再通过链接导入视频"
+
+    def test_upload_video_url_same_url_distinct_users_not_duplicate(self, client, db, monkeypatch, sample_user):
+        """同一 URL 在不同用户下应各自建库，不因全局 URL 去重而误判 duplicate。"""
+        from app.models.user import User
+        from app.utils.auth_token import build_auth_token
+
+        monkeypatch.setattr("app.core.executor.submit_task", lambda *args, **kwargs: None)
+
+        other = User(
+            username="other_url_user", email="other_url@example.com", phone="13900139002", password="Other#9999"
+        )
+        db.add(other)
+        db.commit()
+        db.refresh(other)
+
+        payload = {"url": "https://www.bilibili.com/video/BV1isolated", "model": "medium"}
+        first = client.post(
+            "/api/videos/upload-url",
+            json=payload,
+            headers={"Authorization": f"Bearer {build_auth_token(sample_user.id)}"},
+        )
+        second = client.post(
+            "/api/videos/upload-url",
+            json=payload,
+            headers={"Authorization": f"Bearer {build_auth_token(other.id)}"},
+        )
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert first.json()["duplicate"] is False
+        assert second.json()["duplicate"] is False
+        assert first.json()["id"] != second.json()["id"]
 
 
 @pytest.mark.api

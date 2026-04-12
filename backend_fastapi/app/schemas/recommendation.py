@@ -60,6 +60,8 @@ class RecommendationVideoItem(BaseModel):
     action_target: Optional[str] = None
     action_api: Optional[str] = None
     action_method: Optional[str] = None
+    materialized_from_external: bool = False
+    materialization_status: Optional[str] = None
 
 
 class RecommendationSourceItem(BaseModel):
@@ -94,21 +96,76 @@ class RecommendationExternalProviderItem(BaseModel):
 
 
 class VideoRecommendationResponse(BaseModel):
-    """推荐视频列表响应。"""
+    """推荐视频列表响应（Contract v2 起默认形态）。"""
 
     message: str
+    contract_version: str = Field(default="2", description="Recommendation Contract：v2 起不再包含 seed_video_title")
     scene: str
     strategy: str
     personalized: bool = False
     fallback_used: bool = False
     seed_video_id: Optional[int] = None
-    seed_video_title: Optional[str] = None
     internal_item_count: int = 0
     external_item_count: int = 0
     external_failed_provider_count: int = 0
     external_fetch_failed: bool = False
+    flow_version: str = "recommendation_flow_v1"
+    auto_materialized_external_count: int = 0
+    auto_materialization_failed_count: int = 0
     coach_summary: Optional[str] = Field(default=None, description="可选：模板或 LLM 一句话说明，默认不返回")
     sources: List[RecommendationSourceItem] = Field(default_factory=list)
     external_query: Optional[RecommendationExternalQuery] = None
     external_providers: List[RecommendationExternalProviderItem] = Field(default_factory=list)
     items: List[RecommendationVideoItem] = Field(default_factory=list)
+
+
+class VideoRecommendationResponseV1(VideoRecommendationResponse):
+    """Contract v1：仍返回 seed_video_title（与 seed_video_id 冗余，仅兼容旧客户端）。"""
+
+    contract_version: str = Field(default="1", description="v1 契约标识")
+    seed_video_title: Optional[str] = None
+
+
+class RecommendationImportOpsMetrics(BaseModel):
+    """推荐导入运营指标。"""
+
+    requested_count: int = Field(default=0, description="推荐导入请求总数")
+    completed_count: int = Field(default=0, description="推荐导入完成数")
+    failed_count: int = Field(default=0, description="推荐导入失败数")
+    in_flight_count: int = Field(default=0, description="推荐导入处理中数量")
+    success_rate: float = Field(default=0, description="推荐导入成功率（completed/requested）")
+
+
+class RecommendationAutoMaterializationOpsMetrics(BaseModel):
+    """推荐自动入库运营指标。"""
+
+    attempted_count: int = Field(default=0, description="自动入库尝试总数")
+    materialized_count: int = Field(default=0, description="自动入库成功数")
+    failed_count: int = Field(default=0, description="自动入库失败数")
+    success_rate: float = Field(default=0, description="自动入库成功率（materialized/attempted）")
+
+
+class RecommendationProcessingOpsMetrics(BaseModel):
+    """推荐导入后处理链路指标。"""
+
+    tracked_video_count: int = Field(default=0, description="纳入处理跟踪的视频数")
+    completed_count: int = Field(default=0, description="处理完成数（completed）")
+    failed_count: int = Field(default=0, description="处理失败数（failed）")
+    in_progress_count: int = Field(default=0, description="处理中数量（非 completed/failed）")
+    completion_rate: float = Field(default=0, description="处理完成率（completed/tracked）")
+    failure_rate: float = Field(default=0, description="处理失败率（failed/tracked）")
+    terminal_rate: float = Field(default=0, description="终态占比（(completed+failed)/tracked）")
+    status_breakdown: dict[str, int] = Field(default_factory=dict, description="处理状态分布")
+
+
+class RecommendationOpsMetricsResponse(BaseModel):
+    """推荐运营面板聚合响应。"""
+
+    message: str
+    data_source: str = Field(default="database", description="聚合数据来源：database/memory_fallback")
+    window_days: int = Field(default=7, description="统计窗口（天）")
+    window_start: datetime
+    window_end: datetime
+    recommendation_import: RecommendationImportOpsMetrics
+    auto_materialization: RecommendationAutoMaterializationOpsMetrics
+    processing: RecommendationProcessingOpsMetrics

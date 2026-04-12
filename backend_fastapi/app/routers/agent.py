@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from app.agents.exceptions import GovernanceError
 from app.core.database import get_db
 from app.schemas.agent import AgentExecuteRequest
 from app.schemas.agent import AgentPlanResponse
@@ -23,6 +24,8 @@ async def execute_agent(request: AgentExecuteRequest, db: Session = Depends(get_
     try:
         payload = execute_learning_flow_agent(db, request=request)
         return payload
+    except GovernanceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except HTTPException:

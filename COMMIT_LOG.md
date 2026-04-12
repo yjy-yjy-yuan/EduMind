@@ -140,3 +140,15 @@
 ### 2026-04-01
 - `a007418` `feat(recommendation): harden pipeline and align note-QA learning flow`
 - `67bc068` `feat(mobile): refine guide accordion and home layout`
+
+## 0411-feature/video-recommendation-enhancement
+
+- 分支创建：`2026-04-11`
+- 创建基线：`ff86a447` `feat(recommendation): harden auth isolation and land agent governance pipeline`
+
+### 2026-04-11
+- `3beabfc5` `feat(recommendation): auto-materialize external candidates for logged-in users`
+
+### 2026-04-12
+- `54419d52` `feat(recommendation): contract v2, sanitize responses, similarity fusion, hub UX`
+- `5827f3c5` `feat(backend): recommendation title filter, delete cascade, purge script`

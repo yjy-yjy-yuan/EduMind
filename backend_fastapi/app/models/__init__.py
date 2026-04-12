@@ -4,6 +4,7 @@ from app.models.base import Base
 from app.models.base import TimestampMixin
 from app.models.note import Note
 from app.models.qa import Question
+from app.models.recommendation_ops_event import RecommendationOpsEvent
 from app.models.semantic_search_log import SemanticSearchLog
 from app.models.similarity_audit_log import SimilarityAuditLogModel
 from app.models.subtitle import Subtitle
@@ -26,6 +27,7 @@ __all__ = [
     "VectorIndexStatus",
     "User",
     "Question",
+    "RecommendationOpsEvent",
     "SemanticSearchLog",
     "SimilarityAuditLogModel",
 ]

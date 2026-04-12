@@ -21,6 +21,7 @@ from app.core.database import engine
 from app.models import Base
 from app.models import Note
 from app.models import Question
+from app.models import RecommendationOpsEvent
 from app.models import SemanticSearchLog
 from app.models import Subtitle
 from app.models import User
@@ -35,6 +36,7 @@ TABLE_DESCRIPTIONS = {
     "notes": "学习笔记表",
     "note_timestamps": "笔记时间戳关联表",
     "questions": "问答记录表",
+    "recommendation_ops_events": "推荐运营事件日志表",
     "semantic_search_logs": "语义搜索全局检索日志表",
     "similarity_audit_logs": "标签相似度 LLM 审计日志表",
 }
@@ -46,6 +48,7 @@ MANAGED_TABLE_NAMES = {
     Note.__tablename__,
     NoteTimestamp.__tablename__,
     Question.__tablename__,
+    RecommendationOpsEvent.__tablename__,
     SemanticSearchLog.__tablename__,
     SimilarityAuditLogModel.__tablename__,
 }

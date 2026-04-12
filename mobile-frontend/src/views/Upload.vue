@@ -184,9 +184,6 @@
         </div>
       </div>
       <div class="muted">{{ uploadRecommendationIntro }}</div>
-      <div v-if="uploadRecommendationQuerySummary" class="upload-followup__context">
-        当前推荐围绕：{{ uploadRecommendationQuerySummary }}
-      </div>
       <div class="upload-followup__list">
         <article v-for="item in uploadRecommendationItems" :key="item.key" class="upload-followup__item">
           <div class="upload-followup__top">
@@ -194,10 +191,6 @@
             <span class="recent-tag recent-tag--soft">{{ item.sourceLabel }}</span>
           </div>
           <strong class="upload-followup__title">{{ item.title }}</strong>
-          <p class="upload-followup__desc">{{ item.summaryText }}</p>
-          <div v-if="item.tags.length > 0" class="upload-followup__tags">
-            <span v-for="tag in item.tags.slice(0, 4)" :key="`${item.key}-${tag}`" class="upload-followup__tag">{{ tag }}</span>
-          </div>
           <div class="upload-followup__meta">
             <span v-if="item.statusText">{{ item.statusText }}</span>
             <span v-if="item.subjectText">{{ item.subjectText }}</span>
@@ -474,8 +467,16 @@ const currentFileDisplayHint = computed(() => {
 const uploadRecommendationPayload = ref(null)
 const latestUploadedVideoId = ref(0)
 const latestUploadedTitle = ref('')
-const normalizeRecommendationItems = (payload) => Array.isArray(payload?.items) ? payload.items : []
-const normalizeRecommendationQuery = (payload) => payload?.external_query || null
+const RECOMMENDATION_TITLE_BLOCKLIST = ['排列组合插空法详解']
+const isBlockedRecommendationTitle = (item) => {
+  const title = String(item?.title || '').trim()
+  if (!title) return false
+  return RECOMMENDATION_TITLE_BLOCKLIST.some((keyword) => keyword && title.includes(keyword))
+}
+const normalizeRecommendationItems = (payload) => {
+  const items = Array.isArray(payload?.items) ? payload.items : []
+  return items.filter((item) => !isBlockedRecommendationTitle(item))
+}
 const resolveRecommendationItemKey = (item, index = 0) =>
   String(item?.id || item?.video_id || item?.external_url || item?.url || `upload-recommendation-${index}`)
 const isExternalRecommendationItem = (item) => {
@@ -499,7 +500,6 @@ const decorateUploadRecommendationItem = (item, index = 0) => {
     tags,
     sourceLabel,
     reasonLabel: String(item?.reason_label || '推荐'),
-    summaryText: String(item?.reason_text || item?.summary || '可继续从这里进入学习链路。'),
     statusText: item?.status ? videoStatusText(item.status) : '',
     timeText: formatRecommendationTime(item?.upload_time || item?.updated_at || item?.created_at),
     subjectText: String(item?.subject || '').trim() ? `科目 · ${String(item.subject).trim()}` : '',
@@ -517,18 +517,6 @@ const uploadRecommendationIntro = computed(() => {
   const label = UPLOAD_RECOMMENDATION_SCENE_LABELS[scene] || '下一步推荐'
   const title = latestUploadedTitle.value ? `《${latestUploadedTitle.value}》` : '当前上传内容'
   return `${title} 上传后，后端已自动返回 ${label}，你可以直接从这里决定下一步学什么。`
-})
-const uploadRecommendationQuerySummary = computed(() => {
-  const query = normalizeRecommendationQuery(uploadRecommendationPayload.value)
-  if (!query) return ''
-  const parts = [query.subject, query.primary_topic].filter(Boolean)
-  if (query.preferred_provider_label) {
-    parts.push(`优先来源：${query.preferred_provider_label}`)
-  }
-  if (Array.isArray(query.preferred_tags) && query.preferred_tags.length > 0) {
-    parts.push(`优先标签：${query.preferred_tags.join('、')}`)
-  }
-  return parts.join(' · ')
 })
 
 const clearUploadRecommendations = () => {

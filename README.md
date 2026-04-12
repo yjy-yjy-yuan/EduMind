@@ -84,7 +84,7 @@ bash ios-app/sync_ios_web_assets.sh
 
 ## 后端测试目录
 
-后端测试已经统一放在 [backend_fastapi/tests](/Users/yuan/final-work/EduMind/backend_fastapi/tests)：
+后端测试已经统一放在 [backend_fastapi/tests](backend_fastapi/tests)：
 
 - `backend_fastapi/tests/unit/`：单元测试
 - `backend_fastapi/tests/api/`：接口测试
@@ -98,7 +98,7 @@ bash ios-app/sync_ios_web_assets.sh
 python scripts/validate_backend_smoke.py
 ```
 
-`backend_fastapi/tests/` 仍保留历史回归用例与 pytest 风格目录结构；更具体的放置规则见 [backend_fastapi/tests/README.md](/Users/yuan/final-work/EduMind/backend_fastapi/tests/README.md)。
+`backend_fastapi/tests/` 仍保留历史回归用例与 pytest 风格目录结构；更具体的放置规则见 [backend_fastapi/tests/README.md](backend_fastapi/tests/README.md)。
 
 补充边界：
 
@@ -107,7 +107,7 @@ python scripts/validate_backend_smoke.py
 
 ## GitHub Actions CI（基线）
 
-仓库当前新增最小后端 CI 工作流：[`.github/workflows/backend-ci.yml`](/Users/yuan/final-work/EduMind/.github/workflows/backend-ci.yml)。
+仓库当前新增最小后端 CI 工作流：[`.github/workflows/backend-ci.yml`](.github/workflows/backend-ci.yml)。
 
 触发事件：
 
@@ -206,14 +206,14 @@ cd mobile-frontend && npm run build:ios
 ./.venv/bin/python scripts/validate_search_integration.py
 ```
 
-部署与当前限制的详细说明见 [backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md](/Users/yuan/final-work/EduMind/backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)。
+部署与当前限制的详细说明见 [backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md](backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)。
 
 ## 标签相似度优化文档
 
 标签相似度（关键词相关子能力）的最新交付与技术说明见：
 
-- [docs/KEYWORD_SEARCH_OPTIMIZATION.md](/Users/yuan/final-work/EduMind/docs/KEYWORD_SEARCH_OPTIMIZATION.md)
-- [KEYWORD_SEARCH_DELIVERY_SUMMARY.md](/Users/yuan/final-work/EduMind/KEYWORD_SEARCH_DELIVERY_SUMMARY.md)
+- [docs/KEYWORD_SEARCH_OPTIMIZATION.md](docs/KEYWORD_SEARCH_OPTIMIZATION.md)
+- [KEYWORD_SEARCH_DELIVERY_SUMMARY.md](KEYWORD_SEARCH_DELIVERY_SUMMARY.md)
 
 ## Blitz / Codex CLI 开发工作流
 
@@ -242,7 +242,7 @@ bash scripts/blitz_build_ios.sh
 1. `mobile-frontend/` 任何改动后，都必须重新执行 `bash ios-app/sync_ios_web_assets.sh`
 2. iOS 容器是本地打包资源模式，不是 dev server 直连模式
 3. 若要做更完整的 iOS 校验，执行 `bash ios-app/validate_ios_build.sh`；该脚本默认执行无签名构建，用于验证本地代码和 `WebAssets` 能否成功编译
-4. 更详细的 Agent 接管说明见 [`docs/BLITZ_EDUMIND_WORKFLOW.md`](/Users/yuan/final-work/EduMind/docs/BLITZ_EDUMIND_WORKFLOW.md)
+4. 更详细的 Agent 接管说明见 [`docs/BLITZ_EDUMIND_WORKFLOW.md`](docs/BLITZ_EDUMIND_WORKFLOW.md)
 
 ## 摘要生成与处理设置
 
@@ -290,12 +290,31 @@ POST /api/videos/{video_id}/generate-tags
 
 1. 后端按受限候选集扫描站内视频，不再无上限全表加载。
 2. 推荐接口支持 `home / continue / review / related` 四种场景。
-3. 首页与推荐页默认通过 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 控制是否带站外候选，避免弱网下首屏被站外抓取拖慢。
+3. 首页「为你推荐」默认通过 `VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL`（默认 `true`）请求站外候选并与推荐中枢同一套入库闭环；弱网可改为 `false` 仅拉站内。历史变量 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 仍可在其它构建中复用。
 4. 站外候选会明确区分两类动作：
    - 可直接导入：进入现有 URL 导入链路
    - 暂不可直接导入：打开原始来源页，而不是伪装成已入库视频
-5. 推荐页里的“看同主题”会围绕当前站内视频加载 `related` 推荐；若接口暂无结果或请求失败，前端会用当前页已加载的站内内容做同主题兜底，并在当前页“相关推荐”区域内展示结果。
+5. **`scene=related`** 仍用于需要 **`seed_video_id`** 的入口（例如 **视频详情**「相关推荐」子页）：按种子做相关排序并排除种子；若接口暂无结果或失败，前端可按既有策略做兜底。**独立「推荐学习中枢」页**（`/recommendations`）当前仅请求 **`scene=home`** 的单列表推荐，不再提供多场景切换、主列表「看同主题」或页内「同主题」区块。
 6. `related` 场景在扩站外候选时，会优先继承 seed 视频的原始来源平台语境；例如当前视频来自 YouTube 时，同主题站外候选会优先同来源 provider。
+7. 推荐 API 响应体包含 `contract_version`（默认 `"2"`，与 `RECOMMENDATION_CONTRACT_VERSION` 一致；v2 起不再返回 `seed_video_title`，旧版可设环境变量为 `"1"`）；推荐相关请求支持 `X-Trace-Id` / `X-Request-Id` 透传，响应头回传相同 trace 便于前后端对账。完整可测试清单见 `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 第九节（Recommendation Contract）。
+8. 在登录态且开启站外推荐时，后端会优先把可导入站外候选自动入库（`videos`）后再返回给前端；用户拿到的是可直接打开详情、可继续走“下载/处理/复盘”链路的条目，而不是只能二次跳转的占位候选。
+9. 自动入库由后端开关控制：`RECOMMENDATION_AUTO_IMPORT_EXTERNAL`（默认 `true`）与 `RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS`（默认 `2`，单次请求最多尝试入库的站外条数）；关闭前者则行为退化为仅返回站外候选、不自动写库。
+10. **用户动线（闭环）**：已登录且 Bearer 有效 → 前端带 `include_external=true` 请求推荐 → 后端对可导入站外候选调用链接导入并写入 `videos` → 返回项为站内视频（可打开详情、走下载/转写/摘要）。未登录时仍可能看到站外候选卡片，需走「链接导入」或先登录后再刷出已入库条目。
+11. 推荐运营聚合接口 `GET /api/recommendations/ops/metrics`（需登录）返回 `recommendation_import.success_rate` 与 `processing.completion_rate`；口径默认从 MySQL `recommendation_ops_events` 聚合，DB 不可用时降级到进程内缓冲（`data_source=memory_fallback`）。
+12. 首页在推荐接口失败或当前场景暂无命中时，会显式展示“当前为兜底结果”的轻提示，避免把视频库兜底误判为实时推荐结果。
+13. iOS `WKWebView` 构建使用单文件 `iife + inlineDynamicImports`；该模式下路由懒加载不会拆分独立 chunk，前端已通过 `chunkSizeWarningLimit` 与注释避免误导性体积告警。
+14. 推荐排序新增复用语义搜索的“融合相似度”策略（后端内部计算，不对前端展示相似度数值），默认阈值 `RECOMMENDATION_SIMILARITY_MIN_SCORE=0.55`。
+15. 推荐接口在移动端链路上会将请求条数规范化到 `6~8`（默认 6），并优先返回达到相似度阈值的条目；若阈值筛选后仍不足最小条数，后端会从同批排序候选中按条目身份去重**补齐至窗口下限**。相关推荐与首页默认请求条数与窗口一致（以客户端 `limit` 与后端窗口为准）。
+16. 推荐展示口径已做“一次性去切片”收口：`/api/recommendations/videos` 与上传返回 `recommendations` 的 `items[*]` 在输出层统一清空 `summary`、`reason_text`、`tags`（v1/v2 均生效，仅保留 `reason_label/reason_code`）；`Home / Recommendations / Upload` 三入口不再渲染片段描述与内容标签 chips（卡片仍展示 `reason_label` 等轻量理由徽标）。
+17. 推荐结果支持标题黑名单关键词过滤（`RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS`，默认含 `排列组合插空法详解`）：命中关键词的条目会在后端响应收口阶段被剔除，再按剩余候选返回；前端 `Home` / `Recommendations` / `Upload` 亦做同名关键词兜底，避免缓存或 mock 残留。
+18. **首页「为你推荐」**已精简为标题与推荐卡片列表：已移除标题下说明文案、首屏「刷新推荐」按钮、「本页条数 / 更多场景」统计卡片（进入首页仍会照常拉取推荐）。**推荐学习中枢页**已移除 hero 内开发者向说明卡片；页面为 **Hero + 单列表「推荐视频」** 与刷新入口，与首页共用同一推荐接口语义。
+19. **视频详情页**（`/videos/:id`）为横向双页：**学习处理**（Whisper、摘要、笔记、操作、重试、删除等既有流程）与 **相关推荐**（`GET /api/recommendations/videos`，`scene=related` + `seed_video_id` 并排除种子；展示口径与全站一致，不渲染切片化 `summary/reason_text/tags`）。首次仅在学习处理页加载详情；切换到推荐子页时再请求推荐；子页索引保存在 `sessionStorage`（`videoDetailSubPage:<id>`）。
+20. **视频详情布局与手势**：封面区（LIVE/占位、标题、状态、进度、「可进播放器」提示等）在 **`.video-detail__shared` 中固定在页面上方**，不随双页横向滑动；**「学习处理 / 相关推荐」页签与下方 `scroll-snap` 分页轨道**仅作用于其下区域，符合「在封面卡片下」左右切换的预期。分页下面板不使用 `touch-action: pan-y` 锁定，避免在推荐卡片上横滑无法驱动外层分页。实现文件：`mobile-frontend/src/views/VideoDetail.vue`，`mobile-frontend/src/components/videoDetail/VideoDetailRecommendPanel.vue`，`VideoDetailRecommendCard.vue`，`mobile-frontend/src/services/recommendationPresentation.js`，`videoDetailTelemetry.js`。结构化埋点通过 `CustomEvent('edumind:telemetry')`（`detail.scope === 'video_detail'`）抛出，便于 `WKWebView` 原生侧订阅。
+
+## 视频删除与运维脚本
+
+1. `DELETE /api/videos/{video_id}/delete` 在删除 `videos` 行之前，会依次清理关联的 **问答**（`questions`）、**字幕**（`subtitles`）、**笔记时间戳**（`note_timestamps`）与 **笔记**（`notes`），避免外键约束失败；向量索引行（`vector_indexes`）由业务侧在需要时一并处理（见仓库内脚本）。
+2. 运维可按标题查找并删除或仅重置元数据：`scripts/purge_video_recommendation_by_title.py`（需配置 `DATABASE_URL`；默认 **dry-run**，加 `--execute` 才写库）。`--delete-video` 删除整条视频及常见子表；`--reset-metadata` 仅清空摘要/标签与语义索引标记并删 `vector_indexes`，保留视频与字幕。
 
 ## 视频上下文问答
 
@@ -450,7 +469,7 @@ python backend_fastapi/scripts/init_db.py --emit-sql backend_fastapi/scripts/mys
 
 默认导出的 SQL 文件位置：
 
-- [`backend_fastapi/scripts/mysql_managed_schema.sql`](/Users/yuan/final-work/EduMind/backend_fastapi/scripts/mysql_managed_schema.sql)
+- [`backend_fastapi/scripts/mysql_managed_schema.sql`](backend_fastapi/scripts/mysql_managed_schema.sql)
 
 当前默认数据库名已统一为 `edumind`。
 
@@ -513,12 +532,12 @@ bash scripts/install_git_hooks.sh
 
 ## 相关文档
 
-- [`AGENTS.md`](/Users/yuan/final-work/EduMind/AGENTS.md)
-- [`docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)
-- [`docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md)
-- [`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md)
-- [`docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md`](/Users/yuan/final-work/EduMind/docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md)
-- [`backend_fastapi/README.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README.md)
-- [`backend_fastapi/README_RUN.md`](/Users/yuan/final-work/EduMind/backend_fastapi/README_RUN.md)
-- [`mobile-frontend/README.md`](/Users/yuan/final-work/EduMind/mobile-frontend/README.md)
-- [`ios-app/README.md`](/Users/yuan/final-work/EduMind/ios-app/README.md)
+- [`AGENTS.md`](AGENTS.md)
+- [`docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)
+- [`docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md`](docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md)
+- [`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md)
+- [`docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md`](docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md)
+- [`backend_fastapi/README.md`](backend_fastapi/README.md)
+- [`backend_fastapi/README_RUN.md`](backend_fastapi/README_RUN.md)
+- [`mobile-frontend/README.md`](mobile-frontend/README.md)
+- [`ios-app/README.md`](ios-app/README.md)

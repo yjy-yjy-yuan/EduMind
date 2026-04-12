@@ -12,6 +12,7 @@ from typing import Optional
 from urllib.parse import urlencode
 from urllib.parse import urlparse
 
+from app.core.config import settings
 from app.models.user import User
 from app.models.video import Video
 from app.models.video import VideoStatus
@@ -19,6 +20,8 @@ from app.services.external_candidate_service import ExternalCandidate
 from app.services.external_candidate_service import ExternalProviderFetchSummary
 from app.services.external_candidate_service import fetch_external_candidates_report
 from app.services.external_candidate_service import serialize_provider_summary
+from app.services.search.similarity_fusion import fused_similarity_score
+from app.services.search.similarity_fusion import lexical_overlap_score
 from app.services.video_content_service import build_subject_enriched_tags
 from app.services.video_content_service import fallback_primary_topic_name
 from app.services.video_content_service import infer_subject_from_text
@@ -134,6 +137,16 @@ class RankedExternalRecommendationBundle:
     providers: list[ExternalProviderFetchSummary]
 
 
+@dataclass
+class RecommendationSimilarityContext:
+    """推荐相似度计算上下文。"""
+
+    query_text: str
+    focus_subject: str
+    focus_topic: str
+    focus_tokens: set[str]
+
+
 def list_recommendation_scenes() -> list[dict]:
     """返回支持的推荐场景。"""
     return [dict(item) for item in SCENE_OPTIONS]
@@ -220,6 +233,116 @@ def unique_tokens(values: Iterable[str]) -> list[str]:
     return tokens
 
 
+def normalize_similarity_threshold() -> float:
+    """读取并规范化推荐相似度阈值（0~1）。"""
+    raw = float(getattr(settings, "RECOMMENDATION_SIMILARITY_MIN_SCORE", 0.55) or 0.55)
+    return max(0.0, min(raw, 1.0))
+
+
+def normalize_recommendation_limit(limit: int) -> int:
+    """将请求 limit 归一到后端推荐窗口（默认 6~8）。"""
+    min_items = max(1, int(getattr(settings, "RECOMMENDATION_RETURN_MIN_ITEMS", 6) or 6))
+    max_items = max(min_items, int(getattr(settings, "RECOMMENDATION_RETURN_MAX_ITEMS", 8) or 8))
+    return max(min_items, min(int(limit or min_items), max_items))
+
+
+def normalize_recommendation_min_items() -> int:
+    """读取推荐最小返回条数。"""
+    return max(1, int(getattr(settings, "RECOMMENDATION_RETURN_MIN_ITEMS", 6) or 6))
+
+
+def _recommendation_item_identity(item: dict) -> str:
+    """构建推荐条目标识，用于补齐时去重。"""
+    if not isinstance(item, dict):
+        return ""
+    raw_id = item.get("id")
+    if raw_id not in (None, ""):
+        return f"id:{raw_id}"
+    external_url = str(item.get("external_url") or "").strip()
+    if external_url:
+        return f"url:{external_url}"
+    title = str(item.get("title") or "").strip()
+    if title:
+        return f"title:{title}"
+    return ""
+
+
+def build_similarity_context(
+    *,
+    query_context: Optional[ExternalQueryContext],
+    seed_profile: Optional[RecommendationProfile],
+    user_tokens: list[str],
+    user_subject: str,
+) -> RecommendationSimilarityContext:
+    """构建推荐条目共享的相似度上下文。"""
+    query_text = str(query_context.query_text if query_context is not None else "").strip()
+    focus_subject = str(query_context.subject if query_context is not None else "").strip()
+    focus_topic = str(query_context.primary_topic if query_context is not None else "").strip()
+    seed_tokens = list(seed_profile.tokens) if seed_profile is not None else []
+    focus_tokens = set(unique_tokens([query_text, focus_subject, focus_topic, *user_tokens, *seed_tokens]))
+    if not query_text:
+        query_text = " ".join(part for part in [focus_subject, focus_topic] if part).strip() or "学习内容"
+    if not focus_subject:
+        focus_subject = user_subject
+    return RecommendationSimilarityContext(
+        query_text=query_text,
+        focus_subject=focus_subject,
+        focus_topic=focus_topic,
+        focus_tokens=focus_tokens,
+    )
+
+
+def compute_internal_similarity(
+    *,
+    video: Video,
+    profile: RecommendationProfile,
+    context: RecommendationSimilarityContext,
+) -> float:
+    """计算站内推荐候选与当前焦点的融合相似度（0~1）。"""
+    candidate_tokens = set(profile.tokens)
+    if context.focus_tokens:
+        token_overlap = len(candidate_tokens & context.focus_tokens) / max(1, len(context.focus_tokens))
+    else:
+        token_overlap = lexical_overlap_score(context.query_text, " ".join(profile.tokens))
+    subject_match = 1.0 if context.focus_subject and profile.subject == context.focus_subject else 0.0
+    topic_match = 1.0 if context.focus_topic and profile.primary_topic == context.focus_topic else 0.0
+    semantic_signal = min(1.0, token_overlap * 0.55 + subject_match * 0.35 + topic_match * 0.25)
+    fused = fused_similarity_score(
+        vector_similarity=semantic_signal,
+        query=context.query_text,
+        preview_text=" ".join([str(video.summary or ""), *profile.tags]),
+        video_title=video.title,
+    )
+    if subject_match and (topic_match > 0 or token_overlap >= 0.2):
+        return max(fused, 0.58)
+    return fused
+
+
+def compute_external_similarity(
+    *,
+    candidate: ExternalCandidate,
+    context: RecommendationSimilarityContext,
+) -> float:
+    """计算站外候选与当前焦点的融合相似度（0~1）。"""
+    candidate_tokens = set(unique_tokens([candidate.title, candidate.summary, candidate.author, *candidate.tags]))
+    if context.focus_tokens:
+        token_overlap = len(candidate_tokens & context.focus_tokens) / max(1, len(context.focus_tokens))
+    else:
+        token_overlap = lexical_overlap_score(context.query_text, " ".join(candidate.tags))
+    subject_match = 1.0 if context.focus_subject and candidate.subject == context.focus_subject else 0.0
+    topic_match = 1.0 if context.focus_topic and candidate.primary_topic == context.focus_topic else 0.0
+    semantic_signal = min(1.0, token_overlap * 0.55 + subject_match * 0.35 + topic_match * 0.25)
+    fused = fused_similarity_score(
+        vector_similarity=semantic_signal,
+        query=context.query_text,
+        preview_text=" ".join([str(candidate.summary or ""), *candidate.tags]),
+        video_title=candidate.title,
+    )
+    if subject_match and (topic_match > 0 or token_overlap >= 0.2):
+        return max(fused, 0.58)
+    return fused
+
+
 def extract_video_tokens(video: Optional[Video]) -> list[str]:
     """提取视频主题 token。"""
     if video is None:
@@ -297,6 +420,19 @@ def recency_bonus(video: Video, now: datetime) -> float:
     return 0
 
 
+def _seed_reference_for_reason_text(
+    seed_video: Optional[Video],
+    *,
+    include_seed_title_in_reason: bool,
+) -> str:
+    """Related 文案中的种子指代；Contract v2 起不拼接种子视频标题（与顶层 seed_video_title 下线口径一致）。"""
+    if seed_video is None:
+        return "当前种子视频"
+    if include_seed_title_in_reason:
+        return f"《{seed_video.title or '当前视频'}》"
+    return "当前种子视频"
+
+
 def build_reason(
     *,
     scene: str,
@@ -309,6 +445,7 @@ def build_reason(
     interest_overlap: list[str],
     has_summary: bool,
     has_tags: bool,
+    include_seed_title_in_reason: bool = True,
 ) -> tuple[str, str, str]:
     """构建推荐理由。"""
     if status in ACTIVE_STATUSES and scene in {"home", "continue"}:
@@ -317,12 +454,14 @@ def build_reason(
     if status == VideoStatus.FAILED.value and scene in {"home", "continue"}:
         return ("retry", "建议补跑", "该视频上次处理失败，适合优先回到详情页重新提交。")
 
+    seed_ref = _seed_reference_for_reason_text(seed_video, include_seed_title_in_reason=include_seed_title_in_reason)
+
     if scene == "related" and seed_video is not None and seed_overlap:
         topic_text = "、".join(seed_overlap[:2])
-        return ("related", "主题相关", f"与《{seed_video.title or '当前视频'}》共享 {topic_text} 等主题。")
+        return ("related", "主题相关", f"与{seed_ref}共享 {topic_text} 等主题。")
 
     if scene == "related" and seed_video is not None and same_subject and subject:
-        return ("subject", "同科目", f"与《{seed_video.title or '当前视频'}》同属 {subject}，适合继续串联学习。")
+        return ("subject", "同科目", f"与{seed_ref}同属 {subject}，适合继续串联学习。")
 
     if interest_overlap:
         topic_text = "、".join(interest_overlap[:2])
@@ -349,13 +488,16 @@ def build_external_reason(
     seed_overlap: list[str],
     interest_overlap: list[str],
     same_provider: bool,
+    include_seed_title_in_reason: bool = True,
 ) -> tuple[str, str, str]:
     """构建站外候选推荐理由。"""
+    seed_ref = _seed_reference_for_reason_text(seed_video, include_seed_title_in_reason=include_seed_title_in_reason)
+
     if scene == "related" and seed_video is not None and same_provider:
         return (
             "external_source_match",
             "同来源延伸",
-            f"与《{seed_video.title or '当前视频'}》来自同一内容来源，延续当前频道语境更自然。",
+            f"与{seed_ref}来自同一内容来源，延续当前频道语境更自然。",
         )
 
     if scene == "related" and seed_video is not None and seed_overlap:
@@ -363,14 +505,14 @@ def build_external_reason(
         return (
             "external_related",
             "站外同主题",
-            f"与《{seed_video.title or '当前视频'}》共享 {topic_text} 等主题，可直接导入继续学习。",
+            f"与{seed_ref}共享 {topic_text} 等主题，可直接导入继续学习。",
         )
 
     if scene == "related" and seed_video is not None and same_subject and candidate.subject:
         return (
             "external_subject",
             "站外同科",
-            f"与《{seed_video.title or '当前视频'}》同属 {candidate.subject}，适合站内外串联学习。",
+            f"与{seed_ref}同属 {candidate.subject}，适合站内外串联学习。",
         )
 
     if scene == "review":
@@ -398,6 +540,7 @@ def score_video(
     seed_profile: Optional[RecommendationProfile],
     cluster_size: int,
     subject_cluster_size: int,
+    include_seed_title_in_reason: bool = True,
 ) -> tuple[float, str, str, str]:
     """对单个视频打分并返回理由。"""
     status = video.status.value if isinstance(video.status, VideoStatus) else str(video.status or "").lower()
@@ -469,6 +612,7 @@ def score_video(
         interest_overlap=interest_overlap,
         has_summary=has_summary,
         has_tags=has_tags,
+        include_seed_title_in_reason=include_seed_title_in_reason,
     )
     return score, reason_code, reason_label, reason_text
 
@@ -484,6 +628,7 @@ def score_external_candidate(
     focus_subject: str,
     focus_tags: list[str],
     preferred_provider: str,
+    include_seed_title_in_reason: bool = True,
 ) -> tuple[float, str, str, str]:
     """对站外候选打分。"""
     candidate_tokens = unique_tokens([candidate.title, candidate.summary, candidate.author, *candidate.tags])
@@ -537,6 +682,7 @@ def score_external_candidate(
         seed_overlap=seed_overlap,
         interest_overlap=interest_overlap,
         same_provider=same_provider,
+        include_seed_title_in_reason=include_seed_title_in_reason,
     )
     return score, reason_code, reason_label, reason_text
 
@@ -762,6 +908,59 @@ def count_internal_items(items: list[dict]) -> int:
     return sum(1 for item in items if not item.get("is_external"))
 
 
+def _normalize_excluded_title_keywords() -> list[str]:
+    """读取推荐结果标题黑名单关键词。"""
+    raw = str(getattr(settings, "RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS", "") or "").strip()
+    keywords = [part.strip() for part in raw.split(",") if part.strip()]
+    # 兜底保留强制拦截词，避免配置缺失时回归。
+    if "排列组合插空法详解" not in keywords:
+        keywords.append("排列组合插空法详解")
+    return keywords
+
+
+def _is_excluded_recommendation_title(title: str, keywords: list[str]) -> bool:
+    """判断推荐标题是否命中黑名单关键词。"""
+    text = str(title or "").strip()
+    if not text:
+        return False
+    lowered = text.lower()
+    for keyword in keywords:
+        key = str(keyword or "").strip()
+        if not key:
+            continue
+        if key in text or key.lower() in lowered:
+            return True
+    return False
+
+
+def sanitize_recommendation_items_for_client(items: list[dict]) -> list[dict]:
+    """前端展示口径收口：推荐条目不暴露切片化文本与标签。"""
+    sanitized: list[dict] = []
+    excluded_keywords = _normalize_excluded_title_keywords()
+    for item in list(items or []):
+        if not isinstance(item, dict):
+            continue
+        row = dict(item)
+        if _is_excluded_recommendation_title(row.get("title"), excluded_keywords):
+            continue
+        row["summary"] = ""
+        row["tags"] = []
+        row["reason_text"] = ""
+        sanitized.append(row)
+    return sanitized
+
+
+def sanitize_recommendation_payload_for_client(payload: dict) -> dict:
+    """统一清洗推荐响应 payload，保证多出口一致。"""
+    merged = dict(payload or {})
+    items = sanitize_recommendation_items_for_client(list(merged.get("items") or []))
+    merged["items"] = items
+    merged["internal_item_count"] = count_internal_items(items)
+    merged["external_item_count"] = count_external_items(items)
+    merged["sources"] = summarize_recommendation_sources(items)
+    return merged
+
+
 def summarize_external_providers(provider_summaries: list[ExternalProviderFetchSummary]) -> list[dict]:
     """序列化站外 provider 抓取摘要。"""
     return [serialize_provider_summary(summary) for summary in provider_summaries]
@@ -782,6 +981,9 @@ def build_ranked_internal_items(
     user_subject: str,
     profiles: dict[int, RecommendationProfile],
     exclude_ids: set[int],
+    similarity_context: RecommendationSimilarityContext,
+    similarity_threshold: float,
+    include_seed_title_in_reason: bool = True,
 ) -> list[tuple[float, datetime, dict]]:
     """生成站内推荐条目。"""
     scored_items = []
@@ -797,6 +999,9 @@ def build_ranked_internal_items(
         profile = profiles.get(video.id)
         if profile is None:
             continue
+        similarity = compute_internal_similarity(video=video, profile=profile, context=similarity_context)
+        if similarity < similarity_threshold:
+            continue
 
         score, reason_code, reason_label, reason_text = score_video(
             video=video,
@@ -809,6 +1014,7 @@ def build_ranked_internal_items(
             seed_profile=seed_profile,
             cluster_size=cluster_counter.get(profile.cluster_key, 0),
             subject_cluster_size=subject_counter.get(profile.subject, 0),
+            include_seed_title_in_reason=include_seed_title_in_reason,
         )
         scored_items.append(
             (
@@ -838,6 +1044,9 @@ def build_ranked_external_items(
     user_tokens: list[str],
     user_subject: str,
     limit: int,
+    similarity_context: RecommendationSimilarityContext,
+    similarity_threshold: float,
+    include_seed_title_in_reason: bool = True,
 ) -> RankedExternalRecommendationBundle:
     """生成站外候选条目，并附带 provider 报告。"""
     report = fetch_external_candidates_report(
@@ -849,6 +1058,9 @@ def build_ranked_external_items(
     )
     ranked_items = []
     for candidate in report.candidates:
+        similarity = compute_external_similarity(candidate=candidate, context=similarity_context)
+        if similarity < similarity_threshold:
+            continue
         score, reason_code, reason_label, reason_text = score_external_candidate(
             candidate=candidate,
             scene=scene,
@@ -859,6 +1071,7 @@ def build_ranked_external_items(
             focus_subject=query_context.subject,
             focus_tags=query_context.preferred_tags,
             preferred_provider=query_context.preferred_provider,
+            include_seed_title_in_reason=include_seed_title_in_reason,
         )
         ranked_items.append(
             (
@@ -945,20 +1158,46 @@ def recommend_videos(
     exclude_ids: Optional[set[int]] = None,
     include_external: bool = False,
     coach: bool = False,
+    enforce_return_window: bool = False,
 ) -> dict:
     """生成推荐视频列表。"""
     normalized_scene = normalize_scene(scene)
+    contract_version = str(getattr(settings, "RECOMMENDATION_CONTRACT_VERSION", "2") or "2").strip()
+    include_seed_title_in_reason = contract_version == "1"
+    effective_limit = normalize_recommendation_limit(limit) if enforce_return_window else max(1, int(limit or 1))
+    target_min_items = min(normalize_recommendation_min_items(), effective_limit) if enforce_return_window else 1
+    similarity_threshold = normalize_similarity_threshold()
     exclude_ids = set(exclude_ids or set())
     user_tokens = extract_user_interest_tokens(user)
     user_subject = extract_user_subject(user)
     now = datetime.utcnow()
-    profiles = {video.id: build_recommendation_profile(video) for video in videos}
+    excluded_title_keywords = _normalize_excluded_title_keywords()
+    candidate_videos = [
+        video
+        for video in list(videos or [])
+        if not _is_excluded_recommendation_title(video.title, excluded_title_keywords)
+    ]
+    profiles = {video.id: build_recommendation_profile(video) for video in candidate_videos}
     seed_profile = profiles.get(seed_video.id) if seed_video is not None else None
     external_query_summary = None
     external_provider_summaries: list[ExternalProviderFetchSummary] = []
 
+    query_context = build_external_query_context(
+        videos=candidate_videos,
+        profiles=profiles,
+        scene=normalized_scene,
+        seed_video=seed_video,
+        seed_profile=seed_profile,
+        user_subject=user_subject,
+    )
+    similarity_context = build_similarity_context(
+        query_context=query_context,
+        seed_profile=seed_profile,
+        user_tokens=user_tokens,
+        user_subject=user_subject,
+    )
     internal_ranked_items = build_ranked_internal_items(
-        videos=videos,
+        videos=candidate_videos,
         scene=normalized_scene,
         now=now,
         seed_video=seed_video,
@@ -966,18 +1205,13 @@ def recommend_videos(
         user_subject=user_subject,
         profiles=profiles,
         exclude_ids=exclude_ids,
+        similarity_context=similarity_context,
+        similarity_threshold=similarity_threshold,
+        include_seed_title_in_reason=include_seed_title_in_reason,
     )
-    items = [item[2] for item in internal_ranked_items[:limit]]
+    items = [item[2] for item in internal_ranked_items[:effective_limit]]
 
     if include_external:
-        query_context = build_external_query_context(
-            videos=videos,
-            profiles=profiles,
-            scene=normalized_scene,
-            seed_video=seed_video,
-            seed_profile=seed_profile,
-            user_subject=user_subject,
-        )
         external_query_summary = serialize_query_summary(query_context)
         external_bundle = build_ranked_external_items(
             query_context=query_context,
@@ -986,27 +1220,82 @@ def recommend_videos(
             seed_profile=seed_profile,
             user_tokens=user_tokens,
             user_subject=user_subject,
-            limit=min(limit, 4),
+            limit=min(effective_limit, 4),
+            similarity_context=similarity_context,
+            similarity_threshold=similarity_threshold,
+            include_seed_title_in_reason=include_seed_title_in_reason,
         )
         external_provider_summaries = external_bundle.providers
         items = select_combined_items(
             internal_items=internal_ranked_items,
             external_items=external_bundle.items,
-            limit=limit,
+            limit=effective_limit,
         )
 
+    if enforce_return_window and len(items) < target_min_items:
+        relaxed_internal_items = build_ranked_internal_items(
+            videos=candidate_videos,
+            scene=normalized_scene,
+            now=now,
+            seed_video=seed_video,
+            user_tokens=user_tokens,
+            user_subject=user_subject,
+            profiles=profiles,
+            exclude_ids=exclude_ids,
+            similarity_context=similarity_context,
+            similarity_threshold=0.0,
+            include_seed_title_in_reason=include_seed_title_in_reason,
+        )
+        relaxed_external_items: list[tuple[float, datetime, dict]] = []
+        if include_external:
+            relaxed_external_items = build_ranked_external_items(
+                query_context=query_context,
+                scene=normalized_scene,
+                seed_video=seed_video,
+                seed_profile=seed_profile,
+                user_tokens=user_tokens,
+                user_subject=user_subject,
+                limit=max(effective_limit, target_min_items),
+                similarity_context=similarity_context,
+                similarity_threshold=0.0,
+                include_seed_title_in_reason=include_seed_title_in_reason,
+            ).items
+
+        relaxed_candidates = select_combined_items(
+            internal_items=relaxed_internal_items,
+            external_items=relaxed_external_items,
+            limit=effective_limit,
+        )
+        seen_identities = {_recommendation_item_identity(item) for item in items}
+        for candidate in relaxed_candidates:
+            identity = _recommendation_item_identity(candidate)
+            if not identity or identity in seen_identities:
+                continue
+            items.append(candidate)
+            seen_identities.add(identity)
+            if len(items) >= target_min_items:
+                break
+
     fallback_used = False
-    if not items and videos:
+    if not items and candidate_videos:
         fallback_used = True
-        recent_videos = sorted(
+        recent_videos = []
+        for video in sorted(
             (
                 video
-                for video in videos
+                for video in candidate_videos
                 if video.id not in exclude_ids and (seed_video is None or video.id != seed_video.id)
             ),
             key=lambda item: item.updated_at or item.upload_time or datetime.min,
             reverse=True,
-        )[:limit]
+        ):
+            profile = profiles.get(video.id) or build_recommendation_profile(video)
+            similarity = compute_internal_similarity(video=video, profile=profile, context=similarity_context)
+            if similarity < similarity_threshold:
+                continue
+            recent_videos.append(video)
+            if len(recent_videos) >= effective_limit:
+                break
         items = [
             serialize_recommendation_item(
                 video,
@@ -1034,13 +1323,13 @@ def recommend_videos(
         if coach
         else None
     )
-    return {
+    payload: dict = {
+        "contract_version": contract_version,
         "scene": normalized_scene,
         "strategy": "video_status_interest_external_v2" if include_external else "video_status_interest_v1",
         "personalized": bool(user_tokens),
         "fallback_used": fallback_used,
         "seed_video_id": seed_video.id if seed_video is not None else None,
-        "seed_video_title": seed_video.title if seed_video is not None else None,
         "internal_item_count": internal_item_count,
         "external_item_count": external_item_count,
         "external_failed_provider_count": external_failed_provider_count,
@@ -1051,3 +1340,6 @@ def recommend_videos(
         "items": items,
         "coach_summary": coach_summary,
     }
+    if contract_version == "1":
+        payload["seed_video_title"] = seed_video.title if seed_video is not None else None
+    return payload

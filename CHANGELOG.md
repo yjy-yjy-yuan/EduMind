@@ -1,6 +1,142 @@
 # 变更日志
 
+## 2026-04-12
+
+### 推荐数量保底提升：返回窗口 6~8（不足时自动回填）
+
+- **backend_fastapi**：`RECOMMENDATION_RETURN_MIN_ITEMS` 默认从 `5` 调整为 `6`（上限维持 `8`），推荐接口窗口升级为 `6~8`。
+- **backend_fastapi**：推荐服务新增“阈值后回填”逻辑：先按相似度阈值筛选，若结果不足最小条数，则从同批候选按排序补齐到下限（去重后返回），避免推荐条数过少。
+- **tests**：API/单测窗口断言同步为 `6~8`，新增“高阈值过滤后仍可回填到最小条数”的回归用例。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`、`backend_fastapi/.env.example` 同步 `6/8` 默认值与说明。
+
+### 推荐 UI 与文档对齐（首页 / 推荐中枢精简）
+
+- **mobile-frontend**：`Home.vue`「为你推荐」仅保留标题与列表，已移除标题下说明文案、首屏「刷新推荐」按钮、「本页条数 / 更多场景」统计卡片；`Recommendations.vue` 已移除 hero 内开发者向说明卡片（推荐中枢为单列表 + 刷新，与首页共用接口语义）。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`、`docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md`、`mobile-frontend/README.md` 修正与当前实现不一致的表述（**`scene=related` 主要用于视频详情「相关推荐」**；独立 `/recommendations` 为 **`scene=home` 单列表**，不再描述多场景「看同主题」交互）；补充推荐条数 **阈值后回填至窗口下限** 的说明。
+
+### 视频详情页：横向双页（学习处理 + 相关推荐）
+
+- **mobile-frontend**：`VideoDetail.vue` 在「视频详情」内增加 **学习处理 / 相关推荐** 双页：横向 `scroll-snap` 滑动与页签点击切换；默认进入学习处理页；子页选择写入 `sessionStorage`（`videoDetailSubPage:<id>`）以便返回后恢复。
+- **mobile-frontend**：封面与基础信息固定在上方，横向分页仅在下方区域生效（在推荐卡片等列表区域上滑动即可切页）；分页面板内由 `touch-action: pan-y` 改为默认手势，避免横滑被子层吞掉。
+- **mobile-frontend**：相关推荐使用 `GET /api/recommendations/videos`（`scene=related`、`seed_video_id`、排除种子），仅在切换到推荐页时首次拉取；卡片纵向列表展示 `reason_label`、来源/状态、时间与主操作，**不**展示切片语义字段（与当前契约一致）。
+- **mobile-frontend**：新增 `components/videoDetail/VideoDetailRecommendPanel.vue`、`VideoDetailRecommendCard.vue`；`services/recommendationPresentation.js` 统一 API 字段映射与跳转逻辑；`services/videoDetailTelemetry.js` 通过 `CustomEvent('edumind:telemetry')` 输出结构化埋点（切页、曝光、刷新、点击）。
+- **docs**：`docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md` 补充视频详情双页说明（固定封面区、页签下分页、组件路径、手势与 `WKWebView` 验证要点）；`README.md`「视频推荐当前行为」增加视频详情布局、文件清单与埋点说明；与当前 `VideoDetail.vue` 实现一致。
+
+### 视频删除 API 级联与按标题运维脚本
+
+- **backend_fastapi**：`DELETE /api/videos/{video_id}/delete` 在删除视频行前，先删除关联 **字幕**、**问答**、**笔记时间戳**与**笔记**，避免 `note_timestamps` 等外键导致删除失败。
+- **scripts**：新增 `scripts/purge_video_recommendation_by_title.py`，支持按标题 `--match exact|contains` 执行 `--delete-video` 或 `--reset-metadata`（需 `--execute` 写库），便于从库中移除指定视频或仅清空推荐相关元数据以便重新生成。
+- **tests**：`tests/api/test_video_api.py` 增加删除接口级联清理回归。
+- **docs**：`README.md` 补充「视频删除与运维脚本」；`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 实现状态表同步。
+
+### 推荐结果定向剔除：`排列组合插空法详解`（并重排返回）
+
+- **backend_fastapi**：新增 `RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS`（默认包含 `排列组合插空法详解`），在推荐响应收口阶段对 `items[*].title` 做关键词过滤；命中条目直接剔除，并自动重算 `internal_item_count` / `external_item_count` / `sources`。
+- **backend_fastapi**：`sanitize_recommendation_payload_for_client()` 升级为“过滤 + 去切片 + 计数重算”统一出口，覆盖 `/api/recommendations/videos` 与上传返回 `recommendations`。
+- **mobile-frontend**：`Home.vue`、`Recommendations.vue`、`Upload.vue` 增加同关键词前端兜底过滤，避免旧缓存或 mock 数据导致残留展示。
+- **tests**：新增 API 与单测回归，覆盖“命中标题关键词后被剔除、且计数重算正确”。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`、`backend_fastapi/.env.example` 同步配置说明。
+
+### 推荐链路“一次性去切片”全量收口（前后端双收口）
+
+- **backend_fastapi**：新增 `sanitize_recommendation_payload_for_client()`（`app/services/video_recommendation_service.py`），并在两个对外出口强制应用：
+  - `GET /api/recommendations/videos`（含自动入库替换后再次收口）
+  - 上传链路返回的 `recommendations`（`build_upload_recommendations`）
+- **backend_fastapi**：自动入库替换条目 `_serialize_materialized_recommendation_item` 同步改为最小展示集，避免在替换阶段重新引入切片化字段。
+- **contract**：v1/v2 统一执行去切片展示口径，`items[*].summary=""`、`items[*].reason_text=""`、`items[*].tags=[]`，仅保留 `reason_label/reason_code` 等轻量解释信息。
+- **mobile-frontend**：
+  - `Home.vue` 推荐卡片下线 `reason_text/summary` 与 tags 行；
+  - `Recommendations.vue` 下线卡片描述、标签 chips 与顶部标签筛选（含状态逻辑移除）；
+  - `Upload.vue` 上传后推荐下线 `summary/tags` 与 query summary 文案。
+- **mock**：`mockGateway` 推荐条目输出与真实契约对齐为无切片展示字段口径。
+- **tests**：
+  - `tests/api/test_recommendation_api.py` 增加 `/videos` 出口去切片断言，并将既有推荐回归同步改为断言清洗后字段；
+  - `tests/api/test_video_api.py` 增加上传返回 `recommendations.items[*]` 去切片断言；
+  - `tests/unit/test_video_recommendation_service.py` 增加清洗函数单测。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 补充“推荐展示最小信息集”与 v1/v2 统一强制去切片规则。
+
+### 推荐页同主题区：去重兜底与场景/全页刷新行为
+
+- **mobile-frontend**：`Recommendations.vue` 在 `related` 接口无结果或失败时，本地兜底从**各场景已加载列表合并去重**的候选池选取，并**排除**种子视频 ID 与**当前场景主列表**已出现的视频 ID，避免「相关推荐」与主网格重复。
+- **mobile-frontend**：切换场景时清空同主题区；全页「刷新推荐」/重试加载完成后**不再**自动对首条推荐触发「看同主题」，由用户在上面的卡片里主动点击加载。
+
+### 视频推荐：Contract v2（默认不再返回 seed_video_title）
+
+- **backend_fastapi**：`RECOMMENDATION_CONTRACT_VERSION` 默认 `"2"`；`/api/recommendations/videos` 使用 `VideoRecommendationResponse`（无 `seed_video_title`）；`RECOMMENDATION_CONTRACT_VERSION=1` 时使用 `VideoRecommendationResponseV1` 兼容旧字段。
+- **backend_fastapi**：`recommend_videos` 仅在 `contract_version=="1"` 时写入 `seed_video_title`。
+- **tests**：推荐 API/单测更新；新增 Contract v1 回归用例；**mobile-frontend** mock 同步 `contract_version: '2'`。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` §9 P0-C019 更新。
+- **backend_fastapi（收口）**：v2 起 `items[].reason_text` 在 related/站外分支不再拼接种子视频标题；`_coerce_video_recommendation_response` 以 `Settings.RECOMMENDATION_CONTRACT_VERSION` 强制响应 `contract_version`。
+- **mobile-frontend**：mock `related` 理由与 v2 文案一致。
+- **tests**：`backend_fastapi/tests/api/test_recommendation_api.py` 新增 `test_videos_ranking_telemetry_contract_version_follows_server_setting`（约第 791 行）：`RECOMMENDATION_CONTRACT_VERSION=1` 时断言接口响应 `contract_version=="1"`，且 `recommendation_ranking_completed` 遥测 `metadata.contract_version=="1"`（与路由层强制契约一致，便于审计对账）。
+
+### 视频推荐相似性增强（关键词搜索融合）与返回窗口收敛
+
+- **backend_fastapi**：新增共享相似度模块 `app/services/search/similarity_fusion.py`，并让语义搜索与视频推荐共用融合相似度逻辑（语义信号 + 词面匹配）。
+- **backend_fastapi**：推荐链路新增后端阈值过滤（`RECOMMENDATION_SIMILARITY_MIN_SCORE=0.55`），仅返回达到阈值的推荐候选；相似度分值不对前端展示。
+- **backend_fastapi**：推荐接口新增移动端返回窗口配置 `RECOMMENDATION_RETURN_MIN_ITEMS/RECOMMENDATION_RETURN_MAX_ITEMS`（默认 `5/8`），`/api/recommendations/videos` 调用默认按窗口规范化。
+- **backend_fastapi**：`/api/recommendations/videos` 在路由收口阶段新增 seed/排除 ID 硬过滤（`seed_video_id` 与 `exclude_video_ids` 二次过滤），避免自动入库或回归改动导致“当前选中视频”回流到相关推荐结果。
+- **mobile-frontend**：首页推荐请求条数从 4 调整为 6；推荐页 `related` 场景请求条数从 4 调整为 5；本地兜底相关推荐同步提升到 5 条。
+- **mobile-frontend**：推荐页去除“当前种子视频”内容展示，不再暴露所选推荐处理视频标题/标签语义；相关推荐请求显式附带 `exclude_video_ids=<seed_id>`，并使用匿名状态文案。
+- **tests**：`backend_fastapi/tests/unit/test_video_recommendation_service.py` 新增窗口与阈值回归用例，验证“5~8 条 + 排除低相似候选”策略。
+- **tests**：`backend_fastapi/tests/api/test_recommendation_api.py` 增加路由层硬过滤回归，用例覆盖“即使服务层返回 seed/excluded 条目，最终响应仍被过滤”。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`、`backend_fastapi/.env.example` 同步新增相似度阈值与返回窗口配置说明。
+
 ## 2026-04-11
+
+### 视频推荐链路澄清修复：默认值对齐、首页兜底可见、前端分包
+
+- **docs**：修正文档默认值不一致：`README.md` 与 `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 中 `RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS` 默认值从 `4` 更正为 `2`，与后端 `Settings` 一致。
+- **docs**：`backend_fastapi/.env.example` 补充 `RECOMMENDATION_AUTO_IMPORT_EXTERNAL`、`RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS` 示例项，避免本地配置与实现默认值脱节。
+- **mobile-frontend**：`Home.vue` 在推荐接口失败但已回退到视频库兜底时，新增轻提示「当前展示的是兜底结果」，避免用户误以为是实时推荐结果；并区分“空结果兜底”和“接口失败兜底”。
+- **mobile-frontend**：`src/router/index.js` 改为路由级懒加载，减少首包体积、缓解 `index.js` 过大告警风险（不改变路由行为）。
+- **mobile-frontend**：`vite.config.js` 为 iOS 单文件构建（`iife + inlineDynamicImports`）补充 `chunkSizeWarningLimit` 与注释，避免该模式下持续出现误导性 500KB 告警。
+
+### 推荐运营聚合持久化（P2）：跨进程与重启后口径稳定
+
+- **backend_fastapi**：新增 `recommendation_ops_events` 持久化表（模型 `app/models/recommendation_ops_event.py`、迁移 `migrations/add_recommendation_ops_events.sql`、`init_db.py` 与 `mysql_managed_schema.sql` 同步）。
+- **backend_fastapi**：`app/services/recommendation_ops_service.py` 改为“DB 优先 + 内存降级”聚合：`/api/recommendations/ops/metrics` 默认读数据库，返回 `data_source=database`；表缺失/DB 异常时自动回退 `memory_fallback`，不阻断主链路。
+- **backend_fastapi**：推荐路由 `_emit_recommendation_event` 在写 telemetry 的同时持久化事件（`trace_id`、`event_type`、`status`、`metadata_json`），并新增 `recommendation_ops_metrics_served` 的 `data_source` 元数据。
+- **tests**：`tests/api/test_recommendation_api.py` 增加“清空内存缓冲后仍可从 DB 恢复口径”回归用例，验证“第二天可继续工作”能力。
+- **docs**：`README.md` 与 `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 同步更新 `ops/metrics` 与 `P1-C096` 说明，补充 `data_source` 语义和 `RECOMMENDATION_OPS_EVENT_BUFFER_SIZE` 降级配置。
+
+### 视频推荐：首页与推荐页对齐入库闭环与动线说明
+
+- **mobile-frontend**：首页默认 `include_external=true`（`shouldIncludeExternalRecommendationsOnHome`，可由 `VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL` 关闭）；先加载视频列表再请求推荐，避免兜底竞态；展示自动入库条数提示、未登录空态引导登录；精简首页推荐摘要卡片并仅在无结果时展示 provider 诊断。
+- **mobile-frontend**：`Recommendations.vue` 补充三步流程说明与「与首页同一后端」提示。
+- **docs**：`README.md`、`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 第七节半「用户动线」；`mobile-frontend/.env.example` 补充 `VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL`。
+
+### 视频推荐闭环 v2：站外候选自动入库后返回可打开条目
+- **backend_fastapi**：`GET /api/recommendations/videos` 在登录态、开启站外推荐时，会优先把可导入站外候选自动写入 `videos` 并提交下载处理，再返回可直接打开详情的推荐项（`action_type=open_video_detail`），减少“看得到推荐却找不到视频”的断层。
+- **backend_fastapi**：新增配置 `RECOMMENDATION_AUTO_IMPORT_EXTERNAL`、`RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS`；响应补充 `flow_version`、`auto_materialized_external_count`、`auto_materialization_failed_count`，并新增自动入库成功/失败遥测事件。
+- **tests**：`backend_fastapi/tests/api/test_recommendation_api.py` 新增登录态自动入库回归用例；继续覆盖无 Bearer 401 与无效 Bearer 不回退 legacy 的负向路径。
+- **mobile-frontend**：`Recommendations.vue` 增加“自动入库结果”提示文案，明确当前场景已自动导入多少条站外推荐，失败多少条；推荐中心页固定请求站外候选（`include_external=true`），避免用户进入推荐页却看不到站外推荐结果。
+- **docs**：`README.md` 与 `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 同步闭环 v2 行为说明；`README.md` 内文档链接改为仓库相对路径；契约 §9 增补 P1-C095（`flow_version`、自动入库计数与条目字段）、闭环 v2 配置与遥测事件说明。
+
+### 智能体编排：学习流治理管道与预算硬限流
+- **backend_fastapi**：新增 `app/agents/` 编排域模块：`learning_flow_pipeline` 固定 Planner → Executor → Validator；`governance/gateway.py` 作为学习流唯一工具执行入口，`lf_*` 白名单与参数校验落地，异常统一归一为治理错误。
+- **backend_fastapi**：`TokenBudget` 增加超额中断能力，预算不足时抛出 `BudgetExceededError`（继承 `GovernanceError`）；`/api/agent/execute` 统一把治理错误映射为 HTTP 400，返回结构保持稳定。
+- **backend_fastapi**：`learning_flow_agent.execute_learning_flow_agent` 收敛为薄委托编排入口，写库与摘要副作用只经治理工具执行，减少路由/服务散落副作用。
+- **tests**：新增 `backend_fastapi/tests/unit/test_agent_budget.py`、`backend_fastapi/tests/unit/test_agent_governance_gateway.py`；`backend_fastapi/tests/api/test_agent_api.py` 增补 `pipeline_meta` 与治理错误回归。
+- **docs**：`docs/PROJECT_AGENT_ORCHESTRATION_PROMPT.md` 第七节补充阶段性落地状态与边界。
+
+### 视频推荐：鉴权隔离与 import-external 负向回归补齐
+- **backend_fastapi**：`resolve_user_from_request` 默认仅信任 Bearer；仅在 `AUTH_ALLOW_LEGACY_USER_ID_ONLY=True` 且请求未携带 Bearer 时允许 legacy `user_id`，避免无效 Bearer 回退造成冒用。
+- **backend_fastapi**：链接导入与上传链路按用户隔离：远程 URL 去重按 `url + user_id`，本地上传 MD5 去重按 `md5 + user_id`，离线同步命中按 `task_id + user_id + processing_origin`。
+- **backend_fastapi**：推荐遥测补强：`/api/recommendations/scenes` 发射 `recommendation_scenes_served`（含 `scene_count`）；`recommendation_import_external_requested.metadata.url_host` 使用真实 hostname。
+- **tests**：`backend_fastapi/tests/api/test_recommendation_api.py` 新增 `import-external` 负向 API 用例：`AUTH_ALLOW_LEGACY_USER_ID_ONLY=True + Authorization: Bearer <invalid> + user_id` 必须返回 401；并补齐 scenes/url_host 遥测断言。
+- **tests**：`backend_fastapi/tests/api/test_video_api.py` 与 `backend_fastapi/tests/unit/test_auth_deps.py` 同步 Bearer/legacy 规则与跨用户去重回归。
+
+### 移动推荐页可访问性与 iOS WebAssets 同步
+- **mobile-frontend**：`Recommendations.vue` 增加移动端基础可访问性语义：主区域 `role="main"`、错误态 `role="alert"`、加载态 `aria-busy/aria-live`、空态 `role="status"`。
+- **ios-app**：同步 `ios-app/EduMindIOS/EduMindIOS/WebAssets/` 产物，确保 `WKWebView` 运行时与最新推荐页交互一致。
+
+### 视频推荐：契约 v1 对齐（contract_version、Trace、telemetry）
+- **backend_fastapi**：`VideoRecommendationResponse` 增加 `contract_version`；`recommend_videos` 写入 `settings.RECOMMENDATION_CONTRACT_VERSION`；`/api/recommendations/scenes|videos|import-external` 回传 `X-Trace-Id`/`X-Request-Id`（支持上游透传）；`RECOMMENDATION_TELEMETRY_ENABLED` 为真时通过 `app.analytics.telemetry` 发射推荐域事件（请求、排序完成、站外抓取、fallback、import 等）。
+- **backend_fastapi**：`Settings` 新增 `RECOMMENDATION_CONTRACT_VERSION`、`RECOMMENDATION_TELEMETRY_ENABLED`；CORS `expose_headers` 暴露 trace 响应头。
+- **docs**：`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 第九节收录冻结版 Recommendation Contract v1（SSOT）与实现速查。
+- **README**：「视频推荐当前行为」补充 `contract_version` 与 trace 对账说明。
+- **tests**：推荐 API/单测断言 `contract_version` 与 `X-Trace-Id`。
 
 ### iOS 真机播放链路修复：搜索卡片跳转后视频流加载失败
 - **backend_fastapi**：更新 `app/routers/video.py`，新增 `HEAD /api/videos/{video_id}/stream`，兼容 iOS/WKWebView 在播放前的预检请求；并将流文件解析改为“优先 `processed_filepath`，回退 `filepath`”，避免原始文件缺失时误报不可播放。

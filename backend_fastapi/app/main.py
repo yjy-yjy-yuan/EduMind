@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.database import engine
 from app.models.base import Base
+from app.models.recommendation_ops_event import RecommendationOpsEvent  # noqa: F401
 from app.models.semantic_search_log import SemanticSearchLog  # noqa: F401
 from app.models.video import Video
 from app.models.video import VideoStatus
@@ -139,6 +140,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-Trace-Id", "X-Request-Id"],
 )
 app.add_middleware(RequestTimingMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)

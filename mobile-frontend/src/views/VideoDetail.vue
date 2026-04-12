@@ -1,5 +1,5 @@
 <template>
-  <div class="page">
+  <div class="page video-detail-page">
     <header class="topbar">
       <button class="back" @click="router.back()">‹</button>
       <div class="topbar-title">视频详情</div>
@@ -19,40 +19,69 @@
 
     <div v-else-if="!video" class="empty">未找到该视频。</div>
 
-    <div v-else class="card">
-      <div class="hero">
-        <div class="hero-shell" :class="heroClass">
-          <div class="hero-shell__badge">{{ usingMockGateway ? 'UI ONLY' : 'LIVE' }}</div>
-          <div class="hero-shell__initial">{{ heroInitial }}</div>
-          <div class="hero-shell__caption">
-            {{ usingMockGateway ? '当前阶段仅构建界面，封面与播放器资源后续通过预留接口接入。' : '视频预览与播放资源由后端接口提供。' }}
+    <div v-else class="video-detail-body">
+      <!-- 封面与基础信息固定在上方；横向分页仅在下方区域生效（符合「在卡片下」滑动） -->
+      <div class="card video-detail__shared">
+        <div class="hero">
+          <div class="hero-shell" :class="heroClass">
+            <div class="hero-shell__badge">{{ usingMockGateway ? 'UI ONLY' : 'LIVE' }}</div>
+            <div class="hero-shell__initial">{{ heroInitial }}</div>
+            <div class="hero-shell__caption">
+              {{ usingMockGateway ? '当前阶段仅构建界面，封面与播放器资源后续通过预留接口接入。' : '视频预览与播放资源由后端接口提供。' }}
+            </div>
           </div>
+        </div>
+
+        <h2 class="title">{{ video.title || '未命名视频' }}</h2>
+
+        <div class="meta">
+          <span class="badge" :class="badgeClass(statusValue)">{{ statusText(statusValue) }}</span>
+          <span v-if="autoStarting" class="muted">正在自动启动处理…</span>
+          <span v-if="isInProgress(statusValue)" class="muted">{{ progressValue }}% · {{ stepValue || '处理中' }}</span>
+        </div>
+
+        <div v-if="offlineTaskCount > 0" class="inline-tip inline-tip--queue">
+          上传页还有 {{ offlineTaskCount }} 个离线任务等待自动补跑；本页只展示已经拿到视频 ID 的在线处理状态。
+        </div>
+
+        <div v-if="activeModelText" class="setting-hint">本次任务模型：{{ activeModelText }}</div>
+
+        <div v-if="isInProgress(statusValue)" class="progress">
+          <div class="bar" :style="{ width: `${progressValue}%` }"></div>
+        </div>
+
+        <div v-if="canOpenPlayerWhileProcessing" class="inline-tip">
+          后台处理中仍可进入播放器，当前播放原始视频文件。
         </div>
       </div>
 
-      <h2 class="title">{{ video.title || '未命名视频' }}</h2>
-
-      <div class="meta">
-        <span class="badge" :class="badgeClass(statusValue)">{{ statusText(statusValue) }}</span>
-        <span v-if="autoStarting" class="muted">正在自动启动处理…</span>
-        <span v-if="isInProgress(statusValue)" class="muted">{{ progressValue }}% · {{ stepValue || '处理中' }}</span>
+      <div class="video-detail__segment" role="tablist" aria-label="详情分页">
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="activePanelIndex === 0"
+          class="video-detail__tab"
+          :class="{ 'video-detail__tab--active': activePanelIndex === 0 }"
+          @click="goPanel(0)"
+        >
+          学习处理
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="activePanelIndex === 1"
+          class="video-detail__tab"
+          :class="{ 'video-detail__tab--active': activePanelIndex === 1 }"
+          @click="goPanel(1)"
+        >
+          相关推荐
+        </button>
       </div>
 
-      <div v-if="offlineTaskCount > 0" class="inline-tip inline-tip--queue">
-        上传页还有 {{ offlineTaskCount }} 个离线任务等待自动补跑；本页只展示已经拿到视频 ID 的在线处理状态。
-      </div>
-
-      <div v-if="activeModelText" class="setting-hint">本次任务模型：{{ activeModelText }}</div>
-
-      <div v-if="isInProgress(statusValue)" class="progress">
-        <div class="bar" :style="{ width: `${progressValue}%` }"></div>
-      </div>
-
-      <div v-if="canOpenPlayerWhileProcessing" class="inline-tip">
-        后台处理中仍可进入播放器，当前播放原始视频文件。
-      </div>
-
-      <div class="card-sections">
+      <div ref="pagerTrackRef" class="video-detail__pager-track" @scroll.passive="onPagerScroll">
+        <div class="video-detail__panel video-detail__panel--process">
+          <div class="card video-detail__panel-card">
+            <div class="card-sections">
         <div class="block video-detail__section video-detail__section--whisper">
         <WhisperModelPicker
           title="Whisper 模型"
@@ -131,19 +160,32 @@
         </button>
 
         <button class="danger video-detail__section video-detail__section--delete" @click="remove" :disabled="deleteDisabled">删除视频</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="video-detail__panel video-detail__panel--rec">
+          <VideoDetailRecommendPanel
+            v-if="numericVideoId > 0"
+            :seed-video-id="numericVideoId"
+            :visible="activePanelIndex === 1"
+          />
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi } from '@/config'
 import { createNote, getNotes, updateNote } from '@/api/note'
 import { getSubtitleContext } from '@/api/subtitle'
 import { deleteVideo, generateVideoSummary, generateVideoTags, getVideo, getVideoProcessingOptions, getVideoStatus, processVideo } from '@/api/video'
+import VideoDetailRecommendPanel from '@/components/videoDetail/VideoDetailRecommendPanel.vue'
 import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
+import { emitVideoDetailTelemetry } from '@/services/videoDetailTelemetry'
 import { buildVideoMemoryContext, cacheLearningState, cacheNotes, cacheVideoMetadata, cacheVideoSubtitles, getOfflineNotes, shouldUseOfflineMemoryMode } from '@/services/offlineMemory'
 import { OFFLINE_QUEUE_EVENT_NAME, getPendingOfflineTasks } from '@/services/offlineQueue'
 import {
@@ -173,6 +215,76 @@ const id = computed(() => route.params.id)
 const loading = ref(false)
 const error = ref('')
 const video = ref(null)
+
+/** 当前视频数字 ID，供推荐种子使用（依赖 video 与路由） */
+const numericVideoId = computed(() => {
+  const n = Number(video.value?.id ?? id.value ?? 0)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+})
+
+const PANEL_STORAGE_PREFIX = 'videoDetailSubPage:'
+const activePanelIndex = ref(0)
+const pagerTrackRef = ref(null)
+
+const persistPanelIndex = () => {
+  try {
+    if (!id.value) return
+    sessionStorage.setItem(`${PANEL_STORAGE_PREFIX}${id.value}`, String(activePanelIndex.value))
+  } catch {
+    /* ignore */
+  }
+}
+
+const restorePanelIndex = () => {
+  try {
+    const raw = sessionStorage.getItem(`${PANEL_STORAGE_PREFIX}${id.value}`)
+    activePanelIndex.value = raw === '1' ? 1 : 0
+  } catch {
+    activePanelIndex.value = 0
+  }
+}
+
+const goPanel = (panelIndex) => {
+  const el = pagerTrackRef.value
+  if (!el) return
+  const w = el.clientWidth
+  if (w < 1) return
+  const from = activePanelIndex.value
+  const next = Math.min(1, Math.max(0, panelIndex))
+  if (from !== next) {
+    emitVideoDetailTelemetry('video_detail_panel_change', { from, to: next, video_id: id.value })
+  }
+  activePanelIndex.value = next
+  el.scrollTo({ left: next * w, behavior: 'smooth' })
+  persistPanelIndex()
+}
+
+const onPagerScroll = () => {
+  const el = pagerTrackRef.value
+  if (!el) return
+  const w = el.clientWidth
+  if (w < 1) return
+  const next = Math.min(1, Math.max(0, Math.round(el.scrollLeft / w)))
+  if (next !== activePanelIndex.value) {
+    const from = activePanelIndex.value
+    activePanelIndex.value = next
+    persistPanelIndex()
+    emitVideoDetailTelemetry('video_detail_panel_change', { from, to: next, video_id: id.value })
+  }
+}
+
+watch(
+  () => video.value?.id,
+  async (vid) => {
+    if (!vid) return
+    restorePanelIndex()
+    await nextTick()
+    const el = pagerTrackRef.value
+    if (el && el.clientWidth > 0) {
+      el.scrollLeft = activePanelIndex.value * el.clientWidth
+    }
+  }
+)
 const offlineTaskCount = ref(0)
 const statusInfo = ref({ status: '', progress: 0, current_step: '' })
 const autoStarting = ref(false)
@@ -705,10 +817,90 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.page {
+.video-detail-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
   max-width: 520px;
   margin: 0 auto;
   padding: 16px 16px 0;
+  box-sizing: border-box;
+}
+
+.video-detail-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.video-detail__segment {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.video-detail__tab {
+  border-radius: 16px;
+  padding: 10px 12px;
+  font-weight: 900;
+  font-size: 13px;
+  border: 1px solid rgba(32, 42, 55, 0.1);
+  background: rgba(255, 255, 255, 0.92);
+  color: #64748b;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.video-detail__tab--active {
+  background: linear-gradient(135deg, #a792bc, #7f698f);
+  color: #fff;
+  border-color: transparent;
+}
+
+.video-detail__pager-track {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  border-radius: 20px;
+}
+
+.video-detail__panel {
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* 不锁定为 pan-y，避免子区域（含推荐卡片）上的横滑无法驱动外层分页 */
+  touch-action: auto;
+  box-sizing: border-box;
+}
+
+.video-detail__panel--rec {
+  padding: 0 2px 8px;
+}
+
+.video-detail__shared {
+  flex-shrink: 0;
+}
+
+.video-detail__panel-card {
+  margin-top: 0;
 }
 
 .topbar {

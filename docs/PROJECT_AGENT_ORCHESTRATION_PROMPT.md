@@ -93,6 +93,8 @@
 
 与现有业务连接方式：**薄适配层**调用 `app/services/search/`、`app/routers/qa.py` 及相关视频处理服务，**避免**编排逻辑散落在多个 router。
 
+**落地进度（阶段性）**：学习流 `/api/agent/execute` 已接入 `app/agents/pipelines/learning_flow_pipeline.py`（Planner / Executor / Validator），写库与摘要生成仅经 `app/agents/governance/gateway.py` 白名单工具；其余七条系统要求仍按上文「分阶段验收」，见根目录 `CHANGELOG.md` 对应条目。
+
 ---
 
 ## 八、未来拆分 `agent-service` 的边界（仅预留，不实施）

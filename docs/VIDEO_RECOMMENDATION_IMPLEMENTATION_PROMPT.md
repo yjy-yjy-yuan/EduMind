@@ -46,8 +46,8 @@
 - `mobile-frontend/src/views/Home.vue`
   - 已有首页“推荐视频”区域，并接入当前推荐接口；是否默认带站外检索由 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 控制。
 - `mobile-frontend/src/views/Recommendations.vue`
-  - 已有推荐页、相关推荐区域和“看同主题”交互。
-  - “看同主题”应保持为完整闭环：可点击、可见 loading、可在当前页渲染结果，并在接口空结果或失败时允许前端基于当前已加载站内结果做兜底。
+  - 已有独立「推荐学习中枢」页（`/recommendations`）：当前为 **单列表 `scene=home`** + 刷新，与首页共用推荐接口；**不再**内嵌多场景切换、主列表「看同主题」或页内「同主题」区块。
+  - **`scene=related` + `seed_video_id`** 仍用于 **视频详情**「相关推荐」等需要种子的入口；兜底与排除规则仍由后端收口，前端按契约展示。
 - `mobile-frontend/src/views/Upload.vue`
   - 已支持链接导入，且链接校验已覆盖 B 站 / YouTube / 中国大学慕课。
 
@@ -169,7 +169,7 @@
    - 外部项必须明确展示来源平台与“导入学习链路”动作
    - 不要把外部候选伪装成已经导入成功的视频
    - 如果选择跳到上传页，优先复用现有链接导入能力并传递 URL
-   - “看同主题”按钮必须形成完整闭环：能点、点击后有 loading、能在当前页看到同主题推荐、失败时有明确 fallback 或错误提示
+   - **视频详情「相关推荐」**（`scene=related`）应在子页内完成加载、空态与错误提示；独立推荐页以 `scene=home` 单列表为主，不与该闭环混写
 
 实现时必须遵守这些硬约束：
 
@@ -257,6 +257,16 @@
    - “这一轮只做外部候选源适配器和接口，不改 UI。”
    - “这一轮前端只负责把外部推荐项接到上传页预填 URL，不新增独立推荐页。”
 
+## 七点五、用户动线（产品视角，与实现同步）
+
+1. **首页与推荐页**共用 `GET /api/recommendations/videos`；首页默认 `include_external=true`（`VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL`，默认开启），以便与推荐中枢一致的「站外候选 → 入库 → 可打开详情」闭环。
+2. **已登录**：后端在 `RECOMMENDATION_AUTO_IMPORT_EXTERNAL`、`include_external` 为真时，对可导入站外候选自动 `import_remote_video_from_url`，响应中条目为 `item_type=video`、`action_type=open_video_detail`，用户进入的是真实 `videos.id` 详情页，可继续处理链路。
+3. **未登录**：仍返回站外候选（链接类），用户需手动导入或登录后刷新以看到已入库视频。
+4. **首屏加载顺序**：首页应先拉齐视频列表再拉推荐，避免「推荐为空、兜底仍为空」的竞态。
+5. **兜底可见性**：当推荐接口失败或返回空集合但首页有视频库兜底时，前端应明确提示“当前为兜底结果”，避免用户误解为实时推荐。
+6. **iOS 打包约束**：`WKWebView` 构建采用单文件 `iife + inlineDynamicImports`，路由懒加载在 iOS 包内不产生独立 chunk；相关体积告警策略应结合该约束解释。
+7. **相似度与数量约束（本轮增强）**：推荐链路复用关键词搜索的融合相似度方法，后端优先保留相似度 `>=0.55` 的候选；若阈值筛选后仍不足 `RECOMMENDATION_RETURN_MIN_ITEMS`，会从同批排序候选中按身份去重补齐至窗口下限（不在前端展示相似度数字）。移动端推荐请求条数规范化到 **`6~8`**（默认最小 6、最大 8）。
+
 ## 八、验收底线
 
 视频推荐这一轮完成后，至少应满足以下底线：
@@ -266,3 +276,103 @@
 3. 不是只推站内视频，而是能返回外部候选源结果，且来源清晰可辨。
 4. 不是把外部结果停留在浏览，而是能接回现有“链接导入 -> 处理 -> 学习”的主链路。
 5. 不是只在浏览器里看起来正常，而是在 iOS `WKWebView` 中也可正常使用。
+
+## 九、Recommendation Contract v1（冻结，基线：2026-04-11）
+
+本节为推荐子系统的**单一事实源（SSOT）**：工单拆分、测试用例与渐进升级应与本节对齐；与 `AGENTS.md` 冲突时以仓库规范为准，并在此节追加「更正说明」。
+
+### 架构与交付角色（执行提示词摘要）
+
+以高级系统架构师 / 技术负责人身份推进「相似性视频推荐」重构：需求澄清 → 方案 → 实现 → 测试 → `WKWebView` 验证 → 演示交付。UI 须与现有 `mobile-frontend/` 一致、简洁可信；业务与排序**仅在后端**；遵守增量 TDD、可回滚提交、`CHANGELOG.md` 仅追加等仓库规则。
+
+### 契约分级说明
+
+- **P0**：上线与互操作性底线，未满足不得标为完成。
+- **P1**：可观测、对账、渐进升级与治理增强。
+- **P2**：实验、解释接口、弱网/A-B 等增强项。
+
+### A. API 契约（后端对外）
+
+| ID | 要求 |
+|----|------|
+| P0-C001 | `GET /api/recommendations/scenes` 必须返回 200，响应体包含 `message` 与 `scenes[]`。 |
+| P0-C002 | `scenes[].value` 只允许 `home\|continue\|review\|related`。 |
+| P0-C003 | `scenes[].requires_seed=true` 仅允许出现在 `related`。 |
+| P0-C004 | `GET /api/recommendations/videos` 支持参数：`scene`、`limit`(1..12)、`include_external`、`coach`、`seed_video_id`、`exclude_video_ids`、`user_id`(legacy)。 |
+| P0-C005 | `scene=related` 且缺少 `seed_video_id` 必须返回 422，`detail="scene=related 时必须传入 seed_video_id"`。 |
+| P0-C006 | `seed_video_id` 不存在必须返回 404，`detail="seed 视频不存在"`。 |
+| P0-C007 | `scene` 非法值必须自动归一到 `home`，不得 500。 |
+| P0-C008 | `exclude_video_ids` 必须支持逗号分隔整数，非法片段忽略，不得 500。 |
+| P0-C009 | `Authorization: Bearer <token>` 有效时，`personalized=true/false` 按真实兴趣信号计算。 |
+| P0-C010 | 无 token 时接口仍可用，降级为非个性化推荐，不返回 401。 |
+| P0-C011 | `message` 固定为「获取推荐视频成功」。 |
+| P0-C012 | `strategy` 必须可追踪：`video_status_interest_v1`（无站外）或 `video_status_interest_external_v2`（含站外）。 |
+| P0-C013 | `POST /api/recommendations/import-external` 入参沿用 `VideoUploadURL` 契约，至少包含 `url`。 |
+| P0-C014 | `import-external` 成功返回 `VideoUploadResponse`，且 `status` 为 `downloading\|pending\|processing` 之一。 |
+| P0-C015 | 重复导入须走现有去重语义（`duplicate=true`），不得重复造脏数据。 |
+| P1-C016 | 新增 `request_id`/`trace_id` 回传头（如 `X-Trace-Id`），便于前后端对账。 |
+| P1-C017 | `videos` 接口增加 `contract_version` 字段，便于渐进升级。 |
+| P1-C096 | 新增 `GET /api/recommendations/ops/metrics` 聚合接口（窗口天数可配），返回推荐导入成功率与导入后处理完成率，供运营看板直接消费。 |
+| P2-C018 | 可选 `POST /api/recommendations/explain`，默认模板，不依赖强制 LLM。 |
+
+### B. 响应字段契约（`/api/recommendations/videos`）
+
+| ID | 要求 |
+|----|------|
+| P0-C019 | 顶层字段稳定：`scene`、`strategy`、`personalized`、`fallback_used`、`seed_video_id`、`internal_item_count`、`external_item_count`、`external_failed_provider_count`、`external_fetch_failed`、`sources`、`external_query`、`external_providers`、`items`、`coach_summary`；以及 **`contract_version`**（P1-C017）。**Contract v2**（`contract_version="2"`，默认）**不**再返回 `seed_video_title`；`items[].reason_text` 在 related/站外理由中亦**不**拼接种子视频标题（统一用「当前种子视频」指代）。`RECOMMENDATION_CONTRACT_VERSION=1` 可恢复顶层字段与 v1 文案。响应 **`contract_version` 以服务端 `Settings` 为准**，与 payload 内字段无关。 |
+| P0-C019A | 推荐对外展示字段“一次性去切片”强制生效（v1/v2 一致）：`items[*].summary==""`、`items[*].reason_text==""`、`items[*].tags==[]`。该规则同时覆盖 `GET /api/recommendations/videos` 与上传返回 `recommendations.items[*]`。推荐解释仅保留 `reason_label/reason_code`。 |
+| P1-C095 | **闭环 v2（追加）**：`flow_version`（`recommendation_flow_v1` \| `recommendation_flow_v2`）、`auto_materialized_external_count`、`auto_materialization_failed_count`；`items[]` 可含 `materialized_from_external`、`materialization_status`（站外候选经自动入库后转为站内视频项时）。`include_external=false` 时仍为 v1 语义，自动入库计数为 0。 |
+| P0-C020～C030 | `items` 永不为 `null`；计数一致；`sources` / `external_query` / `external_providers` / 单条 `item` 字段与站内外动作语义见原冻结清单（`reason_code`、`action_type`、可导入与不可导入分支等）。 |
+| P1-C031 | `reason_code` 枚举白名单文档化（见 D 段）。 |
+| P1-C032 | `recommendation_score` 保留 2 位小数，禁止字符串化。 |
+| P2-C033 | 可选 `rank_index` 字段，便于 A/B 与回放。 |
+
+### C. 请求参数与输入校验
+
+P0-C034～C038：limit 边界、`RECOMMENDATION_INCLUDE_EXTERNAL_DEFAULT`、`RECOMMENDATION_MAX_CANDIDATES_SCAN`、`related` 排除 seed、`exclude_video_ids` 对站内与 fallback 同时生效。P1：scene 大小写兼容、`user_id` 仅 legacy。P2：locale/lang 预留。
+
+**闭环 v2 配置（后端 Settings）**：`RECOMMENDATION_AUTO_IMPORT_EXTERNAL`（默认 `true`）控制登录态下是否对可导入站外候选自动写入 `videos`；`RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS`（默认 `2`）限制单次 `/videos` 响应前最多尝试自动入库的站外条数；`RECOMMENDATION_SIMILARITY_MIN_SCORE`（默认 `0.55`）控制融合相似度阈值；`RECOMMENDATION_RETURN_MIN_ITEMS/RECOMMENDATION_RETURN_MAX_ITEMS`（默认 `6/8`）控制移动端返回窗口；`RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS`（逗号分隔）用于在响应收口阶段剔除命中标题关键词的推荐条目（默认含 `排列组合插空法详解`）。为 `false` 或 `max_items=0` 时退化为仅返回候选、不自动写库。
+
+### D. 排序、理由、降级
+
+P0-C042～C048：主题信号优先、四场景差异化、`related` 同主题优先、站外同 provider 语境、`fallback_used` 触发条件唯一、站外失败不拖垮主接口、空结果合法。P1-C049：`reason_code` 白名单。P1-C050：`coach_summary` 不阻塞主链路。P2-C051：冷启动策略版本号。
+
+### E. 外部来源与合规（治理）
+
+P0-C052～C057：轻量元数据、域名白名单集中配置、超时/重试/并行可开关、失败可见、缓存键维度。P1-C058～C059：import 前 URL 校验、治理执行入口不可绕过。P2-C060：版权与外链分地区配置。
+
+### F. 可观测性与复利
+
+P0-C061～C063：接入 `app.analytics.telemetry`；事件含 `event_type`、`trace_id`、`module`、`status`、`latency_ms`、`metadata`；建议事件集：`recommendation_request_received`、`recommendation_ranking_completed`、`recommendation_external_fetch_completed`、`recommendation_external_fetch_failed`、`recommendation_fallback_used`、`recommendation_import_external_*`；闭环 v2 另含 `recommendation_external_materialization_completed`、`recommendation_external_materialization_failed`（自动入库成功/失败摘要）与 `recommendation_ops_metrics_served`（运营聚合接口访问）。P1-C064～C066：Trace 透传、告警阈值、轨迹导出。P2-C067：效果指标沉淀。
+
+### G. 前端与 iOS
+
+P0-C068～C073：四态 UI、related loading 与 seed 固定、站内外区分、动作跟随后端 `action_type`、`WKWebView` 验证。P1-C074 / P2-C075：可访问性与弱网。
+
+### H. 兼容、发布、回滚
+
+P0-C076～C078：不破坏现有解析；新增字段向后兼容；可回退站内-only + recent fallback。P1-C079～C080：特性开关与版本化灰度。P2-C081：A/B 归档。
+
+### I. 测试契约
+
+P0-C082～C087：API/排序/站外隔离/fallback/import/本地验证链（`validate_backend_smoke`、`compileall`、`build:ios`、`sync_ios_web_assets`、`validate_ios_build`）。P1-C088～C089：遥测与轨迹导出。P2-C090：离线策略对比。
+
+### J. 文档与变更记录
+
+P0-C091～C092：API/行为变化同步 `README.md` 与 `docs/*recommendation*`；`CHANGELOG.md` 仅追加。P1-C093：以**本节**为 SSOT，避免 prompt 分叉。P2-C094：运行手册。
+
+### 实现状态速查（维护时请更新）
+
+| 条目 | 说明 |
+|------|------|
+| P1-C016 / P1-C064 | `GET/POST /api/recommendations/*` 回传 `X-Trace-Id` 与 `X-Request-Id`（与上游透传一致时可对账）。 |
+| P1-C017 | 响应体含 `contract_version`，默认与 `settings.RECOMMENDATION_CONTRACT_VERSION` 一致（默认 `"2"`；v2 不返回 `seed_video_title`）。 |
+| P0-C061～C063 | `RECOMMENDATION_TELEMETRY_ENABLED` 为真时写入推荐域 telemetry 事件（见路由层）。 |
+| P1-C096 | `GET /api/recommendations/ops/metrics`：聚合返回 `recommendation_import.success_rate` 与 `processing.completion_rate`，并附 `auto_materialization.success_rate`；数据源字段 `data_source` 便于识别 `database` / `memory_fallback`。 |
+| 用户闭环增强 | 登录态下，`/api/recommendations/videos` 可将站外可导入候选自动入库后再返回（`flow_version=recommendation_flow_v2`、`auto_materialized_external_count`），用户可直接打开详情继续处理链路。 |
+| 去切片展示收口 | 推荐对外响应（含上传后 `recommendations`）统一清空 `summary/reason_text/tags`；`Home`、`Recommendations`、`Upload` 三入口仅展示标题、理由徽标（`reason_label` 等）、来源/状态/时间与动作按钮，不渲染内容标签 chips 与长片段文案。 |
+| 推荐页同主题兜底与状态 | `Recommendations.vue`：`related` 失败时本地兜底候选池为各场景已加载列表合并去重，排除种子与当前场景主列表 ID；切换场景清空同主题；全页刷新不自动展开同主题。 |
+| 标题黑名单过滤 | `RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS`（默认包含 `排列组合插空法详解`）：`sanitize_recommendation_payload_for_client()` 在收口阶段按标题子串剔除条目并重算计数；前端三入口同步兜底。 |
+| 视频删除与运维 | `DELETE /api/videos/{id}/delete` 先删 `questions`、`subtitles`、`note_timestamps`、`notes` 再删视频；可选 `scripts/purge_video_recommendation_by_title.py` 按标题批量删除或 `--reset-metadata`。 |
+| 安全回归补充 | `POST /api/recommendations/import-external` 在 `AUTH_ALLOW_LEGACY_USER_ID_ONLY=True` 且 Bearer 无效时返回 401，不回退 legacy `user_id`（见 `tests/api/test_recommendation_api.py`）。 |
+| 其余 P0 | 以现有 `recommendation` 路由、`video_recommendation_service`、`Recommendations.vue` 为准持续对齐；缺口在 issue/下一迭代关闭。 |

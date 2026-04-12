@@ -40,15 +40,18 @@ from app.services.video_processing_registry import forget_video_processing_reque
 from app.services.video_processing_registry import remember_video_processing_request
 from app.services.video_recommendation_service import load_candidate_videos_for_recommendation
 from app.services.video_recommendation_service import recommend_videos
+from app.services.video_recommendation_service import sanitize_recommendation_payload_for_client
 from app.services.video_url_import_service import import_remote_video_from_url
 from app.services.whisper_runtime import get_supported_whisper_models
 from app.services.whisper_runtime import get_whisper_model_catalog
 from app.services.whisper_runtime import normalize_whisper_model_name
 from app.services.whisper_runtime import transcribe_audio_with_whisper
+from app.utils.auth_deps import resolve_user_from_request
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import File
 from fastapi import Form
+from fastapi import Header
 from fastapi import HTTPException
 from fastapi import Query
 from fastapi import Request
@@ -226,13 +229,14 @@ def build_upload_recommendations(db: Session, *, video: Video, limit: int = 4) -
         videos = load_candidate_videos_for_recommendation(db, seed_video, max_scan)
         if not videos:
             return None
-        return recommend_videos(
+        payload = recommend_videos(
             videos=videos,
             scene=scene,
             limit=limit,
             seed_video=seed_video,
             include_external=False,
         )
+        return sanitize_recommendation_payload_for_client(payload)
     except Exception as exc:
         logger.debug("上传后自动获取推荐失败 | video_id=%s | error=%s", video.id, exc)
         return None
@@ -408,8 +412,13 @@ async def upload_video(
     auto_generate_tags: bool = Form(True),
     summary_style: str = Form("study"),
     db: Session = Depends(get_db),
+    user_id: Optional[int] = Query(default=None, description="兼容旧链路的用户 ID"),
+    authorization: Optional[str] = Header(default=None),
 ):
     """上传视频文件"""
+    user = resolve_user_from_request(db, user_id, authorization)
+    if user is None:
+        raise HTTPException(status_code=401, detail="请先登录后再上传视频")
     logger.info(f"收到文件上传请求: {file.filename}")
 
     if not file.filename or not allowed_file(file.filename):
@@ -423,8 +432,8 @@ async def upload_video(
         temp_path, file_md5, file_size = await save_upload_to_temp(file)
         logger.info(f"文件MD5: {file_md5}")
 
-        # 检查重复
-        existing_video = db.query(Video).filter(Video.md5 == file_md5).first()
+        # 检查重复（按用户隔离，避免跨用户命中他人上传的相同文件）
+        existing_video = db.query(Video).filter(Video.md5 == file_md5, Video.user_id == user.id).first()
         if existing_video:
             if temp_path and os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -448,6 +457,7 @@ async def upload_video(
 
         # 创建数据库记录
         video = Video(
+            user_id=user.id,
             filename=filename,
             filepath=file_path,
             title=title,
@@ -561,8 +571,16 @@ async def transcribe_audio(
 
 
 @router.post("/upload-url", response_model=VideoUploadResponse)
-async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
+async def upload_video_url(
+    data: VideoUploadURL,
+    db: Session = Depends(get_db),
+    user_id: Optional[int] = Query(default=None, description="兼容旧链路的用户 ID"),
+    authorization: Optional[str] = Header(default=None),
+):
     """通过 URL 上传视频"""
+    user = resolve_user_from_request(db, user_id, authorization)
+    if user is None:
+        raise HTTPException(status_code=401, detail="请先登录后再通过链接导入视频")
     video_url = data.url
     logger.info(f"处理视频URL: {video_url}")
     process_options = build_processing_options(
@@ -574,6 +592,7 @@ async def upload_video_url(data: VideoUploadURL, db: Session = Depends(get_db)):
     )
     result = import_remote_video_from_url(
         db,
+        user_id=user.id,
         video_url=video_url,
         process_options=process_options,
         preferred_title=data.title,
@@ -754,9 +773,16 @@ async def delete_video(video_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="视频不存在")
 
     # 删除关联的问题记录
+    from app.models.note import Note
+    from app.models.note import NoteTimestamp
     from app.models.qa import Question
 
     db.query(Question).filter(Question.video_id == video_id).delete()
+    db.query(Subtitle).filter(Subtitle.video_id == video_id).delete()
+    note_ids = [row[0] for row in db.query(Note.id).filter(Note.video_id == video_id).all()]
+    if note_ids:
+        db.query(NoteTimestamp).filter(NoteTimestamp.note_id.in_(note_ids)).delete()
+    db.query(Note).filter(Note.video_id == video_id).delete()
 
     # 提交清理任务
     try:
@@ -965,8 +991,15 @@ async def generate_summary_from_transcript(request: TranscriptSummaryRequest):
 
 
 @router.post("/sync-offline-transcript")
-async def sync_offline_transcript(request: OfflineTranscriptSyncRequest, db: Session = Depends(get_db)):
+async def sync_offline_transcript(
+    request: OfflineTranscriptSyncRequest,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(default=None),
+):
     """将 iOS 本地离线转录结果同步到 videos 表与 subtitles 表。"""
+    user = resolve_user_from_request(db, request.user_id, authorization)
+    if user is None:
+        raise HTTPException(status_code=401, detail="请先登录后再同步离线转录结果")
     transcript_text = str(request.transcript_text or "").strip()
     if not transcript_text:
         raise HTTPException(status_code=400, detail="转录文本为空，无法同步到视频库")
@@ -1008,13 +1041,18 @@ async def sync_offline_transcript(request: OfflineTranscriptSyncRequest, db: Ses
     serialized_tags = json.dumps(resolved_tags, ensure_ascii=False) if resolved_tags else None
     video = (
         db.query(Video)
-        .filter(Video.task_id == task_id, Video.processing_origin == VideoProcessingOrigin.IOS_OFFLINE)
+        .filter(
+            Video.task_id == task_id,
+            Video.user_id == user.id,
+            Video.processing_origin == VideoProcessingOrigin.IOS_OFFLINE,
+        )
         .first()
     )
     is_new = video is None
 
     if is_new:
         video = Video(
+            user_id=user.id,
             title=title,
             filename=filename,
             filepath=None,
