@@ -1,5 +1,25 @@
 # 变更日志
 
+## 2026-04-14
+
+### 移除 Docker/Railway 部署配置，聚焦固定域名部署
+
+- **删除文件**：
+  - `.dockerignore`：不再使用 Docker/Railway 部署
+  - `Dockerfile`：根目录 Dockerfile（已迁移至 `backend_fastapi/Dockerfile`）
+  - `backend_fastapi/Dockerfile`：Railway 轻量版 Dockerfile
+  - `docs/RAILWAY_DEPLOYMENT.md`：Railway 平台部署指南
+  - `railway.json`：Railway 项目配置文件
+- **更新 `backend_fastapi/.env.example`**：
+  - 移除 Railway 部署相关注释，改为固定域名部署说明
+  - CORS 配置注释从 Railway 子域名改为通用固定域名方案
+  - 补充 Nginx 反向代理 header 配置说明
+  - 链接到 `docs/BACKEND_FIXED_DOMAIN.md`
+- **更新 `scripts/deploy_aliyun.sh`**：
+  - 部署打包排除规则移除 `railway.json`，改为 `mobile-frontend/node_modules`
+- **同步更新 `CHANGELOG.md`**：
+  - 移除「部署配置」小节（Docker/Railway 相关条目已作废）
+
 ## 2026-04-13
 
 ### 固定后端域名方案（iOS TestFlight 发布准备）
@@ -40,14 +60,6 @@
 #### 后端可观测性
 
 - `backend_fastapi/app/main.py`：启动时打印 CORS 允许来源（不含敏感信息）。
-
-### 部署配置
-
-- 新增 `.dockerignore`：Docker 构建忽略文件。
-- 新增 `backend_fastapi/Dockerfile`：后端 FastAPI 容器化部署配置。
-- 新增 `docs/RAILWAY_DEPLOYMENT.md`：Railway 平台部署指南。
-- 新增 `railway.json`：Railway 项目配置文件。
-- 更新 `backend_fastapi/.env.example`：补充生产环境变量示例。
 
 ### README 全面重写
 
