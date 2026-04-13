@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# 虚拟环境
+.venv/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# 测试
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+
+# 文档
+docs/
+CLAUDE.md
+CHANGELOG.md
+index.md
+README.md
+LICENSE
+
+# Git
+.git/
+.gitignore
+
+# iOS App
+ios-app/
+
+# 前端
+mobile-frontend/
+
+# 本地上传和模型文件（Railway 临时存储，重要文件不放这里）
+uploads/
+previews/
+temp/
+data/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.flv
+*.webm
+
+# Whisper 本地模型（Railway 用不了大模型，用 yt-dlp 代替本地转录）
+whisper_models/
+models/
+
+# 本地开发文件
+.env
+.env.local
+.env.production
+.env.example
+railway.json
+Dockerfile
