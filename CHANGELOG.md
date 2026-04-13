@@ -41,6 +41,14 @@
 
 - `backend_fastapi/app/main.py`：启动时打印 CORS 允许来源（不含敏感信息）。
 
+### 部署配置
+
+- 新增 `.dockerignore`：Docker 构建忽略文件。
+- 新增 `backend_fastapi/Dockerfile`：后端 FastAPI 容器化部署配置。
+- 新增 `docs/RAILWAY_DEPLOYMENT.md`：Railway 平台部署指南。
+- 新增 `railway.json`：Railway 项目配置文件。
+- 更新 `backend_fastapi/.env.example`：补充生产环境变量示例。
+
 ### README 全面重写
 
 - 合并重复章节（`## 测试` / `## 后端测试目录`、`## Git Hooks` / `## Git Hooks 与本地质量门`、`## MySQL 表管理` / `## 用户认证当前约定` 等）；从 532 行压缩至约 333 行。
