@@ -996,6 +996,9 @@ async def sync_offline_transcript(
     db: Session = Depends(get_db),
     authorization: Optional[str] = Header(default=None),
 ):
+    """离线同步接口已从主项目移除。"""
+    raise HTTPException(status_code=410, detail="离线转录同步能力已从当前项目移除")
+
     """将 iOS 本地离线转录结果同步到 videos 表与 subtitles 表。"""
     user = resolve_user_from_request(db, request.user_id, authorization)
     if user is None:

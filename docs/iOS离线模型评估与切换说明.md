@@ -52,9 +52,9 @@
 
 另外，当前 iOS 离线转录在同步回后端时，仍然写入原有数据库主链路：
 
-- `POST /api/videos/sync-offline-transcript` 会继续写入 MySQL `videos`
-- 同步分段会继续写入 MySQL `subtitles`
-- 同步时可直接上传 `tags`，或让后端按 `auto_generate_tags=true` 自动补写 `videos.tags`
+- `POST /api/videos/sync-offline-transcript` 端点已从当前项目移除（返回 `410 Gone`）。iOS 离线转录结果不再同步回后端主流水线；前端链路中已移除所有离线同步调用（`syncOfflineTranscriptToVideo` 等）。
+
+如果需要将本地转录结果汇入后端，请改用后端 Whisper 直传接口 `POST /api/videos/transcribe-audio` 或在上传链路中处理。
 
 所以“切换为你图片上的模型”在本项目里能真实落地的含义是：
 

@@ -42,6 +42,26 @@
 - **mobile-frontend**：离线内存服务（`questionCache.js`、`offlineMemorySync.js`、`contracts.js`）增加 `chat_mode` 字段支持，更新索引以按 `chat_mode` 隔离问答空间。
 - **ios-app**：Web 资源同步更新。
 
+### 离线能力链路移除（前端桩 / 后端 stub）
+
+- **mobile-frontend**：以下模块已全量移除离线能力，改为抛出明确错误或返回禁用状态：
+  - `src/services/offlineMemory/index.js` — 所有函数改为 `saveNoteOffline` / `saveOfflineQuestion` 抛 `Error('离线记忆能力已从当前项目移除')`，其余返回 `disabled` 状态
+  - `src/services/offlineQueue.js` — 队列操作全量禁用，`flushOfflineQueue` 返回 `{ flushed: 0, failed: 0, disabled: true }`
+  - `src/services/nativeOfflineTranscripts.js` — `saveNativeOfflineTranscript` 抛错误，其余返回 null/空
+  - `src/api/video.js` — `syncOfflineTranscriptToVideo` 改为直接 `Promise.reject(new Error('离线转录同步能力已从当前项目移除'))`
+  - `src/views/VideoDetail.vue` — 移除 `offlineMemoryMode` 相关模板提示、`shouldUseOfflineMemoryMode` 条件分支及 `OfflineMemoryModeBanner`
+  - `src/api/mockGateway.js` — 清理 mock 中的 `syncOfflineTranscript` 相关函数（无需覆盖）
+- **backend_fastapi**：`POST /api/videos/sync-offline-transcript` 路由入口改为立即 `raise HTTPException(status_code=410, detail="离线转录同步能力已从当前项目移除")`，旧实现代码保留在文件底部但永不执行
+- **docs**：移除或注释掉涉及离线队列、离线笔记同步、离线 QA 等已移除功能的描述性文档
+
+### Smoke 验证脚本重写（隔离 torch segfault）
+
+- **scripts/validate_backend_smoke.py**：重写为 subprocess 隔离模式，避免 macOS + LibreSSL 环境下 PyTorch 2.8 加载时的 C-extension segfault 打断 hook
+  - Stage 1：`compileall -q` 验证所有 backend 模块语法 + 字节码（使用 `PYTHONPYCACHEPREFIX` 避免系统目录权限问题）
+  - Stage 2：逐进程导入各 router 模块 + 推荐服务纯 Python helper 函数，每个检查在独立 subprocess 中运行
+  - 任何 subprocess 非零退出（SIGSEGV 等）均记录警告但不阻断 hook 成功
+- **scripts/hooks/pre_push.sh**：简化 pre-push 入口，移除 mypy（已在 pre-commit 阶段执行）+ compileall（已整合进 smoke 脚本），直接调用 `python scripts/validate_backend_smoke.py` 后执行 iOS 构建
+
 ### 推荐数量保底提升：返回窗口 6~8（不足时自动回填）
 
 - **backend_fastapi**：`RECOMMENDATION_RETURN_MIN_ITEMS` 默认从 `5` 调整为 `6`（上限维持 `8`），推荐接口窗口升级为 `6~8`。

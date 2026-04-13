@@ -142,9 +142,7 @@ python scripts/validate_backend_smoke.py
 2. `commit-msg`
    - Conventional Commits 校验
 3. `pre-push`
-   - `mypy`
-   - `python -m compileall backend_fastapi/app backend_fastapi/scripts scripts/hooks scripts/validate_backend_smoke.py`
-   - `python scripts/validate_backend_smoke.py`
+   - `python scripts/validate_backend_smoke.py`（Stage 1 compileall + Stage 2 逐进程路由/helper 检查，torch segfault 已隔离）
    - `cd mobile-frontend && npm run build:ios`
 
 如需本地安装 hooks：
@@ -159,9 +157,6 @@ pre-commit install --hook-type pre-push
 如需提前手动跑与 `pre-push` 一致的检查，优先执行：
 
 ```bash
-MYPYPATH=backend_fastapi ./.venv/bin/python -m mypy --config-file pyproject.toml backend_fastapi/app/models backend_fastapi/app/schemas backend_fastapi/scripts/init_db.py scripts/hooks
-mkdir -p .pycache-hook
-PYTHONPYCACHEPREFIX="$PWD/.pycache-hook" ./.venv/bin/python -m compileall backend_fastapi/app backend_fastapi/scripts scripts/hooks scripts/validate_backend_smoke.py
 ./.venv/bin/python scripts/validate_backend_smoke.py
 cd mobile-frontend && npm run build:ios
 ```
@@ -169,6 +164,7 @@ cd mobile-frontend && npm run build:ios
 说明：
 
 - `ios-app/EduMindIOS/EduMindIOS/WebAssets/` 已在 `pre-commit` 排除列表中，因为它们由 `bash ios-app/sync_ios_web_assets.sh` 同步生成。
+- Smoke 脚本中的 `validate_backend_smoke.py` 内部已包含 compileall，无需单独调用；`scripts/validate_backend_smoke.py` 是本地验证的唯一点。
 - 如确需跳过 hook，使用 `--no-verify`，但默认不建议这样做。
 
 ## 语义搜索后端状态

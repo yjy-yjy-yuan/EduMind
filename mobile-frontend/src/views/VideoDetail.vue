@@ -587,10 +587,6 @@ const reload = async () => {
     const res = await getVideo(id.value)
     video.value = normalizeVideo(res.data)
     await refreshOfflineMemoryContext(video.value)
-    if (video.value?.processing_origin === 'ios_offline' && video.value?.task_id) {
-      await router.replace(`/local-transcripts/${video.value.task_id}`)
-      return
-    }
     await loadVideoNotes()
     try {
       const subtitleResponse = await getSubtitleContext(Number(id.value), { preferMerged: true })

@@ -11,67 +11,14 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import TabBar from '@/components/TabBar.vue'
-import { flushOfflineQueue } from '@/services/offlineQueue'
-import { offlineMemorySync } from '@/services/offlineMemory'
 
 const route = useRoute()
-let wasHidden = typeof document !== 'undefined' ? document.visibilityState === 'hidden' : false
-
-const flushAllOfflineWork = async () => {
-  await flushOfflineQueue()
-  await offlineMemorySync.flush()
-}
-
-const handleVisibilityChange = async () => {
-  if (typeof document === 'undefined') return
-  if (document.visibilityState === 'hidden') {
-    wasHidden = true
-    return
-  }
-  if (!wasHidden) return
-  wasHidden = false
-  await runStartupWork(flushAllOfflineWork)
-}
-
-const handleOnline = async () => {
-  await runStartupWork(flushAllOfflineWork)
-}
-
-const isAbortError = (error) => {
-  const name = String(error?.name || '')
-  const message = String(error?.message || error || '')
-  return name === 'AbortError' || message.includes('The operation was aborted')
-}
-
-const runStartupWork = async (task) => {
-  try {
-    await task()
-  } catch (error) {
-    if (isAbortError(error)) return
-    throw error
-  }
-}
 
 onMounted(async () => {
-  await runStartupWork(flushAllOfflineWork)
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-  }
-  if (typeof window !== 'undefined') {
-    window.addEventListener('online', handleOnline)
-  }
-})
-
-onUnmounted(() => {
-  if (typeof document !== 'undefined') {
-    document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('online', handleOnline)
-  }
+  await Promise.resolve()
 })
 </script>
 

@@ -87,7 +87,7 @@
       <div class="section-head">
         <div>
           <h2>学习概览</h2>
-          <p>把最近任务、本地离线结果和回看入口压缩成一屏里的稳定节奏。</p>
+          <p>把最近任务和回看入口压缩成一屏里的稳定节奏。</p>
         </div>
         <button class="overview-link" @click="reloadDashboard" :disabled="loading || recommendationLoading">
           {{ loading ? '刷新中…' : '刷新' }}
@@ -120,11 +120,6 @@
         </div>
 
         <div class="summary-grid">
-          <button class="summary-card" @click="go('/local-transcripts')">
-            <span class="summary-card__label">本地离线转录</span>
-            <strong class="summary-card__value">{{ localTranscriptCount }}</strong>
-            <span class="summary-card__note">查看 iOS 端侧转录结果</span>
-          </button>
           <button class="summary-card summary-card--soft" @click="goStat(completedCount > 0 ? 'completed' : 'recent')">
             <span class="summary-card__label">可复盘内容</span>
             <strong class="summary-card__value">{{ completedCount }}</strong>
@@ -254,7 +249,6 @@ import {
   shouldOpenRecommendationExternalSource
 } from '@/services/recommendationActions'
 import { getVideoList } from '@/api/video'
-import { listNativeOfflineTranscripts } from '@/services/nativeOfflineTranscripts'
 import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
 const router = useRouter()
@@ -265,7 +259,6 @@ const error = ref('')
 const recommendationError = ref('')
 const recommendationFallbackMode = ref('none')
 const allVideos = ref([])
-const localTranscriptCount = ref(0)
 const recommendations = ref([])
 const recommendationMeta = ref({
   sources: [],
@@ -417,12 +410,8 @@ const reload = async () => {
   loading.value = true
   error.value = ''
   try {
-    const [videos, transcripts] = await Promise.all([
-      fetchAllVideos(),
-      listNativeOfflineTranscripts().catch(() => [])
-    ])
+    const [videos] = await Promise.all([fetchAllVideos()])
     allVideos.value = mergeVideosById(videos)
-    localTranscriptCount.value = transcripts.length
   } catch (e) {
     error.value = e?.message || '加载失败'
   } finally {
@@ -479,10 +468,6 @@ const goStat = (scope) => {
 
 const openVideo = (video) => {
   const current = video || {}
-  if (current.processing_origin === 'ios_offline' && current.task_id) {
-    router.push(`/local-transcripts/${current.task_id}`)
-    return
-  }
   if (!current.id) return
   router.push(`/videos/${current.id}`)
 }

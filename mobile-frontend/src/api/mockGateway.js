@@ -493,10 +493,8 @@ const buildMockRecommendationItem = (video, reasonCode, reasonLabel, score) => (
   subject: resolveMockRecommendationSubject(video),
   cluster_key: (Array.isArray(video.tags) && video.tags[0]) ? String(video.tags[0]) : resolveMockRecommendationSubject(video),
   action_type: 'route',
-  action_label: video.processing_origin === 'ios_offline' ? '打开本地结果' : '打开详情',
-  action_target: video.processing_origin === 'ios_offline'
-    ? `/local-transcripts/${video.task_id || video.id}`
-    : `/videos/${video.id}`
+  action_label: '打开详情',
+  action_target: `/videos/${video.id}`
 })
 
 const buildMockExternalRecommendationItem = (candidate, reasonCode, reasonLabel, score) => ({
