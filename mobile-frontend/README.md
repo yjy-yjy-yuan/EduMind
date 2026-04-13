@@ -45,6 +45,28 @@ npm run preview
 
 旧文档里出现过 `5001/5002` 的示例，那是旧后端阶段的端口，不再是当前默认值。
 
+### iOS 打包 / 固定域名构建
+
+**iOS 打包（npm run build:ios）使用 `--mode ios`**，会自动读取 `.env.ios` 文件（如存在），优先级高于 `.env`：
+
+```bash
+# 一次性准备（复制示例文件并编辑实际域名）
+cp .env.ios.example .env.ios
+# 编辑 .env.ios，将 https://api.xxx.com 替换为实际后端固定域名
+
+# iOS 打包（会读 .env.ios）
+npm run build:ios
+```
+
+`.env.ios.example` 的关键变量（与 `.env` 相同键名，值不同）：
+
+```
+VITE_MOBILE_API_BASE_URL=https://api.xxx.com   # 固定域名（必须）
+VITE_MOBILE_UI_ONLY=false                      # 关闭 UI-only
+```
+
+详见 `docs/BACKEND_FIXED_DOMAIN.md`。
+
 ## 目录说明
 
 | 路径 | 说明 |
@@ -94,13 +116,20 @@ npm run build:web
 
 ## 固定域名构建（后端使用固定域名，换 Wi‑Fi/换地点不失效）
 
-后端使用固定域名（如 `https://api.yourdomain.com`）时，构建前设置该地址，请求会始终发往该域名：
+后端使用固定域名（如 `https://api.xxx.com`）时，使用 iOS 构建命令并在构建前准备好 `.env.ios`：
+
+```bash
+cp .env.ios.example .env.ios
+# 编辑 .env.ios，将 https://api.xxx.com 改为实际后端固定域名
+npm run build:ios
+```
+
+同样可用于 Web 生产部署（`npm run build` 或 `npm run build:web`）：
 
 ```bash
 cp .env.production.example .env.production
-# 编辑 .env.production，将 https://api.yourdomain.com 改为实际后端固定域名
+# 编辑 .env.production，将 https://api.xxx.com 改为实际后端固定域名
 npm run build
-# iOS 打包（会读 .env.ios）：cp .env.production.example .env.ios && 编辑域名 && npm run build:ios
 ```
 
 详见仓库根目录 `docs/BACKEND_FIXED_DOMAIN.md`。

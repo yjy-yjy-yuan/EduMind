@@ -1,61 +1,59 @@
 # EduMind
 
-EduMind 现已收敛为 iOS-only 移动学习项目。唯一有效工程链路如下：
+EduMind 是一个 iOS-only 移动学习项目，工程链路如下：
 
 1. `backend_fastapi/`：真实后端能力与 MySQL 数据写入
-2. `mobile-frontend/`：移动端 H5 UI
-3. `ios-app/`：iOS `WKWebView` 容器
+2. `mobile-frontend/`：移动端 H5 UI（由 iOS `WKWebView` 加载）
+3. `ios-app/`：iOS `WKWebView` 容器与原生桥接层
 
 不再维护桌面网页版、旧 Flask 后端或 Android 工程。
 
-## 当前结构
+## 项目结构
 
 ```text
 EduMind/
 ├── backend_fastapi/   # 唯一后端
-├── mobile-frontend/   # 唯一前端
-├── ios-app/           # iOS 容器
+├── mobile-frontend/   # 唯一前端（H5，由 WKWebView 加载）
+├── ios-app/           # iOS WKWebView 容器与原生桥接
 ├── docs/              # iOS 链路相关文档
-├── AGENTS.md
-├── docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md
+├── scripts/           # 本地验证、数据库管理、运维脚本
+├── AGENTS.md          # 研发规范（AI 与人均遵守）
 └── CHANGELOG.md
 ```
 
 ## 架构原则
 
-- 前端只负责 UI、交互、请求发送
-- 后端负责真实功能：上传、音视频提取、转录、摘要生成、标签提取、数据库写入、分析
-- 前后端通过端口联调
-- 数据库必须是 MySQL
-- 尽量适配现有表结构，不随意改表或加表
+- 前端只负责 UI、交互、请求发送；不实现业务规则或数据库逻辑
+- 后端负责真实功能：上传、音视频提取、Whisper 转录、摘要生成、标签提取、数据库写入、QA、推荐
+- 前后端通过 HTTP 端口联调；前端与 `ios-app/` 通过 `WKWebView` bridge 通信
+- 数据库必须是 MySQL；尽量适配现有表，不随意改表或加表
+- 交付目标是 iOS App，不是独立桌面网页
 
 ## 环境要求
 
-- MacBook Pro 开发环境
+- macOS（MacBook Pro）
 - Python 3.10+
 - Node.js 16+
-- MySQL
+- MySQL 8+
 - FFmpeg
 - 通义千问或 DeepSeek API Key
 
 ## 快速开始
 
-### 1. 创建虚拟环境并启动后端
+### 1. 后端
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r backend_fastapi/requirements.txt
 cp backend_fastapi/.env.example backend_fastapi/.env
+# 编辑 .env：填写 DATABASE_URL、QWEN_API_KEY 或 DEEPSEEK_API_KEY
 python backend_fastapi/run.py
 ```
 
-默认地址：
+默认监听 `0.0.0.0:2004`；健康检查 `http://127.0.0.1:2004/health`，API 文档 `http://127.0.0.1:2004/docs`。
 
-- 健康检查：`http://127.0.0.1:2004/health`
-- API 文档：`http://127.0.0.1:2004/docs`
-
-### 2. 启动移动端前端
+### 2. 移动端前端（开发调试）
 
 ```bash
 cd mobile-frontend
@@ -64,11 +62,7 @@ cp .env.example .env
 npm run dev
 ```
 
-说明：
-
-- 浏览器仅用于开发调试
-- 实际交付端是 iOS `WKWebView`
-- 默认接口地址指向 `http://127.0.0.1:2004`
+浏览器仅用于开发调试；实际交付端是 iOS `WKWebView`，默认接口地址指向 `http://127.0.0.1:2004`。
 
 ### 3. 构建并同步到 iOS 容器
 
@@ -76,76 +70,31 @@ npm run dev
 bash ios-app/sync_ios_web_assets.sh
 ```
 
-该脚本会：
+该脚本执行三步：构建 `mobile-frontend` → 从 `backend_fastapi/.env` 读取端口并刷新 iOS 真机后端地址 → 将 `dist/` 同步到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`。
 
-1. 构建 `mobile-frontend`
-2. 读取 `backend_fastapi/.env` 中的 `PORT`，自动刷新 iOS 真机默认后端地址
-3. 将最新 `dist/` 同步到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
+iOS 容器使用本地打包资源模式，不是 dev server 直连模式。前端任何改动后均须重新执行此脚本。
 
-## 后端测试目录
-
-后端测试已经统一放在 [backend_fastapi/tests](backend_fastapi/tests)：
-
-- `backend_fastapi/tests/unit/`：单元测试
-- `backend_fastapi/tests/api/`：接口测试
-- `backend_fastapi/tests/smoke/`：冒烟测试
-- `backend_fastapi/tests/integration/`：集成测试
-
-当前修改程序时，仓库要求不要用 `pytest` 做本次验证；优先执行：
+### 4. 本地验证
 
 ```bash
 . .venv/bin/activate
-python scripts/validate_backend_smoke.py
+python scripts/validate_backend_smoke.py   # 语法 + 路由导入 smoke 检查
+bash ios-app/validate_ios_build.sh         # iOS 构建 + 屏幕方向配置校验
 ```
 
-`backend_fastapi/tests/` 仍保留历史回归用例与 pytest 风格目录结构；更具体的放置规则见 [backend_fastapi/tests/README.md](backend_fastapi/tests/README.md)。
+`validate_backend_smoke.py` 分两阶段运行：Stage 1 `compileall` 语法/字节码检查，Stage 2 逐进程导入各 router 和推荐 helper（已隔离 torch segfault）。
 
-补充边界：
+## 本地 Git Hooks
 
-- 本地改动验证默认遵循上述非-`pytest` 规则
-- GitHub Actions CI 基线允许运行 `pytest` 作为回归门禁（见下节）
+仓库使用 `pre-commit` 框架统一管理，覆盖三类 hook：
 
-## GitHub Actions CI（基线）
+| Hook | 执行内容 |
+|---|---|
+| `pre-commit` | 基础文件/配置检查、Python `black` / `isort` / `flake8`、Shell 语法检查、前端调试语句守卫 |
+| `commit-msg` | Conventional Commits 格式校验（`type(scope): description`） |
+| `pre-push` | `scripts/validate_backend_smoke.py` + `npm run build:ios` |
 
-仓库当前新增最小后端 CI 工作流：[`.github/workflows/backend-ci.yml`](.github/workflows/backend-ci.yml)。
-
-触发事件：
-
-- `pull_request`
-- `workflow_dispatch`
-
-触发范围（path-filtered）：
-
-- `.github/workflows/backend-ci.yml`
-- `backend_fastapi/**`
-- `pyproject.toml`
-- `pytest.ini`
-
-当前最小检查项：
-
-- `ruff check backend_fastapi/tests`
-- `cd backend_fastapi && pytest tests/smoke`
-
-说明：
-
-- 运行时使用 Python `3.10` 与 pip cache
-- 该 CI 负责云端回归门禁，不替代本地 iOS / smoke / build 验证链路
-
-## Git Hooks 与本地质量门
-
-当前仓库使用 `pre-commit` 框架，而不是 Husky。默认本地质量门如下：
-
-1. `pre-commit`
-   - 基础文本/配置检查
-   - Python `black` / `isort` / `flake8`
-   - `mobile-frontend/src/` 下调试语句守卫
-2. `commit-msg`
-   - Conventional Commits 校验
-3. `pre-push`
-   - `python scripts/validate_backend_smoke.py`（Stage 1 compileall + Stage 2 逐进程路由/helper 检查，torch segfault 已隔离）
-   - `cd mobile-frontend && npm run build:ios`
-
-如需本地安装 hooks：
+一键安装：
 
 ```bash
 bash scripts/install_git_hooks.sh
@@ -154,124 +103,98 @@ pre-commit install --hook-type commit-msg
 pre-commit install --hook-type pre-push
 ```
 
-如需提前手动跑与 `pre-push` 一致的检查，优先执行：
-
-```bash
-./.venv/bin/python scripts/validate_backend_smoke.py
-cd mobile-frontend && npm run build:ios
-```
-
 说明：
 
-- `ios-app/EduMindIOS/EduMindIOS/WebAssets/` 已在 `pre-commit` 排除列表中，因为它们由 `bash ios-app/sync_ios_web_assets.sh` 同步生成。
-- Smoke 脚本中的 `validate_backend_smoke.py` 内部已包含 compileall，无需单独调用；`scripts/validate_backend_smoke.py` 是本地验证的唯一点。
-- 如确需跳过 hook，使用 `--no-verify`，但默认不建议这样做。
+- `ios-app/EduMindIOS/EduMindIOS/WebAssets/` 在 `pre-commit` 排除列表中，由 `sync_ios_web_assets.sh` 同步生成。
+- `pre-push` 依赖 `.venv` 和 `mobile-frontend/node_modules` 已就绪。
+- CI 环境（`CI` 变量存在时）自动跳过本地专用 hook。
+- 如需临时跳过：`git commit --no-verify` / `git push --no-verify`，应作例外而非常态。
 
-## 语义搜索后端状态
+## GitHub Actions CI
 
-当前仓库已经落下语义搜索后端的第一版骨架和主链路，范围集中在 `backend_fastapi/`：
+最小后端 CI 工作流：[`.github/workflows/backend-ci.yml`](.github/workflows/backend-ci.yml)。
 
-1. 视频切片：`backend_fastapi/app/services/search/chunker.py`
-2. 向量嵌入：`backend_fastapi/app/services/search/embedder.py`、`backend_fastapi/app/services/search/gemini_embedder.py`
-3. 向量存储：`backend_fastapi/app/services/search/store.py`
-4. 搜索编排：`backend_fastapi/app/services/search/search.py`
-5. 搜索接口：`backend_fastapi/app/routers/search.py`
-6. 后台索引：`backend_fastapi/app/tasks/vector_indexing.py`
+触发：`pull_request` + `workflow_dispatch`；path-filter 范围：`backend_fastapi/**`、`pyproject.toml`、`pytest.ini`。
 
-当前已经支持：
+检查项：`ruff check backend_fastapi/tests` + `pytest tests/smoke`（Python 3.10）。
 
-- `mp4` / `mov` 切片
-- 语义索引时按视频时长自动调整切片参数，短视频更细、长视频更粗
-- 在本地 `local` 后端下优先使用字幕时间窗分块建索引，不再强依赖 `processed_filepath`
-- `LocalEmbedder` 已切换为可运行的本地文本向量方案，可直接支撑字幕语义搜索
-- ChromaDB 持久化
-- 手动索引接口和索引状态接口
-- 视频处理完成后按配置自动提交索引任务
-- 多视频查询和按相似度排序返回
-- 搜索结果已回填字幕预览文本 `preview_text`
+CI 为云端回归门禁，不替代本地 smoke / iOS build 验证链路。本地改动验证默认使用 `validate_backend_smoke.py`，不直接运行 `pytest`。
 
-当前仍是“后端实验性能力”，还不能把整条链路视为完全闭环：
+## MySQL 数据库管理
 
-- 搜索路由尚未接入完整认证体系，当前优先取 `X-User-ID` 请求头，否则回退默认用户
-- 当前默认打通方案更偏向“字幕语义搜索”，并非生产级视频视觉嵌入方案
-- iOS / H5 搜索界面已经有基础页面与播放器跳转链路，但当前仍属于轻量版本，结果摘要与完整认证联动尚未补齐
+当前后端显式管理的业务表（6 张）：`users`、`videos`、`notes`、`questions`、`subtitles`、`note_timestamps`。默认数据库名 `edumind`。
 
-如需单独验证这条搜索链路，可补跑：
+```bash
+. .venv/bin/activate
+python backend_fastapi/scripts/init_db.py --info        # 查看表结构
+python backend_fastapi/scripts/init_db.py --create      # 补创建缺失表（不删已有数据）
+python backend_fastapi/scripts/init_db.py --reset       # 删除并重建（危险）
+python backend_fastapi/scripts/init_db.py --emit-sql backend_fastapi/scripts/mysql_managed_schema.sql
+```
+
+导出的 SQL 文件：[`backend_fastapi/scripts/mysql_managed_schema.sql`](backend_fastapi/scripts/mysql_managed_schema.sql)，可直接在 Navicat 执行。
+
+## 用户认证
+
+- 注册接受邮箱或手机号（至少一项），密码要求大小写字母 + 数字 + 特殊字符（≥8 位）。
+- 登录只接受邮箱/手机号 + 密码；登录后支持修改用户名（写回 `users.username`）和上传头像（存于 `backend_fastapi/uploads/avatars/`）。
+- 所有用户数据写入现有 `users` 表，不新建认证平行表。
+- `init_db.py --create` 会补齐 `users` 表所需认证字段（手机号、登录次数等）。
+- JWT Token 有效期由 `AUTH_TOKEN_TTL_SECONDS`（默认 604800 秒/7天）控制。
+
+## 语义搜索
+
+后端语义搜索（字幕向量检索）主要文件：
+
+| 文件 | 说明 |
+|---|---|
+| `backend_fastapi/app/services/search/chunker.py` | 视频切片（按时长自动调整粒度） |
+| `backend_fastapi/app/services/search/embedder.py` | 本地文本向量嵌入（`LocalEmbedder`） |
+| `backend_fastapi/app/services/search/store.py` | ChromaDB 持久化 |
+| `backend_fastapi/app/services/search/search.py` | 搜索编排 |
+| `backend_fastapi/app/routers/search.py` | 搜索接口 |
+| `backend_fastapi/app/tasks/vector_indexing.py` | 后台索引任务 |
+
+当前能力：字幕语义搜索 + 相似度排序 + `preview_text` 回填；视频处理完成后按配置自动提交索引。
+
+当前限制：搜索路由优先取 `X-User-ID` 请求头（未完全接入认证体系）；iOS / H5 搜索界面为轻量版本，结果摘要与完整认证联动尚未补齐。
+
+部署与限制详情：[`backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md`](backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)。
+
+验证搜索链路：
 
 ```bash
 ./.venv/bin/python scripts/validate_search_integration.py
 ```
 
-部署与当前限制的详细说明见 [backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md](backend_fastapi/SEMANTIC_SEARCH_DEPLOYMENT.md)。
+## AI Agent 开发工作流（Blitz / Codex CLI）
 
-## 标签相似度优化文档
-
-标签相似度（关键词相关子能力）的最新交付与技术说明见：
-
-- [docs/KEYWORD_SEARCH_OPTIMIZATION.md](docs/KEYWORD_SEARCH_OPTIMIZATION.md)
-- [KEYWORD_SEARCH_DELIVERY_SUMMARY.md](KEYWORD_SEARCH_DELIVERY_SUMMARY.md)
-
-## Blitz / Codex CLI 开发工作流
-
-面向 Blitz、Codex CLI、Claude Code 等本地代码代理，当前仓库新增了 4 个统一脚本：
+面向本地代码代理（Blitz、Codex CLI 等）的统一脚本：
 
 ```bash
-bash scripts/blitz_prepare_edumind.sh
-bash scripts/blitz_start_backend.sh
-bash scripts/blitz_backend_healthcheck.sh
-bash scripts/blitz_build_ios.sh
+bash scripts/blitz_prepare_edumind.sh      # 创建 .venv、安装依赖、同步 WebAssets
+bash scripts/blitz_start_backend.sh        # 启动后端
+bash scripts/blitz_backend_healthcheck.sh  # 检查 http://127.0.0.1:2004/health
+bash scripts/blitz_build_ios.sh            # xcodebuild 构建 iOS 容器
 ```
 
-推荐顺序：
+更详细的 Agent 接管说明见 [`docs/BLITZ_EDUMIND_WORKFLOW.md`](docs/BLITZ_EDUMIND_WORKFLOW.md)。
+## 视频处理与摘要生成
 
-1. `blitz_prepare_edumind.sh`
-   创建或复用 `.venv`，安装后端依赖，必要时安装前端依赖，并执行 `bash ios-app/sync_ios_web_assets.sh`
-2. `blitz_start_backend.sh`
-   激活 `.venv` 并启动 `backend_fastapi/run.py`
-3. `blitz_backend_healthcheck.sh`
-   默认检查 `http://127.0.0.1:2004/health`
-4. `blitz_build_ios.sh`
-   用 `xcodebuild` 构建 `ios-app/EduMindIOS/EduMindIOS.xcodeproj`
+上传或链接导入视频后，后端依次执行：音频提取（FFmpeg）→ Whisper 转录 → 字幕写回（`subtitles` 表）→ 摘要生成（`videos.summary`）→ 标签提取（`videos.tags`）。
 
-补充说明：
+大模型不可用时自动降级到本地摘要与关键词提取逻辑，保证字段仍可写入。
 
-1. `mobile-frontend/` 任何改动后，都必须重新执行 `bash ios-app/sync_ios_web_assets.sh`
-2. iOS 容器是本地打包资源模式，不是 dev server 直连模式
-3. 若要做更完整的 iOS 校验，执行 `bash ios-app/validate_ios_build.sh`；该脚本默认执行无签名构建，用于验证本地代码和 `WebAssets` 能否成功编译
-4. 更详细的 Agent 接管说明见 [`docs/BLITZ_EDUMIND_WORKFLOW.md`](docs/BLITZ_EDUMIND_WORKFLOW.md)
+可配置项（位于"我的"页处理设置）：
 
-## 摘要生成与处理设置
-
-当前视频处理链路已经包含真实摘要生成，不再停留在 UI-only 占位：
-
-1. 上传或链接导入视频
-2. 后端完成音频提取与 Whisper 转录
-3. 后端写回字幕文件和 `subtitles` 表
-4. 后端继续生成课程摘要并写回 `videos.summary`
-5. 后端继续提取学习标签并写回 `videos.tags`
-
-处理设置入口在 iOS 端“我的”页面，当前会影响：
-
-1. 新上传视频
-2. 链接导入视频
-3. 视频详情页重新处理
-4. 失败任务重试
-
-当前可配置项：
-
-1. 识别语言
-2. Whisper 模型
-3. 摘要风格：`brief` / `study` / `detailed`
-4. 是否在处理完成后自动生成摘要
-5. 是否在处理完成后自动提取标签
-
-如果在线大模型不可用，后端会自动回退到本地摘要与关键词提取逻辑，保证 `videos.summary` 与 `videos.tags` 仍可生成。
+- 识别语言、Whisper 模型
+- 摘要风格：`brief` / `study` / `detailed`
+- 处理完成后是否自动生成摘要 / 提取标签
 
 补充说明：
 
-- iOS 本地离线转录当前仍然使用 Apple `Speech` 端侧识别
-- 本地 GGUF / Ollama 模型只影响后端本地摘要、标题、标签与语义整理回退链路，不直接替代 iOS 端语音转文字
-- iOS 本地离线转录在同步到后端后，仍然继续写入同一套 MySQL `videos`、`subtitles`，并可按配置补写 `videos.tags`
+- iOS 本地离线转录使用 Apple `Speech` 端侧识别，同步后续写入同一套 `videos`、`subtitles` 表。
+- 本地 GGUF / Ollama 模型只影响后端摘要/标签回退链路，不替代 iOS 端语音转文字。
 
 手动补生成接口：
 
@@ -280,255 +203,126 @@ POST /api/videos/{video_id}/generate-summary
 POST /api/videos/{video_id}/generate-tags
 ```
 
-## 视频推荐当前行为
 
-当前推荐链路已经不是“只按最近时间排序”的早期占位态，默认行为如下：
+## 视频推荐
 
-1. 后端按受限候选集扫描站内视频，不再无上限全表加载。
-2. 推荐接口支持 `home / continue / review / related` 四种场景。
-3. 首页「为你推荐」默认通过 `VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL`（默认 `true`）请求站外候选并与推荐中枢同一套入库闭环；弱网可改为 `false` 仅拉站内。历史变量 `VITE_RECOMMENDATION_INCLUDE_EXTERNAL` 仍可在其它构建中复用。
-4. 站外候选会明确区分两类动作：
-   - 可直接导入：进入现有 URL 导入链路
-   - 暂不可直接导入：打开原始来源页，而不是伪装成已入库视频
-5. **`scene=related`** 仍用于需要 **`seed_video_id`** 的入口（例如 **视频详情**「相关推荐」子页）：按种子做相关排序并排除种子；若接口暂无结果或失败，前端可按既有策略做兜底。**独立「推荐学习中枢」页**（`/recommendations`）当前仅请求 **`scene=home`** 的单列表推荐，不再提供多场景切换、主列表「看同主题」或页内「同主题」区块。
-6. `related` 场景在扩站外候选时，会优先继承 seed 视频的原始来源平台语境；例如当前视频来自 YouTube 时，同主题站外候选会优先同来源 provider。
-7. 推荐 API 响应体包含 `contract_version`（默认 `"2"`，与 `RECOMMENDATION_CONTRACT_VERSION` 一致；v2 起不再返回 `seed_video_title`，旧版可设环境变量为 `"1"`）；推荐相关请求支持 `X-Trace-Id` / `X-Request-Id` 透传，响应头回传相同 trace 便于前后端对账。完整可测试清单见 `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md` 第九节（Recommendation Contract）。
-8. 在登录态且开启站外推荐时，后端会优先把可导入站外候选自动入库（`videos`）后再返回给前端；用户拿到的是可直接打开详情、可继续走“下载/处理/复盘”链路的条目，而不是只能二次跳转的占位候选。
-9. 自动入库由后端开关控制：`RECOMMENDATION_AUTO_IMPORT_EXTERNAL`（默认 `true`）与 `RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS`（默认 `2`，单次请求最多尝试入库的站外条数）；关闭前者则行为退化为仅返回站外候选、不自动写库。
-10. **用户动线（闭环）**：已登录且 Bearer 有效 → 前端带 `include_external=true` 请求推荐 → 后端对可导入站外候选调用链接导入并写入 `videos` → 返回项为站内视频（可打开详情、走下载/转写/摘要）。未登录时仍可能看到站外候选卡片，需走「链接导入」或先登录后再刷出已入库条目。
-11. 推荐运营聚合接口 `GET /api/recommendations/ops/metrics`（需登录）返回 `recommendation_import.success_rate` 与 `processing.completion_rate`；口径默认从 MySQL `recommendation_ops_events` 聚合，DB 不可用时降级到进程内缓冲（`data_source=memory_fallback`）。
-12. 首页在推荐接口失败或当前场景暂无命中时，会显式展示“当前为兜底结果”的轻提示，避免把视频库兜底误判为实时推荐结果。
-13. iOS `WKWebView` 构建使用单文件 `iife + inlineDynamicImports`；该模式下路由懒加载不会拆分独立 chunk，前端已通过 `chunkSizeWarningLimit` 与注释避免误导性体积告警。
-14. 推荐排序新增复用语义搜索的“融合相似度”策略（后端内部计算，不对前端展示相似度数值），默认阈值 `RECOMMENDATION_SIMILARITY_MIN_SCORE=0.55`。
-15. 推荐接口在移动端链路上会将请求条数规范化到 `6~8`（默认 6），并优先返回达到相似度阈值的条目；若阈值筛选后仍不足最小条数，后端会从同批排序候选中按条目身份去重**补齐至窗口下限**。相关推荐与首页默认请求条数与窗口一致（以客户端 `limit` 与后端窗口为准）。
-16. 推荐展示口径已做“一次性去切片”收口：`/api/recommendations/videos` 与上传返回 `recommendations` 的 `items[*]` 在输出层统一清空 `summary`、`reason_text`、`tags`（v1/v2 均生效，仅保留 `reason_label/reason_code`）；`Home / Recommendations / Upload` 三入口不再渲染片段描述与内容标签 chips（卡片仍展示 `reason_label` 等轻量理由徽标）。
-17. 推荐结果支持标题黑名单关键词过滤（`RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS`，默认含 `排列组合插空法详解`）：命中关键词的条目会在后端响应收口阶段被剔除，再按剩余候选返回；前端 `Home` / `Recommendations` / `Upload` 亦做同名关键词兜底，避免缓存或 mock 残留。
-18. **首页「为你推荐」**已精简为标题与推荐卡片列表：已移除标题下说明文案、首屏「刷新推荐」按钮、「本页条数 / 更多场景」统计卡片（进入首页仍会照常拉取推荐）。**推荐学习中枢页**已移除 hero 内开发者向说明卡片；页面为 **Hero + 单列表「推荐视频」** 与刷新入口，与首页共用同一推荐接口语义。
-19. **视频详情页**（`/videos/:id`）为横向双页：**学习处理**（Whisper、摘要、笔记、操作、重试、删除等既有流程）与 **相关推荐**（`GET /api/recommendations/videos`，`scene=related` + `seed_video_id` 并排除种子；展示口径与全站一致，不渲染切片化 `summary/reason_text/tags`）。首次仅在学习处理页加载详情；切换到推荐子页时再请求推荐；子页索引保存在 `sessionStorage`（`videoDetailSubPage:<id>`）。
-20. **视频详情布局与手势**：封面区（LIVE/占位、标题、状态、进度、「可进播放器」提示等）在 **`.video-detail__shared` 中固定在页面上方**，不随双页横向滑动；**「学习处理 / 相关推荐」页签与下方 `scroll-snap` 分页轨道**仅作用于其下区域，符合「在封面卡片下」左右切换的预期。分页下面板不使用 `touch-action: pan-y` 锁定，避免在推荐卡片上横滑无法驱动外层分页。实现文件：`mobile-frontend/src/views/VideoDetail.vue`，`mobile-frontend/src/components/videoDetail/VideoDetailRecommendPanel.vue`，`VideoDetailRecommendCard.vue`，`mobile-frontend/src/services/recommendationPresentation.js`，`videoDetailTelemetry.js`。结构化埋点通过 `CustomEvent('edumind:telemetry')`（`detail.scope === 'video_detail'`）抛出，便于 `WKWebView` 原生侧订阅。
+### 接口与场景
+
+- `GET /api/recommendations/videos`：统一推荐接口，支持 `scene=home|continue|review|related`。
+- `GET /api/recommendations/scenes`：返回可用场景列表。
+- `GET /api/recommendations/ops/metrics`（需登录）：推荐运营聚合指标（`recommendation_import.success_rate`、`processing.completion_rate`）。
+
+### 当前行为
+
+1. **返回窗口**：请求条数规范化到 `6~8`，优先返回相似度 ≥ `RECOMMENDATION_SIMILARITY_MIN_SCORE`（默认 `0.55`）的条目；阈值筛选后不足下限时从同批候选按排序补齐（去重）。
+2. **展示口径**：响应 `items[*]` 统一清空 `summary`、`reason_text`、`tags`，仅保留 `reason_label`/`reason_code`；前端不渲染切片描述与内容标签 chips。
+3. **标题黑名单**：后端以 `RECOMMENDATION_EXCLUDED_TITLE_KEYWORDS`（默认含 `排列组合插空法详解`）在收口阶段剔除命中条目。
+4. **站外候选自动入库**：登录态且 `include_external=true` 时，后端优先对可导入站外候选调用链接导入写入 `videos` 后返回站内视频；由 `RECOMMENDATION_AUTO_IMPORT_EXTERNAL`（默认 `true`）与 `RECOMMENDATION_AUTO_IMPORT_MAX_ITEMS`（默认 `2`）控制。
+5. **首页**：`Home.vue` 仅展示标题 + 推荐卡片列表；移除了说明文案、首屏刷新按钮、统计卡片。
+6. **推荐中枢页**（`/recommendations`）：Hero + 单列表 + 刷新入口，仅请求 `scene=home`。
+7. **视频详情相关推荐**：`scene=related` + `seed_video_id`，排除种子，station 优先同来源 provider。
+
+### API 契约
+
+- `contract_version` 默认 `"2"`（对应 `RECOMMENDATION_CONTRACT_VERSION`）；v2 不再返回 `seed_video_title`，旧版可设为 `"1"`。
+- 请求支持 `X-Trace-Id` / `X-Request-Id` 透传，响应头回传。
+- 完整契约清单见 [`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md) 第九节。
+
+### 视频详情双页布局
+
+`/videos/:id` 为横向双页：**学习处理**（转录/摘要/笔记/操作）与 **相关推荐**（首次切换时懒加载）。
+
+- 封面区固定在上方（`.video-detail__shared`），不随横向滑动。
+- 页签 + `scroll-snap` 分页轨道仅作用于封面下方区域；分页面板不使用 `touch-action: pan-y`，避免吞掉外层横滑。
+- 子页索引保存在 `sessionStorage`（`videoDetailSubPage:<id>`）。
+- 相关文件：`VideoDetail.vue`、`VideoDetailRecommendPanel.vue`、`VideoDetailRecommendCard.vue`、`recommendationPresentation.js`、`videoDetailTelemetry.js`。
+- 埋点通过 `CustomEvent('edumind:telemetry')`（`detail.scope === 'video_detail'`）抛出。
+
+### iOS 已知行为清单
+
+| # | 说明 |
+|---|---|
+| 1 | `WKWebView` 构建使用单文件 `iife + inlineDynamicImports`，路由懒加载不拆分 chunk |
+| 2 | 推荐接口失败或无命中时显示"当前为兜底结果"轻提示 |
+| 3 | 屏幕方向锁定为竖屏（`UIInterfaceOrientationPortrait`）；`validate_ios_build.sh` 构建前校验，检测到横屏方向立即报错 |
+
 
 ## 视频删除与运维脚本
 
-1. `DELETE /api/videos/{video_id}/delete` 在删除 `videos` 行之前，会依次清理关联的 **问答**（`questions`）、**字幕**（`subtitles`）、**笔记时间戳**（`note_timestamps`）与 **笔记**（`notes`），避免外键约束失败；向量索引行（`vector_indexes`）由业务侧在需要时一并处理（见仓库内脚本）。
-2. 运维可按标题查找并删除或仅重置元数据：`scripts/purge_video_recommendation_by_title.py`（需配置 `DATABASE_URL`；默认 **dry-run**，加 `--execute` 才写库）。`--delete-video` 删除整条视频及常见子表；`--reset-metadata` 仅清空摘要/标签与语义索引标记并删 `vector_indexes`，保留视频与字幕。
+- `DELETE /api/videos/{video_id}/delete` 级联删除关联 **问答**（`questions`）、**字幕**（`subtitles`）、**笔记时间戳**（`note_timestamps`）与 **笔记**（`notes`），避免外键约束失败。
+- 按标题运维：`scripts/purge_video_recommendation_by_title.py`（需配置 `DATABASE_URL`；默认 dry-run，加 `--execute` 才写库）。`--delete-video` 删整条视频；`--reset-metadata` 仅清空摘要/标签与语义索引标记。
 
 ## 视频上下文问答
 
-当前视频问答已经接入真实后端 RAG，不再依赖前端占位回复：
+前端向 `POST /api/qa/ask` 提交 `video_id`、`question`、`chat_mode`；后端基于 `subtitles`、`videos.summary`、`videos.tags` 做轻量 RAG 召回，生成回答后写入 `questions` 表。
 
-1. 前端向 `POST /api/qa/ask` 提交 `video_id`、`question`、`provider`
-2. 后端基于现有 `subtitles`、`videos.summary`、`videos.tags` 组装检索上下文
-3. 后端对字幕片段做轻量召回，再调用通义千问或 DeepSeek 生成回答
-4. 问答记录写入现有 `questions` 表，不新增平行问答表
+移动端自动携带最近几轮历史，支持连续追问。
 
-为保证连续追问时的上下文记忆，移动端会把最近几轮问答一并提交给后端，后端再结合视频字幕检索结果组织最终提示词；因此“它 / 这个 / 上一题提到的第二点”这类追问不再只靠当前一句话硬猜。
+### 对话模式（`chat_mode`）
 
-当前移动端问答页支持以下模型交互：
+| 模式 | 值 | 行为 |
+|---|---|---|
+| 直接回答 | `direct` | 优先通义千问；失败时切换 DeepSeek `deepseek-chat` 兜底 |
+| 深度思考 | `deep_think` | 强制 `deepseek-reasoner`，不兜底；UI 展示可展开的推理过程 |
 
-1. 选择 `通义千问` 进行标准在线问答
-2. 选择 `DeepSeek` 进行在线问答
-3. 当选择 `DeepSeek` 时，可进一步切换：
-4. `直接回答`：优先返回速度
-5. `深度思考`：优先多步推理质量，通常更慢
+`/api/chat/modes` 接口返回可用模式列表。
 
-当前 `DeepSeek` 的两种模式分别对应：
+### 流式进度事件（`stream=true`）
 
-1. `直接回答` -> `deepseek-chat`
-2. `深度思考` -> `deepseek-reasoner`
+`accepted` → `retrieving` → `thinking`/`thinking_complete`（深度思考时）→ `reasoning`/`answering` → `organizing` → `completed`
 
-当前问答页在真实后端模式下还会显示阶段进度，便于区分“还在推理中”还是“已经完成回答”。`POST /api/qa/ask` 在传入 `stream=true` 时会按顺序返回可解析的进度事件，当前至少包含：
+### 引用片段
 
-1. `accepted`：问题已提交
-2. `retrieving`：正在检索视频字幕、摘要与标签
-3. `reasoning` / `answering`：正在调用 DeepSeek 或通义千问
-4. `organizing`：正在整理回答与引用片段
-5. `completed`：最终回答已生成
+后端为字幕类引用附加 `time_order`（按 `start_time` 排序的时间位次），前端按 `time_order` 排序展示，保证多轮问答引用顺序稳定。
 
-当前视频问答将 `通义千问` 与 `DeepSeek` 作为两个独立聊天空间处理，但当前隔离范围收敛为“前端状态 + 本地缓存 + 请求处理分流”：
-
-1. 切到 `通义千问` 时，只显示并续写通义千问自己的本地问答空间
-2. 切到 `DeepSeek` 时，只显示并续写 DeepSeek 自己的本地问答空间
-3. 同一 `videoId` 下，两种 provider 的前端内存状态与本地缓存不会再混用
-4. 后端仍会按 `provider` 做处理分流，但在不改现有 `questions` 表结构的前提下，服务端历史恢复默认安全禁用，避免把旧共享记录错误混入新的模型空间
-
-当前问答提供方只支持：
-
-1. `qwen`
-2. `deepseek`
-
-相关配置位于 `backend_fastapi/.env`：
+### 相关配置
 
 ```bash
-OPENAI_API_KEY=your-qwen-api-key
-OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-QWEN_API_KEY=your-qwen-api-key
+QWEN_API_KEY=...
 QWEN_API_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1
-DEEPSEEK_API_KEY=your-deepseek-api-key
-DEEPSEEK_API_BASE=https://api.deepseek.com/v1
-QA_DEFAULT_PROVIDER=qwen
 QWEN_QA_MODEL=qwen-plus
+DEEPSEEK_API_KEY=...
+DEEPSEEK_API_BASE=https://api.deepseek.com/v1
 DEEPSEEK_QA_MODEL=deepseek-chat
 DEEPSEEK_REASONER_MODEL=deepseek-reasoner
+QA_DEFAULT_PROVIDER=qwen
 QA_MAX_HISTORY_MESSAGES=8
 QA_MAX_HISTORY_CHARS=2200
 ```
 
-说明：
+## 设计助手（Sleek 代理）
 
-1. 当前通义千问链路已经可用，`OPENAI_*` 与 `QWEN_*` 都是为 Qwen 的 OpenAI 兼容接口准备的兼容变量。
-2. 若要使用 DeepSeek，至少需要补齐 `DEEPSEEK_API_KEY`。
-3. 若希望默认问答走 DeepSeek，可将 `QA_DEFAULT_PROVIDER` 改为 `deepseek`。
-4. 当前版本不要求修改现有 MySQL `questions` 表；数据库继续只保存基础问答记录，视频问答空间隔离以前端本地缓存与请求参数为准。
+`backend_fastapi/` 统一代理 Sleek API，前端与 iOS 容器不直接暴露 `SLEEK_API_KEY`。
 
-## 设计助手（接入 agent-skills / Sleek）
+后端接口（均以 `/api/design/` 为前缀）：`GET /status`、`GET/POST /projects`、`GET /projects/{id}/components`、`POST /projects/{id}/messages`、`GET /projects/{id}/runs/{run_id}`、`POST /projects/{id}/screenshots`。
 
-你提供的 `agent-skills` 仓库本质上是 Sleek API 的技能说明，而不是可直接放进 `mobile-frontend/` 的组件包。当前仓库已经按 EduMind 的 iOS-only 架构，将它收敛为一条新的后端代理链路：
+启用：在 `backend_fastapi/.env` 中填写 `SLEEK_API_KEY`（scope 至少含 `projects:read/write`、`components:read`、`chats:read/write`、`screenshots`）。
 
-1. `backend_fastapi/` 负责保存 `SLEEK_API_KEY`，统一代理 `projects`、`components`、`chat runs`、`screenshots`
-2. `mobile-frontend/` 新增“设计助手”页面，只调用 EduMind 自己的 `/api/design/*`
-3. `ios-app/` 无需直连 Sleek，也不会暴露第三方 API Key
+## 后端测试目录
 
-启用步骤：
-
-```bash
-cp backend_fastapi/.env.example backend_fastapi/.env
-# 在 backend_fastapi/.env 中补齐：
-# SLEEK_API_KEY=...
-python backend_fastapi/run.py
+```
+backend_fastapi/tests/
+├── unit/        # 单元测试
+├── api/         # 接口测试
+├── smoke/       # 冒烟测试（CI 门禁）
+└── integration/ # 集成测试
 ```
 
-需要的 Sleek scope 至少包括：
-
-1. `projects:read`
-2. `projects:write`
-3. `components:read`
-4. `chats:read`
-5. `chats:write`
-6. `screenshots`
-
-当前新增的 EduMind 后端接口：
-
-1. `GET /api/design/status`
-2. `GET /api/design/projects`
-3. `POST /api/design/projects`
-4. `GET /api/design/projects/{project_id}/components`
-5. `GET /api/design/projects/{project_id}/components/{component_id}`
-6. `POST /api/design/projects/{project_id}/messages`
-7. `GET /api/design/projects/{project_id}/runs/{run_id}`
-8. `POST /api/design/projects/{project_id}/screenshots`
-
-移动端入口位于“我的”页中的“设计助手”。当前流程支持：
-
-1. 创建或选择 Sleek 项目
-2. 直接输入自然语言描述生成页面
-3. 自动回显生成结果截图
-4. 查看生成组件的 HTML 原型
-
-## MySQL 表管理
-
-当前后端显式管理的业务表只有 6 张：
-
-1. `users`
-2. `videos`
-3. `notes`
-4. `questions`
-5. `subtitles`
-6. `note_timestamps`
-
-查看当前脚本管理的表结构：
-
-```bash
-. .venv/bin/activate
-python backend_fastapi/scripts/init_db.py --info
-```
-
-只补创建缺失表，不删除现有数据：
-
-```bash
-. .venv/bin/activate
-python backend_fastapi/scripts/init_db.py --create
-```
-
-删除并重建当前后端管理的表：
-
-```bash
-. .venv/bin/activate
-python backend_fastapi/scripts/init_db.py --reset
-```
-
-导出可直接在 Navicat 执行的 MySQL SQL：
-
-```bash
-. .venv/bin/activate
-python backend_fastapi/scripts/init_db.py --emit-sql backend_fastapi/scripts/mysql_managed_schema.sql
-```
-
-默认导出的 SQL 文件位置：
-
-- [`backend_fastapi/scripts/mysql_managed_schema.sql`](backend_fastapi/scripts/mysql_managed_schema.sql)
-
-当前默认数据库名已统一为 `edumind`。
-
-## 用户认证当前约定
-
-- 注册只接受“邮箱或手机号”至少一项，密码必须至少 8 位，且同时包含大小写字母、数字和特殊字符。
-- 登录只接受邮箱/手机号 + 密码。
-- 用户数据继续写入现有 `users` 表；不会新建认证平行表。
-- 登录后支持在“我的”页修改用户名，并将新值写回 `users.username`。
-- 登录后支持上传头像照片；文件保存在 `backend_fastapi/uploads/avatars/`，数据库继续只在现有 `users.avatar` 字段内记录可访问路径。
-- `python backend_fastapi/scripts/init_db.py --create` 现在会补齐 `users` 表的认证字段（手机号、重复密码指纹、登录次数）并同步必要索引。
-
-## 测试
-
-```bash
-. .venv/bin/activate
-python scripts/validate_backend_smoke.py
-```
-
-## Git Hooks
-
-仓库当前统一使用 `pre-commit` 管理本地 Git hooks，覆盖：
-
-1. `pre-commit`
-2. `pre-push`
-3. `commit-msg`
-
-一键安装：
-
-```bash
-bash scripts/install_git_hooks.sh
-```
-
-该命令会：
-
-1. 复用或创建根目录 `.venv`
-2. 安装 `pre-commit` 与 `mypy`
-3. 安装 `pre-commit`、`pre-push`、`commit-msg` 三类 hook
-
-当前 hook 规则：
-
-1. `pre-commit`：基础文件检查、Python `black` / `isort` / `flake8`、Shell 语法检查、前端 `console.log` / `debugger` 拦截
-2. `pre-push`：对当前已清理干净的 Python 层执行 `mypy`（`backend_fastapi/app/models`、`backend_fastapi/app/schemas`、`backend_fastapi/scripts/init_db.py`、`scripts/hooks`），再跑 `compileall + scripts/validate_backend_smoke.py`，最后执行 `mobile-frontend` 的 `npm run build:ios`
-3. `commit-msg`：强制 Conventional Commits，格式为 `type(scope): description`
-
-约定说明：
-
-1. Hook 默认只在本地开发环境执行；脚本检测到 `CI` 时会自动跳过本地专用逻辑
-2. `pre-commit` 只检查暂存文件，保持提交前反馈尽量快
-3. 如需临时跳过，可使用 `git commit --no-verify` 或 `git push --no-verify`，但这应是明确的例外而不是常态
-4. 首次执行 hook 时，`pre-commit` 会拉取并缓存自身依赖，后续会复用缓存
-5. `pre-push` 依赖 `.venv` 和 `mobile-frontend/node_modules` 已就绪
+本地改动验证使用 `python scripts/validate_backend_smoke.py`，不直接使用 `pytest`。
+GitHub Actions CI 在云端运行 `pytest tests/smoke` 作为回归门禁。
 
 ## 开发约束
 
 1. 真实功能只写在 `backend_fastapi/`
 2. `mobile-frontend/` 不直接实现业务规则或数据库逻辑
-3. 前端改动后必须同步 iOS `WebAssets`
-4. 文档规范以 `AGENTS.md` 与 `docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md` 为准
+3. 前端任何改动后必须重新执行 `bash ios-app/sync_ios_web_assets.sh` 同步 WebAssets
+4. 规范以 [`AGENTS.md`](AGENTS.md) 与 [`docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md) 为准
+5. 变更日志追加写入 [`CHANGELOG.md`](CHANGELOG.md)，不修改或删除历史记录
 
 ## 相关文档
 
-- [`AGENTS.md`](AGENTS.md)
+- [`AGENTS.md`](AGENTS.md) — 研发规范（AI 与人均遵守）
+- [`CHANGELOG.md`](CHANGELOG.md) — 变更日志
 - [`docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`](docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md)
 - [`docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md`](docs/NOTE_SYSTEM_IMPLEMENTATION_PROMPT.md)
 - [`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md)

@@ -41,9 +41,7 @@ def stream_chat(
     yield result
 
 
-def get_chat_response(
-    messages: List[dict], mode: str = "direct", provider: str = "qwen", model: str = ""
-) -> dict:
+def get_chat_response(messages: List[dict], mode: str = "direct", provider: str = "qwen", model: str = "") -> dict:
     """在线模型聊天非流式响应。
 
     对话模式:
@@ -58,9 +56,7 @@ def get_chat_response(
     }
 
 
-def _execute_chat_with_fallback(
-    messages: List[dict], mode: str, provider: str, model: str
-) -> tuple[str, str, str]:
+def _execute_chat_with_fallback(messages: List[dict], mode: str, provider: str, model: str) -> tuple[str, str, str]:
     """执行聊天请求，支持模式化路由和兜底。
 
     Args:

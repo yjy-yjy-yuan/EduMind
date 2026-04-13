@@ -262,11 +262,15 @@ private struct H5WebView: UIViewRepresentable {
             Bundle.main.object(forInfoDictionaryKey: "EDUMIND_API_BASE_URL") as? String
         )?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let apiBase = configuredAPIBase.isEmpty ? "http://yuandeMacBook-Pro.local:2004" : configuredAPIBase
-        EduMindLog.info(
-            "WebView",
-            "native api base=\(apiBase) | source=\(configuredAPIBase.isEmpty ? "fallback-local-hostname" : "info-plist")"
-        )
+        let apiBase = configuredAPIBase.isEmpty ? "" : configuredAPIBase
+        if apiBase.isEmpty {
+            EduMindLog.error("WebView", "EDUMIND_API_BASE_URL 未配置！H5 将无法请求后端 API。请在 Xcode Build Settings 中设置 INFOPLIST_KEY_EDUMIND_API_BASE_URL。")
+        } else {
+            EduMindLog.info(
+                "WebView",
+                "native api base=\(apiBase) | source=info-plist"
+            )
+        }
 
         let payload: [String: String] = [
             "apiBaseUrl": apiBase
@@ -1181,7 +1185,11 @@ private struct H5WebView: UIViewRepresentable {
                 Bundle.main.object(forInfoDictionaryKey: "EDUMIND_API_BASE_URL") as? String
             )?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let apiBase = configuredAPIBase.isEmpty ? "http://yuandeMacBook-Pro.local:2004" : configuredAPIBase
+            let apiBase = configuredAPIBase.isEmpty ? "" : configuredAPIBase
+            if apiBase.isEmpty {
+                EduMindLog.error("OfflineTranscript", "EDUMIND_API_BASE_URL 未配置！离线转录将无法请求后端。")
+                return nil
+            }
             return URL(string: apiBase.trimmingCharacters(in: .whitespacesAndNewlines))
         }
 

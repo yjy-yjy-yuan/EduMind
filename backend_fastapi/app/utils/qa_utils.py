@@ -180,7 +180,9 @@ def call_deepseek_reasoner_stream(
     data: [DONE]
     """
     api_key, base_url = resolve_provider_credentials("deepseek")
-    resolved_model = clean_whitespace(model) or clean_whitespace(settings.DEEPSEEK_REASONER_MODEL) or "deepseek-reasoner"
+    resolved_model = (
+        clean_whitespace(model) or clean_whitespace(settings.DEEPSEEK_REASONER_MODEL) or "deepseek-reasoner"
+    )
 
     with requests.post(
         f"{base_url}/chat/completions",
@@ -951,7 +953,9 @@ class QASystem:
                 provider_label = resolve_provider_label(pv)
                 final_model = pv_model
 
-        result = self._build_result(answer_buffer, "deepseek" if deep_thinking else normalized_provider, final_model, [])
+        result = self._build_result(
+            answer_buffer, "deepseek" if deep_thinking else normalized_provider, final_model, []
+        )
         yield build_stream_event(
             "status",
             stage="organizing",

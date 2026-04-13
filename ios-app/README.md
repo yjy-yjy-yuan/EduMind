@@ -6,15 +6,15 @@
 
 ```text
 ios-app/
-├── sync_ios_web_assets.sh      # 一键构建并同步 H5 资源到 iOS 工程
+├── sync_ios_web_assets.sh      # 一键构建并同步 H5 资源到 iOS 工程（支持 Debug/Release 双通道）
 ├── EduMindIOS/                 # Xcode 工程目录（由 Xcode 创建）
 │   ├── EduMindIOS.xcodeproj
 │   ├── EduMindIOS/
 │   │   ├── EduMindIOSApp.swift
 │   │   ├── ContentView.swift   # 已改为 WKWebView 容器
 │   │   ├── WebAssets/          # 打包后的 H5 静态资源
-│   └── Assets.xcassets
-└── README.md                   # 本说明
+│   │   └── Assets.xcassets
+│   └── README.md               # 本说明
 ```
 
 ### 2. WebView 加载策略
@@ -49,33 +49,41 @@ if let indexURL = Bundle.main.url(forResource: "index", withExtension: "html", s
 - H5 启动时会优先读取原生注入的 `window.__edumindNativeConfig.apiBaseUrl`；
 - 原生注入值来自 Info.plist / Build Settings 中的 `EDUMIND_API_BASE_URL`；
 - 若 H5 本地还没有保存过后端地址，会自动把该值落到 `localStorage`，首次安装也能直接连到 FastAPI；
-- 若换了 Wi‑Fi 或 Mac 局域网 IP 变化，仍可在“我的”页面手动覆盖。
+- 若换了 Wi‑Fi 或 Mac 局域网 IP 变化，仍可在"我的"页面手动覆盖。
 
-当前工程已在 Build Settings 中预留：
+**【重要】双通道配置说明**
 
-- `INFOPLIST_KEY_EDUMIND_API_BASE_URL = http://yuandeMacBook-Pro.local:2004`
+| 通道 | 用途 | API 地址来源 |
+|------|------|-------------|
+| Debug | 本地开发联调 | `sync_ios_web_assets.sh` 动态注入本机 `LocalHostName.local` |
+| Release / TestFlight | App Store / TestFlight 分发 | `project.pbxproj` Release 配置（已预置固定域名） |
 
-现在执行 `bash ios-app/sync_ios_web_assets.sh` 时，脚本会自动：
+`project.pbxproj` 配置现状：
 
-1. 读取 `backend_fastapi/.env` 里的 `PORT`
-2. 读取当前 Mac 的 `LocalHostName`
-3. 将 `EDUMIND_API_BASE_URL` 刷新成 `http://<LocalHostName>.local:<PORT>`
-4. 再同步最新 `mobile-frontend/dist` 到 `WebAssets`
+```
+Debug 配置（UUID: 1C23BC312F62C3DC00D572F8）:
+  INFOPLIST_KEY_EDUMIND_API_BASE_URL = "__DEBUG_DYNAMIC__"
+  （由 sync_ios_web_assets.sh 动态注入）
 
-推荐优先使用 `.local` 主机名而不是 IP。对于当前这台机器，主机名可写成：
+Release 配置（UUID: 1C23BC322F62C3DC00D572F8）:
+  INFOPLIST_KEY_EDUMIND_API_BASE_URL = "https://api.xxx.com"
+  （已预置固定域名，脚本不覆盖）
+```
 
-- `http://yuandeMacBook-Pro.local:2004`
+**使用方式：**
 
-这样换 Wi‑Fi 后只要 iPhone 和 Mac 仍在同一局域网，地址通常不需要跟着改。
-如果你需要“跨网络、跨地点也完全不变”，则不要再依赖局域网主机名，直接使用固定域名或反向隧道，见 [`docs/BACKEND_FIXED_DOMAIN.md`](/Users/yuan/final-work/EduMind/docs/BACKEND_FIXED_DOMAIN.md)。
+- **本地 Debug 开发**：`bash ios-app/sync_ios_web_assets.sh`（默认 Debug 模式，自动注入本机 LocalHostName）
+- **Release / TestFlight 打包**：`FIXED_DOMAIN=https://api.xxx.com bash ios-app/sync_ios_web_assets.sh --release`
+
+详细配置说明见 [`docs/BACKEND_FIXED_DOMAIN.md`](docs/BACKEND_FIXED_DOMAIN.md)。
 
 ### 4. 强制更新（无需卸载 App）
 
-iOS 容器已支持“强制更新拦截”：
+iOS 容器已支持"强制更新拦截"：
 
 1. 启动时会读取 Info.plist 配置键 `EDUMIND_UPDATE_MANIFEST_URL`
-2. 若该地址返回的清单命中强更条件，会展示全屏拦截层，只允许“立即更新”
-3. 点击“立即更新”会跳转 `update_url`（如 App Store 链接或企业分发链接）
+2. 若该地址返回的清单命中强更条件，会展示全屏拦截层，只允许"立即更新"
+3. 点击"立即更新"会跳转 `update_url`（如 App Store 链接或企业分发链接）
 
 当前工程已在 Build Settings 中预留：
 
@@ -106,17 +114,29 @@ iOS 容器已支持“强制更新拦截”：
 
 ### 5. 一键同步命令
 
-已提供脚本：
+已提供脚本（支持 Debug/Release 双通道）：
 
 ```bash
+# Debug 模式（默认）：联调本机后端
 bash ios-app/sync_ios_web_assets.sh
+
+# Release/TestFlight 模式：使用固定域名
+FIXED_DOMAIN=https://api.xxx.com bash ios-app/sync_ios_web_assets.sh --release
 ```
 
-该脚本会自动执行：
+Debug 模式脚本会自动执行：
 
-1. `mobile-frontend` 执行 `npm run build:ios`（生成相对路径资源，适配 `loadFileURL`）
-2. 根据 `backend_fastapi/.env` 的 `PORT` 和当前 Mac 主机名刷新 iOS 原生默认后端地址
-3. 同步 `dist/` 到 `ios-app/EduMindIOS/EduMindIOS/WebAssets/`
+1. 读取 `backend_fastapi/.env` 里的 `PORT`
+2. 读取当前 Mac 的 `LocalHostName`
+3. 将 `EDUMIND_API_BASE_URL` 刷新成 `http://<LocalHostName>.local:<PORT>`
+4. 再同步最新 `mobile-frontend/dist` 到 `WebAssets`
+
+Release 模式脚本会：
+
+1. 验证 FIXED_DOMAIN 不含 `.local` / `127.0.0.1` / 私网 IP / 占位符域名（安全检查）
+2. 将 `EDUMIND_API_BASE_URL` 刷新成 `FIXED_DOMAIN`（仅 Release 块，不影响 Debug 配置）
+3. 执行前端构建
+4. 同步产物到 WebAssets
 
 ### 6. 命令行编译（可选）
 
@@ -124,30 +144,33 @@ bash ios-app/sync_ios_web_assets.sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 xcodebuild -project ios-app/EduMindIOS/EduMindIOS.xcodeproj \
   -scheme EduMindIOS \
-  -destination 'generic/platform=iOS Simulator' \
+  -configuration Release \
+  -destination 'generic/platform=iOS' \
   build
 ```
 
 如果你要连同前端资源同步和构建日志一起做一遍本地校验，可直接执行：
 
 ```bash
+# Debug 验证（本地联调）
 bash ios-app/validate_ios_build.sh
+
+# Release 验证（TestFlight 准备）
+# validate_ios_build.sh --release 会：
+#   a. 调用 sync_ios_web_assets.sh --release（真正更新 Release UUID）
+#   b. 执行 xcodebuild -configuration Release
+#   c. 若 FIXED_DOMAIN 含占位符域名，自动失败
+FIXED_DOMAIN=https://api.xxx.com bash ios-app/validate_ios_build.sh --release
 ```
-
-该脚本会：
-
-1. 先执行 `bash ios-app/sync_ios_web_assets.sh`
-2. 再用无签名模式构建 iOS 工程，默认目标是 `generic/platform=iOS`
-3. 构建失败时输出更聚焦的签名链路误入 / CoreSimulator / `actool` 排查提示
 
 说明：
 
-- 这个脚本的目标是验证当前仓库代码和 `WKWebView` 资源能否成功编译，不要求本机已登录 Apple ID
+- `validate_ios_build.sh` 的目标是验证当前仓库代码和 `WKWebView` 资源能否成功编译，不要求本机已登录 Apple ID
 - 如果你要做真机安装或归档，再在 Xcode 里单独配置 Team / 描述文件并执行签名构建
 
 ### 7. 视频上传权限说明
 
-iOS 容器当前依赖 `WKWebView` 默认文件选择能力。由于 iPhone 上点击视频上传控件时，系统可能同时提供“拍摄视频 / 相册 / 文件”等入口，因此工程必须保留以下隐私说明，避免上传视频时触发系统权限崩溃：
+iOS 容器当前依赖 `WKWebView` 默认文件选择能力。由于 iPhone 上点击视频上传控件时，系统可能同时提供"拍摄视频 / 相册 / 文件"等入口，因此工程必须保留以下隐私说明，避免上传视频时触发系统权限崩溃：
 
 - `NSCameraUsageDescription`
 - `NSLocalNetworkUsageDescription`
