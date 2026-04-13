@@ -12,6 +12,8 @@ import { ensureOfflineCachePolicy } from '@/services/offlineMemory/cache/policie
 import { findExistingRecord, getTable, upsertRecord } from '@/services/offlineMemory/storage/repository'
 import { cacheLearningState, touchVideoAccess } from '@/services/offlineMemory/cache/videoCache'
 
+const MAX_THINKING = OFFLINE_MEMORY_LIMITS.MAX_THINKING_CHARS
+
 const parseTimeRangeStartSeconds = (timeRange = '') => {
   const start = String(timeRange || '')
     .split('-')[0]
@@ -85,6 +87,7 @@ const buildQuestionRecord = (input = {}, existing = null) => {
     model: normalizeString(input.model ?? prior.model, 64),
     question: normalizeString(input.question ?? input.content ?? prior.question, OFFLINE_MEMORY_LIMITS.MAX_QUESTION_CHARS),
     answer: normalizeString(input.answer ?? prior.answer, OFFLINE_MEMORY_LIMITS.MAX_ANSWER_CHARS),
+    thinking: normalizeString(input.thinking ?? prior.thinking, MAX_THINKING),
     references: normalizeReferences(input.references ?? prior.references),
     source: normalizeString(input.source ?? prior.source ?? 'online', 32),
     deep_thinking: Boolean(input.deep_thinking ?? prior.deep_thinking),
@@ -100,6 +103,7 @@ const mapQuestionToMessagePair = (item) => ([
   {
     role: 'ai',
     text: item.answer || '',
+    thinking: item.thinking || '',
     providerLabel: item.source === 'offline' ? '离线记忆' : '',
     model: item.model || '',
     references: Array.isArray(item.references) ? item.references : []

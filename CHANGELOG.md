@@ -2,6 +2,14 @@
 
 ## 2026-04-13
 
+### Mock 流式响应增强：深度思考过程展示与引用位次排序
+
+- **mobile-frontend**：`api/qa.js` Mock 流式响应新增 `thinking` 思考过程展示，包括思考状态事件、`thinking` 阶段流式输出、`thinking_complete` 完成状态，与真实后端深度思考模式对齐。
+- **mobile-frontend**：`services/offlineMemory/storage/db.js` 新增 `OFFLINE_MEMORY_LIMITS.MAX_THINKING_CHARS`（30000）和 `MAX_CONTEXT_CHARS`（9000）常量定义。
+- **mobile-frontend**：`services/offlineMemory/cache/questionCache.js` 新增 `parseTimeRangeStartSeconds`/`applySubtitleTimeOrder`/`normalizeReferences` 函数，实现引用片段时间位次排序与自动回填。
+- **mobile-frontend**：`QA.vue` 新增 `displayReferences`/`normalizeReferences`/`applySubtitleTimeOrder`/`parseTimeRangeStartSeconds` 函数，引用展示按 `time_order` 排序；新增 thinking 思考区域 UI（展开/收起、内容展示、折叠摘要）。
+- **ios-app**：同步 `WebAssets/index.js` 与 `WebAssets/index.css`。
+
 ### 问答引用片段增强：time_order 时间位次、后端传递、前端按时间排序
 
 - **backend_fastapi**：`qa_utils.py` 的 `KnowledgeChunk.to_reference()` 新增 `time_order` 参数（字幕片段按 `start_time` 排序后的位次），后端传递字幕时间位次供前端精确定位。

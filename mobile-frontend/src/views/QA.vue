@@ -44,8 +44,20 @@
           <div v-if="m.role === 'ai' && typeof m.progress !== 'undefined'" class="progress-track">
             <div class="progress-fill" :style="{ width: `${normalizeProgress(m.progress)}%` }"></div>
           </div>
-          <div class="text" :class="{ 'text--placeholder': m.role === 'ai' && m.loading && !m.text }">
-            {{ m.text || (m.role === 'ai' && m.loading ? '正在处理中，请稍候…' : '（无返回内容）') }}
+          <div v-if="m.role === 'ai' && m.thinking" class="thinking-area" :class="{ 'thinking-area--collapsed': m.thinkingCollapsed }">
+            <div class="thinking-header">
+              <span class="thinking-label">🤔 深度思考</span>
+              <button class="thinking-toggle" @click="toggleThinking(m)">
+                {{ m.thinkingCollapsed ? '展开' : '收起' }}
+              </button>
+            </div>
+            <div v-show="!m.thinkingCollapsed" class="thinking-content">{{ m.thinking }}</div>
+            <div v-if="m.thinkingCollapsed && m.thinking" class="thinking-summary">
+              {{ getThinkingSummary(m.thinking) }}
+            </div>
+          </div>
+          <div class="text" :class="{ 'text--placeholder': m.role === 'ai' && m.loading && !m.text && !m.thinking }">
+            {{ m.text || (m.role === 'ai' && m.loading && !m.thinking ? '正在处理中，请稍候…' : '（无返回内容）') }}
           </div>
           <div v-if="m.role === 'ai' && (m.providerLabel || m.model)" class="msg-meta">
             {{ m.providerLabel || '在线模型' }}<span v-if="m.model"> · {{ m.model }}</span>
@@ -187,7 +199,9 @@ const normalizeMessage = (item) => {
     references: normalizeReferences(item?.references),
     loading: Boolean(item?.loading),
     statusText: String(item?.statusText || item?.status_text || ''),
-    progress: typeof item?.progress === 'undefined' ? undefined : normalizeProgress(item.progress)
+    progress: typeof item?.progress === 'undefined' ? undefined : normalizeProgress(item.progress),
+    thinking: String(item?.thinking || ''),
+    thinkingCollapsed: Boolean(item?.thinkingCollapsed ?? false),
   }
 }
 
@@ -204,6 +218,7 @@ const stripMessageForCache = (item) => {
   return {
     role: normalized.role,
     text: normalized.text,
+    thinking: normalized.thinking,
     providerLabel: normalized.providerLabel,
     model: normalized.model,
     references: normalized.references
@@ -295,7 +310,8 @@ const persistSpaceMessages = (spaceKey = currentSpaceKey.value) => {
 
 const buildMessageSignature = (item) => {
   const normalized = normalizeMessage(item)
-  return `${normalized.role}:${normalized.text}:${normalized.providerLabel}:${normalized.model}`
+  const thinkingPart = normalized.thinking ? normalized.thinking.slice(0, 80) : ""
+  return `${normalized.role}:${normalized.text}:${normalized.providerLabel}:${normalized.model}:${thinkingPart}`
 }
 
 const mergeMessageLists = (primary = [], secondary = []) => {
@@ -403,6 +419,17 @@ const selectChatMode = (value) => {
   }
 }
 
+const toggleThinking = (message) => {
+  if (!message) return
+  message.thinkingCollapsed = !message.thinkingCollapsed
+}
+
+const getThinkingSummary = (thinking) => {
+  if (!thinking) return ''
+  const lines = thinking.split('\n').filter((l) => l.trim())
+  return lines.length > 0 ? `…${lines[lines.length - 1].trim()}` : ''
+}
+
 const buildPendingAiMessage = () => {
   const isDeepThink = chatMode.value === 'deep_think'
   return {
@@ -417,12 +444,13 @@ const buildPendingAiMessage = () => {
   }
 }
 
-const persistQuestionToOfflineMemory = async ({ questionText, answerText, references, source, model, serverId, historyPayload }) => {
+const persistQuestionToOfflineMemory = async ({ questionText, answerText, thinking, references, source, model, serverId, historyPayload }) => {
   const payload = {
     local_id: null,
     server_id: serverId || null,
     question: questionText,
     answer: answerText,
+    thinking: thinking || '',
     references,
     video_id: normalizedVideoId.value ?? null,
     user_id: currentUserId.value ?? null,
@@ -454,6 +482,7 @@ const runOfflineAnswer = async ({ questionText, historyPayload, pendingAiMessage
   await persistQuestionToOfflineMemory({
     questionText,
     answerText: offlineResult.answer,
+    thinking: '',
     references: offlineResult.references,
     source: 'offline',
     model: 'indexeddb-context',
@@ -469,7 +498,17 @@ const applyStreamEventToMessage = async (message, event) => {
   if (Array.isArray(event.references)) message.references = normalizeReferences(event.references)
   if (typeof event.progress !== 'undefined') message.progress = normalizeProgress(event.progress)
 
-  if (event.type === 'answer') {
+  if (event.type === 'thinking') {
+    const delta = String(event.delta || event.thinking || '')
+    if (delta) {
+      message.thinking = (message.thinking || '') + delta
+      message.progress = typeof event.progress !== 'undefined' ? normalizeProgress(event.progress) : message.progress
+    }
+  } else if (event.type === 'thinking_complete') {
+    message.thinking = String(event.thinking || message.thinking || '')
+    message.thinkingCollapsed = false
+    message.progress = typeof event.progress !== 'undefined' ? normalizeProgress(event.progress) : message.progress
+  } else if (event.type === 'answer') {
     message.loading = false
     message.statusText = String(event.message || '回答已完成')
     message.progress = 100
@@ -528,6 +567,7 @@ const send = async () => {
     await persistQuestionToOfflineMemory({
       questionText: q,
       answerText: finalEvent?.answer || pendingAiMessage.text,
+      thinking: pendingAiMessage.thinking || '',
       references: Array.isArray(finalEvent?.references) ? finalEvent.references : pendingAiMessage.references,
       source: 'online',
       model: finalEvent?.model || pendingAiMessage.model,
@@ -788,6 +828,61 @@ watch(
   font-size: 11px;
   line-height: 1.5;
   color: var(--muted);
+}
+
+.thinking-area {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(100, 116, 139, 0.06);
+  border: 1px dashed rgba(100, 116, 139, 0.22);
+}
+
+.thinking-area--collapsed {
+  padding: 8px 12px;
+}
+
+.thinking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.thinking-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.thinking-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.thinking-toggle:active {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.thinking-content {
+  font-size: 12px;
+  line-height: 1.65;
+  color: #64748b;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.thinking-summary {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
 }
 
 .inputbar {

@@ -61,6 +61,7 @@ const dispatchMockStream = async (payload, onEvent) => {
     : (payload.model || 'qwen-plus')
   const answerText = (await mockAskQuestion(payload)).data?.answer || '【UI 模式】暂无回答。'
   const isDeepThink = provider === 'deepseek' && deep_thinking
+
   const events = [
     { type: 'status', stage: 'accepted', message: '问题已提交，等待处理', progress: 5 },
     {
@@ -71,21 +72,62 @@ const dispatchMockStream = async (payload, onEvent) => {
       provider,
       provider_label: providerText,
       model: modelText
-    },
-    {
-      type: 'status',
-      stage: isDeepThink ? 'reasoning' : 'answering',
-      message: isDeepThink ? '正在调用 DeepSeek 思考模型' : `正在调用 ${providerText} 回答`,
-      progress: 60,
+    }
+  ]
+
+  if (isDeepThink) {
+    events.push(
+      {
+        type: 'status',
+        stage: 'reasoning',
+        message: '正在深度思考...',
+        progress: 50,
+        provider,
+        provider_label: providerText,
+        model: modelText
+      }
+    )
+
+    const thinkingChunks = [
+      '首先，我需要仔细分析这个问题涉及的各个方面...\n',
+      '让我回顾一下视频中提到的核心概念：\n',
+      '  1. 理解问题的本质诉求\n',
+      '  2. 对照视频内容寻找相关证据\n',
+      '  3. 综合分析形成逻辑链\n',
+      '基于以上分析，我可以看出这是一个涉及多个知识点的综合问题...\n',
+      '现在让我进一步推理，得出最终结论。'
+    ]
+
+    for (const chunk of thinkingChunks) {
+      events.push({
+        type: 'thinking',
+        stage: 'streaming',
+        thinking: chunk,
+        delta: chunk,
+        progress: 52,
+        provider,
+        provider_label: providerText,
+        model: modelText
+      })
+    }
+
+    events.push({
+      type: 'thinking_complete',
+      stage: 'completed',
+      thinking: thinkingChunks.join(''),
+      progress: 65,
       provider,
       provider_label: providerText,
       model: modelText
-    },
+    })
+  }
+
+  events.push(
     {
       type: 'status',
       stage: 'organizing',
       message: '正在整理回答与引用片段',
-      progress: 85,
+      progress: isDeepThink ? 80 : 85,
       provider,
       provider_label: providerText,
       model: modelText
@@ -101,13 +143,13 @@ const dispatchMockStream = async (payload, onEvent) => {
       model: modelText,
       references: []
     }
-  ]
+  )
 
   let finalEvent = null
   for (const event of events) {
     onEvent?.(event)
     finalEvent = event
-    await sleep(event.type === 'answer' ? 0 : 220)
+    await sleep(event.type === 'answer' ? 0 : event.type === 'thinking' ? 280 : 220)
   }
   return finalEvent
 }
