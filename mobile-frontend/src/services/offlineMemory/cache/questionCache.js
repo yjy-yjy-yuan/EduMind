@@ -12,16 +12,59 @@ import { ensureOfflineCachePolicy } from '@/services/offlineMemory/cache/policie
 import { findExistingRecord, getTable, upsertRecord } from '@/services/offlineMemory/storage/repository'
 import { cacheLearningState, touchVideoAccess } from '@/services/offlineMemory/cache/videoCache'
 
+const parseTimeRangeStartSeconds = (timeRange = '') => {
+  const start = String(timeRange || '')
+    .split('-')[0]
+    .trim()
+  if (!start) return Number.POSITIVE_INFINITY
+
+  const parts = start.split(':').map((part) => Number(part))
+  if (parts.some((part) => Number.isNaN(part) || part < 0)) return Number.POSITIVE_INFINITY
+  if (parts.length === 2) return parts[0] * 60 + parts[1]
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  return Number.POSITIVE_INFINITY
+}
+
+const applySubtitleTimeOrder = (references = []) => {
+  const subtitles = references.filter((item) => item?.source_type === 'subtitle')
+  if (subtitles.length === 0) return references
+
+  const orderedSubtitles = subtitles
+    .slice()
+    .sort((left, right) => {
+      const startDiff = parseTimeRangeStartSeconds(left?.time_range) - parseTimeRangeStartSeconds(right?.time_range)
+      if (startDiff !== 0) return startDiff
+      return Number(left?.index || 0) - Number(right?.index || 0)
+    })
+
+  const subtitleOrderMap = new Map()
+  orderedSubtitles.forEach((item, index) => {
+    subtitleOrderMap.set(item, index + 1)
+  })
+
+  return references.map((item) =>
+    item?.source_type === 'subtitle'
+      ? {
+          ...item,
+          time_order: subtitleOrderMap.get(item) || null
+        }
+      : item
+  )
+}
+
 const normalizeReferences = (references = []) =>
-  (Array.isArray(references) ? references : [])
-    .map((item, index) => ({
-      index: Number(item?.index || index + 1),
-      label: normalizeString(item?.label, 120),
-      preview: normalizeString(item?.preview, 240),
-      time_range: normalizeString(item?.time_range, 40),
-      source_type: normalizeString(item?.source_type, 40)
-    }))
-    .filter((item) => item.preview)
+  applySubtitleTimeOrder(
+    (Array.isArray(references) ? references : [])
+      .map((item, index) => ({
+        index: Number(item?.index || index + 1),
+        label: normalizeString(item?.label, 120),
+        preview: normalizeString(item?.preview, 240),
+        time_range: normalizeString(item?.time_range, 40),
+        source_type: normalizeString(item?.source_type, 40),
+        time_order: typeof item?.time_order === 'number' ? Number(item.time_order) : null
+      }))
+      .filter((item) => item.preview)
+  )
 
 const buildQuestionRecord = (input = {}, existing = null) => {
   const prior = existing ?? {}
@@ -94,7 +137,31 @@ export const getOfflineQuestions = async ({
   userId = null,
   limit = OFFLINE_MEMORY_LIMITS.MAX_QUESTIONS_PER_VIDEO
 } = {}) => {
-  let rows = await getTable('offline_questions').toArray()
+  const questionTable = getTable('offline_questions')
+  let rows = await questionTable.toArray()
+  const backfillQueue = []
+
+  rows = rows.map((row) => {
+    if (!row) return row
+    const normalizedRefs = normalizeReferences(row.references)
+    const originalRefs = Array.isArray(row.references) ? row.references : []
+    const changed = JSON.stringify(originalRefs) !== JSON.stringify(normalizedRefs)
+    if (changed && row.local_id) {
+      backfillQueue.push({
+        localId: String(row.local_id),
+        references: normalizedRefs
+      })
+    }
+    return {
+      ...row,
+      references: normalizedRefs
+    }
+  })
+
+  if (backfillQueue.length > 0) {
+    await Promise.all(backfillQueue.map((item) => questionTable.update(item.localId, { references: item.references })))
+  }
+
   if (videoId != null) {
     rows = rows.filter((row) => Number(row.video_id || 0) === Number(videoId))
   }

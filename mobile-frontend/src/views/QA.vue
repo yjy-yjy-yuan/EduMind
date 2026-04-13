@@ -51,7 +51,7 @@
             {{ m.providerLabel || '在线模型' }}<span v-if="m.model"> · {{ m.model }}</span>
           </div>
           <div v-if="m.role === 'ai' && m.references?.length" class="refs">
-            <div v-for="ref in m.references" :key="`${idx}-${ref.index}`" class="ref-item">
+            <div v-for="ref in displayReferences(m.references)" :key="`${idx}-${ref.index}-${ref.time_order ?? 'n'}`" class="ref-item">
               [{{ ref.index }}] {{ ref.label }}<span v-if="ref.time_range"> · {{ ref.time_range }}</span> · {{ ref.preview }}
             </div>
           </div>
@@ -116,16 +116,66 @@ const normalizeProgress = (value) => {
   return Math.max(0, Math.min(100, Math.round(num)))
 }
 
+const parseTimeRangeStartSeconds = (timeRange = '') => {
+  const start = String(timeRange || '')
+    .split('-')[0]
+    .trim()
+  if (!start) return Number.POSITIVE_INFINITY
+
+  const parts = start.split(':').map((part) => Number(part))
+  if (parts.some((part) => Number.isNaN(part) || part < 0)) return Number.POSITIVE_INFINITY
+  if (parts.length === 2) return parts[0] * 60 + parts[1]
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  return Number.POSITIVE_INFINITY
+}
+
+const applySubtitleTimeOrder = (references = []) => {
+  const subtitles = references.filter((item) => item?.source_type === 'subtitle')
+  if (subtitles.length === 0) return references
+
+  const orderedSubtitles = subtitles
+    .slice()
+    .sort((left, right) => {
+      const startDiff = parseTimeRangeStartSeconds(left?.time_range) - parseTimeRangeStartSeconds(right?.time_range)
+      if (startDiff !== 0) return startDiff
+      return Number(left?.index || 0) - Number(right?.index || 0)
+    })
+
+  const subtitleOrderMap = new Map()
+  orderedSubtitles.forEach((item, index) => {
+    subtitleOrderMap.set(item, index + 1)
+  })
+
+  return references.map((item) =>
+    item?.source_type === 'subtitle'
+      ? {
+          ...item,
+          time_order: subtitleOrderMap.get(item) || null
+        }
+      : item
+  )
+}
+
+const displayReferences = (refs = []) => {
+  const subtitles = refs.filter((r) => r.source_type === 'subtitle' && r.time_order != null)
+  const others = refs.filter((r) => r.source_type !== 'subtitle' || r.time_order == null)
+  return [...subtitles.sort((a, b) => a.time_order - b.time_order), ...others]
+}
+
 const normalizeReferences = (value) => {
   if (!Array.isArray(value)) return []
-  return value.map((item, index) => ({
-    index: Number(item?.index || index + 1),
-    source_type: String(item?.source_type || ''),
-    label: String(item?.label || ''),
-    time_range: String(item?.time_range || ''),
-    preview: String(item?.preview || '')
-  }))
+  return applySubtitleTimeOrder(
+    value.map((item, index) => ({
+      index: Number(item?.index || index + 1),
+      source_type: String(item?.source_type || ''),
+      label: String(item?.label || ''),
+      time_range: String(item?.time_range || ''),
+      preview: String(item?.preview || ''),
+      time_order: typeof item?.time_order === 'number' ? Number(item.time_order) : null
+    }))
+  )
 }
+
 
 const normalizeMessage = (item) => {
   const role = item?.role === 'assistant' ? 'ai' : String(item?.role || 'user')

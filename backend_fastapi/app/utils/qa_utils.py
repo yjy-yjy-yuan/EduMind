@@ -53,7 +53,7 @@ class KnowledgeChunk:
             return ""
         return f"{format_seconds(self.start_time)}-{format_seconds(self.end_time)}"
 
-    def to_reference(self, index: int) -> dict:
+    def to_reference(self, index: int, time_order: Optional[int] = None) -> dict:
         preview = clean_whitespace(self.text)
         if len(preview) > 120:
             preview = f"{preview[:117]}..."
@@ -62,6 +62,7 @@ class KnowledgeChunk:
             "source_type": self.source_type,
             "label": self.source_label,
             "time_range": self.time_range,
+            "time_order": time_order,
             "preview": preview,
         }
 
@@ -604,12 +605,19 @@ class QASystem:
 
     def _build_result(self, answer: str, provider: str, model: str, references: list[KnowledgeChunk]) -> dict:
         normalized_provider = normalize_provider(provider, model)
+        # 字幕片段按 start_time 排序得到时间位次（供前端精确定位）；非字幕片段（摘要等）无时间位次
+        time_ordered_subtitles = [c for c in references if c.source_type == "subtitle"]
+        time_ordered_subtitles.sort(key=lambda c: float(c.start_time or 0))
+        subtitle_time_order = {id(c): i + 1 for i, c in enumerate(time_ordered_subtitles)}
         return {
             "answer": clean_multiline_text(answer),
             "provider": normalized_provider,
             "model": model,
             "provider_label": resolve_provider_label(normalized_provider),
-            "references": [chunk.to_reference(index) for index, chunk in enumerate(references, start=1)],
+            "references": [
+                chunk.to_reference(index, time_order=subtitle_time_order.get(id(chunk)))
+                for index, chunk in enumerate(references, start=1)
+            ],
         }
 
     def ask(

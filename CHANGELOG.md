@@ -2,6 +2,13 @@
 
 ## 2026-04-13
 
+### 问答引用片段增强：time_order 时间位次、后端传递、前端按时间排序
+
+- **backend_fastapi**：`qa_utils.py` 的 `KnowledgeChunk.to_reference()` 新增 `time_order` 参数（字幕片段按 `start_time` 排序后的位次），后端传递字幕时间位次供前端精确定位。
+- **mobile-frontend**：`questionCache.js` 新增 `parseTimeRangeStartSeconds`/`applySubtitleTimeOrder` 函数，实现 `references` 数组的时间位次排序；新增 `time_order` 字段存储字幕片段在时间轴上的位次；读取时自动回填缺失的 `time_order`。
+- **mobile-frontend**：`QA.vue` 引用片段展示新增 `displayReferences` 函数，按 `time_order` 排序字幕引用（无 `time_order` 的标签等引用保持原顺序），解决同一视频多次问答时引用索引顺序不确定的问题。
+- **ios-app**：同步 `WebAssets/index.js` 与 `WebAssets/index.css`。
+
 ### 离线内存系统增强：问答同步、笔记视频关联、学习状态缓存
 
 - **mobile-frontend**：`offlineMemorySync.js` 新增 `saveOfflineQuestion` 函数，支持将离线问题记录到 IndexedDB 并入同步队列，待网络恢复后自动同步到后端。
