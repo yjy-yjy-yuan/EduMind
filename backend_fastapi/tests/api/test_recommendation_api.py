@@ -229,7 +229,7 @@ class TestRecommendationAPI:
         assert any(item["reason_code"] in {"interest", "continue"} for item in payload["items"])
 
     def test_home_recommendations_enforce_similarity_threshold_and_window(self, client, db, sample_user):
-        """推荐接口应按后端阈值过滤，并将条数规范化到 5~8。"""
+        """推荐接口应按后端阈值过滤，并将条数规范化到 6~8。"""
         from app.models.video import Video
         from app.models.video import VideoStatus
         from app.utils.auth_token import build_auth_token

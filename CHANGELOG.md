@@ -2,6 +2,14 @@
 
 ## 2026-04-13
 
+### 屏幕方向锁定：强制竖屏显示
+
+- **ios-app**：修改 `project.pbxproj` 中 `UISupportedInterfaceOrientations` 配置，移除横屏方向（`LandscapeLeft`、`LandscapeRight`），仅保留 `Portrait` 竖屏支持；同步更新 iPad 配置。
+- **mobile-frontend**：`index.html` viewport meta 标签新增 `screen-orientation: portrait` 属性，增强屏幕方向锁定。
+- **ios-app**：`ContentView.swift` 的 `H5WebView` 组件新增 `.rotationEffect(.zero)` 和安全区域适配，确保 SwiftUI 层不会产生意外旋转。
+- **ios-app**：`validate_ios_build.sh` 新增屏幕方向配置校验步骤，构建前检查 `UISupportedInterfaceOrientations` 是否正确配置为仅竖屏，防止未来误加横屏。
+- **ios-app**：同步 `WebAssets/index.js` 与 `WebAssets/index.css`。
+
 ### Mock 流式响应增强：深度思考过程展示与引用位次排序
 
 - **mobile-frontend**：`api/qa.js` Mock 流式响应新增 `thinking` 思考过程展示，包括思考状态事件、`thinking` 阶段流式输出、`thinking_complete` 完成状态，与真实后端深度思考模式对齐。

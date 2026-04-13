@@ -306,6 +306,7 @@ POST /api/videos/{video_id}/generate-tags
 18. **首页「为你推荐」**已精简为标题与推荐卡片列表：已移除标题下说明文案、首屏「刷新推荐」按钮、「本页条数 / 更多场景」统计卡片（进入首页仍会照常拉取推荐）。**推荐学习中枢页**已移除 hero 内开发者向说明卡片；页面为 **Hero + 单列表「推荐视频」** 与刷新入口，与首页共用同一推荐接口语义。
 19. **视频详情页**（`/videos/:id`）为横向双页：**学习处理**（Whisper、摘要、笔记、操作、重试、删除等既有流程）与 **相关推荐**（`GET /api/recommendations/videos`，`scene=related` + `seed_video_id` 并排除种子；展示口径与全站一致，不渲染切片化 `summary/reason_text/tags`）。首次仅在学习处理页加载详情；切换到推荐子页时再请求推荐；子页索引保存在 `sessionStorage`（`videoDetailSubPage:<id>`）。
 20. **视频详情布局与手势**：封面区（LIVE/占位、标题、状态、进度、「可进播放器」提示等）在 **`.video-detail__shared` 中固定在页面上方**，不随双页横向滑动；**「学习处理 / 相关推荐」页签与下方 `scroll-snap` 分页轨道**仅作用于其下区域，符合「在封面卡片下」左右切换的预期。分页下面板不使用 `touch-action: pan-y` 锁定，避免在推荐卡片上横滑无法驱动外层分页。实现文件：`mobile-frontend/src/views/VideoDetail.vue`，`mobile-frontend/src/components/videoDetail/VideoDetailRecommendPanel.vue`，`VideoDetailRecommendCard.vue`，`mobile-frontend/src/services/recommendationPresentation.js`，`videoDetailTelemetry.js`。结构化埋点通过 `CustomEvent('edumind:telemetry')`（`detail.scope === 'video_detail'`）抛出，便于 `WKWebView` 原生侧订阅。
+21. **屏幕方向锁定（强制竖屏）**：`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj` 的 `UISupportedInterfaceOrientations`（含 iPad）已收敛为仅 `UIInterfaceOrientationPortrait`；`mobile-frontend/index.html` viewport meta 补充 `screen-orientation: portrait`；`ios-app/validate_ios_build.sh` 新增构建前屏幕方向配置校验，检测到横屏方向时立即报错阻断构建。
 
 ## 视频删除与运维脚本
 
@@ -316,40 +317,32 @@ POST /api/videos/{video_id}/generate-tags
 
 当前视频问答已经接入真实后端 RAG，不再依赖前端占位回复：
 
-1. 前端向 `POST /api/qa/ask` 提交 `video_id`、`question`、`provider`
+1. 前端向 `POST /api/qa/ask` 提交 `video_id`、`question`、`chat_mode`
 2. 后端基于现有 `subtitles`、`videos.summary`、`videos.tags` 组装检索上下文
 3. 后端对字幕片段做轻量召回，再调用通义千问或 DeepSeek 生成回答
 4. 问答记录写入现有 `questions` 表，不新增平行问答表
 
 为保证连续追问时的上下文记忆，移动端会把最近几轮问答一并提交给后端，后端再结合视频字幕检索结果组织最终提示词；因此“它 / 这个 / 上一题提到的第二点”这类追问不再只靠当前一句话硬猜。
 
-当前移动端问答页支持以下模型交互：
+当前移动端问答页支持以下对话模式（`chat_mode` 字段）：
 
-1. 选择 `通义千问` 进行标准在线问答
-2. 选择 `DeepSeek` 进行在线问答
-3. 当选择 `DeepSeek` 时，可进一步切换：
-4. `直接回答`：优先返回速度
-5. `深度思考`：优先多步推理质量，通常更慢
+1. **直接回答**（`chat_mode=direct`）：优先通义千问响应速度；通义千问失败时自动切换 DeepSeek `deepseek-chat` 兜底。
+2. **深度思考**（`chat_mode=deep_think`）：强制使用 `deepseek-reasoner` 多步推理，不进行兜底。
 
-当前 `DeepSeek` 的两种模式分别对应：
+`POST /api/qa/ask` 新版参数以 `chat_mode` 替换原有的 `provider + deep_thinking` 组合；`/api/chat/modes` 接口返回当前可用模式列表。
 
-1. `直接回答` -> `deepseek-chat`
-2. `深度思考` -> `deepseek-reasoner`
+问答引用片段新增 `time_order` 字段：后端按字幕 `start_time` 排序后为每个字幕片段分配位次，前端 `QA.vue` 按 `time_order` 排序展示，保证同一视频多次问答时引用顺序稳定；非字幕来源（标签等）保持原顺序。
 
-当前问答页在真实后端模式下还会显示阶段进度，便于区分“还在推理中”还是“已经完成回答”。`POST /api/qa/ask` 在传入 `stream=true` 时会按顺序返回可解析的进度事件，当前至少包含：
+当前问答页在真实后端模式下还会显示阶段进度，便于区分"还在推理中"还是"已经完成回答"。`POST /api/qa/ask` 在传入 `stream=true` 时会按顺序返回可解析的进度事件，当前至少包含：
 
 1. `accepted`：问题已提交
 2. `retrieving`：正在检索视频字幕、摘要与标签
-3. `reasoning` / `answering`：正在调用 DeepSeek 或通义千问
-4. `organizing`：正在整理回答与引用片段
-5. `completed`：最终回答已生成
+3. `thinking` / `thinking_complete`：深度思考模式下的推理过程（UI 可展开/收起）
+4. `reasoning` / `answering`：正在调用模型生成回答
+5. `organizing`：正在整理回答与引用片段
+6. `completed`：最终回答已生成
 
-当前视频问答将 `通义千问` 与 `DeepSeek` 作为两个独立聊天空间处理，但当前隔离范围收敛为“前端状态 + 本地缓存 + 请求处理分流”：
-
-1. 切到 `通义千问` 时，只显示并续写通义千问自己的本地问答空间
-2. 切到 `DeepSeek` 时，只显示并续写 DeepSeek 自己的本地问答空间
-3. 同一 `videoId` 下，两种 provider 的前端内存状态与本地缓存不会再混用
-4. 后端仍会按 `provider` 做处理分流，但在不改现有 `questions` 表结构的前提下，服务端历史恢复默认安全禁用，避免把旧共享记录错误混入新的模型空间
+当前问答隔离范围收敛为"前端本地缓存 + `chat_mode` 请求参数"：同一 `videoId` 下不同模式的历史记录在前端分开存储，后端按 `chat_mode` 路由但不要求修改 `questions` 表结构。
 
 当前问答提供方只支持：
 

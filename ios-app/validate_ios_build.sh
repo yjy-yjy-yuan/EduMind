@@ -24,6 +24,16 @@ fi
 echo "==> Sync latest WebAssets"
 bash "$REPO_DIR/ios-app/sync_ios_web_assets.sh"
 
+echo "==> Validate screen orientation configuration"
+ORIENTATION_CONFIG=$(rg -o 'UISupportedInterfaceOrientations[^;]*;' "$PROJECT_PATH/project.pbxproj" | head -2)
+if echo "$ORIENTATION_CONFIG" | rg -q "LandscapeLeft|LandscapeRight"; then
+  echo "警告: 检测到 UISupportedInterfaceOrientations 包含横屏方向，当前应仅支持竖屏"
+  echo "配置内容: $ORIENTATION_CONFIG"
+  exit 1
+else
+  echo "屏幕方向配置正确: 仅支持竖屏 (Portrait)"
+fi
+
 echo "==> Build iOS project"
 set +e
 xcodebuild \
