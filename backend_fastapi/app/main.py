@@ -114,6 +114,11 @@ async def lifespan(app: FastAPI):
     os.makedirs(settings.PREVIEW_FOLDER, exist_ok=True)
     os.makedirs(settings.TEMP_FOLDER, exist_ok=True)
     logger.info(f"上传目录已就绪: {settings.UPLOAD_FOLDER}")
+    cors_safe = [o for o in settings.CORS_ORIGINS if o not in ("*", "null", None, "")]
+    logger.info(
+        "CORS 允许来源（已过滤敏感项）: %s | 全量原始值请查看 settings.CORS_ORIGINS",
+        cors_safe,
+    )
     start_whisper_background_preload(settings.WHISPER_MODEL, settings.WHISPER_MODEL_PATH)
 
     yield

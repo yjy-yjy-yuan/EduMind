@@ -72,3 +72,5 @@ DerivedData/
 .env.local
 .env.*
 !.env.example
+!.env.ios.example
+!.env.production.example

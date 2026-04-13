@@ -27,14 +27,17 @@ BACKEND_DIR = REPO_DIR / "backend_fastapi"
 # Stage 1 — syntax / bytecode check (compileall)
 # ---------------------------------------------------------------------------
 
+
 def _run_compileall() -> bool:
     """Verify all backend modules compile without syntax errors."""
     result = subprocess.run(
         [
             sys.executable,
-            "-m", "compileall",
+            "-m",
+            "compileall",
             "-q",  # quiet
-            "-x", "backend_fastapi/uploads/*",  # skip runtime-uploaded files
+            "-x",
+            "backend_fastapi/uploads/*",  # skip runtime-uploaded files
             str(BACKEND_DIR),
         ],
         cwd=str(REPO_DIR),
@@ -104,10 +107,12 @@ def _run_helper_check(name: str, code: str) -> bool:
 # Stage 2 helpers
 # ---------------------------------------------------------------------------
 
+
 def _verify_recommendation_helpers() -> bool:
     return _run_helper_check(
         "recommendation_service helpers",
-        textwrap.dedent("""\
+        textwrap.dedent(
+            """\
             import importlib
             mod = importlib.import_module('app.services.video_recommendation_service')
             fn = getattr(mod, 'infer_preferred_provider_from_url')
@@ -121,7 +126,8 @@ def _verify_recommendation_helpers() -> bool:
             assert r[3] == 'youtube'
 
             print('recommendation_service helpers: OK')
-        """),
+        """
+        ),
     )
 
 
@@ -157,6 +163,7 @@ def _verify_route_registration() -> bool:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def main() -> int:
     print("=== Stage 1: compileall syntax check ===")

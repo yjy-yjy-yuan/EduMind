@@ -279,7 +279,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = EduMind;
-				INFOPLIST_KEY_EDUMIND_API_BASE_URL = "http://yuandeMacBook-Pro.local:2004";
+				INFOPLIST_KEY_EDUMIND_API_BASE_URL = "__DEBUG_DYNAMIC__";
 				INFOPLIST_KEY_EDUMIND_UPDATE_MANIFEST_URL = "";
 				"INFOPLIST_KEY_EDUMIND_UPDATE_MANIFEST_URL[arch=*]" = "http://192.168.1.10:5173";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
@@ -329,7 +329,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = EduMind;
-				INFOPLIST_KEY_EDUMIND_API_BASE_URL = "http://yuandeMacBook-Pro.local:2004";
+				INFOPLIST_KEY_EDUMIND_API_BASE_URL = "https://api.xxx.com";
 				INFOPLIST_KEY_EDUMIND_UPDATE_MANIFEST_URL = "";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.education";
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoadsInWebContent = YES;

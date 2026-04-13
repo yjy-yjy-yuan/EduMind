@@ -2,6 +2,45 @@
 
 ## 2026-04-13
 
+### 固定后端域名方案（iOS TestFlight 发布准备）
+
+#### 架构改进
+
+- **双通道配置设计**：iOS `project.pbxproj` Debug 和 Release 配置现在完全隔离。
+  - Debug 配置（UUID `1C23BC312F62C3DC00D572F8`）：`__DEBUG_DYNAMIC__` 占位符，由 `sync_ios_web_assets.sh` 在 Debug 模式下动态注入当前机器 LocalHostName。
+  - Release 配置（UUID `1C23BC322F62C3DC00D572F8`）：由 `sync_ios_web_assets.sh --release` 真正写入固定域名。
+- **安全保护机制**：
+  - Release 模式检测到 `.local` / `127.0.0.1` / 私网 IP 时，脚本报错退出。
+  - Release 模式检测到占位符域名（`xxx.com`、`example.com`、`test.local`）时报错退出，防止发布含占位符的包。
+- **ContentView.swift 硬编码移除**：移除了 `http://yuandeMacBook-Pro.local:2004` 静默 fallback，改为未配置时输出 error 日志。
+
+#### 脚本变更
+
+- `ios-app/sync_ios_web_assets.sh`：
+  - Debug 模式：精确更新 Debug UUID（`1C23BC312F62C3DC00D572F8`），Release 块不受影响。
+  - Release 模式：精确更新 Release UUID（`1C23BC322F62C3DC00D572F8`），Debug 块不受影响。
+  - 新增占位符域名检查（`is_placeholder_domain()`）。
+  - 使用 Python 精确块替换，移除 sed fallback。
+- `ios-app/validate_ios_build.sh`：
+  - 新增 `--release` 参数，调用 `sync_ios_web_assets.sh --release` 并执行 `xcodebuild -configuration Release`。
+  - Debug 模式（默认）行为不变。
+
+#### 前端新增文件
+
+- `mobile-frontend/.env.ios.example`：iOS 打包专用环境变量示例（`VITE_MOBILE_API_BASE_URL=https://api.xxx.com`）。
+- `mobile-frontend/.env.production.example`：生产 Web 部署环境变量示例。
+
+#### 文档更新
+
+- `docs/BACKEND_FIXED_DOMAIN.md`：重写，新增双通道设计、安全保护机制、验收步骤、故障排查、回滚策略章节。
+- `ios-app/README.md`：更新 API 配置章节，说明 Debug/Release 双通道用法。
+- `mobile-frontend/README.md`：更新 iOS 打包环境变量说明。
+- `.gitignore`：新增 `.env.ios.example` 和 `.env.production.example` 的例外规则。
+
+#### 后端可观测性
+
+- `backend_fastapi/app/main.py`：启动时打印 CORS 允许来源（不含敏感信息）。
+
 ### README 全面重写
 
 - 合并重复章节（`## 测试` / `## 后端测试目录`、`## Git Hooks` / `## Git Hooks 与本地质量门`、`## MySQL 表管理` / `## 用户认证当前约定` 等）；从 532 行压缩至约 333 行。
