@@ -71,6 +71,15 @@ DerivedData/
 .env
 .env.local
 .env.*
+# Explicitly ignore local backend env files with secrets.
+backend_fastapi/.env
+backend_fastapi/.env.production
 !.env.example
 !.env.ios.example
 !.env.production.example
+
+# Deployment artifacts (contain secrets / binary tools)
+scripts/deploy_aliyun.sh
+scripts/deploy_server.sh
+sshpass_bin
+edumind.tar.gz
