@@ -23,28 +23,29 @@ const normalizeReferences = (references = []) =>
     }))
     .filter((item) => item.preview)
 
-const buildQuestionRecord = (input = {}, existing = {}) => {
-  const updatedAt = input.updated_at || input.created_at || existing.updated_at || nowIso()
-  const serverId = input.server_id || input.id || existing.server_id || null
+const buildQuestionRecord = (input = {}, existing = null) => {
+  const prior = existing ?? {}
+  const updatedAt = input.updated_at || input.created_at || prior.updated_at || nowIso()
+  const serverId = input.server_id || input.id || prior.server_id || null
   return createBaseRecord({
-    local_id: existing.local_id || input.local_id || createLocalId('offline-question'),
+    local_id: prior.local_id || input.local_id || createLocalId('offline-question'),
     server_id: serverId,
     updated_at: updatedAt,
-    sync_status: input.sync_status || existing.sync_status || OFFLINE_SYNC_STATUS.SYNCED,
-    lastAccessedAt: input.lastAccessedAt || existing.lastAccessedAt || updatedAt,
+    sync_status: input.sync_status || prior.sync_status || OFFLINE_SYNC_STATUS.SYNCED,
+    lastAccessedAt: input.lastAccessedAt || prior.lastAccessedAt || updatedAt,
     entity_type: OFFLINE_ENTITY_TYPE.QUESTION,
-    video_id: normalizeIntegerId(input.video_id ?? existing.video_id),
-    user_id: normalizeIntegerId(input.user_id ?? existing.user_id),
-    mode: normalizeString(input.mode ?? existing.mode ?? 'video', 16) || 'video',
-    chat_mode: normalizeString(input.chat_mode ?? existing.chat_mode ?? 'direct', 16) || 'direct',
-    provider: normalizeString(input.provider ?? existing.provider ?? 'qwen', 32) || 'qwen',
-    model: normalizeString(input.model ?? existing.model, 64),
-    question: normalizeString(input.question ?? input.content ?? existing.question, OFFLINE_MEMORY_LIMITS.MAX_QUESTION_CHARS),
-    answer: normalizeString(input.answer ?? existing.answer, OFFLINE_MEMORY_LIMITS.MAX_ANSWER_CHARS),
-    references: normalizeReferences(input.references ?? existing.references),
-    source: normalizeString(input.source ?? existing.source ?? 'online', 32),
-    deep_thinking: Boolean(input.deep_thinking ?? existing.deep_thinking),
-    history: Array.isArray(input.history) ? input.history : Array.isArray(existing.history) ? existing.history : []
+    video_id: normalizeIntegerId(input.video_id ?? prior.video_id),
+    user_id: normalizeIntegerId(input.user_id ?? prior.user_id),
+    mode: normalizeString(input.mode ?? prior.mode ?? 'video', 16) || 'video',
+    chat_mode: normalizeString(input.chat_mode ?? prior.chat_mode ?? 'direct', 16) || 'direct',
+    provider: normalizeString(input.provider ?? prior.provider ?? 'qwen', 32) || 'qwen',
+    model: normalizeString(input.model ?? prior.model, 64),
+    question: normalizeString(input.question ?? input.content ?? prior.question, OFFLINE_MEMORY_LIMITS.MAX_QUESTION_CHARS),
+    answer: normalizeString(input.answer ?? prior.answer, OFFLINE_MEMORY_LIMITS.MAX_ANSWER_CHARS),
+    references: normalizeReferences(input.references ?? prior.references),
+    source: normalizeString(input.source ?? prior.source ?? 'online', 32),
+    deep_thinking: Boolean(input.deep_thinking ?? prior.deep_thinking),
+    history: Array.isArray(input.history) ? input.history : Array.isArray(prior.history) ? prior.history : []
   })
 }
 
@@ -108,7 +109,10 @@ export const getOfflineQuestions = async ({
   }
   return rows
     .filter(Boolean)
-    .sort((left, right) => new Date(right.lastAccessedAt || right.updated_at || 0) - new Date(left.lastAccessedAt || left.updated_at || 0))
+    .sort(
+      (left, right) =>
+        new Date(right?.lastAccessedAt || right?.updated_at || 0) - new Date(left?.lastAccessedAt || left?.updated_at || 0)
+    )
     .slice(0, limit)
 }
 

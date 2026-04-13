@@ -287,7 +287,9 @@ const tickVideoProgress = (video) => {
 }
 
 const sortByUpdatedDesc = (list) =>
-  [...list].sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0))
+  [...list].sort(
+    (a, b) => new Date(b?.updated_at || b?.created_at || 0) - new Date(a?.updated_at || a?.created_at || 0)
+  )
 
 const recommendationScenes = [
   {

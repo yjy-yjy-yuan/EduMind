@@ -1,5 +1,20 @@
 # 变更日志
 
+## 2026-04-13
+
+### 离线内存系统增强：问答同步、笔记视频关联、学习状态缓存
+
+- **mobile-frontend**：`offlineMemorySync.js` 新增 `saveOfflineQuestion` 函数，支持将离线问题记录到 IndexedDB 并入同步队列，待网络恢复后自动同步到后端。
+- **mobile-frontend**：`offlineMemorySync.js` 优化 `persistQuestionResult` 支持 `deep_thinking` 参数透传；新增 `shouldUseOfflineMemoryMode` 判断逻辑，视频问答模式强制走在线。
+- **mobile-frontend**：`noteCache.js` 笔记记录新增 `video_title` 字段，自动关联笔记所属视频标题，便于离线场景展示。
+- **mobile-frontend**：`questionCache.js` 问答记录新增 `references` 字段支持（引用片段索引、标签、预览、时间范围），与后端问答接口字段对齐。
+- **mobile-frontend**：`videoCache.js` 新增 `cacheLearningState` 函数，支持记录视频学习状态（播放位置、进度百分比、笔记时间、问答时间）；新增 `touchVideoAccess` 函数统一更新视频和相关实体的访问时间戳。
+- **mobile-frontend**：`videoCache.js` 字幕缓存新增 `cacheVideoSubtitles` 分页存储支持，统一离线字幕访问入口。
+- **mobile-frontend**：`mockGateway.js` 新增 `mockAskQuestion` 函数，支持 Mock 环境下的问答模拟。
+- **mobile-frontend**：`QA.vue` 新增「记笔记」入口，在视频上下文问答时提供快捷笔记功能，会把 `videoId` 和 `videoTitle` 传入笔记编辑页。
+- **mobile-frontend**：问答页面消息展示新增引用片段 (`references`) 展示区域。
+- **ios-app**：同步 `WebAssets/index.js` 与 `WebAssets/index.css`。
+
 ## 2026-04-12
 
 ### 对话功能优化：直接回答/深度思考模式，新增通义千问→DeepSeek兜底

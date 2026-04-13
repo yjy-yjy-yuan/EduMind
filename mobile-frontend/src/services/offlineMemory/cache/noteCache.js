@@ -113,7 +113,7 @@ export const getOfflineNotes = async ({ videoId = null, search = '', tag = '' } 
   }
   return rows
     .filter(Boolean)
-    .sort((left, right) => new Date(right.updated_at || 0) - new Date(left.updated_at || 0))
+    .sort((left, right) => new Date(right?.updated_at || 0) - new Date(left?.updated_at || 0))
     .map((row) => mapNoteForUi(row))
 }
 

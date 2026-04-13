@@ -450,7 +450,7 @@ const send = async () => {
 
   asking.value = true
   try {
-    if (shouldUseOfflineMemoryMode()) {
+    if (shouldUseOfflineMemoryMode(null, currentMode.value)) {
       await runOfflineAnswer({
         questionText: q,
         historyPayload,
@@ -487,7 +487,7 @@ const send = async () => {
     await offlineMemorySync.flush()
     persistSpaceMessages()
   } catch (e) {
-    if (shouldUseOfflineMemoryMode(e)) {
+    if (shouldUseOfflineMemoryMode(e, currentMode.value)) {
       await runOfflineAnswer({
         questionText: q,
         historyPayload,
