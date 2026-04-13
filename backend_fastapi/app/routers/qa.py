@@ -39,6 +39,25 @@ def validate_provider(provider: str) -> str:
     return normalized_provider
 
 
+def resolve_qa_routing(request: AskRequest) -> tuple[str, str, bool]:
+    """解析问答路由：将 chat_mode 转换为 provider 和 deep_thinking。
+
+    chat_mode 优先级高于 provider + deep_thinking。
+    - direct: 优先通义千问（DeepSeek 兜底由后端处理）
+    - deep_think: 强制 DeepSeek reasoner
+
+    Returns:
+        (provider, model, deep_thinking)
+    """
+    chat_mode = getattr(request, "chat_mode", None)
+    if chat_mode == "deep_think":
+        return "deepseek", request.model or "", True
+    if chat_mode == "direct":
+        return "qwen", request.model or "", False
+    # 向后兼容：使用 provider + deep_thinking
+    return request.provider, request.model or "", request.deep_thinking
+
+
 def _debug_qa_context(
     prefix: str, *, video: Optional[Video], request: AskRequest, normalized_mode: str, normalized_provider: str
 ):
@@ -86,7 +105,8 @@ async def ask_question(request: AskRequest, db: Session = Depends(get_db)):
         normalized_mode = str(request.mode or "").strip().lower() or "video"
         if normalized_mode not in SUPPORTED_QA_MODES:
             raise HTTPException(status_code=400, detail="不支持的问答模式，仅支持 video 或 free")
-        normalized_provider = validate_provider(request.provider)
+        normalized_provider, request_model, deep_thinking = resolve_qa_routing(request)
+        validate_provider(normalized_provider)
 
         video = None
 
@@ -159,6 +179,7 @@ async def ask_question(request: AskRequest, db: Session = Depends(get_db)):
                             "progress": 5,
                             "provider": normalized_provider,
                             "provider_label": resolve_provider_label(normalized_provider),
+                            "chat_mode": getattr(request, "chat_mode", None),
                         }
                     )
 
@@ -173,8 +194,8 @@ async def ask_question(request: AskRequest, db: Session = Depends(get_db)):
                     for event in stream_qa_system.answer_stream(
                         request.question,
                         provider=normalized_provider,
-                        model=request.model or "",
-                        deep_thinking=request.deep_thinking,
+                        model=request_model,
+                        deep_thinking=deep_thinking,
                         mode=normalized_mode,
                         history=stream_history,
                     ):
@@ -252,8 +273,8 @@ async def ask_question(request: AskRequest, db: Session = Depends(get_db)):
         result = qa_system.ask(
             request.question,
             provider=normalized_provider,
-            model=request.model or "",
-            deep_thinking=request.deep_thinking,
+            model=request_model,
+            deep_thinking=deep_thinking,
             mode=normalized_mode,
             history=effective_history,
         )

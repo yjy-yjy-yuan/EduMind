@@ -16,7 +16,11 @@ import { getTable } from '@/services/offlineMemory/storage/repository'
 
 const isNavigatorOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
 
-export const shouldUseOfflineMemoryMode = (error = null) => {
+export const shouldUseOfflineMemoryMode = (error = null, mode = 'free') => {
+  // 视频问答（mode=video）必须走后端，因为需要检索字幕/摘要内容
+  // 即使后端不可达也不能降级到离线记忆，否则无法正确回答
+  if (mode === 'video') return false
+  // 通用问答（mode=free）才允许降级
   if (!hasReachableBackendConfig()) return true
   if (isNavigatorOffline()) return true
   return Boolean(error) && isBackendUnavailableError(error)
@@ -178,8 +182,12 @@ export const flush = async () => {
 
     const queueTable = getTable('offline_sync_queue')
     const queueItems = (await queueTable.toArray())
+      .filter(Boolean)
       .filter((item) => item.sync_status === OFFLINE_SYNC_STATUS.PENDING || item.sync_status === OFFLINE_SYNC_STATUS.FAILED)
-      .sort((left, right) => new Date(left.created_at || left.updated_at || 0) - new Date(right.created_at || right.updated_at || 0))
+      .sort(
+        (left, right) =>
+          new Date(left?.created_at || left?.updated_at || 0) - new Date(right?.created_at || right?.updated_at || 0)
+      )
 
     for (const item of queueItems) {
       try {
@@ -249,9 +257,8 @@ export const persistQuestionResult = async ({
   video_id = null,
   user_id = null,
   mode = 'video',
-  provider = 'qwen',
+  chat_mode = 'direct',
   model = '',
-  deep_thinking = false,
   history = [],
   source = 'online',
   syncStatus = OFFLINE_SYNC_STATUS.SYNCED,
@@ -268,9 +275,8 @@ export const persistQuestionResult = async ({
       video_id,
       user_id,
       mode,
-      provider,
+      chat_mode,
       model,
-      deep_thinking,
       history,
       source
     },

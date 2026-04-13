@@ -53,7 +53,7 @@ class KnowledgeChunk:
             return ""
         return f"{format_seconds(self.start_time)}-{format_seconds(self.end_time)}"
 
-    def to_reference(self, index: int) -> dict:
+    def to_reference(self, index: int, time_order: Optional[int] = None) -> dict:
         preview = clean_whitespace(self.text)
         if len(preview) > 120:
             preview = f"{preview[:117]}..."
@@ -62,6 +62,7 @@ class KnowledgeChunk:
             "source_type": self.source_type,
             "label": self.source_label,
             "time_range": self.time_range,
+            "time_order": time_order,
             "preview": preview,
         }
 
@@ -164,6 +165,58 @@ def extract_message_content(payload: dict) -> str:
                 text_parts.append(str(item.get("text") or ""))
         return clean_multiline_text("".join(text_parts))
     return clean_multiline_text(str(content or ""))
+
+
+def call_deepseek_reasoner_stream(
+    messages: list[dict],
+    *,
+    model: str = "",
+) -> Generator[tuple[str, str], None, None]:
+    """流式调用 DeepSeek Reasoner，yield (thinking_chunk, answer_chunk)。
+
+    DeepSeek SSE 格式:
+    data: {"choices":[{"delta":{"role":"assistant","content":"","thinking_content":"..."}}]}
+    data: {"choices":[{"delta":{"thinking_content":"...","content":"..."}}]}
+    data: [DONE]
+    """
+    api_key, base_url = resolve_provider_credentials("deepseek")
+    resolved_model = clean_whitespace(model) or clean_whitespace(settings.DEEPSEEK_REASONER_MODEL) or "deepseek-reasoner"
+
+    with requests.post(
+        f"{base_url}/chat/completions",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": resolved_model,
+            "messages": messages,
+            "temperature": 0.2,
+            "stream": True,
+        },
+        stream=True,
+        timeout=180,
+    ) as response:
+        if response.status_code >= 400:
+            detail = clean_whitespace(response.text)[:240] or f"HTTP {response.status_code}"
+            raise QAProviderError(f"DeepSeek 流式调用失败：{detail}")
+
+        for line in response.iter_lines():
+            raw = line.strip()
+            if raw == b"data: [DONE]":
+                break
+            if not raw or not raw.startswith(b"data: "):
+                continue
+            try:
+                chunk = json.loads(raw[6:])
+                delta = (chunk.get("choices") or [{}])[0].get("delta") or {}
+                thinking = delta.get("thinking_content") or ""
+                answer = delta.get("content") or ""
+                if thinking or answer:
+                    yield thinking, answer
+            except (json.JSONDecodeError, IndexError, TypeError) as exc:
+                logger.warning("解析 DeepSeek 流式响应失败: %s | line=%s", exc, raw[:80])
+                continue
 
 
 def qa_search_tokens(text: str) -> list[str]:
@@ -551,14 +604,57 @@ class QASystem:
 
         return chunks
 
+    def _call_model_stream(
+        self,
+        messages: list[dict],
+        *,
+        provider: str,
+        model: str,
+        deep_thinking: bool,
+    ) -> Generator[tuple[str, str, str], None, None]:
+        """流式调用模型，yield (thinking_chunk, answer_chunk, provider_info)。
+
+        - deep_thinking=True: 强制使用 DeepSeek Reasoner 流式调用
+        - deep_thinking=False: 非流式（复用水印逻辑）
+        """
+        if deep_thinking:
+            resolved_provider = provider or "deepseek"
+            resolved_model = model or resolve_model(resolved_provider, "", deep_thinking=True)
+            logger.info("深度思考流式调用: provider=%s, model=%s", resolved_provider, resolved_model)
+            yield "", "", f"{resolved_provider}:{resolved_model}"
+            for thinking_chunk, answer_chunk in call_deepseek_reasoner_stream(messages, model=resolved_model):
+                yield thinking_chunk, answer_chunk, ""
+            return
+
+        primary_provider = "qwen"
+        primary_model = model or resolve_model(primary_provider, "", deep_thinking=False)
+        try:
+            answer = call_provider_chat(messages, provider=primary_provider, model=primary_model)
+            yield "", answer, f"{primary_provider}:{primary_model}"
+            return
+        except Exception as primary_error:
+            logger.warning("直接回答模式-主模型(%s)调用失败，触发兜底: %s", primary_model, primary_error)
+
+        fallback_provider = "deepseek"
+        fallback_model = resolve_model(fallback_provider, "deepseek-chat", deep_thinking=False)
+        logger.info("直接回答模式-兜底模型: provider=%s, model=%s", fallback_provider, fallback_model)
+        answer = call_provider_chat(messages, provider=fallback_provider, model=fallback_model)
+        yield "", answer, f"{fallback_provider}:{fallback_model}"
+
     def _build_result(self, answer: str, provider: str, model: str, references: list[KnowledgeChunk]) -> dict:
         normalized_provider = normalize_provider(provider, model)
+        time_ordered_subtitles = [c for c in references if c.source_type == "subtitle"]
+        time_ordered_subtitles.sort(key=lambda c: float(c.start_time or 0))
+        subtitle_time_order = {id(c): i + 1 for i, c in enumerate(time_ordered_subtitles)}
         return {
             "answer": clean_multiline_text(answer),
             "provider": normalized_provider,
             "model": model,
             "provider_label": resolve_provider_label(normalized_provider),
-            "references": [chunk.to_reference(index) for index, chunk in enumerate(references, start=1)],
+            "references": [
+                chunk.to_reference(index, time_order=subtitle_time_order.get(id(chunk)))
+                for index, chunk in enumerate(references, start=1)
+            ],
         }
 
     def ask(
@@ -571,8 +667,8 @@ class QASystem:
         mode: str = "video",
         history: Optional[list] = None,
     ) -> dict:
+        """非流式问答接口（保留向后兼容）。"""
         normalized_provider = normalize_provider(provider, model)
-        resolved_model = resolve_model(normalized_provider, model, deep_thinking=deep_thinking)
         history_messages = normalize_history_messages(history)
 
         if mode == "video":
@@ -588,12 +684,45 @@ class QASystem:
                 context_text=context_text,
                 history_messages=history_messages,
             )
-            answer = call_provider_chat(messages, provider=normalized_provider, model=resolved_model)
-            return self._build_result(answer, normalized_provider, resolved_model, ranked_chunks)
+
+            if deep_thinking:
+                resolved_model = model or resolve_model(normalized_provider, "", deep_thinking=True)
+                answer = call_provider_chat(messages, provider="deepseek", model=resolved_model)
+                thinking = ""
+                payload_answer, payload_thinking = answer, ""
+                return self._build_result(payload_answer, "deepseek", resolved_model, ranked_chunks)
+
+            primary_provider = "qwen"
+            primary_model = model or resolve_model(primary_provider, "", deep_thinking=False)
+            try:
+                answer = call_provider_chat(messages, provider=primary_provider, model=primary_model)
+                return self._build_result(answer, primary_provider, primary_model, ranked_chunks)
+            except Exception as primary_error:
+                logger.warning("直接回答模式-主模型(%s)调用失败，触发兜底: %s", primary_model, primary_error)
+
+            fallback_provider = "deepseek"
+            fallback_model = resolve_model(fallback_provider, "deepseek-chat", deep_thinking=False)
+            answer = call_provider_chat(messages, provider=fallback_provider, model=fallback_model)
+            return self._build_result(answer, fallback_provider, fallback_model, ranked_chunks)
 
         messages = build_free_qa_messages(question, history_messages=history_messages)
-        answer = call_provider_chat(messages, provider=normalized_provider, model=resolved_model)
-        return self._build_result(answer, normalized_provider, resolved_model, [])
+        if deep_thinking:
+            resolved_model = model or resolve_model(normalized_provider, "", deep_thinking=True)
+            answer = call_provider_chat(messages, provider="deepseek", model=resolved_model)
+            return self._build_result(answer, "deepseek", resolved_model, [])
+
+        primary_provider = "qwen"
+        primary_model = model or resolve_model(primary_provider, "", deep_thinking=False)
+        try:
+            answer = call_provider_chat(messages, provider=primary_provider, model=primary_model)
+            return self._build_result(answer, primary_provider, primary_model, [])
+        except Exception as primary_error:
+            logger.warning("直接回答模式-主模型(%s)调用失败，触发兜底: %s", primary_model, primary_error)
+
+        fallback_provider = "deepseek"
+        fallback_model = resolve_model(fallback_provider, "deepseek-chat", deep_thinking=False)
+        answer = call_provider_chat(messages, provider=fallback_provider, model=fallback_model)
+        return self._build_result(answer, fallback_provider, fallback_model, [])
 
     def answer_stream(
         self,
@@ -606,10 +735,9 @@ class QASystem:
         history: Optional[list] = None,
     ) -> Generator[dict, None, None]:
         normalized_provider = normalize_provider(provider, model)
-        resolved_model = resolve_model(normalized_provider, model, deep_thinking=deep_thinking)
-        provider_label = resolve_provider_label(normalized_provider)
         history_messages = normalize_history_messages(history)
-        answering_stage, answering_message = resolve_answering_status(normalized_provider, deep_thinking=deep_thinking)
+
+        resolved_model = model or resolve_model(normalized_provider, model, deep_thinking=deep_thinking)
 
         if mode == "video":
             if not self._chunks:
@@ -621,7 +749,7 @@ class QASystem:
                 message="正在检索视频字幕、摘要与标签",
                 progress=25,
                 provider=normalized_provider,
-                provider_label=provider_label,
+                provider_label=resolve_provider_label(normalized_provider),
                 model=resolved_model,
             )
             retrieval_query = build_retrieval_query(question, history_messages)
@@ -634,18 +762,100 @@ class QASystem:
                 history_messages=history_messages,
             )
 
+            if deep_thinking:
+                yield build_stream_event(
+                    "status",
+                    stage="reasoning",
+                    message="正在深度思考...",
+                    progress=50,
+                    provider="deepseek",
+                    provider_label="DeepSeek",
+                    model=resolved_model,
+                )
+                thinking_buffer = ""
+                answer_buffer = ""
+                provider_info = ""
+                for thinking_chunk, answer_chunk, provider_info in self._call_model_stream(
+                    messages, provider=normalized_provider, model=model, deep_thinking=True
+                ):
+                    if thinking_chunk:
+                        thinking_buffer += thinking_chunk
+                        yield build_stream_event(
+                            "thinking",
+                            stage="streaming",
+                            thinking=thinking_chunk,
+                            delta=thinking_chunk,
+                            progress=52,
+                        )
+                    if answer_chunk:
+                        answer_buffer += answer_chunk
+
+                if not thinking_buffer and not answer_buffer:
+                    raise QAProviderError("DeepSeek 深度思考未返回任何内容")
+
+                provider_label, final_model = resolve_provider_label("deepseek"), resolved_model
+                if ":" in provider_info:
+                    pv, pv_model = provider_info.split(":", 1)
+                    provider_label = resolve_provider_label(pv)
+                    final_model = pv_model
+
+                yield build_stream_event(
+                    "thinking_complete",
+                    stage="completed",
+                    thinking=thinking_buffer,
+                    progress=65,
+                    provider="deepseek",
+                    provider_label=provider_label,
+                    model=final_model,
+                )
+
+                yield build_stream_event(
+                    "status",
+                    stage="organizing",
+                    message="正在整理回答与引用片段",
+                    progress=80,
+                    provider="deepseek",
+                    provider_label=provider_label,
+                    model=final_model,
+                )
+                result = self._build_result(answer_buffer, "deepseek", final_model, ranked_chunks)
+                yield build_stream_event(
+                    "answer",
+                    stage="completed",
+                    message="回答已完成",
+                    progress=100,
+                    answer=result["answer"],
+                    provider=result["provider"],
+                    provider_label=result["provider_label"],
+                    model=result["model"],
+                    references=result["references"],
+                )
+                return
+
+            answering_stage, answering_message = resolve_answering_status(normalized_provider, deep_thinking=False)
             yield build_stream_event(
                 "status",
                 stage=answering_stage,
                 message=answering_message,
-                progress=60,
+                progress=45,
                 provider=normalized_provider,
-                provider_label=provider_label,
+                provider_label=resolve_provider_label(normalized_provider),
                 model=resolved_model,
             )
-            answer = call_provider_chat(messages, provider=normalized_provider, model=resolved_model)
-            result = self._build_result(answer, normalized_provider, resolved_model, ranked_chunks)
+            answer_buffer = ""
+            provider_info = ""
+            for thinking_chunk, answer_chunk, provider_info in self._call_model_stream(
+                messages, provider=normalized_provider, model=model, deep_thinking=False
+            ):
+                answer_buffer += answer_chunk
 
+            provider_label, final_model = resolve_provider_label(normalized_provider), resolved_model
+            if ":" in provider_info:
+                pv, pv_model = provider_info.split(":", 1)
+                provider_label = resolve_provider_label(pv)
+                final_model = pv_model
+
+            result = self._build_result(answer_buffer, normalized_provider, final_model, ranked_chunks)
             yield build_stream_event(
                 "status",
                 stage="organizing",
@@ -668,19 +878,80 @@ class QASystem:
             )
             return
 
+        # free 模式
         messages = build_free_qa_messages(question, history_messages=history_messages)
-        yield build_stream_event(
-            "status",
-            stage=answering_stage,
-            message=answering_message,
-            progress=45,
-            provider=normalized_provider,
-            provider_label=provider_label,
-            model=resolved_model,
-        )
-        answer = call_provider_chat(messages, provider=normalized_provider, model=resolved_model)
-        result = self._build_result(answer, normalized_provider, resolved_model, [])
 
+        if deep_thinking:
+            yield build_stream_event(
+                "status",
+                stage="reasoning",
+                message="正在深度思考...",
+                progress=50,
+                provider="deepseek",
+                provider_label="DeepSeek",
+                model=resolved_model,
+            )
+            thinking_buffer = ""
+            answer_buffer = ""
+            provider_info = ""
+            for thinking_chunk, answer_chunk, provider_info in self._call_model_stream(
+                messages, provider=normalized_provider, model=model, deep_thinking=True
+            ):
+                if thinking_chunk:
+                    thinking_buffer += thinking_chunk
+                    yield build_stream_event(
+                        "thinking",
+                        stage="streaming",
+                        thinking=thinking_chunk,
+                        delta=thinking_chunk,
+                        progress=52,
+                    )
+                if answer_chunk:
+                    answer_buffer += answer_chunk
+
+            if not thinking_buffer and not answer_buffer:
+                raise QAProviderError("DeepSeek 深度思考未返回任何内容")
+
+            provider_label, final_model = resolve_provider_label("deepseek"), resolved_model
+            if ":" in provider_info:
+                pv, pv_model = provider_info.split(":", 1)
+                provider_label = resolve_provider_label(pv)
+                final_model = pv_model
+
+            yield build_stream_event(
+                "thinking_complete",
+                stage="completed",
+                thinking=thinking_buffer,
+                progress=65,
+                provider="deepseek",
+                provider_label=provider_label,
+                model=final_model,
+            )
+        else:
+            answering_stage, answering_message = resolve_answering_status(normalized_provider, deep_thinking=False)
+            yield build_stream_event(
+                "status",
+                stage=answering_stage,
+                message=answering_message,
+                progress=45,
+                provider=normalized_provider,
+                provider_label=resolve_provider_label(normalized_provider),
+                model=resolved_model,
+            )
+            answer_buffer = ""
+            provider_info = ""
+            for thinking_chunk, answer_chunk, provider_info in self._call_model_stream(
+                messages, provider=normalized_provider, model=model, deep_thinking=False
+            ):
+                answer_buffer += answer_chunk
+
+            provider_label, final_model = resolve_provider_label(normalized_provider), resolved_model
+            if ":" in provider_info:
+                pv, pv_model = provider_info.split(":", 1)
+                provider_label = resolve_provider_label(pv)
+                final_model = pv_model
+
+        result = self._build_result(answer_buffer, "deepseek" if deep_thinking else normalized_provider, final_model, [])
         yield build_stream_event(
             "status",
             stage="organizing",

@@ -1,6 +1,46 @@
 # 变更日志
 
+## 2026-04-13
+
+### Mock 流式响应增强：深度思考过程展示与引用位次排序
+
+- **mobile-frontend**：`api/qa.js` Mock 流式响应新增 `thinking` 思考过程展示，包括思考状态事件、`thinking` 阶段流式输出、`thinking_complete` 完成状态，与真实后端深度思考模式对齐。
+- **mobile-frontend**：`services/offlineMemory/storage/db.js` 新增 `OFFLINE_MEMORY_LIMITS.MAX_THINKING_CHARS`（30000）和 `MAX_CONTEXT_CHARS`（9000）常量定义。
+- **mobile-frontend**：`services/offlineMemory/cache/questionCache.js` 新增 `parseTimeRangeStartSeconds`/`applySubtitleTimeOrder`/`normalizeReferences` 函数，实现引用片段时间位次排序与自动回填。
+- **mobile-frontend**：`QA.vue` 新增 `displayReferences`/`normalizeReferences`/`applySubtitleTimeOrder`/`parseTimeRangeStartSeconds` 函数，引用展示按 `time_order` 排序；新增 thinking 思考区域 UI（展开/收起、内容展示、折叠摘要）。
+- **ios-app**：同步 `WebAssets/index.js` 与 `WebAssets/index.css`。
+
+### 问答引用片段增强：time_order 时间位次、后端传递、前端按时间排序
+
+- **backend_fastapi**：`qa_utils.py` 的 `KnowledgeChunk.to_reference()` 新增 `time_order` 参数（字幕片段按 `start_time` 排序后的位次），后端传递字幕时间位次供前端精确定位。
+- **mobile-frontend**：`questionCache.js` 新增 `parseTimeRangeStartSeconds`/`applySubtitleTimeOrder` 函数，实现 `references` 数组的时间位次排序；新增 `time_order` 字段存储字幕片段在时间轴上的位次；读取时自动回填缺失的 `time_order`。
+- **mobile-frontend**：`QA.vue` 引用片段展示新增 `displayReferences` 函数，按 `time_order` 排序字幕引用（无 `time_order` 的标签等引用保持原顺序），解决同一视频多次问答时引用索引顺序不确定的问题。
+- **ios-app**：同步 `WebAssets/index.js` 与 `WebAssets/index.css`。
+
+### 离线内存系统增强：问答同步、笔记视频关联、学习状态缓存
+
+- **mobile-frontend**：`offlineMemorySync.js` 新增 `saveOfflineQuestion` 函数，支持将离线问题记录到 IndexedDB 并入同步队列，待网络恢复后自动同步到后端。
+- **mobile-frontend**：`offlineMemorySync.js` 优化 `persistQuestionResult` 支持 `deep_thinking` 参数透传；新增 `shouldUseOfflineMemoryMode` 判断逻辑，视频问答模式强制走在线。
+- **mobile-frontend**：`noteCache.js` 笔记记录新增 `video_title` 字段，自动关联笔记所属视频标题，便于离线场景展示。
+- **mobile-frontend**：`questionCache.js` 问答记录新增 `references` 字段支持（引用片段索引、标签、预览、时间范围），与后端问答接口字段对齐。
+- **mobile-frontend**：`videoCache.js` 新增 `cacheLearningState` 函数，支持记录视频学习状态（播放位置、进度百分比、笔记时间、问答时间）；新增 `touchVideoAccess` 函数统一更新视频和相关实体的访问时间戳。
+- **mobile-frontend**：`videoCache.js` 字幕缓存新增 `cacheVideoSubtitles` 分页存储支持，统一离线字幕访问入口。
+- **mobile-frontend**：`mockGateway.js` 新增 `mockAskQuestion` 函数，支持 Mock 环境下的问答模拟。
+- **mobile-frontend**：`QA.vue` 新增「记笔记」入口，在视频上下文问答时提供快捷笔记功能，会把 `videoId` 和 `videoTitle` 传入笔记编辑页。
+- **mobile-frontend**：问答页面消息展示新增引用片段 (`references`) 展示区域。
+- **ios-app**：同步 `WebAssets/index.js` 与 `WebAssets/index.css`。
+
 ## 2026-04-12
+
+### 对话功能优化：直接回答/深度思考模式，新增通义千问→DeepSeek兜底
+
+- **backend_fastapi**：`/api/qa/ask` 新增 `chat_mode` 字段（`direct`/`deep_think`），替换原有的 `provider` + `deep_thinking` 组合；新增 `/api/chat/modes` 接口返回可用模式列表。
+- **backend_fastapi**：「直接回答」模式：优先使用通义千问，失败时自动切换 DeepSeek `deepseek-chat` 兜底；「深度思考」模式：强制使用 `deepseek-reasoner`，不进行兜底。
+- **backend_fastapi**：`QASystem` 新增 `_call_model_with_fallback` 方法，统一处理模式化路由与降级逻辑。
+- **mobile-frontend**：`QA.vue` 对话模式切换 UI 改为「直接回答 / 深度思考」双按钮，移除了原有的通义千问/DeepSeek 切换 + DeepSeek 子选项的层级结构。
+- **mobile-frontend**：`api/qa.js` API 参数从 `provider + deep_thinking` 替换为 `chat_mode`；Mock 同步支持新参数。
+- **mobile-frontend**：离线内存服务（`questionCache.js`、`offlineMemorySync.js`、`contracts.js`）增加 `chat_mode` 字段支持，更新索引以按 `chat_mode` 隔离问答空间。
+- **ios-app**：Web 资源同步更新。
 
 ### 离线能力链路移除（前端桩 / 后端 stub）
 

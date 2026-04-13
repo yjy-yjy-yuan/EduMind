@@ -166,7 +166,10 @@ export const getCachedVideoOptions = async () => {
   const rows = await getTable('offline_videos').toArray()
   return rows
     .filter((row) => Number(row?.video_id || 0) > 0)
-    .sort((left, right) => new Date(right.lastAccessedAt || right.updated_at || 0) - new Date(left.lastAccessedAt || left.updated_at || 0))
+    .sort(
+      (left, right) =>
+        new Date(right?.lastAccessedAt || right?.updated_at || 0) - new Date(left?.lastAccessedAt || left?.updated_at || 0)
+    )
     .map((row) => ({
       id: row.video_id,
       title: row.title || `视频 ${row.video_id}`,

@@ -15,35 +15,21 @@
       <span class="note-entry__tip">会把 videoId 传入笔记编辑页，便于与问答同一上下文整理结论。</span>
     </div>
 
-    <div class="provider-row">
-      <button
-        v-for="item in PROVIDER_OPTIONS"
-        :key="item.value"
-        class="provider-chip"
-        :class="{ 'provider-chip--active': provider === item.value }"
-        :disabled="asking"
-        @click="selectProvider(item.value)"
-      >
-        {{ item.label }}
-      </button>
-    </div>
-
-    <div v-if="isDeepSeekProvider" class="mode-panel">
-      <div class="mode-panel__label">DeepSeek 回答方式</div>
+    <div class="mode-panel">
       <div class="mode-row">
         <button
-          v-for="item in DEEPSEEK_ANSWER_MODE_OPTIONS"
+          v-for="item in CHAT_MODE_OPTIONS"
           :key="item.value"
           class="mode-chip"
-          :class="{ 'mode-chip--active': deepSeekAnswerMode === item.value }"
+          :class="{ 'mode-chip--active': chatMode === item.value }"
           :disabled="asking"
-          @click="selectDeepSeekAnswerMode(item.value)"
+          @click="selectChatMode(item.value)"
         >
           {{ item.label }}
         </button>
       </div>
       <div class="mode-panel__hint">
-        {{ deepThinkingEnabled ? '已开启深度思考，会先进行推理再组织回答，质量更稳但通常更慢。' : '优先直接回答，首字和整体返回速度更快。' }}
+        {{ chatMode === 'deep_think' ? '已开启深度思考，会先进行推理再组织回答，质量更稳但通常更慢。' : '优先直接回答，响应更快速；通义千问不可用时自动切换 DeepSeek 兜底。' }}
       </div>
     </div>
 
@@ -58,14 +44,26 @@
           <div v-if="m.role === 'ai' && typeof m.progress !== 'undefined'" class="progress-track">
             <div class="progress-fill" :style="{ width: `${normalizeProgress(m.progress)}%` }"></div>
           </div>
-          <div class="text" :class="{ 'text--placeholder': m.role === 'ai' && m.loading && !m.text }">
-            {{ m.text || (m.role === 'ai' && m.loading ? '正在处理中，请稍候…' : '（无返回内容）') }}
+          <div v-if="m.role === 'ai' && m.thinking" class="thinking-area" :class="{ 'thinking-area--collapsed': m.thinkingCollapsed }">
+            <div class="thinking-header">
+              <span class="thinking-label">🤔 深度思考</span>
+              <button class="thinking-toggle" @click="toggleThinking(m)">
+                {{ m.thinkingCollapsed ? '展开' : '收起' }}
+              </button>
+            </div>
+            <div v-show="!m.thinkingCollapsed" class="thinking-content">{{ m.thinking }}</div>
+            <div v-if="m.thinkingCollapsed && m.thinking" class="thinking-summary">
+              {{ getThinkingSummary(m.thinking) }}
+            </div>
+          </div>
+          <div class="text" :class="{ 'text--placeholder': m.role === 'ai' && m.loading && !m.text && !m.thinking }">
+            {{ m.text || (m.role === 'ai' && m.loading && !m.thinking ? '正在处理中，请稍候…' : '（无返回内容）') }}
           </div>
           <div v-if="m.role === 'ai' && (m.providerLabel || m.model)" class="msg-meta">
             {{ m.providerLabel || '在线模型' }}<span v-if="m.model"> · {{ m.model }}</span>
           </div>
           <div v-if="m.role === 'ai' && m.references?.length" class="refs">
-            <div v-for="ref in m.references" :key="`${idx}-${ref.index}`" class="ref-item">
+            <div v-for="ref in displayReferences(m.references)" :key="`${idx}-${ref.index}-${ref.time_order ?? 'n'}`" class="ref-item">
               [{{ ref.index }}] {{ ref.label }}<span v-if="ref.time_range"> · {{ ref.time_range }}</span> · {{ ref.preview }}
             </div>
           </div>
@@ -103,16 +101,11 @@ import {
 } from '@/services/offlineMemory'
 import { storageGet, storageRemove, storageSet } from '@/utils/storage'
 
-const QA_PROVIDER_KEY = 'm_qa_provider'
-const DEEPSEEK_ANSWER_MODE_KEY = 'm_deepseek_answer_mode'
+const QA_CHAT_MODE_KEY = 'm_qa_chat_mode'
 const QA_SPACE_CACHE_PREFIX = 'm_qa_space'
-const PROVIDER_OPTIONS = Object.freeze([
-  { value: 'qwen', label: '通义千问' },
-  { value: 'deepseek', label: 'DeepSeek' }
-])
-const DEEPSEEK_ANSWER_MODE_OPTIONS = Object.freeze([
+const CHAT_MODE_OPTIONS = Object.freeze([
   { value: 'direct', label: '直接回答' },
-  { value: 'reasoning', label: '深度思考' }
+  { value: 'deep_think', label: '深度思考' }
 ])
 
 const parseJSON = (text, fallback = null) => {
@@ -124,14 +117,9 @@ const parseJSON = (text, fallback = null) => {
   }
 }
 
-const normalizeProvider = (value) => {
+const normalizeChatMode = (value) => {
   const text = String(value || '').trim().toLowerCase()
-  return PROVIDER_OPTIONS.some((item) => item.value === text) ? text : 'qwen'
-}
-
-const normalizeDeepSeekAnswerMode = (value) => {
-  const text = String(value || '').trim().toLowerCase()
-  return DEEPSEEK_ANSWER_MODE_OPTIONS.some((item) => item.value === text) ? text : 'direct'
+  return CHAT_MODE_OPTIONS.some((item) => item.value === text) ? text : 'direct'
 }
 
 const normalizeProgress = (value) => {
@@ -140,16 +128,66 @@ const normalizeProgress = (value) => {
   return Math.max(0, Math.min(100, Math.round(num)))
 }
 
+const parseTimeRangeStartSeconds = (timeRange = '') => {
+  const start = String(timeRange || '')
+    .split('-')[0]
+    .trim()
+  if (!start) return Number.POSITIVE_INFINITY
+
+  const parts = start.split(':').map((part) => Number(part))
+  if (parts.some((part) => Number.isNaN(part) || part < 0)) return Number.POSITIVE_INFINITY
+  if (parts.length === 2) return parts[0] * 60 + parts[1]
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]
+  return Number.POSITIVE_INFINITY
+}
+
+const applySubtitleTimeOrder = (references = []) => {
+  const subtitles = references.filter((item) => item?.source_type === 'subtitle')
+  if (subtitles.length === 0) return references
+
+  const orderedSubtitles = subtitles
+    .slice()
+    .sort((left, right) => {
+      const startDiff = parseTimeRangeStartSeconds(left?.time_range) - parseTimeRangeStartSeconds(right?.time_range)
+      if (startDiff !== 0) return startDiff
+      return Number(left?.index || 0) - Number(right?.index || 0)
+    })
+
+  const subtitleOrderMap = new Map()
+  orderedSubtitles.forEach((item, index) => {
+    subtitleOrderMap.set(item, index + 1)
+  })
+
+  return references.map((item) =>
+    item?.source_type === 'subtitle'
+      ? {
+          ...item,
+          time_order: subtitleOrderMap.get(item) || null
+        }
+      : item
+  )
+}
+
+const displayReferences = (refs = []) => {
+  const subtitles = refs.filter((r) => r.source_type === 'subtitle' && r.time_order != null)
+  const others = refs.filter((r) => r.source_type !== 'subtitle' || r.time_order == null)
+  return [...subtitles.sort((a, b) => a.time_order - b.time_order), ...others]
+}
+
 const normalizeReferences = (value) => {
   if (!Array.isArray(value)) return []
-  return value.map((item, index) => ({
-    index: Number(item?.index || index + 1),
-    source_type: String(item?.source_type || ''),
-    label: String(item?.label || ''),
-    time_range: String(item?.time_range || ''),
-    preview: String(item?.preview || '')
-  }))
+  return applySubtitleTimeOrder(
+    value.map((item, index) => ({
+      index: Number(item?.index || index + 1),
+      source_type: String(item?.source_type || ''),
+      label: String(item?.label || ''),
+      time_range: String(item?.time_range || ''),
+      preview: String(item?.preview || ''),
+      time_order: typeof item?.time_order === 'number' ? Number(item.time_order) : null
+    }))
+  )
 }
+
 
 const normalizeMessage = (item) => {
   const role = item?.role === 'assistant' ? 'ai' : String(item?.role || 'user')
@@ -161,7 +199,9 @@ const normalizeMessage = (item) => {
     references: normalizeReferences(item?.references),
     loading: Boolean(item?.loading),
     statusText: String(item?.statusText || item?.status_text || ''),
-    progress: typeof item?.progress === 'undefined' ? undefined : normalizeProgress(item.progress)
+    progress: typeof item?.progress === 'undefined' ? undefined : normalizeProgress(item.progress),
+    thinking: String(item?.thinking || ''),
+    thinkingCollapsed: Boolean(item?.thinkingCollapsed ?? false),
   }
 }
 
@@ -184,6 +224,7 @@ const stripMessageForCache = (item) => {
   return {
     role: normalized.role,
     text: normalized.text,
+    thinking: normalized.thinking,
     providerLabel: normalized.providerLabel,
     model: normalized.model,
     references: normalized.references
@@ -196,10 +237,10 @@ const resolveCurrentUserId = () => {
   return Number.isInteger(numericId) && numericId > 0 ? numericId : null
 }
 
-const buildQaSpaceCacheKey = ({ userId, provider, videoId, mode }) => {
+const buildQaSpaceCacheKey = ({ userId, chatMode, videoId, mode }) => {
   const scopeUser = userId == null ? 'anon' : `user_${userId}`
   const scopeVideo = videoId == null ? 'video_none' : `video_${videoId}`
-  return `${QA_SPACE_CACHE_PREFIX}:${mode}:${scopeUser}:${scopeVideo}:${provider}`
+  return `${QA_SPACE_CACHE_PREFIX}:${mode}:${scopeUser}:${scopeVideo}:${chatMode}`
 }
 
 const route = useRoute()
@@ -224,10 +265,7 @@ const currentUserId = computed(() => resolveCurrentUserId())
 const chatRef = ref(null)
 const question = ref('')
 const asking = ref(false)
-const provider = ref(normalizeProvider(storageGet(QA_PROVIDER_KEY)))
-const deepSeekAnswerMode = ref(normalizeDeepSeekAnswerMode(storageGet(DEEPSEEK_ANSWER_MODE_KEY)))
-const isDeepSeekProvider = computed(() => provider.value === 'deepseek')
-const deepThinkingEnabled = computed(() => isDeepSeekProvider.value && deepSeekAnswerMode.value === 'reasoning')
+const chatMode = ref(normalizeChatMode(storageGet(QA_CHAT_MODE_KEY)))
 const messageSpaces = ref({})
 const remoteHydratedSpaces = ref({})
 let historyRestoreSequence = 0
@@ -235,7 +273,7 @@ let historyRestoreSequence = 0
 const currentSpaceKey = computed(() =>
   buildQaSpaceCacheKey({
     userId: currentUserId.value,
-    provider: provider.value,
+    chatMode: chatMode.value,
     videoId: normalizedVideoId.value,
     mode: currentMode.value
   })
@@ -294,7 +332,8 @@ const persistSpaceMessages = (spaceKey = currentSpaceKey.value) => {
 
 const buildMessageSignature = (item) => {
   const normalized = normalizeMessage(item)
-  return `${normalized.role}:${normalized.text}:${normalized.providerLabel}:${normalized.model}`
+  const thinkingPart = normalized.thinking ? normalized.thinking.slice(0, 80) : ""
+  return `${normalized.role}:${normalized.text}:${normalized.providerLabel}:${normalized.model}:${thinkingPart}`
 }
 
 const mergeMessageLists = (primary = [], secondary = []) => {
@@ -323,7 +362,7 @@ const buildHistoryPayload = () => {
 const loadOfflineSpaceMessages = async () => {
   const rows = await getOfflineQaMessages({
     videoId: normalizedVideoId.value ?? null,
-    provider: provider.value,
+    chatMode: chatMode.value,
     mode: currentMode.value,
     userId: currentUserId.value ?? null
   })
@@ -368,7 +407,6 @@ const restoreCurrentSpace = async () => {
     const res = await getQuestionHistory({
       user_id: currentUserId.value,
       video_id: normalizedVideoId.value,
-      provider: provider.value,
       mode: currentMode.value
     })
     if (requestId !== historyRestoreSequence || spaceKey !== currentSpaceKey.value) return
@@ -393,50 +431,54 @@ const restoreCurrentSpace = async () => {
   }
 }
 
-const selectProvider = (value) => {
-  const next = normalizeProvider(value)
-  provider.value = next
+const selectChatMode = (value) => {
+  const next = normalizeChatMode(value)
+  chatMode.value = next
   try {
-    storageSet(QA_PROVIDER_KEY, next)
+    storageSet(QA_CHAT_MODE_KEY, next)
   } catch {
     // ignore storage errors in restricted WebView contexts
   }
 }
 
-const selectDeepSeekAnswerMode = (value) => {
-  const next = normalizeDeepSeekAnswerMode(value)
-  deepSeekAnswerMode.value = next
-  try {
-    storageSet(DEEPSEEK_ANSWER_MODE_KEY, next)
-  } catch {
-    // ignore storage errors in restricted WebView contexts
+const toggleThinking = (message) => {
+  if (!message) return
+  message.thinkingCollapsed = !message.thinkingCollapsed
+}
+
+const getThinkingSummary = (thinking) => {
+  if (!thinking) return ''
+  const lines = thinking.split('\n').filter((l) => l.trim())
+  return lines.length > 0 ? `…${lines[lines.length - 1].trim()}` : ''
+}
+
+const buildPendingAiMessage = () => {
+  const isDeepThink = chatMode.value === 'deep_think'
+  return {
+    role: 'ai',
+    text: '',
+    providerLabel: isDeepThink ? 'DeepSeek' : '通义千问',
+    model: isDeepThink ? 'deepseek-reasoner' : 'qwen-plus',
+    references: [],
+    loading: true,
+    statusText: '问题已提交，等待处理',
+    progress: 5
   }
 }
 
-const buildPendingAiMessage = () => ({
-  role: 'ai',
-  text: '',
-  providerLabel: provider.value === 'deepseek' ? 'DeepSeek' : '通义千问',
-  model: '',
-  references: [],
-  loading: true,
-  statusText: '问题已提交，等待处理',
-  progress: 5
-})
-
-const persistQuestionToOfflineMemory = async ({ questionText, answerText, references, source, model, serverId, historyPayload }) => {
+const persistQuestionToOfflineMemory = async ({ questionText, answerText, thinking, references, source, model, serverId, historyPayload }) => {
   const payload = {
     local_id: null,
     server_id: serverId || null,
     question: questionText,
     answer: answerText,
+    thinking: thinking || '',
     references,
     video_id: normalizedVideoId.value ?? null,
     user_id: currentUserId.value ?? null,
     mode: currentMode.value,
-    provider: provider.value,
+    chat_mode: chatMode.value,
     model,
-    deep_thinking: deepThinkingEnabled.value,
     history: historyPayload,
     source
   }
@@ -462,6 +504,7 @@ const runOfflineAnswer = async ({ questionText, historyPayload, pendingAiMessage
   await persistQuestionToOfflineMemory({
     questionText,
     answerText: offlineResult.answer,
+    thinking: '',
     references: offlineResult.references,
     source: 'offline',
     model: 'indexeddb-context',
@@ -477,7 +520,17 @@ const applyStreamEventToMessage = async (message, event) => {
   if (Array.isArray(event.references)) message.references = normalizeReferences(event.references)
   if (typeof event.progress !== 'undefined') message.progress = normalizeProgress(event.progress)
 
-  if (event.type === 'answer') {
+  if (event.type === 'thinking') {
+    const delta = String(event.delta || event.thinking || '')
+    if (delta) {
+      message.thinking = (message.thinking || '') + delta
+      message.progress = typeof event.progress !== 'undefined' ? normalizeProgress(event.progress) : message.progress
+    }
+  } else if (event.type === 'thinking_complete') {
+    message.thinking = String(event.thinking || message.thinking || '')
+    message.thinkingCollapsed = false
+    message.progress = typeof event.progress !== 'undefined' ? normalizeProgress(event.progress) : message.progress
+  } else if (event.type === 'answer') {
     message.loading = false
     message.statusText = String(event.message || '回答已完成')
     message.progress = 100
@@ -508,7 +561,7 @@ const send = async () => {
 
   asking.value = true
   try {
-    if (shouldUseOfflineMemoryMode()) {
+    if (shouldUseOfflineMemoryMode(null, currentMode.value)) {
       await runOfflineAnswer({
         questionText: q,
         historyPayload,
@@ -524,8 +577,7 @@ const send = async () => {
         question: q,
         video_id: normalizedVideoId.value ?? undefined,
         mode: currentMode.value,
-        provider: provider.value,
-        deep_thinking: deepThinkingEnabled.value,
+        chat_mode: chatMode.value,
         history: historyPayload
       },
       {
@@ -537,6 +589,7 @@ const send = async () => {
     await persistQuestionToOfflineMemory({
       questionText: q,
       answerText: finalEvent?.answer || pendingAiMessage.text,
+      thinking: pendingAiMessage.thinking || '',
       references: Array.isArray(finalEvent?.references) ? finalEvent.references : pendingAiMessage.references,
       source: 'online',
       model: finalEvent?.model || pendingAiMessage.model,
@@ -546,7 +599,7 @@ const send = async () => {
     await offlineMemorySync.flush()
     persistSpaceMessages()
   } catch (e) {
-    if (shouldUseOfflineMemoryMode(e)) {
+    if (shouldUseOfflineMemoryMode(e, currentMode.value)) {
       await runOfflineAnswer({
         questionText: q,
         historyPayload,
@@ -643,29 +696,6 @@ cleanupLegacyOfflineMemoryCache()
   font-size: 12px;
   color: var(--muted);
   margin-bottom: 8px;
-}
-
-.provider-row {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-
-.provider-chip {
-  border: 1px solid rgba(32, 42, 55, 0.12);
-  border-radius: 999px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.provider-chip--active {
-  color: #fff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #8b799d, #a48eb5);
 }
 
 .mode-panel {
@@ -822,6 +852,61 @@ cleanupLegacyOfflineMemoryCache()
   font-size: 11px;
   line-height: 1.5;
   color: var(--muted);
+}
+
+.thinking-area {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(100, 116, 139, 0.06);
+  border: 1px dashed rgba(100, 116, 139, 0.22);
+}
+
+.thinking-area--collapsed {
+  padding: 8px 12px;
+}
+
+.thinking-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.thinking-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.thinking-toggle {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.thinking-toggle:active {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.thinking-content {
+  font-size: 12px;
+  line-height: 1.65;
+  color: #64748b;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.thinking-summary {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
 }
 
 .inputbar {
