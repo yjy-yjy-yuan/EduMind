@@ -1,0 +1,61 @@
+# ============================================================
+# EduMind API systemd 服务单元文件
+# 放置位置: /etc/systemd/system/edumind-api.service
+# 安装命令（见部署文档）:
+#   sudo cp deploy/edumind-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable edumind-api
+#   sudo systemctl start edumind-api
+# ============================================================
+
+[Unit]
+Description=EduMind FastAPI Backend Service
+Documentation=https://github.com/YuanFengTing/EduMind
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+# ── 运行身份 ───────────────────────────────────────────────
+# 推荐创建专用用户以遵循最小权限原则：
+#   sudo useradd -r -s /usr/sbin/nologin -d /var/www/edumind/backend_fastapi edumind
+#   sudo chown -R edumind:edumind /var/www/edumind
+# 创建用户后取消下方 User/Group 的注释即可启用
+User=root
+Group=root
+
+# ── 工作目录 ───────────────────────────────────────────────
+# run_prod.py 位于 backend_fastapi/ 子目录，WorkingDirectory 必须与其对齐
+WorkingDirectory=/var/www/edumind/backend_fastapi
+
+# ── Python 虚拟环境 ────────────────────────────────────────
+# .venv 创建在 /var/www/edumind/.venv（与 backend_fastapi 同级）
+# .env 文件同样在 /var/www/edumind/backend_fastapi/.env
+Environment="PATH=/var/www/edumind/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+Environment="PYTHONDONTWRITEBYTECODE=1"
+
+# ── 启动命令 ────────────────────────────────────────────────
+# run_prod.py 位于 backend_fastapi/ 下，需完整相对路径
+ExecStart=/var/www/edumind/.venv/bin/python /var/www/edumind/backend_fastapi/run_prod.py
+
+# ── 重启策略 ───────────────────────────────────────────────
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=5
+StartLimitIntervalSec=120
+
+# ── 日志 ───────────────────────────────────────────────────
+# journalctl -u edumind-api -f  查看实时日志
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=edumind-api
+
+# ── 文件描述符与进程限制（可选，按需取消注释）────────────
+# LimitNOFILE=65535
+# MemoryMax=4G
+
+# ── 健康检查（可选，取消注释则 systemd 在启动后自动检查健康状态）────
+# ExecStartPost=/bin/bash -c 'sleep 3 && curl -sf http://127.0.0.1:2004/health || exit 1'
+
+[Install]
+WantedBy=multi-user.target
