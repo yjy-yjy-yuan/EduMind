@@ -10,7 +10,7 @@
 
 [Unit]
 Description=EduMind FastAPI Backend Service
-Documentation=https://github.com/YuanFengTing/EduMind
+Documentation=https://github.com/yjy-yjy-yuan/EduMind
 After=network.target mysql.service
 Wants=mysql.service
 
