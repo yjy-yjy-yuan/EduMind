@@ -59,6 +59,17 @@ service.interceptors.request.use(
       delete config.headers.authorization
     }
 
+    // 设置用户ID头（用于语义搜索等需要用户权限的API）
+    const userStr = storageGet('m_user')
+    try {
+      const user = userStr ? JSON.parse(userStr) : null
+      if (user && user.id) {
+        config.headers['X-User-ID'] = String(user.id)
+      }
+    } catch (e) {
+      // 忽略解析错误
+    }
+
     return config
   },
   (error) => Promise.reject(error)
