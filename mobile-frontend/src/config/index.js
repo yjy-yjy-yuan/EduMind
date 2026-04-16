@@ -53,7 +53,71 @@ const toBool = (value, fallback = false) => {
   return fallback
 }
 
-const normalizeApiBaseUrl = (value) => String(value || '').trim().replace(/\/+$/, '')
+const pickBuildEnvValue = (buildValue, viteValue = '') => {
+  const fromBuild = String(buildValue || '').trim()
+  if (fromBuild) return fromBuild
+  return String(viteValue || '').trim()
+}
+
+const ENV_API_BASE_URL = pickBuildEnvValue(
+  globalThis.__EDUMIND_ENV_API_BASE_URL__,
+  import.meta.env.VITE_MOBILE_API_BASE_URL || ''
+)
+const ENV_UI_ONLY = pickBuildEnvValue(
+  globalThis.__EDUMIND_ENV_UI_ONLY__,
+  import.meta.env.VITE_MOBILE_UI_ONLY || ''
+)
+const ENV_ALLOW_UI_ONLY_IN_PROD = pickBuildEnvValue(
+  globalThis.__EDUMIND_ENV_ALLOW_UI_ONLY_IN_PROD__,
+  import.meta.env.VITE_ALLOW_UI_ONLY_IN_PROD || ''
+)
+const ENV_RECOMMENDATION_INCLUDE_EXTERNAL = pickBuildEnvValue(
+  globalThis.__EDUMIND_ENV_RECOMMENDATION_INCLUDE_EXTERNAL__,
+  import.meta.env.VITE_RECOMMENDATION_INCLUDE_EXTERNAL || ''
+)
+const ENV_RECOMMENDATION_HOME_INCLUDE_EXTERNAL = pickBuildEnvValue(
+  globalThis.__EDUMIND_ENV_RECOMMENDATION_HOME_INCLUDE_EXTERNAL__,
+  import.meta.env.VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL || ''
+)
+
+const parseAbsoluteApiBaseUrl = (value) => {
+  const text = String(value || '').trim()
+  if (!text) return null
+  try {
+    const url = new URL(text)
+    if (!['http:', 'https:'].includes(url.protocol)) return null
+    return url
+  } catch {
+    return null
+  }
+}
+
+const normalizeApiBaseUrl = (value) => {
+  const parsed = parseAbsoluteApiBaseUrl(value)
+  return parsed ? parsed.href.replace(/\/+$/, '') : ''
+}
+
+const LOCK_RUNTIME_API_BASE_IN_PROD = import.meta.env.PROD || Boolean(fromNative)
+
+const TRUSTED_API_BASE_ORIGINS = (() => {
+  const origins = new Set()
+  for (const candidate of [fromNative, ENV_API_BASE_URL]) {
+    const parsed = parseAbsoluteApiBaseUrl(candidate)
+    if (parsed) origins.add(parsed.origin)
+  }
+  return origins
+})()
+
+const canUseRuntimeApiBase = (value, source) => {
+  const normalized = normalizeApiBaseUrl(value)
+  if (!normalized) return ''
+  if (!LOCK_RUNTIME_API_BASE_IN_PROD) return normalized
+  if (source === 'native' || source === 'env') return normalized
+  if (TRUSTED_API_BASE_ORIGINS.size === 0) return ''
+
+  const parsed = parseAbsoluteApiBaseUrl(normalized)
+  return parsed && TRUSTED_API_BASE_ORIGINS.has(parsed.origin) ? normalized : ''
+}
 
 const resolveApiBaseConfig = ({
   queryValue = '',
@@ -62,7 +126,7 @@ const resolveApiBaseConfig = ({
   nativeValue = '',
   envValue = ''
 } = {}) => {
-  const normalizedQuery = normalizeApiBaseUrl(queryValue)
+  const normalizedQuery = canUseRuntimeApiBase(queryValue, 'query')
   if (normalizedQuery) {
     return {
       apiBaseUrl: normalizedQuery,
@@ -70,7 +134,7 @@ const resolveApiBaseConfig = ({
     }
   }
 
-  const normalizedOverride = normalizeApiBaseUrl(overrideValue)
+  const normalizedOverride = canUseRuntimeApiBase(overrideValue, 'override')
   if (normalizedOverride) {
     return {
       apiBaseUrl: normalizedOverride,
@@ -78,7 +142,7 @@ const resolveApiBaseConfig = ({
     }
   }
 
-  const normalizedNative = normalizeApiBaseUrl(nativeValue)
+  const normalizedNative = canUseRuntimeApiBase(nativeValue, 'native')
   if (normalizedNative) {
     return {
       apiBaseUrl: normalizedNative,
@@ -86,7 +150,7 @@ const resolveApiBaseConfig = ({
     }
   }
 
-  const normalizedStorage = normalizeApiBaseUrl(storageValue)
+  const normalizedStorage = canUseRuntimeApiBase(storageValue, 'storage')
   if (normalizedStorage) {
     return {
       apiBaseUrl: normalizedStorage,
@@ -94,7 +158,7 @@ const resolveApiBaseConfig = ({
     }
   }
 
-  const normalizedEnv = normalizeApiBaseUrl(envValue)
+  const normalizedEnv = canUseRuntimeApiBase(envValue, 'env')
   if (normalizedEnv) {
     return {
       apiBaseUrl: normalizedEnv,
@@ -125,7 +189,7 @@ const getRuntimeApiBaseConfig = () => {
       overrideValue,
       storageValue,
       nativeValue,
-      envValue: import.meta.env.VITE_MOBILE_API_BASE_URL || ''
+      envValue: ENV_API_BASE_URL
     })
   } catch {
     return initialApiBaseConfig
@@ -137,7 +201,7 @@ const initialApiBaseConfig = resolveApiBaseConfig({
   overrideValue: fromOverrideStorage,
   storageValue: fromStorage,
   nativeValue: fromNative,
-  envValue: import.meta.env.VITE_MOBILE_API_BASE_URL || ''
+  envValue: ENV_API_BASE_URL
 })
 
 export const API_BASE_URL = initialApiBaseConfig.apiBaseUrl
@@ -154,13 +218,26 @@ if (fromNative && fromNative !== fromStorage && !fromOverrideStorage) {
   }
 }
 
+export function isTrustedApiBaseUrl(url) {
+  const normalized = normalizeApiBaseUrl(url)
+  if (!normalized) return false
+  if (!LOCK_RUNTIME_API_BASE_IN_PROD || TRUSTED_API_BASE_ORIGINS.size === 0) return true
+
+  const parsed = parseAbsoluteApiBaseUrl(normalized)
+  return Boolean(parsed && TRUSTED_API_BASE_ORIGINS.has(parsed.origin))
+}
+
 /** 运行时设置 API 基地址（换 Wi‑Fi/换地点后可用，避免因本机 IP 变化导致请求失败） */
 export function setApiBaseUrl(url) {
   try {
     const value = normalizeApiBaseUrl(url)
+    const allowOverride = !value || isTrustedApiBaseUrl(value)
     if (typeof localStorage !== 'undefined') {
-      if (value) localStorage.setItem('m_api_base_url_override', value)
+      if (value && allowOverride) localStorage.setItem('m_api_base_url_override', value)
       else localStorage.removeItem('m_api_base_url_override')
+    }
+    if (value && !allowOverride) {
+      console.warn('[WARN][Config] ignore untrusted api base override:', value)
     }
     const runtimeConfig = getRuntimeApiBaseConfig()
     console.info(
@@ -186,11 +263,11 @@ export function getApiBaseSource() {
 }
 
 export const UI_ONLY_MODE = toBool(
-  fromUiOnlyQuery || import.meta.env.VITE_MOBILE_UI_ONLY,
+  fromUiOnlyQuery || ENV_UI_ONLY,
   false
 )
 
-const ALLOW_UI_ONLY_IN_PROD = toBool(import.meta.env.VITE_ALLOW_UI_ONLY_IN_PROD, false)
+const ALLOW_UI_ONLY_IN_PROD = toBool(ENV_ALLOW_UI_ONLY_IN_PROD, false)
 
 export const shouldUseMockApi = () => {
   if (!UI_ONLY_MODE || getApiBaseUrl()) return false
@@ -200,7 +277,7 @@ export const shouldUseMockApi = () => {
 
 /** 推荐接口是否默认附带站外检索（历史名；未单独配置首页时仍可读此变量） */
 export const shouldIncludeExternalRecommendationsByDefault = () =>
-  toBool(import.meta.env.VITE_RECOMMENDATION_INCLUDE_EXTERNAL, false)
+  toBool(ENV_RECOMMENDATION_INCLUDE_EXTERNAL, false)
 
 /**
  * 首页「推荐预览」是否附带站外检索与后端自动入库闭环。
@@ -208,7 +285,7 @@ export const shouldIncludeExternalRecommendationsByDefault = () =>
  * 弱网/仅站内时可设 VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL=false。
  */
 export const shouldIncludeExternalRecommendationsOnHome = () =>
-  toBool(import.meta.env.VITE_RECOMMENDATION_HOME_INCLUDE_EXTERNAL, true)
+  toBool(ENV_RECOMMENDATION_HOME_INCLUDE_EXTERNAL, true)
 
 export const withBase = (path) => {
   const p = String(path || '')

@@ -91,7 +91,7 @@ fi
 # 3. 构建 iOS 工程
 # ============================================================
 BUILD_CONFIGURATION=$([ "$IS_RELEASE" = true ] && echo "Release" || echo "Debug")
-info "==> 构建 iOS 工程（configuration: $BUILD_CONFIGURATION）"
+info "==> 构建 iOS 工程 (configuration: $BUILD_CONFIGURATION)"
 
 mkdir -p "$DERIVED_DATA_PATH"
 

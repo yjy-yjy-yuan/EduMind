@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { getApiBaseUrl } from '@/config'
+import { getApiBaseUrl, isTrustedApiBaseUrl } from '@/config'
 import { storageGet } from '@/utils/storage'
 
 const DEFAULT_TIMEOUT_MS = 10000
@@ -44,13 +44,20 @@ service.interceptors.request.use(
   (config) => {
     config.baseURL = getApiBaseUrl()
     config.timeout = Number(config.timeout) > 0 ? Number(config.timeout) : DEFAULT_TIMEOUT_MS
+    config.headers = config.headers || {}
 
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type']
     }
 
+    const requestBaseUrl = String(config.baseURL || '').trim()
     const token = storageGet('m_token')
-    if (token) config.headers.Authorization = `Bearer ${token}`
+    if (!requestBaseUrl || isTrustedApiBaseUrl(requestBaseUrl)) {
+      if (token) config.headers.Authorization = `Bearer ${token}`
+    } else {
+      delete config.headers.Authorization
+      delete config.headers.authorization
+    }
 
     return config
   },
