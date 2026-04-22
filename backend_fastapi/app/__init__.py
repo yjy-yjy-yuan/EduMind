@@ -1,1 +1,1 @@
-"""FastAPI Application Package"""
+# EduMind Application

@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.models.video import Video
 from app.models.video import VideoStatus
 from app.tasks.video_processing import update_video_status
+from app.tasks.bilibili_downloader import download_bilibili_video
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import sessionmaker
@@ -29,7 +30,6 @@ def secure_filename_with_chinese(filename: str) -> str:
     safe_name = re.sub(r'[<>:"/\\|?*]', "_", filename)
     return safe_name.strip(". ")
 
-
 def get_video_db_session() -> Tuple[object, Session]:
     """创建任务内独立数据库连接"""
     engine = create_engine(
@@ -40,7 +40,6 @@ def get_video_db_session() -> Tuple[object, Session]:
     session_factory = sessionmaker(bind=engine)
     return engine, session_factory()
 
-
 def build_source_prefix(source_type: str) -> str:
     """构建来源前缀"""
     prefix_map = {
@@ -50,7 +49,6 @@ def build_source_prefix(source_type: str) -> str:
     }
     return prefix_map.get(source_type, "video-")
 
-
 def build_ydl_options(download_folder: str, source_type: str, outtmpl: Optional[str] = None) -> dict:
     """构建 yt-dlp 配置"""
     options = {
@@ -58,6 +56,7 @@ def build_ydl_options(download_folder: str, source_type: str, outtmpl: Optional[
         "merge_output_format": "mp4",
         "quiet": True,
         "no_warnings": True,
+        "nocheckcertificate": True,
     }
 
     if source_type == "youtube":
@@ -65,7 +64,6 @@ def build_ydl_options(download_folder: str, source_type: str, outtmpl: Optional[
         options["cookiesfrombrowser"] = ("chrome",)
 
     return options
-
 
 def resolve_downloaded_file_path(download_folder: str, output_title: str) -> str:
     """解析下载完成后的文件路径"""
@@ -85,7 +83,6 @@ def resolve_downloaded_file_path(download_folder: str, output_title: str) -> str
     candidates.sort(key=os.path.getmtime, reverse=True)
     return candidates[0]
 
-
 def compute_file_md5(file_path: str) -> str:
     """计算文件 MD5"""
     digest = hashlib.md5()
@@ -96,7 +93,6 @@ def compute_file_md5(file_path: str) -> str:
                 break
             digest.update(chunk)
     return digest.hexdigest()
-
 
 def finalize_video_record(video_id: int, *, filename: str, filepath: str, title: str, md5: str, model: str = ""):
     """写回下载完成的视频记录"""
@@ -120,7 +116,6 @@ def finalize_video_record(video_id: int, *, filename: str, filepath: str, title:
         db.close()
         engine.dispose()
 
-
 def mark_download_failed(video_id: int, error_message: str):
     """标记下载失败"""
     update_video_status(
@@ -130,7 +125,6 @@ def mark_download_failed(video_id: int, error_message: str):
         "下载失败",
         error_message=error_message[:1000],
     )
-
 
 def download_video_from_url_task(
     video_id: int,
@@ -145,7 +139,6 @@ def download_video_from_url_task(
 ):
     """下载远程视频到本地上传目录"""
     try:
-        import yt_dlp
         from app.tasks.video_processing import process_video_task
 
         update_video_status(video_id, VideoStatus.DOWNLOADING, DOWNLOAD_PREPARE_PROGRESS, "准备下载")
@@ -153,22 +146,61 @@ def download_video_from_url_task(
         download_folder = settings.UPLOAD_FOLDER
         os.makedirs(download_folder, exist_ok=True)
 
-        update_video_status(video_id, VideoStatus.DOWNLOADING, DOWNLOAD_METADATA_PROGRESS, "获取视频信息")
-        with yt_dlp.YoutubeDL(build_ydl_options(download_folder, source_type)) as ydl:
-            info = ydl.extract_info(video_url, download=False)
+        # B站视频使用专用下载器
+        if source_type == "bilibili":
+            update_video_status(video_id, VideoStatus.DOWNLOADING, DOWNLOAD_METADATA_PROGRESS, "获取B站视频信息")
+            
+            # 提取BV号
+            bv_match = re.search(r'BV[0-9A-Za-z]+', video_url)
+            if not bv_match:
+                raise Exception("无法从URL提取B站BV号")
+            bvid = bv_match.group(0)
+            
+            update_video_status(video_id, VideoStatus.DOWNLOADING, DOWNLOAD_RUNNING_PROGRESS, "下载B站视频")
+            
+            output_base = os.path.join(download_folder, f"bilibili-{bvid}")
+            result = download_bilibili_video(bvid, output_base)
+            
+            if not result.get('success'):
+                raise Exception(result.get('error', 'B站视频下载失败'))
+            
+            downloaded_path = result['path']
+            md5 = result['md5']
+            output_title = result.get('title', f'bilibili-{bvid}')
+            
+            # 安全文件名
+            safe_title = secure_filename_with_chinese(output_title) or f"bilibili-{bvid}"
+            final_filename = f"bilibili-{safe_title}.mp4"
+            final_path = os.path.join(download_folder, final_filename)
+            
+            # 重命名文件
+            if downloaded_path != final_path:
+                if os.path.exists(final_path):
+                    os.remove(final_path)
+                os.rename(downloaded_path, final_path)
+                downloaded_path = final_path
+            
+            update_video_status(video_id, VideoStatus.DOWNLOADING, DOWNLOAD_VERIFY_PROGRESS, "校验视频文件")
+        else:
+            # 其他平台使用yt-dlp
+            import yt_dlp
+            
+            update_video_status(video_id, VideoStatus.DOWNLOADING, DOWNLOAD_METADATA_PROGRESS, "获取视频信息")
+            with yt_dlp.YoutubeDL(build_ydl_options(download_folder, source_type)) as ydl:
+                info = ydl.extract_info(video_url, download=False)
 
-        raw_title = info.get("title") or f"{source_type}-{video_id}"
-        safe_title = secure_filename_with_chinese(raw_title) or f"{source_type}-{video_id}"
-        output_title = f"{build_source_prefix(source_type)}{safe_title}"
-        output_pattern = os.path.join(download_folder, f"{output_title}.%(ext)s")
+            raw_title = info.get("title") or f"{source_type}-{video_id}"
+            safe_title = secure_filename_with_chinese(raw_title) or f"{source_type}-{video_id}"
+            output_title = f"{build_source_prefix(source_type)}{safe_title}"
+            output_pattern = os.path.join(download_folder, f"{output_title}.%(ext)s")
 
-        update_video_status(video_id, VideoStatus.DOWNLOADING, DOWNLOAD_RUNNING_PROGRESS, "下载视频")
-        with yt_dlp.YoutubeDL(build_ydl_options(download_folder, source_type, output_pattern)) as ydl:
-            ydl.download([video_url])
+            update_video_status(video_id, VideoStatus.DOWNLOADING, DOWNLOAD_RUNNING_PROGRESS, "下载视频")
+            with yt_dlp.YoutubeDL(build_ydl_options(download_folder, source_type, output_pattern)) as ydl:
+                ydl.download([video_url])
 
-        update_video_status(video_id, VideoStatus.DOWNLOADING, DOWNLOAD_VERIFY_PROGRESS, "校验视频文件")
-        downloaded_path = resolve_downloaded_file_path(download_folder, output_title)
-        md5 = compute_file_md5(downloaded_path)
+            update_video_status(video_id, VideoStatus.DOWNLOADING, DOWNLOAD_VERIFY_PROGRESS, "校验视频文件")
+            downloaded_path = resolve_downloaded_file_path(download_folder, output_title)
+            md5 = compute_file_md5(downloaded_path)
 
         finalize_video_record(
             video_id,

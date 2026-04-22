@@ -1,5 +1,11 @@
 """语义搜索服务 API"""
 
+# Fix SQLite version requirement for ChromaDB
+import sys
+import pysqlite3
+sys.modules['sqlite3'] = pysqlite3
+
+
 import logging
 import os
 import time

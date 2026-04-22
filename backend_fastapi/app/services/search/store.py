@@ -1,5 +1,11 @@
 """ChromaDB 向量存储包装 - 改编自 SentrySearch"""
 
+# Fix SQLite version requirement for ChromaDB
+import sys
+import pysqlite3
+sys.modules['sqlite3'] = pysqlite3
+
+
 import hashlib
 import logging
 import os
@@ -25,6 +31,13 @@ def make_chunk_id(source_file: str, start_time: float, end_time: float, preview_
 
 class EduMindStore:
     """
+
+# Fix for SQLite version requirement
+import pysqlite3
+import sys
+sys.modules["sqlite3"] = pysqlite3
+
+
     ChromaDB 向量存储包装，用于 EduMind 语义搜索
 
     特性：
