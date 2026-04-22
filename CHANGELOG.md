@@ -1722,3 +1722,8 @@
   - `cd /Users/yuan/final-work/EduMind && pre-commit run --files README.md mobile-frontend/README.md docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md mobile-frontend/src/services/recommendationActions.js mobile-frontend/src/views/Home.vue mobile-frontend/src/views/Recommendations.vue mobile-frontend/src/views/Upload.vue`
   - `cd /Users/yuan/final-work/EduMind && MYPYPATH=backend_fastapi ./.venv/bin/python -m mypy --config-file pyproject.toml backend_fastapi/app/models backend_fastapi/app/schemas backend_fastapi/scripts/init_db.py scripts/hooks`
   - `cd /Users/yuan/final-work/EduMind && ./.venv/bin/python -m pytest backend_fastapi/tests/unit backend_fastapi/tests/api backend_fastapi/tests/smoke -q`
+
+## 2026-04-22 16:20 (Asia/Shanghai) 0422 系统验收与运维总结
+
+- 新增 `docs/0422_SYSTEM_REQUIREMENTS_OPERATION_SUMMARY.md`：记录本轮“本地前端 + 云端独立后端”联调与运维验收结果，覆盖服务运行状态、视频上传处理链路、关键词搜索链路与 7 项系统要求核验结论。
+- 本次记录明确了后端 7 项要求的可审计验证入口：`/Users/yuan/final-work/edumind-backend/scripts/validate_system_requirements.py`，并同步保留当日关键运行事实与风险提示（如磁盘容量阈值）。
