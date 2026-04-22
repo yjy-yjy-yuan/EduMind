@@ -246,3 +246,77 @@ async def get_indexing_status(
         error_message=vector_index.error_message,
         message=f"状态: {vector_index.status.value}",
     )
+
+
+@router.get('/keyword/search')
+async def keyword_search(
+    query: str,
+    user_id: int = 0,
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    关键词搜索 API
+    
+    搜索范围：
+    - 视频标题
+    - 字幕内容（通过 JOIN subtitles 表）
+    - 视频标签
+    
+    Args:
+        query: 搜索关键词
+        user_id: 用户ID（0表示搜索所有用户的视频，仅用于测试）
+        db: 数据库会话
+    
+    Returns:
+        搜索结果列表
+    """
+    if not query or len(query.strip()) == 0:
+        return {"query": query, "results": [], "count": 0}
+    
+    keyword = f"%{query.strip()}%"
+    
+    # 搜索视频标题和标签
+    videos_query = db.query(Video)
+    if user_id > 0:
+        videos_query = videos_query.filter(Video.user_id == user_id)
+    
+    # 搜索标题
+    title_results = videos_query.filter(Video.title.like(keyword)).all()
+    
+    # 搜索标签
+    tag_results = videos_query.filter(Video.tags.like(keyword)).all()
+    
+    # 搜索字幕
+    from app.models.subtitle import Subtitle
+    subtitle_query = db.query(Video).join(Subtitle, Video.id == Subtitle.video_id)
+    if user_id > 0:
+        subtitle_query = subtitle_query.filter(Video.user_id == user_id)
+    subtitle_results = subtitle_query.filter(Subtitle.text.like(keyword)).all()
+    
+    # 合并结果并去重
+    all_videos = {}
+    for video in title_results + tag_results + subtitle_results:
+        if video.id not in all_videos:
+            all_videos[video.id] = {
+                "id": video.id,
+                "title": video.title or "",
+                "filename": video.filename or "",
+                "status": video.status.value if hasattr(video.status, "value") else str(video.status),
+                "preview_filename": video.preview_filename,
+                "duration": video.duration,
+                "summary": video.summary,
+                "tags": [],
+            }
+            if video.tags:
+                try:
+                    import json
+                    all_videos[video.id]["tags"] = json.loads(video.tags)
+                except:
+                    pass
+    
+    results = list(all_videos.values())
+    return {
+        "query": query,
+        "results": results,
+        "count": len(results)
+    }
