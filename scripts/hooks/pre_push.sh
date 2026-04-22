@@ -12,7 +12,7 @@ VENV_PYTHON="${REPO_DIR}/.venv/bin/python"
 
 if [ ! -x "$VENV_PYTHON" ]; then
   echo "Missing ${VENV_PYTHON}. Create the project virtualenv before pushing." >&2
-  echo "Expected: python3 -m venv .venv && . .venv/bin/activate && pip install -r backend_fastapi/requirements.txt" >&2
+  echo "Expected: python3 -m venv .venv && . .venv/bin/activate && pip install -r ../edumind-backend/requirements.txt" >&2
   exit 1
 fi
 

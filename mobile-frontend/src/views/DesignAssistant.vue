@@ -25,7 +25,7 @@
         <span class="status-detail">服务地址：{{ status.base_url || 'https://sleek.design' }}</span>
       </div>
       <p v-if="!status.configured" class="note">
-        先在 `backend_fastapi/.env` 中配置 `SLEEK_API_KEY`，并为 key 打开 `projects`、`components`、`chats`、`screenshots` 相关 scope。
+        先在 `../edumind-backend/.env` 中配置 `SLEEK_API_KEY`，并为 key 打开 `projects`、`components`、`chats`、`screenshots` 相关 scope。
       </p>
     </section>
 

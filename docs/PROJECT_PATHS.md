@@ -7,7 +7,7 @@
 | 说明 | 绝对路径 |
 |------|----------|
 | **EduMind 主仓库** | `/Users/yuan/final-work/EduMind` |
-| 后端（FastAPI） | `/Users/yuan/final-work/EduMind/backend_fastapi` |
+| 后端（FastAPI） | `/Users/yuan/final-work/edumind-backend` |
 | 移动端 H5 | `/Users/yuan/final-work/EduMind/mobile-frontend` |
 | 新手使用指南页面（`#/guide`） | `/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Guide.vue` |
 | iOS 容器 | `/Users/yuan/final-work/EduMind/ios-app` |

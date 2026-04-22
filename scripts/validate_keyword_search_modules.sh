@@ -6,7 +6,31 @@ echo "============================================================"
 echo "阶段 1-2 验证: 关键词搜索模块化改造"
 echo "============================================================"
 
-cd "$(dirname "$0")/backend_fastapi"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+resolve_backend_dir() {
+  local candidates=()
+  if [ -n "${EDUMIND_BACKEND_DIR:-}" ]; then
+    candidates+=("${EDUMIND_BACKEND_DIR}")
+  fi
+  candidates+=(
+    "$PROJECT_ROOT/../edumind-backend"
+  )
+
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if [ -f "$candidate/run.py" ] && [ -d "$candidate/app" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+BACKEND_DIR="$(resolve_backend_dir || true)"
+[ -n "$BACKEND_DIR" ] || { echo "❌ 未找到后端目录（../edumind-backend）"; exit 1; }
+cd "$BACKEND_DIR"
 
 echo ""
 echo "1. 编译检查..."
@@ -24,20 +48,15 @@ python3 -c "from app.services.similarity_analytics import SimilarityAuditLog; lo
 
 echo ""
 echo "3. 测试文件编译..."
-python3 -m compileall ../tests/unit/test_tag_similarity_prompts.py -q && echo "   ✅ test_tag_similarity_prompts.py"
-python3 -m compileall ../tests/unit/test_similarity_score_parser.py -q && echo "   ✅ test_similarity_score_parser.py"
-python3 -m compileall ../tests/unit/test_config_model_params.py -q && echo "   ✅ test_config_model_params.py"
-python3 -m compileall ../tests/unit/test_similarity_analytics.py -q && echo "   ✅ test_similarity_analytics.py"
+python3 -m compileall tests/unit/test_tag_similarity_prompts.py -q && echo "   ✅ test_tag_similarity_prompts.py"
+python3 -m compileall tests/unit/test_similarity_score_parser.py -q && echo "   ✅ test_similarity_score_parser.py"
+python3 -m compileall tests/unit/test_config_model_params.py -q && echo "   ✅ test_config_model_params.py"
+python3 -m compileall tests/unit/test_similarity_analytics.py -q && echo "   ✅ test_similarity_analytics.py"
 
 echo ""
 echo "============================================================"
 echo "✅ 所有编译与导入检查通过"
 echo "============================================================"
 echo ""
-echo "下一步: 运行完整测试套件"
-echo "  cd backend_fastapi"
-echo "  pytest tests/unit/test_tag_similarity_prompts.py -v"
-echo "  pytest tests/unit/test_similarity_score_parser.py -v"
-echo "  pytest tests/unit/test_config_model_params.py -v"
-echo "  pytest tests/unit/test_similarity_analytics.py -v"
+echo "下一步: 执行仓库规定的非 pytest 本地验证（如 compileall / smoke 脚本）"
 echo "============================================================"

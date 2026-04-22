@@ -126,7 +126,7 @@ FIXED_DOMAIN=https://api.xxx.com bash ios-app/sync_ios_web_assets.sh --release
 
 Debug 模式脚本会自动执行：
 
-1. 读取 `backend_fastapi/.env` 里的 `PORT`
+1. 读取 `../edumind-backend/.env` 里的 `PORT`
 2. 读取当前 Mac 的 `LocalHostName`
 3. 将 `EDUMIND_API_BASE_URL` 刷新成 `http://<LocalHostName>.local:<PORT>`
 4. 再同步最新 `mobile-frontend/dist` 到 `WebAssets`

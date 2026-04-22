@@ -4,7 +4,28 @@
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BACKEND_DIR="$PROJECT_ROOT/backend_fastapi"
+
+resolve_backend_dir() {
+    local candidates=()
+    if [ -n "${EDUMIND_BACKEND_DIR:-}" ]; then
+        candidates+=("${EDUMIND_BACKEND_DIR}")
+    fi
+    candidates+=(
+        "$PROJECT_ROOT/../edumind-backend"
+    )
+
+    local candidate
+    for candidate in "${candidates[@]}"; do
+        if [ -f "$candidate/run.py" ] && [ -d "$candidate/app" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+BACKEND_DIR="$(resolve_backend_dir || true)"
+[ -n "$BACKEND_DIR" ] || { echo "❌ 未找到后端目录（../edumind-backend）"; exit 1; }
 
 echo "=========================================="
 echo "🔍 关键词搜索优化 - 完整验证清单"

@@ -6,9 +6,29 @@
 - 异常场景处理
 """
 
+import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, '/Users/yuan/final-work/EduMind/backend_fastapi')
+
+def _resolve_backend_dir() -> Path:
+    repo_root = Path(__file__).resolve().parent.parent
+    candidates: list[Path] = []
+    env_path = os.environ.get("EDUMIND_BACKEND_DIR", "").strip()
+    if env_path:
+        candidates.append(Path(env_path).expanduser())
+    candidates.extend([repo_root.parent / "edumind-backend"])
+
+    for candidate in candidates:
+        if (candidate / "run.py").is_file() and (candidate / "app").is_dir():
+            return candidate.resolve()
+    raise FileNotFoundError(
+        "backend directory not found; expected ../edumind-backend "
+        "(or set EDUMIND_BACKEND_DIR)"
+    )
+
+
+sys.path.insert(0, str(_resolve_backend_dir()))
 
 # ============================================================================
 # 演示数据

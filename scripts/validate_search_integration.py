@@ -18,8 +18,25 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-BACKEND_ROOT = REPO_ROOT / "backend_fastapi"
 PROJECT_VENV_PYTHON = REPO_ROOT / ".venv" / "bin" / "python"
+
+
+def resolve_backend_root() -> Path:
+    candidates = []
+    env_path = os.environ.get("EDUMIND_BACKEND_DIR", "").strip()
+    if env_path:
+        candidates.append(Path(env_path).expanduser())
+    candidates.extend([REPO_ROOT.parent / "edumind-backend"])
+
+    for candidate in candidates:
+        if (candidate / "run.py").is_file() and (candidate / "app").is_dir():
+            return candidate.resolve()
+    raise FileNotFoundError(
+        "未找到后端目录。请确保存在 ../edumind-backend 或设置 EDUMIND_BACKEND_DIR"
+    )
+
+
+BACKEND_ROOT = resolve_backend_root()
 
 
 def colored(text: str, color: str) -> str:
