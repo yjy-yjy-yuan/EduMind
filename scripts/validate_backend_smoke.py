@@ -20,7 +20,25 @@ import textwrap
 from pathlib import Path
 
 REPO_DIR = Path(__file__).resolve().parent.parent
-BACKEND_DIR = REPO_DIR / "backend_fastapi"
+
+
+def _resolve_backend_dir() -> Path:
+    candidates: list[Path] = []
+    env_path = os.environ.get("EDUMIND_BACKEND_DIR", "").strip()
+    if env_path:
+        candidates.append(Path(env_path).expanduser())
+    candidates.extend([REPO_DIR.parent / "edumind-backend"])
+
+    for candidate in candidates:
+        if (candidate / "run.py").is_file() and (candidate / "app").is_dir():
+            return candidate.resolve()
+    raise FileNotFoundError(
+        "backend directory not found; expected ../edumind-backend "
+        "(or set EDUMIND_BACKEND_DIR)"
+    )
+
+
+BACKEND_DIR = _resolve_backend_dir()
 
 
 # ---------------------------------------------------------------------------
@@ -37,7 +55,7 @@ def _run_compileall() -> bool:
             "compileall",
             "-q",  # quiet
             "-x",
-            "backend_fastapi/uploads/*",  # skip runtime-uploaded files
+            r".*/uploads/.*",  # skip runtime-uploaded files
             str(BACKEND_DIR),
         ],
         cwd=str(REPO_DIR),

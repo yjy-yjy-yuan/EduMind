@@ -4,13 +4,13 @@
 This repository is now an iOS-only mobile learning project for MacBook Pro development. The only supported product chain is:
 
 1. `mobile-frontend/` as the frontend UI layer
-2. `backend_fastapi/` as the real backend capability layer
+2. `../edumind-backend/` as the real backend capability layer
 3. `ios-app/` as the iOS `WKWebView` container and native execution layer for on-device features
 
 Do not reintroduce `frontend/`, `backend/`, Android modules, or desktop-web-specific product branches.
 
 ## Project Structure & Module Organization
-- `backend_fastapi/`: the only backend service. All server-side business logic, database access, upload handling, audio extraction, transcription, analysis, notes, QA, and graph features belong here.
+- `../edumind-backend/`: the only backend service. All server-side business logic, database access, upload handling, audio extraction, transcription, analysis, notes, QA, and graph features belong here.
 - `mobile-frontend/`: the only frontend codebase. It provides the H5 UI loaded by iOS `WKWebView`.
 - `ios-app/`: the iOS container project, native bridge layer, on-device media/file access, on-device audio extraction/transcription execution, and Web asset sync script.
 - `docs/`: only keep documents that directly support the iOS mobile chain, Mac development, backend deployment, database setup, or video-processing workflow.
@@ -20,10 +20,10 @@ Do not reintroduce `frontend/`, `backend/`, Android modules, or desktop-web-spec
 ## Architecture Rules
 - UI is frontend, real functionality is backend.
 - `mobile-frontend/` must not implement database logic, model inference, or fake “real processing” in page code.
-- `backend_fastapi/` remains the default online execution layer for uploads, FFmpeg extraction, Whisper transcription, database writes, summaries, QA, and similar features.
+- `../edumind-backend/` remains the default online execution layer for uploads, FFmpeg extraction, Whisper transcription, database writes, summaries, QA, and similar features.
 - `ios-app/` is the only on-device execution layer for iOS-native capabilities such as local file picking, media access, audio extraction, local task persistence, and on-device transcription.
 - Frontend and backend communicate through HTTP ports and documented APIs; frontend and `ios-app/` communicate through a documented `WKWebView` bridge.
-- The default backend entry is `/Users/yuan/final-work/EduMind/backend_fastapi`.
+- The default backend entry is `/Users/yuan/final-work/edumind-backend`.
 - The product target is iOS, not a standalone desktop website.
 
 ## Build, Test, and Development Commands
@@ -34,8 +34,8 @@ Backend:
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-pip install -r backend_fastapi/requirements.txt
-python backend_fastapi/run.py
+pip install -r ../edumind-backend/requirements.txt
+python ../edumind-backend/run.py
 ```
 
 Mobile frontend:
@@ -73,30 +73,18 @@ bash ios-app/validate_ios_build.sh
 - Prefer small top-level helpers over nested functions unless there is a hard technical reason.
 
 ## Testing Guidelines
-- Historical backend regression tests remain under `backend_fastapi/tests/`.
+- Historical backend regression tests remain under `../edumind-backend/tests/`.
 - Verification for the modified program must use non-`pytest` checks such as `python scripts/validate_backend_smoke.py`, `python -m compileall ...`, frontend build, and iOS container validation.
-- New backend features should still keep `backend_fastapi/tests/` coverage in sync when those historical tests are maintained.
+- New backend features should still keep `../edumind-backend/tests/` coverage in sync when those historical tests are maintained.
 - For frontend changes, build output alone is insufficient. iOS container validation is required.
 - For `ios-app/` native changes, at minimum run an iOS build validation and verify the affected bridge or native flow in the container.
 
 ## CI (GitHub Actions) Baseline
-- Repository baseline CI workflow: `.github/workflows/backend-ci.yml`.
-- CI events:
-  - `pull_request`
-  - `workflow_dispatch`
-- CI trigger scope (path-filtered):
-  - `.github/workflows/backend-ci.yml`
-  - `backend_fastapi/**`
-  - `pyproject.toml`
-  - `pytest.ini`
-- Current minimal CI checks:
-  - `ruff check backend_fastapi/tests`
-  - `cd backend_fastapi && pytest tests/smoke`
-- CI uses Python `3.10` and pip cache; this is the default backend CI runtime unless explicitly changed.
+- Backend CI now belongs to the standalone repository `../edumind-backend` and is no longer maintained in this repository.
+- This repository should only keep iOS/mobile frontend related CI.
 - Rule boundary:
   - Local modification verification for this repository still follows the non-`pytest` rule in this document.
-  - `pytest` is allowed in GitHub Actions CI as a regression guardrail and can be used when explicitly troubleshooting CI failures.
-- When CI scope or commands change, update this section and related workflow/docs in the same patch.
+  - Backend regression `pytest` should run in the standalone `edumind-backend` repository CI.
 
 ## Commit & Pull Request Guidelines
 - Use short imperative commit titles.

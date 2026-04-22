@@ -8,7 +8,8 @@
 #
 # 环境变量:
 #   FIXED_DOMAIN      固定后端域名，--release 模式必须设置（如 https://api.xxx.com）
-#   BACKEND_PORT      后端端口（从 backend_fastapi/.env 读取，默认 2004）
+#   BACKEND_PORT      后端端口（从后端 .env 读取，默认 2004）
+#   EDUMIND_BACKEND_DIR  可选，显式指定后端目录（优先级最高）
 #
 set -euo pipefail
 
@@ -16,8 +17,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 MOBILE_DIR="$REPO_DIR/mobile-frontend"
 WEB_ASSETS_DIR="$REPO_DIR/ios-app/EduMindIOS/EduMindIOS/WebAssets"
-BACKEND_ENV_FILE="$REPO_DIR/backend_fastapi/.env"
 IOS_PROJECT_FILE="$REPO_DIR/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj"
+BACKEND_DIR=""
+BACKEND_ENV_FILE=""
 
 # Debug/Release 模式标志
 IS_RELEASE=false
@@ -36,6 +38,7 @@ while [[ $# -gt 0 ]]; do
       echo "环境变量:"
       echo "  FIXED_DOMAIN    固定后端域名，如 https://api.xxx.com"
       echo "  BACKEND_PORT    后端端口（默认 2004）"
+      echo "  EDUMIND_BACKEND_DIR  后端目录（默认优先 ../edumind-backend）"
       exit 0
       ;;
     *)
@@ -59,9 +62,31 @@ require_path() {
   [ -e "$path" ] || fail "缺少必要文件或目录：$path"
 }
 
+resolve_backend_dir() {
+  local candidates=()
+  if [ -n "${EDUMIND_BACKEND_DIR:-}" ]; then
+    candidates+=("${EDUMIND_BACKEND_DIR}")
+  fi
+  candidates+=(
+    "$REPO_DIR/../edumind-backend"
+  )
+
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if [ -f "$candidate/run.py" ] && [ -d "$candidate/app" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
 require_path "$MOBILE_DIR"
 require_path "$MOBILE_DIR/package.json"
 require_path "$IOS_PROJECT_FILE"
+BACKEND_DIR="$(resolve_backend_dir || true)"
+[ -n "$BACKEND_DIR" ] || fail "未找到后端目录。请确保存在 ../edumind-backend 或设置 EDUMIND_BACKEND_DIR"
+BACKEND_ENV_FILE="$BACKEND_DIR/.env"
 
 command -v npm >/dev/null 2>&1 || fail "未找到 npm，请先安装 Node.js"
 command -v rsync >/dev/null 2>&1 || fail "未找到 rsync，无法同步 WebAssets"
@@ -79,6 +104,7 @@ if [ -f "$BACKEND_ENV_FILE" ]; then
   fi
 fi
 log "backend port: $BACKEND_PORT (source: $PORT_SOURCE)"
+log "backend dir:  $BACKEND_DIR"
 
 # ============================================================
 # 2. 确定 API Base URL（双通道核心逻辑）

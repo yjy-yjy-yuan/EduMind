@@ -1722,3 +1722,15 @@
   - `cd /Users/yuan/final-work/EduMind && pre-commit run --files README.md mobile-frontend/README.md docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md mobile-frontend/src/services/recommendationActions.js mobile-frontend/src/views/Home.vue mobile-frontend/src/views/Recommendations.vue mobile-frontend/src/views/Upload.vue`
   - `cd /Users/yuan/final-work/EduMind && MYPYPATH=backend_fastapi ./.venv/bin/python -m mypy --config-file pyproject.toml backend_fastapi/app/models backend_fastapi/app/schemas backend_fastapi/scripts/init_db.py scripts/hooks`
   - `cd /Users/yuan/final-work/EduMind && ./.venv/bin/python -m pytest backend_fastapi/tests/unit backend_fastapi/tests/api backend_fastapi/tests/smoke -q`
+
+## 2026-04-22 16:20 (Asia/Shanghai) 0422 系统验收与运维总结
+
+- 新增 `docs/0422_SYSTEM_REQUIREMENTS_OPERATION_SUMMARY.md`：记录本轮“本地前端 + 云端独立后端”联调与运维验收结果，覆盖服务运行状态、视频上传处理链路、关键词搜索链路与 7 项系统要求核验结论。
+- 本次记录明确了后端 7 项要求的可审计验证入口：`/Users/yuan/final-work/edumind-backend/scripts/validate_system_requirements.py`，并同步保留当日关键运行事实与风险提示（如磁盘容量阈值）。
+
+## 2026-04-22 17:02 (Asia/Shanghai) 后端独立拆分与连调收敛
+
+- 从主仓库删除 `backend_fastapi/`，后端改为同级独立目录 `/Users/yuan/final-work/edumind-backend`；同时删除本仓库旧的后端 CI 工作流 `.github/workflows/backend-ci.yml`，避免继续引用已移除目录。
+- 更新后端联动脚本与部署配置到独立后端路径：`scripts/blitz_prepare_edumind.sh`、`scripts/blitz_start_backend.sh`、`scripts/validate_backend_smoke.py`、`scripts/validate_search_integration.py`、`scripts/demo_keyword_search.py`、`scripts/purge_video_recommendation_by_title.py`、`scripts/validate_keyword_search_modules.sh`、`scripts/verify_keyword_search_submission.sh`、`ios-app/sync_ios_web_assets.sh`、`deploy/edumind-api.service`。
+- 更新项目路径与说明文档到独立后端架构：`AGENTS.md`、`README.md`、`docs/PROJECT_PATHS.md`、`ios-app/README.md`、`mobile-frontend/README.md`、`mobile-frontend/src/views/DesignAssistant.vue`、`scripts/hooks/pre_push.sh`。
+- 连调验证结论（本地前端 + 云端后端）：`/health` 正常；视频上传与处理链路可达；关键词搜索链路可达（搜索接口当前需要 `X-User-ID` 与登录态配合）。

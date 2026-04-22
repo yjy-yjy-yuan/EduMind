@@ -5,7 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VENV_DIR="$REPO_DIR/.venv"
 VENV_PYTHON="$VENV_DIR/bin/python"
-BACKEND_REQUIREMENTS="$REPO_DIR/backend_fastapi/requirements.txt"
+BACKEND_DIR=""
+BACKEND_REQUIREMENTS=""
 MOBILE_DIR="$REPO_DIR/mobile-frontend"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
@@ -23,6 +24,28 @@ require_file() {
   [ -e "$path" ] || fail "缺少必要文件或目录：$path"
 }
 
+resolve_backend_dir() {
+  local candidates=()
+  if [ -n "${EDUMIND_BACKEND_DIR:-}" ]; then
+    candidates+=("${EDUMIND_BACKEND_DIR}")
+  fi
+  candidates+=(
+    "$REPO_DIR/../edumind-backend"
+  )
+
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    if [ -f "$candidate/run.py" ] && [ -d "$candidate/app" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+BACKEND_DIR="$(resolve_backend_dir || true)"
+[ -n "$BACKEND_DIR" ] || fail "未找到后端目录。请确保存在 ../edumind-backend 或设置 EDUMIND_BACKEND_DIR"
+BACKEND_REQUIREMENTS="$BACKEND_DIR/requirements.txt"
 require_file "$BACKEND_REQUIREMENTS"
 require_file "$MOBILE_DIR/package.json"
 require_file "$REPO_DIR/ios-app/sync_ios_web_assets.sh"
@@ -37,7 +60,7 @@ else
   log "复用已有虚拟环境：$VENV_DIR"
 fi
 
-log "安装后端依赖：backend_fastapi/requirements.txt"
+log "安装后端依赖：$BACKEND_REQUIREMENTS"
 "$VENV_PYTHON" -m pip install -r "$BACKEND_REQUIREMENTS"
 
 if [ ! -d "$MOBILE_DIR/node_modules" ]; then

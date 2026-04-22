@@ -1,6 +1,6 @@
 # EduMind Mobile Frontend
 
-`mobile-frontend/` 是独立的移动端 H5 / WebView 工程，当前默认与 `backend_fastapi/` 联调。
+`mobile-frontend/` 是独立的移动端 H5 / WebView 工程，当前默认与 `../edumind-backend/` 联调。
 
 ## 启动
 
@@ -82,7 +82,7 @@ VITE_MOBILE_UI_ONLY=false                      # 关闭 UI-only
 
 当前移动端已新增“设计助手”页，入口位于“我的”页面中。它不会直接请求 Sleek，而是统一走 EduMind 后端的 `/api/design/*` 代理接口：
 
-- 先在 `backend_fastapi/.env` 中配置 `SLEEK_API_KEY`
+- 先在 `../edumind-backend/.env` 中配置 `SLEEK_API_KEY`
 - 登录 EduMind 后进入“我的” -> “设计助手”
 - 可创建 Sleek 项目、提交自然语言设计描述、查看截图预览和组件 HTML 原型
 

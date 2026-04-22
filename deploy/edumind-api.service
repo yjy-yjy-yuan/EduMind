@@ -17,26 +17,26 @@ Wants=mysql.service
 [Service]
 # ── 运行身份 ───────────────────────────────────────────────
 # 推荐创建专用用户以遵循最小权限原则：
-#   sudo useradd -r -s /usr/sbin/nologin -d /var/www/edumind/backend_fastapi edumind
+#   sudo useradd -r -s /usr/sbin/nologin -d /var/www/edumind-backend edumind
 #   sudo chown -R edumind:edumind /var/www/edumind
 # 创建用户后取消下方 User/Group 的注释即可启用
 User=root
 Group=root
 
 # ── 工作目录 ───────────────────────────────────────────────
-# run_prod.py 位于 backend_fastapi/ 子目录，WorkingDirectory 必须与其对齐
-WorkingDirectory=/var/www/edumind/backend_fastapi
+# run_prod.py 位于 edumind-backend 目录，WorkingDirectory 必须与其对齐
+WorkingDirectory=/var/www/edumind-backend
 
 # ── Python 虚拟环境 ────────────────────────────────────────
-# .venv 创建在 /var/www/edumind/.venv（与 backend_fastapi 同级）
-# .env 文件同样在 /var/www/edumind/backend_fastapi/.env
+# .venv 创建在 /var/www/edumind/.venv（与 edumind-backend 同级）
+# .env 文件同样在 /var/www/edumind-backend/.env
 Environment="PATH=/var/www/edumind/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="PYTHONUNBUFFERED=1"
 Environment="PYTHONDONTWRITEBYTECODE=1"
 
 # ── 启动命令 ────────────────────────────────────────────────
-# run_prod.py 位于 backend_fastapi/ 下，需完整相对路径
-ExecStart=/var/www/edumind/.venv/bin/python /var/www/edumind/backend_fastapi/run_prod.py
+# run_prod.py 位于 edumind-backend 下，需完整相对路径
+ExecStart=/var/www/edumind/.venv/bin/python /var/www/edumind-backend/run_prod.py
 
 # ── 重启策略 ───────────────────────────────────────────────
 Restart=on-failure
