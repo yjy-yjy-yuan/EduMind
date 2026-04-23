@@ -39,7 +39,7 @@ const parseStreamErrorBody = async (response) => {
   if (!text) return `请求失败（HTTP ${response.status}）`
   try {
     const payload = JSON.parse(text)
-    const detail = payload?.detail || payload?.message || payload?.msg
+    const detail = payload?.message || payload?.detail || payload?.msg
     return typeof detail === 'string' && detail.trim() ? detail.trim() : text
   } catch {
     return text
@@ -200,7 +200,7 @@ export async function askQuestionStream(
 
     onEvent?.(event)
     if (event?.type === 'error') {
-      const detail = event.detail || event.message || '问答处理失败，请稍后重试。'
+      const detail = event.message || event.detail || '问答处理失败，请稍后重试。'
       throw toStreamError(detail, response.status)
     }
     if (event?.type === 'answer') {
