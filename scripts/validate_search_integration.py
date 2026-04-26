@@ -31,9 +31,7 @@ def resolve_backend_root() -> Path:
     for candidate in candidates:
         if (candidate / "run.py").is_file() and (candidate / "app").is_dir():
             return candidate.resolve()
-    raise FileNotFoundError(
-        "未找到后端目录。请确保存在 ../edumind-backend 或设置 EDUMIND_BACKEND_DIR"
-    )
+    raise FileNotFoundError("未找到后端目录。请确保存在 ../edumind-backend 或设置 EDUMIND_BACKEND_DIR")
 
 
 BACKEND_ROOT = resolve_backend_root()

@@ -32,10 +32,7 @@ def _resolve_backend_dir() -> Path:
     for candidate in candidates:
         if (candidate / "run.py").is_file() and (candidate / "app").is_dir():
             return candidate.resolve()
-    raise FileNotFoundError(
-        "backend directory not found; expected ../edumind-backend "
-        "(or set EDUMIND_BACKEND_DIR)"
-    )
+    raise FileNotFoundError("backend directory not found; expected ../edumind-backend " "(or set EDUMIND_BACKEND_DIR)")
 
 
 BACKEND_DIR = _resolve_backend_dir()

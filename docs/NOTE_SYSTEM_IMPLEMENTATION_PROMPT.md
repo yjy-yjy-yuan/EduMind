@@ -2,14 +2,14 @@
 
 > 用途：给 Codex、Claude、Blitz 等编码助手直接使用，用于在当前 EduMind 仓库中推进笔记系统建设。
 > 适用仓库：`/Users/yuan/final-work/EduMind`
-> 当前产品边界：iOS-only，唯一有效链路为 `mobile-frontend/` + `backend_fastapi/` + `ios-app/`
+> 当前产品边界：iOS-only，唯一有效链路为 `mobile-frontend/` + `../edumind-backend/` + `ios-app/`
 
 ## 一、当前项目现状
 
 你面对的不是一个空白项目，而是一个已经收敛为 iOS-only 的移动学习系统：
 
 1. `mobile-frontend/` 是唯一前端，负责 `WKWebView` 中的 H5 UI。
-2. `backend_fastapi/` 是唯一真实后端，负责 MySQL、业务逻辑、视频处理、字幕、摘要、问答和笔记能力。
+2. `../edumind-backend/` 是唯一真实后端，负责 MySQL、业务逻辑、视频处理、字幕、摘要、问答和笔记能力。
 3. `ios-app/` 是唯一 iOS 容器，负责 `WKWebView`、原生桥接、本地资源加载与真机验证。
 
 必须严格遵守以下边界：
@@ -25,19 +25,19 @@
 
 ### 后端现状
 
-- `backend_fastapi/app/models/note.py`
+- `../edumind-backend/app/models/note.py`
   - 已有 `Note` 模型，字段包括 `title`、`content`、`content_vector`、`note_type`、`video_id`、`tags`、`keywords`、时间字段。
   - 已有 `NoteTimestamp` 模型，支持 `note_id`、`time_seconds`、`subtitle_text`。
-- `backend_fastapi/app/schemas/note.py`
+- `../edumind-backend/app/schemas/note.py`
   - 已有创建、更新、响应和时间戳相关 schema。
-- `backend_fastapi/app/routers/note.py`
+- `../edumind-backend/app/routers/note.py`
   - 已有笔记列表、详情、创建、更新、删除。
   - 已有时间戳新增/删除。
   - 已有标签汇总、相似笔记、批量删除、批量导出、单条导出、标签同步。
 
 ### 数据库现状
 
-- `backend_fastapi/scripts/mysql_managed_schema.sql`
+- `../edumind-backend/scripts/mysql_managed_schema.sql`
   - 已明确管理 `notes` 和 `note_timestamps`。
   - 当前 `notes` 通过 `video_id` 与 `videos` 关联。
 
@@ -93,18 +93,18 @@
 
 必须严格遵守以下项目事实：
 
-1. 本项目已经收敛为 iOS-only，唯一有效链路是 `mobile-frontend/` + `backend_fastapi/` + `ios-app/`。
+1. 本项目已经收敛为 iOS-only，唯一有效链路是 `mobile-frontend/` + `../edumind-backend/` + `ios-app/`。
 2. `mobile-frontend/` 只负责 UI、路由、状态和 API 调用，不能在页面里实现数据库逻辑、关键词提取、向量计算、摘要推理或伪造“真实笔记处理”。
-3. `backend_fastapi/` 是唯一真实业务层；笔记的持久化、关键词、时间戳写入、筛选、导出、相似笔记等真实逻辑必须继续落在后端。
+3. `../edumind-backend/` 是唯一真实业务层；笔记的持久化、关键词、时间戳写入、筛选、导出、相似笔记等真实逻辑必须继续落在后端。
 4. 数据库必须继续使用 MySQL，并优先复用现有表：`notes`、`note_timestamps`、`videos`、`subtitles`、`questions`。不要轻易新增平行表。
 5. 任何前端交互改动完成后，都要考虑 iOS `WKWebView` 的可点击、可滚动、可跳转和安全区适配；不能只按桌面浏览器验证。
 
 先理解当前现状：
 
 - 后端已有笔记模型和路由：
-  - `backend_fastapi/app/models/note.py`
-  - `backend_fastapi/app/schemas/note.py`
-  - `backend_fastapi/app/routers/note.py`
+  - `../edumind-backend/app/models/note.py`
+  - `../edumind-backend/app/schemas/note.py`
+  - `../edumind-backend/app/routers/note.py`
 - 当前后端已支持：
   - 笔记 CRUD
   - 时间戳新增/删除
@@ -150,7 +150,7 @@
 1. 不要恢复桌面 Web、旧 Flask、Android 或知识图谱旧分支。
 2. 不要把 mock 逻辑包装成真实能力；如果某路径暂时还是占位态，必须明确标识。
 3. 不要随意改表；如确实需要改动 schema，必须优先考虑扩展现有 `notes` 或 `note_timestamps`，并同步更新：
-   - `backend_fastapi/scripts/mysql_managed_schema.sql`
+   - `../edumind-backend/scripts/mysql_managed_schema.sql`
    - 后端测试
    - `README.md`
    - `docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`

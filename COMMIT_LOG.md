@@ -152,3 +152,28 @@
 ### 2026-04-12
 - `54419d52` `feat(recommendation): contract v2, sanitize responses, similarity fusion, hub UX`
 - `5827f3c5` `feat(backend): recommendation title filter, delete cascade, purge script`
+
+## 0422-codex/edumind-vinci-integration-operable-maintainable（edumind-backend）
+
+- 分支创建：`2026-04-22`
+- 创建基线：`cad1c23` `Initial commit: EduMind Backend FastAPI service`
+
+### 2026-04-22
+- `f4b3a9b` `docs: sync backend docs and harden hook pipeline for reliable local/CI checks (#1)`
+- `9c20a22` `feat: add vinci adapter baseline and sync m1 docs`
+- `04e3546` `feat: enforce vinci governance path and sync m1-3 docs`
+
+### 2026-04-23
+- `dabaa5d` `feat: add vinci m1-4 observability metrics and runbook`
+- `b3faf6a` `feat: add vinci ops metrics endpoint and alert rule templates`
+- `066da7f` `feat(agent): route vinci summary through governance pipeline`
+- `e137fba` `fix(agent): enforce governance context in vinci adapter`
+- `d2f6076` `test(agent): add vinci whitelist denial api regression`
+- `cbf4c41` `test(agent): assert denied audit event for vinci whitelist block`
+- `4e4c3c2` `docs(monitoring): align vinci alert templates with runbook thresholds`
+- `c48cb0d` `feat(vinci): add circuit breaker and graceful fallback in learning flow`
+- `c6e5e3f` `docs: add M3 alerting acceptance evidence and sync vinci docs`
+- `daffcca` `feat: add vinci alerting acceptance prep tooling`
+
+### 2026-04-23（待提交）
+- `TBD` `feat(m4): align backend/frontend contracts, stream normalization and integration docs`

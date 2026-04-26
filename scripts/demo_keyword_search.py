@@ -22,10 +22,7 @@ def _resolve_backend_dir() -> Path:
     for candidate in candidates:
         if (candidate / "run.py").is_file() and (candidate / "app").is_dir():
             return candidate.resolve()
-    raise FileNotFoundError(
-        "backend directory not found; expected ../edumind-backend "
-        "(or set EDUMIND_BACKEND_DIR)"
-    )
+    raise FileNotFoundError("backend directory not found; expected ../edumind-backend " "(or set EDUMIND_BACKEND_DIR)")
 
 
 sys.path.insert(0, str(_resolve_backend_dir()))
@@ -169,7 +166,7 @@ def demo_basic_functionality():
                 print(f"{tag1:<15} {tag2:<15} {'ERROR':<8} {str(e)[:20]:<8}")
 
         print("-" * 70)
-        print(f"通过率: {passed}/{len(DEMO_CASES)} ({passed*100//len(DEMO_CASES)}%)")
+        print(f"通过率: {passed}/{len(DEMO_CASES)} ({passed * 100 // len(DEMO_CASES)}%)")
 
     except Exception as e:
         print(f"❌ 演示 1 失败: {e}")

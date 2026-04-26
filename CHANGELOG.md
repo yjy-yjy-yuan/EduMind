@@ -1,5 +1,35 @@
 # 变更日志
 
+## 2026-04-26
+
+### M4.5 Vinci 能力可见化与笔记闭环（播放器 + 笔记列表）
+
+- **mobile-frontend**：更新 [`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)，实时描述面板新增“视觉增强来源（可折叠）”信息区；最近上下文每条描述新增“一键写入笔记”动作。
+- **mobile-frontend**：播放器实时描述写入笔记请求补齐 `video_id`、`timestamp`、`content`、`source=vinci_enhanced`，并补充成功反馈、失败提示与“重试”动作。
+- **mobile-frontend**：更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)，笔记列表新增来源标签渲染，`vinci_enhanced` 显示为“Vinci增强”。
+- **mobile-frontend**：新增 [`mobile-frontend/tests/m45_vinci_notes_contract.test.mjs`](/Users/yuan/final-work/EduMind/mobile-frontend/tests/m45_vinci_notes_contract.test.mjs)，覆盖 M4.5 契约测试：
+  - 实时描述卡片写入笔记动作存在且走后端笔记接口。
+  - 请求体包含 `video_id/timestamp/content/source`。
+  - 写入成功/失败（含可重试）反馈可见。
+  - 笔记列表来源标签可见。
+  - 前端不出现 Vinci 直连地址，仍只调用 EduMind 后端接口。
+- **ios-app**：同步 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)，确保 `WKWebView` 加载本次播放器与笔记来源标签改动。
+
+
+## 2026-04-23
+
+### Vinci M4 联调（前后端契约对齐）
+
+- **backend（edumind-backend）**：
+  - `/api/agent/execute` 治理拒绝场景升级为可恢复错误契约（包含 `error_code`、`message`、`suggestion`、`recoverable`，并保留原始 `detail`）。
+  - `/api/qa/ask` 流式响应统一 `answer` 结束事件（`stage=completed`、`progress=100`、`message=回答已完成`），并修复流式路径数据库会话一致性问题。
+  - 新增 M4 契约测试：`tests/unit/test_m4_frontend_proxy_contract.py`、`tests/unit/test_m4_integration_docs.py`。
+  - 新增联调文档：`docs/VINCI_M4_INTEGRATION.md`。
+- **mobile-frontend**：
+  - `src/api/qa.js` 流式错误文案优先使用后端用户友好 `message`，再回退 `detail`。
+  - 新增轻量契约测试：`mobile-frontend/tests/m4_contract.test.mjs`。
+  - `package.json` 新增 `npm test`（Node 内置 test runner）。
+
 ## 2026-04-14
 
 ### 移除 Docker/Railway 部署配置，聚焦固定域名部署
@@ -1734,3 +1764,15 @@
 - 更新后端联动脚本与部署配置到独立后端路径：`scripts/blitz_prepare_edumind.sh`、`scripts/blitz_start_backend.sh`、`scripts/validate_backend_smoke.py`、`scripts/validate_search_integration.py`、`scripts/demo_keyword_search.py`、`scripts/purge_video_recommendation_by_title.py`、`scripts/validate_keyword_search_modules.sh`、`scripts/verify_keyword_search_submission.sh`、`ios-app/sync_ios_web_assets.sh`、`deploy/edumind-api.service`。
 - 更新项目路径与说明文档到独立后端架构：`AGENTS.md`、`README.md`、`docs/PROJECT_PATHS.md`、`ios-app/README.md`、`mobile-frontend/README.md`、`mobile-frontend/src/views/DesignAssistant.vue`、`scripts/hooks/pre_push.sh`。
 - 连调验证结论（本地前端 + 云端后端）：`/health` 正常；视频上传与处理链路可达；关键词搜索链路可达（搜索接口当前需要 `X-User-ID` 与登录态配合）。
+
+## 2026-04-23 22:40 (Asia/Shanghai) 同步记录 edumind-backend Vinci 治理与告警验收
+
+- 本条为对独立后端仓库 `/Users/yuan/final-work/edumind-backend` 当日变更的同步记录（对应分支：`0422-codex/edumind-vinci-integration-operable-maintainable`）。
+- Vinci 治理链路补强：
+  - 学习流摘要接入治理执行管道，适配器强制携带治理上下文。
+  - 增加白名单拒绝回归与 denied audit event 断言，覆盖 API 与审计事件两侧。
+  - 学习流新增熔断与优雅降级，降低上游波动时的失败扩散风险。
+- 可观测性与运维能力增强：
+  - 新增 Vinci Ops 指标接口、M1~M4 监控指标与 runbook。
+  - 新增告警规则模板并对齐运行手册阈值。
+  - 补充告警验收准备工具、M3 验收证据与预发 dry-run 记录，形成可追溯验收链路。
