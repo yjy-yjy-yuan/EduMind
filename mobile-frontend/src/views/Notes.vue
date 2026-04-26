@@ -108,6 +108,7 @@
             <span v-if="Array.isArray(note.timestamps) && note.timestamps.length > 0" class="meta-pill meta-pill--time">
               {{ formatTimestampSummary(note.timestamps) }}
             </span>
+            <span v-if="resolveSourceLabel(note)" class="meta-pill meta-pill--source">{{ resolveSourceLabel(note) }}</span>
             <span v-if="note.sync_status === 'pending'" class="meta-pill">待同步</span>
             <span v-else-if="note.sync_status === 'failed'" class="meta-pill">同步失败</span>
           </div>
@@ -337,6 +338,26 @@ const buildExcerpt = (content) => {
   const text = String(content || '').replace(/\s+/g, ' ').trim()
   if (!text) return '暂无内容摘要。'
   return text.length > 72 ? `${text.slice(0, 72)}…` : text
+}
+
+const normalizeSourceCode = (note) => {
+  const source = String(note?.source || '').trim().toLowerCase()
+  if (source) return source
+
+  const noteType = String(note?.note_type || '').trim().toLowerCase()
+  if (noteType === 'vinci_enhanced') return 'vinci_enhanced'
+
+  const tags = Array.isArray(note?.tags) ? note.tags : []
+  if (tags.some((tag) => String(tag).trim().toLowerCase() === 'vinci_enhanced')) {
+    return 'vinci_enhanced'
+  }
+  return ''
+}
+
+const resolveSourceLabel = (note) => {
+  const sourceCode = normalizeSourceCode(note)
+  if (sourceCode === 'vinci_enhanced') return 'Vinci增强'
+  return ''
 }
 
 const formatTime = (value) => {
@@ -689,6 +710,11 @@ onMounted(reload)
 .meta-pill--time {
   background: var(--surface-lilac-deep);
   color: var(--lilac-text);
+}
+
+.meta-pill--source {
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
 }
 
 .tag-pill {

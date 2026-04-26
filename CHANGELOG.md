@@ -1,5 +1,21 @@
 # 变更日志
 
+## 2026-04-26
+
+### M4.5 Vinci 能力可见化与笔记闭环（播放器 + 笔记列表）
+
+- **mobile-frontend**：更新 [`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)，实时描述面板新增“视觉增强来源（可折叠）”信息区；最近上下文每条描述新增“一键写入笔记”动作。
+- **mobile-frontend**：播放器实时描述写入笔记请求补齐 `video_id`、`timestamp`、`content`、`source=vinci_enhanced`，并补充成功反馈、失败提示与“重试”动作。
+- **mobile-frontend**：更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)，笔记列表新增来源标签渲染，`vinci_enhanced` 显示为“Vinci增强”。
+- **mobile-frontend**：新增 [`mobile-frontend/tests/m45_vinci_notes_contract.test.mjs`](/Users/yuan/final-work/EduMind/mobile-frontend/tests/m45_vinci_notes_contract.test.mjs)，覆盖 M4.5 契约测试：
+  - 实时描述卡片写入笔记动作存在且走后端笔记接口。
+  - 请求体包含 `video_id/timestamp/content/source`。
+  - 写入成功/失败（含可重试）反馈可见。
+  - 笔记列表来源标签可见。
+  - 前端不出现 Vinci 直连地址，仍只调用 EduMind 后端接口。
+- **ios-app**：同步 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)，确保 `WKWebView` 加载本次播放器与笔记来源标签改动。
+
+
 ## 2026-04-23
 
 ### Vinci M4 联调（前后端契约对齐）

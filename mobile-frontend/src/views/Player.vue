@@ -107,6 +107,16 @@
           </span>
         </div>
 
+        <div class="fd-source-section">
+          <button class="fd-source-toggle" @click="fdSourceExpanded = !fdSourceExpanded">
+            <span>视觉增强来源（可折叠）</span>
+            <span class="fd-source-arrow" :class="{ 'fd-source-arrow--up': fdSourceExpanded }">▾</span>
+          </button>
+          <div v-if="fdSourceExpanded" class="fd-source-body">
+            当前描述由 EduMind 后端视觉增强链路生成，并统一通过后端接口返回。
+          </div>
+        </div>
+
         <div class="fd-description-area" ref="fdDescriptionRef">
           <div v-if="!fdHasContent && fdStage === 'idle'" class="fd-placeholder">
             开启后将持续描述当前画面内容…
@@ -129,10 +139,30 @@
           </button>
           <div v-if="fdContextExpanded" class="fd-context-list">
             <div v-for="(item, idx) in fdRecentHistory" :key="idx" class="fd-context-item">
-              <span class="fd-context-time">{{ formatSeconds(item.timestamp) }}</span>
-              <span class="fd-context-text">{{ item.text }}</span>
+              <div class="fd-context-main">
+                <span class="fd-context-time">{{ formatSeconds(item.timestamp) }}</span>
+                <span class="fd-context-text">{{ item.text }}</span>
+              </div>
+              <button class="fd-context-write" :disabled="fdNoteWriteBusy" @click="saveFdDescriptionToNote(item)">
+                写入笔记
+              </button>
             </div>
           </div>
+        </div>
+
+        <div
+          v-if="fdNoteWriteResult"
+          class="fd-note-result"
+          :class="{ 'fd-note-result--bad': fdNoteWriteResult.type === 'error' }"
+        >
+          <span>{{ fdNoteWriteResult.message }}</span>
+          <button
+            v-if="fdNoteWriteResult.type === 'error' && fdLastFailedNoteItem"
+            class="link"
+            @click="retrySaveDescriptionNote"
+          >
+            重试
+          </button>
         </div>
 
         <div v-if="fdHasContent" class="fd-feedback-row">
@@ -339,6 +369,7 @@ const fdDescriptionText = ref('')
 const fdDescriptionRef = ref(null)
 const fdRecentHistory = ref([])
 const fdContextExpanded = ref(false)
+const fdSourceExpanded = ref(false)
 const fdSessionId = ref('')
 const fdSessionActive = ref(false)
 const fdStreamController = ref(null)
@@ -346,6 +377,9 @@ const fdLastSampleTime = ref(-99)
 const fdRetryCount = ref(0)
 const FD_MAX_RETRIES = 3
 const fdFeedbackSent = ref(false)
+const fdNoteWriteBusy = ref(false)
+const fdNoteWriteResult = ref(null)
+const fdLastFailedNoteItem = ref(null)
 
 const FD_STAGE_LABELS = {
   idle: '就绪',
@@ -613,6 +647,51 @@ const submitFdFeedback = (accurate) => {
   if (fdFeedbackSent.value) return
   fdFeedbackSent.value = true
   console.info('[FrameDesc] feedback:', { session_id: fdSessionId.value, accurate })
+}
+
+const saveFdDescriptionToNote = async (item) => {
+  if (fdNoteWriteBusy.value) return
+  const description = String(item?.text || '').trim()
+  const noteTimestamp = Number(item?.timestamp ?? currentTimeSeconds.value ?? 0)
+  if (!description) {
+    fdNoteWriteResult.value = { type: 'error', message: '写入失败，描述内容为空。' }
+    return
+  }
+
+  fdNoteWriteBusy.value = true
+  fdNoteWriteResult.value = null
+  try {
+    const response = await createNote({
+      title: `画面描述 · ${formatSeconds(noteTimestamp)}`,
+      video_id: Number(id.value),
+      timestamp: noteTimestamp,
+      content: description,
+      source: 'vinci_enhanced',
+      note_type: 'text',
+      tags: 'vinci_enhanced,实时描述',
+      timestamps: [{ time_seconds: noteTimestamp, subtitle_text: description }],
+    })
+    const created = response?.data?.data || response?.data?.note || response?.data || null
+    const noteId = created?.id || created?.note_id || created?.data?.id || null
+    fdLastFailedNoteItem.value = null
+    fdNoteWriteResult.value = {
+      type: 'success',
+      message: noteId ? '已写入笔记，可在笔记列表查看。' : '已写入笔记。',
+    }
+  } catch (err) {
+    fdLastFailedNoteItem.value = item
+    fdNoteWriteResult.value = {
+      type: 'error',
+      message: extractErrorMessage(err, '写入失败，请重试。'),
+    }
+  } finally {
+    fdNoteWriteBusy.value = false
+  }
+}
+
+const retrySaveDescriptionNote = async () => {
+  if (!fdLastFailedNoteItem.value) return
+  await saveFdDescriptionToNote(fdLastFailedNoteItem.value)
 }
 
 watch(currentTimeSeconds, (newTime) => {
@@ -1210,6 +1289,44 @@ onUnmounted(() => {
   gap: 10px;
 }
 
+.fd-source-section {
+  border-radius: 12px;
+  border: 1px solid rgba(32, 42, 55, 0.08);
+  background: rgba(255, 255, 255, 0.55);
+  padding: 6px 8px;
+}
+
+.fd-source-toggle {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.fd-source-arrow {
+  font-size: 10px;
+  transition: transform 0.2s;
+}
+
+.fd-source-arrow--up {
+  transform: rotate(180deg);
+}
+
+.fd-source-body {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #64748b;
+}
+
 .fd-progress-track {
   flex: 1;
   height: 4px;
@@ -1310,6 +1427,15 @@ onUnmounted(() => {
 }
 
 .fd-context-item {
+  border-radius: 10px;
+  border: 1px solid rgba(32, 42, 55, 0.07);
+  background: rgba(255, 255, 255, 0.65);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.fd-context-main {
   display: grid;
   grid-template-columns: 40px 1fr;
   gap: 8px;
@@ -1327,6 +1453,41 @@ onUnmounted(() => {
   font-size: 12px;
   color: #475569;
   line-height: 1.5;
+}
+
+.fd-context-write {
+  justify-self: end;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(32, 42, 55, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.fd-context-write:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fd-note-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #14532d;
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.fd-note-result--bad {
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.1);
 }
 
 .fd-feedback-row {
