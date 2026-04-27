@@ -30,7 +30,7 @@ mysql -u root -p -e "CREATE DATABASE edumind CHARACTER SET utf8mb4 COLLATE utf8m
 
 ## 二、配置连接
 
-在 **backend_fastapi** 目录下：
+在 **`../edumind-backend`** 目录下：
 
 1. 复制环境配置：`cp .env.example .env`
 2. 编辑 `.env`，修改数据库连接（库名、用户名、密码、主机、端口）：
@@ -52,7 +52,7 @@ DATABASE_URL=mysql+pymysql://root:你的密码@127.0.0.1:3306/edumind
 表结构在 **首次启动 FastAPI 应用** 时自动创建（`main.py` 的 lifespan 里会执行 `Base.metadata.create_all(bind=engine)`）。
 
 ```bash
-cd backend_fastapi
+cd ../edumind-backend
 conda activate edumind   # 或你的虚拟环境
 python run.py
 ```
@@ -64,7 +64,7 @@ python run.py
 不启动完整应用，只建表：
 
 ```bash
-cd backend_fastapi
+cd ../edumind-backend
 conda activate edumind
 python scripts/init_db.py
 ```
@@ -89,7 +89,7 @@ python scripts/init_db.py --info
 
 1. **连接是否正常**：启动后端后无报错，且日志有「数据库表创建成功」。
 2. **表是否生成**：在 MySQL 里执行 `USE edumind; SHOW TABLES;`，应能看到 `videos`、`users`、`subtitles`、`notes`、`note_timestamps`、`questions` 等表（具体以当前模型为准）。
-3. **上传视频**：通过接口上传一个视频后，在 `videos` 表中应有一条新记录，且 `backend_fastapi/uploads/` 下有对应文件。
+3. **上传视频**：通过接口上传一个视频后，在 `videos` 表中应有一条新记录，且 `../edumind-backend/uploads/` 下有对应文件。
 
 ---
 
@@ -107,7 +107,7 @@ python scripts/init_db.py --info
 ## 六、小结
 
 1. 安装并启动 MySQL，创建数据库 **edumind**（utf8mb4）。
-2. 在 **backend_fastapi/.env** 中配置 **DATABASE_URL**。
+2. 在 **../edumind-backend/.env** 中配置 **DATABASE_URL**。
 3. 建表二选一：**启动应用**（`python run.py`）或运行 **`python scripts/init_db.py`**。
 
 完成以上步骤后，数据库即构建完毕，可正常使用视频上传、列表、播放等功能。

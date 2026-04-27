@@ -13,7 +13,7 @@
 | 操作系统 | Alibaba Cloud Linux 3（RHEL 系） |
 | Python | 3.6.8（系统）/ 3.6+ 虚拟环境 |
 | 虚拟环境 | `/var/www/edumind/.venv` |
-| 应用目录 | `/var/www/edumind/backend_fastapi` |
+| 应用目录 | `/var/www/edumind/edumind-backend` |
 | Nginx | 1.20.1 |
 | MySQL | 8.0（本地 127.0.0.1:3306） |
 | FFmpeg | 最新 nightly build（手动编译安装） |
@@ -141,7 +141,7 @@ tar --exclude='node_modules' \
     --exclude='*.pyc' \
     --exclude='.venv' \
     --exclude='venv' \
-    -czf edumind_deploy.tar.gz backend_fastapi/ mobile-frontend/ ios-app/ docs/
+    -czf edumind_deploy.tar.gz edumind-backend/ mobile-frontend/ ios-app/ docs/
 
 # 上传到服务器
 scp edumind_deploy.tar.gz root@47.84.228.226:/tmp/
@@ -167,7 +167,7 @@ source .venv/bin/activate
 pip install --upgrade pip
 
 # 安装依赖
-pip install -r backend_fastapi/requirements.txt
+pip install -r edumind-backend/requirements.txt
 ```
 
 > 注意：服务器上 Whisper 等大包已手动安装。如果网络安装超时，可以先在本地下载 wheel 文件再上传：
@@ -175,7 +175,7 @@ pip install -r backend_fastapi/requirements.txt
 > pip download openai-whisper torch sentence-transformers -d /tmp/wheels/
 > scp -r /tmp/wheels root@47.84.228.226:/tmp/
 > # 服务器上
-> pip install --no-index --find-links=/tmp/wheels -r backend_fastapi/requirements.txt
+> pip install --no-index --find-links=/tmp/wheels -r edumind-backend/requirements.txt
 > ```
 
 ### 7. 配置 .env 环境变量
@@ -206,7 +206,7 @@ WHISPER_MODEL_PATH=/var/www/edumind/models/whisper
 WHISPER_PRELOAD_ON_STARTUP=true
 
 # 文件存储
-BASE_DIR=/var/www/edumind/backend_fastapi
+BASE_DIR=/var/www/edumind/edumind-backend
 
 # CORS（允许 iOS WKWebView 和本地开发）
 CORS_ORIGINS=http://47.84.228.226,http://localhost:328,http://127.0.0.1:328
@@ -240,7 +240,7 @@ python3 download_whisper.py
 ### 9. 初始化数据库表
 
 ```bash
-cd /var/www/edumind/backend_fastapi
+cd /var/www/edumind/edumind-backend
 source /var/www/edumind/.venv/bin/activate
 python3 -c "
 from app.database import engine
@@ -293,8 +293,8 @@ Description=EduMind FastAPI
 After=network.target
 
 [Service]
-WorkingDirectory=/var/www/edumind/backend_fastapi
-ExecStart=/var/www/edumind/.venv/bin/python /var/www/edumind/backend_fastapi/run_prod.py
+WorkingDirectory=/var/www/edumind/edumind-backend
+ExecStart=/var/www/edumind/.venv/bin/python /var/www/edumind/edumind-backend/run_prod.py
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1

@@ -291,7 +291,7 @@ curl -I --tlsv1.3 https://47.84.228.226/
 
 ### 步骤 6：更新后端 CORS 白名单
 
-在服务器创建 `/var/www/edumind/backend_fastapi/.env`：
+在服务器创建 `/var/www/edumind/edumind-backend/.env`：
 
 ```env
 # 基础配置
@@ -310,7 +310,7 @@ QWEN_API_KEY=sk-你的DashScope密钥
 CORS_ORIGINS=null,https://47.84.228.226,http://localhost:328,http://127.0.0.1:328
 
 # 文件存储
-BASE_DIR=/var/www/edumind/backend_fastapi
+BASE_DIR=/var/www/edumind/edumind-backend
 WHISPER_MODEL=base
 WHISPER_MODEL_PATH=/var/www/edumind/models/whisper
 ```

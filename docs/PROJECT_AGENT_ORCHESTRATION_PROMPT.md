@@ -1,8 +1,8 @@
 # EduMind 智能体编排与能力强化 — 统一提示词
 
 > **用途**：指导本仓库在「视频学习 / 语义搜索 / 问答」方向上的智能体编排、治理、可观测与交付验收。供研发、联调、自动化助手与代码评审对齐目标与边界。
-> **产品链**：唯一有效链路为 `mobile-frontend/` + `backend_fastapi/` + `ios-app/`（iOS `WKWebView`）。
-> **决策状态（已定）**：智能体编排**目前仅在 `backend_fastapi` 内模块化实现**，未来可拆独立 `agent-service`；业务焦点**先强化现有「视频学习 / 搜索 / 问答」**，不另起无关产品线。
+> **产品链**：唯一有效链路为 `mobile-frontend/` + `../edumind-backend/` + `ios-app/`（iOS `WKWebView`）。
+> **决策状态（已定）**：智能体编排**目前仅在 `../edumind-backend` 内模块化实现**，未来可拆独立 `agent-service`；业务焦点**先强化现有「视频学习 / 搜索 / 问答」**，不另起无关产品线。
 
 ---
 
@@ -49,7 +49,7 @@
 
 ### 架构
 
-- **FastAPI** 为默认在线执行层；智能体编排放在 `backend_fastapi` 内，**边界清晰**以便未来迁移。
+- **FastAPI** 为默认在线执行层；智能体编排放在 `../edumind-backend` 内，**边界清晰**以便未来迁移。
 - **禁止**模型或提示词直接操作系统资源；执行只经由治理层与既有 `app/services/` 能力。
 
 ### 测试与提交（TDD + 里程碑）
@@ -82,7 +82,7 @@
 
 ---
 
-## 七、`backend_fastapi` 内建议物理结构（当前）
+## 七、`../edumind-backend` 内建议物理结构（当前）
 
 以下目录名为建议，实施时可微调，但**职责**应保持一致：
 
@@ -100,7 +100,7 @@
 ## 八、未来拆分 `agent-service` 的边界（仅预留，不实施）
 
 - **迁出**：编排运行时、治理、轨迹、提示词版本服务。
-- **保留在 `backend_fastapi`**：MySQL、上传、FFmpeg、Whisper、领域业务服务。
+- **保留在 `../edumind-backend`**：MySQL、上传、FFmpeg、Whisper、领域业务服务。
 - **契约**：任务 ID、用户 ID、资源引用、工具调用记录、版本号；通过 HTTP/gRPC 等明确接口交互。
 - **当前约束**：编排代码**避免**深度绑定 ORM 细节，领域修改通过已有 service 函数进入。
 
@@ -108,7 +108,7 @@
 
 ## 九、优先复用资产（禁止从零重建）
 
-- `backend_fastapi/`：上传、转写、摘要、QA、搜索等现有管线。
+- `../edumind-backend/`：上传、转写、摘要、QA、搜索等现有管线。
 - 已有结构化日志（如搜索侧 JSON 事件）：演进为统一遥测事件，而非并行另一套。
 - `mobile-frontend/`、`ios-app/` 与 `sync_ios_web_assets.sh` 同步流程。
 - `AGENTS.md`、`CHANGELOG.md`、`.github/workflows/backend-ci.yml` 等规范与 CI。

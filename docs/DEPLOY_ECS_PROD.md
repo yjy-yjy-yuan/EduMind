@@ -87,7 +87,7 @@ git status
 # 在本地开发机执行（替换 SOURCE_PATH 为实际项目路径）
 rsync -avz --exclude='.venv' --exclude='__pycache__' --exclude='*.pyc' \
       --exclude='node_modules' --exclude='.git' \
-      /Users/yuan/final-work/EduMind/backend_fastapi/ \
+      /Users/yuan/final-work/edumind-backend/ \
       ubuntu@47.84.228.226:/var/www/edumind/
 ```
 
@@ -96,7 +96,7 @@ rsync -avz --exclude='.venv' --exclude='__pycache__' --exclude='*.pyc' \
 ```bash
 cd /var/www/edumind
 ./.venv/bin/pip install --upgrade pip
-./.venv/bin/pip install -r backend_fastapi/requirements.txt
+./.venv/bin/pip install -r ../edumind-backend/requirements.txt
 
 # 验证 pysqlite3 可导入
 ./.venv/bin/python -c "import pysqlite3; print('pysqlite3 ok')"
@@ -107,11 +107,11 @@ cd /var/www/edumind
 ## 4. 环境变量配置
 
 ```bash
-# 4.1 创建生产环境 .env（从 .env.example 复制，.env 位于 backend_fastapi/ 下）
-cp /var/www/edumind/backend_fastapi/.env.example /var/www/edumind/backend_fastapi/.env
+# 4.1 创建生产环境 .env（从 .env.example 复制，.env 位于 ../edumind-backend/ 下）
+cp /var/www/edumind-backend/.env.example /var/www/edumind-backend/.env
 
 # 4.2 编辑 .env，替换以下关键配置
-sudo nano /var/www/edumind/backend_fastapi/.env
+sudo nano /var/www/edumind-backend/.env
 ```
 
 ### 必须修改的配置项
@@ -152,7 +152,7 @@ WHISPER_MODEL_PATH=/var/www/edumind/models/whisper
 
 ```bash
 # 验证 .env 中无明文密钥
-grep -E "(OPENAI_API_KEY|QWEN_API_KEY|DATABASE_URL=.*@)" /var/www/edumind/backend_fastapi/.env
+grep -E "(OPENAI_API_KEY|QWEN_API_KEY|DATABASE_URL=.*@)" /var/www/edumind-backend/.env
 # 若返回结果为空，说明已全部替换
 ```
 
@@ -469,7 +469,7 @@ sudo systemctl stop edumind-api
 cd /var/www/edumind && git pull origin main
 
 # 3. 更新依赖（如 requirements.txt 有变更）
-./.venv/bin/pip install -r backend_fastapi/requirements.txt
+./.venv/bin/pip install -r ../edumind-backend/requirements.txt
 
 # 4. 重启服务
 sudo systemctl start edumind-api
@@ -532,8 +532,8 @@ sudo crontab -e
 | `deploy/edumind-api.service` | systemd 服务单元 |
 | `deploy/nginx-edumind-api-http.conf` | Nginx HTTP 反向代理配置 |
 | `deploy/nginx-edumind-api-https.conf` | Nginx HTTPS 反向代理配置 |
-| `backend_fastapi/run_prod.py` | 生产启动脚本（pysqlite3 注入） |
-| `backend_fastapi/.env` | 生产环境变量（不提交，含真实密钥） |
+| `../edumind-backend/run_prod.py` | 生产启动脚本（pysqlite3 注入） |
+| `../edumind-backend/.env` | 生产环境变量（不提交，含真实密钥） |
 
 ---
 

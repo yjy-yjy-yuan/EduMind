@@ -103,8 +103,8 @@ Changes:
 - Confirm logging integration into main search workflows
 
 Files modified:
-- backend_fastapi/app/services/search/search.py (导入 + 日志集成)
-- backend_fastapi/app/services/search/search_logging.py (日志类)
+- ../edumind-backend/app/services/search/search.py (导入 + 日志集成)
+- ../edumind-backend/app/services/search/search_logging.py (日志类)
 - scripts/validate_search_integration.py (验证脚本)
 ```
 
@@ -129,7 +129,7 @@ Files modified:
 
 ✅ **编译验证**
 ```bash
-python -m compileall backend_fastapi/app/services/search/ -q
+python -m compileall ../edumind-backend/app/services/search/ -q
 npm run build:ios
 ```
 

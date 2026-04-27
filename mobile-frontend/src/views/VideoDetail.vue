@@ -335,9 +335,8 @@ const summaryStyleText = computed(() => `${summaryStyleLabel(processingSettings.
 const processDisabled = computed(
   () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(normalizeVideoStatus(statusValue.value))
 )
-const deleteDisabled = computed(
-  () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(normalizeVideoStatus(statusValue.value))
-)
+const deleteInFlight = ref(false)
+const deleteDisabled = computed(() => autoStarting.value || retrying.value || deleteInFlight.value)
 
 const extractErrorMessage = (err, fallback) => {
   const detail = err?.response?.data?.detail
@@ -791,12 +790,15 @@ const formatMetaTime = (value) => {
 }
 const remove = async () => {
   const ok = window.confirm('确认删除该视频？')
-  if (!ok) return
+  if (!ok || deleteInFlight.value) return
+  deleteInFlight.value = true
   try {
     await deleteVideo(id.value)
     router.replace('/videos')
   } catch (e) {
-    error.value = e?.message || '删除失败'
+    error.value = extractErrorMessage(e, '删除失败')
+  } finally {
+    deleteInFlight.value = false
   }
 }
 

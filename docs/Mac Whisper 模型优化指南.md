@@ -89,7 +89,7 @@ torch.mps.empty_cache()
 ### 5. 后台执行器模式
 
 **当前仓库实现:**
-- 本地开发默认使用 `backend_fastapi/app/core/executor.py` 中的后台执行器
+- 本地开发默认使用 `../edumind-backend/app/core/executor.py` 中的后台执行器
 - 不再依赖旧的 Celery worker / solo pool 配置
 - 需要提升并发时，优先调整执行器配置而不是恢复旧 Worker 链路
 
@@ -134,7 +134,7 @@ torch.mps.empty_cache()
 **Mac 解决方法:**
 ```bash
 # 结束当前 FastAPI 启动进程
-pkill -f "python backend_fastapi/run.py"
+pkill -f "python ../edumind-backend/run.py"
 ```
 
 **Windows 解决方法:**
@@ -224,7 +224,7 @@ Get-ChildItem "C:\Users\yuan\302_works\whisper_models" | Format-Table Name, Leng
 
 **建议做法:**
 - 先用 `small` 或 `base` 模型验证链路，再视情况升级到 `medium` 或 `large`
-- 如需提高并发，优先检查 [`backend_fastapi/app/core/executor.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/executor.py) 和 [`backend_fastapi/app/core/config.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/core/config.py) 中的执行器配置
+- 如需提高并发，优先检查 [`../edumind-backend/app/core/executor.py`](/Users/yuan/final-work/EduMind/../edumind-backend/app/core/executor.py) 和 [`../edumind-backend/app/core/config.py`](/Users/yuan/final-work/EduMind/../edumind-backend/app/core/config.py) 中的执行器配置
 - 不建议沿用旧文档中的 Celery 多 Worker 命令
 
 ### 3. 监控任务进度
@@ -235,7 +235,7 @@ curl http://127.0.0.1:8000/health
 ```
 
 **查看上传与处理日志:**
-- 直接观察 `python backend_fastapi/run.py` 所在终端输出
+- 直接观察 `python ../edumind-backend/run.py` 所在终端输出
 - 上传后在前端视频列表或详情页查看当前步骤和处理进度
 
 ## 📝 最佳实践
@@ -249,13 +249,13 @@ curl http://127.0.0.1:8000/health
 ## 🔧 配置文件位置
 
 **Mac:**
-- **后台执行器**: `backend_fastapi/app/core/executor.py`
-- **Whisper 运行时**: `backend_fastapi/app/services/whisper_runtime.py`
-- **视频处理任务**: `backend_fastapi/app/tasks/video_processing.py`
+- **后台执行器**: `../edumind-backend/app/core/executor.py`
+- **Whisper 运行时**: `../edumind-backend/app/services/whisper_runtime.py`
+- **视频处理任务**: `../edumind-backend/app/tasks/video_processing.py`
 
 **Windows:**
-- **后台执行器**: `backend_fastapi/app/core/executor.py`
-- **视频处理任务**: `backend_fastapi/app/tasks/video_processing.py`
+- **后台执行器**: `../edumind-backend/app/core/executor.py`
+- **视频处理任务**: `../edumind-backend/app/tasks/video_processing.py`
 
 **模型存储路径 (跨平台):**
 - 当前仓库默认路径: `/Users/yuan/302_works/whisper_models`
@@ -267,7 +267,7 @@ curl http://127.0.0.1:8000/health
 如遇到问题,查看日志:
 ```bash
 # 直接查看本地启动终端输出
-python backend_fastapi/run.py
+python ../edumind-backend/run.py
 ```
 
 ---

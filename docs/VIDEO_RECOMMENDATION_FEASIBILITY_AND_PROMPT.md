@@ -4,7 +4,7 @@
 **路径索引与可选参考仓库**：见 [`PROJECT_PATHS.md`](./PROJECT_PATHS.md)。跨目录实现时请在任务中显式写明该路径。
 
 > **阅读顺序**：先读「第一部分」可行性结论；再读「第二部分」实现提示词（含哲学与范围）。
-> 涉及模块：`backend_fastapi` 推荐服务、`external_candidate_service`、首页与推荐页 `mobile-frontend`。
+> 涉及模块：`../edumind-backend` 推荐服务、`external_candidate_service`、首页与推荐页 `mobile-frontend`。
 
 ---
 
@@ -84,10 +84,10 @@
 
 ### 2.3 现状必读文件
 
-- `backend_fastapi/app/routers/recommendation.py`
-- `backend_fastapi/app/services/video_recommendation_service.py`
-- `backend_fastapi/app/services/external_candidate_service.py`
-- `backend_fastapi/app/schemas/recommendation.py`
+- `../edumind-backend/app/routers/recommendation.py`
+- `../edumind-backend/app/services/video_recommendation_service.py`
+- `../edumind-backend/app/services/external_candidate_service.py`
+- `../edumind-backend/app/schemas/recommendation.py`
 - `mobile-frontend/src/api/recommendation.js`
 - `mobile-frontend/src/views/Home.vue`（`reloadRecommendations`）
 - `mobile-frontend/src/views/Recommendations.vue`

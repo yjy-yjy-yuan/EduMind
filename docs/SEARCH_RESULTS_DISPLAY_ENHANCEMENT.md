@@ -27,7 +27,7 @@
 
 ### 1. 扩展 SearchResultChunk Schema
 
-**文件**: `backend_fastapi/app/schemas/search.py`
+**文件**: `../edumind-backend/app/schemas/search.py`
 
 **改动**:
 ```python
@@ -49,7 +49,7 @@ class SearchResultChunk(BaseModel):
 
 ### 2. 搜索逻辑中补齐视频标题
 
-**文件**: `backend_fastapi/app/services/search/search.py`
+**文件**: `../edumind-backend/app/services/search/search.py`
 
 **改动内容**:
 

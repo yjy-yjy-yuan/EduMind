@@ -6,19 +6,19 @@
 ## 1. 本次已交付内容
 
 ### 代码模块（后端）
-- `backend_fastapi/app/services/tag_similarity_prompts.py`
-- `backend_fastapi/app/services/config_model_params.py`
-- `backend_fastapi/app/services/similarity_score_parser.py`
-- `backend_fastapi/app/services/similarity_analytics.py`
-- `backend_fastapi/app/services/llm_similarity_service.py`
-- `backend_fastapi/app/core/config.py`
+- `../edumind-backend/app/services/tag_similarity_prompts.py`
+- `../edumind-backend/app/services/config_model_params.py`
+- `../edumind-backend/app/services/similarity_score_parser.py`
+- `../edumind-backend/app/services/similarity_analytics.py`
+- `../edumind-backend/app/services/llm_similarity_service.py`
+- `../edumind-backend/app/core/config.py`
 
 ### 单元测试
-- `backend_fastapi/tests/unit/test_tag_similarity_prompts.py`
-- `backend_fastapi/tests/unit/test_config_model_params.py`
-- `backend_fastapi/tests/unit/test_similarity_score_parser.py`
-- `backend_fastapi/tests/unit/test_similarity_analytics.py`
-- `backend_fastapi/tests/unit/test_llm_similarity_service.py`
+- `../edumind-backend/tests/unit/test_tag_similarity_prompts.py`
+- `../edumind-backend/tests/unit/test_config_model_params.py`
+- `../edumind-backend/tests/unit/test_similarity_score_parser.py`
+- `../edumind-backend/tests/unit/test_similarity_analytics.py`
+- `../edumind-backend/tests/unit/test_llm_similarity_service.py`
 
 ### 文档与脚本
 - `docs/KEYWORD_SEARCH_OPTIMIZATION.md`
@@ -40,7 +40,7 @@
 在当前工作区执行并通过：
 
 ```bash
-cd backend_fastapi
+cd ../edumind-backend
 python -m pytest tests/unit/test_llm_similarity_service.py -q
 python -m pytest tests/unit/test_similarity_score_parser.py tests/unit/test_similarity_analytics.py -q
 python -m pytest tests/smoke -q

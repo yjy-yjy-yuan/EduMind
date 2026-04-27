@@ -67,7 +67,7 @@ FIXED_DOMAIN=http://my-mac.local bash ios-app/sync_ios_web_assets.sh --release
 
 ## 四、后端配置（固定域名环境）
 
-在 **backend_fastapi** 的 `.env`（生产环境配置）中：
+在 **`../edumind-backend`** 的 `.env`（生产环境配置）中：
 
 ```bash
 # 应用监听所有网卡（若前面有 Nginx 反向代理，可仍用 127.0.0.1:2004）
@@ -210,7 +210,7 @@ FIXED_DOMAIN=https://api.xxx.com bash ios-app/validate_ios_build.sh --release
 curl -s http://127.0.0.1:2004/health
 
 # Step 2: 后端 CORS 确认（日志）
-# 启动后端: python backend_fastapi/run.py
+# 启动后端: python ../edumind-backend/run.py
 # 检查日志中 "CORS 允许来源" 行
 
 # Step 3: 前端固定域名构建（使用 .env.ios）
@@ -248,7 +248,7 @@ npm run build:ios
 | 症状 | 可能原因 | 解决方案 |
 |------|---------|---------|
 | TestFlight 包请求失败 | `project.pbxproj` Release 配置仍为 `.local` | 确认 Release 配置为 `https://api.xxx.com`，执行 `--release` 模式 |
-| CORS 报错 | 后端 CORS_ORIGINS 未包含前端域名 | 检查 `backend_fastapi/.env` 中 `CORS_ORIGINS` 是否包含 `null` 和前端固定域名 |
+| CORS 报错 | 后端 CORS_ORIGINS 未包含前端域名 | 检查 `../edumind-backend/.env` 中 `CORS_ORIGINS` 是否包含 `null` 和前端固定域名 |
 | H5 404 | 后端未启动或域名解析失败 | 确认后端在 `https://api.xxx.com` 可访问 |
 | iOS 无法构建 | Swift 编译错误 | 检查 ContentView.swift 中是否仍有 `yuandeMacBook-Pro` 硬编码 |
 | 脚本报错 "Release 模式检测到非固定域名" | FIXED_DOMAIN 使用了 `.local` | 确保 FIXED_DOMAIN 使用公网固定域名 |
@@ -269,7 +269,7 @@ npm run build:ios
 
 ### 层面 3：后端配置层面
 
-- `backend_fastapi/.env` 中的 `CORS_ORIGINS`
+- `../edumind-backend/.env` 中的 `CORS_ORIGINS`
 - 回滚：恢复 `.env` 到上一个版本，或重新设置 `CORS_ORIGINS`
 
 ### 回滚触发条件

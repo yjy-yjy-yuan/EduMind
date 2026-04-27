@@ -17,12 +17,12 @@
 │  └─ SEARCH_SYSTEM_QUICK_REFERENCE.md         [THIS]  ← 快速参考（当前文件）
 │
 ├─ 修复脚本
-│  └─ backend_fastapi/scripts/
+│  └─ ../edumind-backend/scripts/
 │     ├─ fix_chromadb_persistence.py           [3 KB]  ← 自动修复脚本
 │     └─ verify_chromadb_integrity.py          [4 KB]  ← 验证脚本（包含在修复指南中）
 │
 └─ 源代码（需要修改）
-   └─ backend_fastapi/app/services/search/
+   └─ ../edumind-backend/app/services/search/
       ├─ store.py                              [需修改第116-143行]
       └─ search.py                             [需修改第245行]
 ```
@@ -83,18 +83,18 @@ mysql -h 127.0.0.1 -u root -ppassword edumind -e \
 如果您想快速修复：
 ```bash
 # 1. 运行自动修复脚本
-python backend_fastapi/scripts/fix_chromadb_persistence.py
+python ../edumind-backend/scripts/fix_chromadb_persistence.py
 
-# 2. 清理旧数据（在 backend_fastapi 目录下执行；数据库为 MySQL）
+# 2. 清理旧数据（在 ../edumind-backend 目录下执行；数据库为 MySQL）
 rm -rf data/chroma
 mysql -h 127.0.0.1 -u root -ppassword edumind -e "DELETE FROM vector_indexes;"
 mysql -h 127.0.0.1 -u root -ppassword edumind -e "UPDATE videos SET has_semantic_index=0, vector_index_id=NULL;"
 
 # 3. 启动后端并等待重新索引
-python backend_fastapi/run.py
+python ../edumind-backend/run.py
 
 # 4. 验证修复
-python backend_fastapi/scripts/verify_chromadb_integrity.py
+python ../edumind-backend/scripts/verify_chromadb_integrity.py
 ```
 
 ---
@@ -224,13 +224,13 @@ if not success:                                       # ← 新增检查
 
 ```bash
 # 诊断当前状态
-python backend_fastapi/scripts/verify_chromadb_integrity.py
+python ../edumind-backend/scripts/verify_chromadb_integrity.py
 
 # 自动应用修复
-python backend_fastapi/scripts/fix_chromadb_persistence.py
+python ../edumind-backend/scripts/fix_chromadb_persistence.py
 
 # 编译检查
-python -m compileall backend_fastapi/app/services/search/
+python -m compileall ../edumind-backend/app/services/search/
 
 # 清理数据（MySQL）
 rm -rf data/chroma
@@ -266,7 +266,7 @@ curl -X POST http://localhost:8000/api/search/semantic/search \
 
 1. 查看 `logs/` 目录中的完整日志
 2. 运行 `verify_chromadb_integrity.py` 获取实时状态
-3. 检查 `backend_fastapi/run.py` 的输出日志
+3. 检查 `../edumind-backend/run.py` 的输出日志
 
 ---
 

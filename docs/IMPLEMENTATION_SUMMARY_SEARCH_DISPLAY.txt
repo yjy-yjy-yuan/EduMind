@@ -46,8 +46,8 @@
 ## 📊 代码改动统计
 
 ```
- backend_fastapi/app/services/search/search.py  | 10 ++
- backend_fastapi/app/schemas/search.py          |  1 +
+ ../edumind-backend/app/services/search/search.py  | 10 ++
+ ../edumind-backend/app/schemas/search.py          |  1 +
  mobile-frontend/src/views/Search.vue           | 155 ++++++++++++++++++-----
  docs/SEARCH_RESULTS_DISPLAY_ENHANCEMENT.md     | 新增
  CHANGELOG.md                                   | 22 ++

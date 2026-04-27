@@ -1,5 +1,42 @@
 # 变更日志
 
+## 2026-04-27
+
+### VideoDetail.vue 删除按钮交互修复
+
+- **mobile-frontend**：更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：
+  - 引入 `deleteInFlight` ref，替代原有的冗余 `deleteDisabled` 计算逻辑，防止删除 API 调用进行中时重复触发。
+  - `remove()` 函数在调用前将 `deleteInFlight` 置为 `true`，`finally` 中复位，防止双删。
+  - 错误提示改为调用 `extractErrorMessage(e, '删除失败')`，与页面已有错误处理惯例一致。
+
+### 文档修复：后端目录从 `backend_fastapi/` 迁移到 `../edumind-backend/`
+
+- **`docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`**：全文更新所有 `backend_fastapi/` 引用为 `../edumind-backend/`（目录路径、命令行、代码块），使实现规范与仓库实际结构完全对齐。
+- 同步更新其余 25 个 `docs/` 文件中残留的 `backend_fastapi/` 路径引用，包括：
+  - `docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`
+  - `docs/VIDEO_RECOMMENDATION_UI_IMPLEMENTATION_PROMPT.md`
+  - `docs/PROJECT_AGENT_ORCHESTRATION_PROMPT.md`
+  - `docs/BACKEND_FIXED_DOMAIN.md`
+  - `docs/BLITZ_EDUMIND_WORKFLOW.md`
+  - `docs/DEPLOY_ECS_PROD.md`
+  - `docs/Mac Whisper 模型优化指南.md`
+  - `docs/LEARNING_FLOW_AGENT_PROMPT.md`
+  - `docs/COMPOUNDING_FEEDBACK_MVP.md`
+  - `docs/VIDEO_UPLOAD_IMPLEMENTATION.md`
+  - `docs/ANALYTICS_PIPELINE_MIGRATION.md`
+  - `docs/KEYWORD_SEARCH_OPTIMIZATION.md`
+  - `docs/SEARCH_FIXES_SUMMARY.md`
+  - `docs/SEARCH_RESULTS_DISPLAY_ENHANCEMENT.md`
+  - `docs/SEARCH_TESTING_PROMPT.md`
+  - `docs/SENTRYSEARCH_INTEGRATION_PROMPT.md`
+  - `docs/SIMILARITY_AUDIT_LOG_PERSISTENCE.md`
+  - `docs/iOS离线模型评估与切换说明.md`
+  - `docs/ISSUES_CONFIRMATION_AND_IMPROVEMENTS.md`
+  - `docs/VIDEO_RECOMMENDATION_FEASIBILITY_AND_PROMPT.md`
+  - `docs/DATABASE_SETUP.md`
+  - `docs/HOME_SEARCH_ENTRY_PROMPT.md`
+  - `docs/IMPLEMENTATION_SUMMARY_SEARCH_DISPLAY.txt`
+
 ## 2026-04-26
 
 ### M4.5 Vinci 能力可见化与笔记闭环（播放器 + 笔记列表）

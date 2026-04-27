@@ -1,7 +1,7 @@
 # 关键词搜索（标签相似度）优化技术文档
 
 更新日期：2026-04-10
-适用范围：`backend_fastapi/app/services/llm_similarity_service.py` 及其配套模块
+适用范围：`../edumind-backend/app/services/llm_similarity_service.py` 及其配套模块
 
 ## 1. 目标与边界
 
@@ -81,7 +81,7 @@
 ### 4.2 本次实测结果
 
 ```bash
-cd backend_fastapi
+cd ../edumind-backend
 python -m pytest tests/unit/test_llm_similarity_service.py -q
 python -m pytest tests/unit/test_similarity_score_parser.py tests/unit/test_similarity_analytics.py -q
 python -m pytest tests/smoke -q

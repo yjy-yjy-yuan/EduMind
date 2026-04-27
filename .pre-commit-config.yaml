@@ -6,7 +6,7 @@ exclude: |
     \.git/|
     \.venv/|
     \.xcode-derived/|
-    backend_fastapi/uploads/|
+    \.\./|
     ios-app/EduMindIOS/EduMindIOS/WebAssets/|
     mobile-frontend/dist/|
     mobile-frontend/\.idea/|
@@ -18,7 +18,7 @@ repos:
     rev: v4.6.0
     hooks:
       - id: check-ast
-        files: ^(backend_fastapi/.*\.py|download_whisper\.py|scripts/.*\.py)$
+        files: ^(download_whisper\.py|scripts/.*\.py)$
       - id: check-byte-order-marker
       - id: check-case-conflict
       - id: check-merge-conflict
@@ -39,21 +39,21 @@ repos:
     rev: 24.10.0
     hooks:
       - id: black
-        files: ^(backend_fastapi/.*\.py|download_whisper\.py|scripts/.*\.py)$
+        files: ^(download_whisper\.py|scripts/.*\.py)$
         args: [--config=pyproject.toml]
 
   - repo: https://github.com/PyCQA/isort
     rev: 5.13.2
     hooks:
       - id: isort
-        files: ^(backend_fastapi/.*\.py|download_whisper\.py|scripts/.*\.py)$
+        files: ^(download_whisper\.py|scripts/.*\.py)$
         args: [--settings-path=pyproject.toml]
 
   - repo: https://github.com/PyCQA/flake8
     rev: 7.1.1
     hooks:
       - id: flake8
-        files: ^(backend_fastapi/.*\.py|download_whisper\.py|scripts/.*\.py)$
+        files: ^(download_whisper\.py|scripts/.*\.py)$
 
   - repo: local
     hooks:

@@ -10,7 +10,7 @@
 
 ## 项目边界（必须遵守）
 
-1. 仅在 `mobile-frontend/`、`backend_fastapi/`、`ios-app/` 这条链路内改动（本切片通常只改 `mobile-frontend/` 与可选文案）。
+1. 仅在 `mobile-frontend/`、`../edumind-backend/`、`ios-app/` 这条链路内改动（本切片通常只改 `mobile-frontend/` 与可选文案）。
 2. 不在前端伪造搜索结果，不新增第二套搜索 API。
 3. 不使用 `pytest` 验证改动；按仓库约定方式验证。
 4. 若有用户可见行为变化，`CHANGELOG.md` 追加新条目（不改历史）。

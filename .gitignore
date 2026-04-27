@@ -32,8 +32,8 @@ dist/
 # Project specific
 backend/uploads/
 backend/instance/
-backend_fastapi/uploads/
-backend_fastapi/data/
+../edumind-backend/uploads/
+../edumind-backend/data/
 
 # Local model/cache artifacts
 .cache/
@@ -72,8 +72,8 @@ DerivedData/
 .env.local
 .env.*
 # Explicitly ignore local backend env files with secrets.
-backend_fastapi/.env
-backend_fastapi/.env.production
+../edumind-backend/.env
+../edumind-backend/.env.production
 !.env.example
 !.env.ios.example
 !.env.production.example

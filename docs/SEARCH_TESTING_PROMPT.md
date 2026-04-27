@@ -10,7 +10,7 @@
 - 本次应优先使用现有验证链路：
 
 ```bash
-python -m compileall backend_fastapi/app backend_fastapi/scripts scripts/hooks scripts/validate_backend_smoke.py
+python -m compileall ../edumind-backend/app ../edumind-backend/scripts scripts/hooks scripts/validate_backend_smoke.py
 python scripts/validate_backend_smoke.py
 cd mobile-frontend && npm run build:ios
 ```
@@ -24,15 +24,15 @@ bash ios-app/validate_ios_build.sh
 
 ## 当前真实实现
 
-- 自适应切片逻辑在 `backend_fastapi/app/services/search/search.py`
-- 固定参数切片与 FFmpeg 调用在 `backend_fastapi/app/services/search/chunker.py`
-- 向量存储真实方法在 `backend_fastapi/app/services/search/store.py`
+- 自适应切片逻辑在 `../edumind-backend/app/services/search/search.py`
+- 固定参数切片与 FFmpeg 调用在 `../edumind-backend/app/services/search/chunker.py`
+- 向量存储真实方法在 `../edumind-backend/app/services/search/store.py`
   - `search()`
   - `add_chunks_batch()`
   - `remove_file()`
   - `get_chunk_count()`
   - `get_stats()`
-- 搜索 schema 在 `backend_fastapi/app/schemas/search.py`
+- 搜索 schema 在 `../edumind-backend/app/schemas/search.py`
   - `SemanticSearchRequest`
   - `SemanticSearchResponse`
 

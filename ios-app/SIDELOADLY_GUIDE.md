@@ -73,7 +73,7 @@ Sideloadly 是一个免费的 iOS 应用侧载工具，支持 Windows 和 Mac，
 ## 常见问题
 
 ### Q: Sideloadly 和 AltStore 有什么区别？
-A: 
+A:
 - Sideloadly 支持 Windows 和 Mac
 - AltStore 只支持 Mac
 - Sideloadly 操作更简单（图形界面）

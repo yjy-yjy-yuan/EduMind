@@ -1,7 +1,7 @@
 # 视频上传功能实现方案
 
 > 基于当前仓库通盘梳理，供「马上实现上传视频功能」时使用。
-> 涉及：`backend_fastapi/`、`mobile-frontend/`、`ios-app/`。
+> 涉及：`../edumind-backend/`、`mobile-frontend/`、`ios-app/`。
 > **连调逻辑**：真机 = 前端（H5/WebView），功能在后端（FastAPI 端口 2004），前后端通过 API 基地址（端口）连调；详见 `docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md` 第二节。
 
 ---
@@ -21,32 +21,32 @@
 
 ### 1. 后端实际落盘路径（你「已经上传」的视频应在此）
 
-- **默认根目录**：`backend_fastapi/uploads/`
-  - 即配置里 `UPLOAD_FOLDER` 未设置时，由 `config.py` 计算为 `os.path.join(BASE_DIR, "uploads")`，`BASE_DIR` 为 `backend_fastapi` 目录。
+- **默认根目录**：`../edumind-backend/uploads/`
+  - 即配置里 `UPLOAD_FOLDER` 未设置时，由 `config.py` 计算为 `os.path.join(BASE_DIR, "uploads")`，`BASE_DIR` 为 `../edumind-backend` 目录。
 - **单个视频文件**：直接放在该目录下，例如：
-  - `backend_fastapi/uploads/local-我的视频.mp4`
-  - `backend_fastapi/uploads/bilibili-某课程.mp4`
+  - `../edumind-backend/uploads/local-我的视频.mp4`
+  - `../edumind-backend/uploads/bilibili-某课程.mp4`
 - **相关子目录**（由后端自动创建和使用）：
-  - `backend_fastapi/uploads/subtitles/` — 字幕文件
-  - `backend_fastapi/uploads/cache/` — 字幕/处理缓存
-  - `backend_fastapi/uploads/audio_temp/` — 语音识别临时音频
-  - `backend_fastapi/uploads/previews/` — 视频预览图（部分逻辑在 `video_processing` 里用此路径）
-- **预览图**（若单独配置）：`backend_fastapi/previews/`（由 `PREVIEW_FOLDER` 默认）
+  - `../edumind-backend/uploads/subtitles/` — 字幕文件
+  - `../edumind-backend/uploads/cache/` — 字幕/处理缓存
+  - `../edumind-backend/uploads/audio_temp/` — 语音识别临时音频
+  - `../edumind-backend/uploads/previews/` — 视频预览图（部分逻辑在 `video_processing` 里用此路径）
+- **预览图**（若单独配置）：`../edumind-backend/previews/`（由 `PREVIEW_FOLDER` 默认）
 
 **若你已有现成视频文件想被系统识别**：
 
-1. 把视频文件放到 `backend_fastapi/uploads/` 下（文件名需符合后端允许的扩展名：mp4, avi, mov, mkv, webm, flv）。
+1. 把视频文件放到 `../edumind-backend/uploads/` 下（文件名需符合后端允许的扩展名：mp4, avi, mov, mkv, webm, flv）。
 2. 在数据库 `videos` 表中插入一条记录，字段至少包括：`filename`、`filepath`（指向该文件的绝对路径或与 `UPLOAD_FOLDER` 一致的相对路径）、`title`、`status='uploaded'` 等（参考 `app/models/video.py`）。
 3. 或在后端提供「扫描 uploads 目录并导入」的脚本/接口（当前需自行按需实现）。
 
-**自定义上传根目录**：在 `backend_fastapi/.env` 中设置：
+**自定义上传根目录**：在 `../edumind-backend/.env` 中设置：
 
 ```bash
-# 可选：指定上传根目录（绝对路径或相对 backend_fastapi 的路径）
+# 可选：指定上传根目录（绝对路径或相对 ../edumind-backend 的路径）
 UPLOAD_FOLDER=/your/custom/uploads
 ```
 
-不设置则一律使用 `backend_fastapi/uploads/`。
+不设置则一律使用 `../edumind-backend/uploads/`。
 
 ---
 
@@ -65,9 +65,9 @@ UPLOAD_FOLDER=/your/custom/uploads
 
 ### 1. 后端准备
 
-- 在 `backend_fastapi` 下执行：
+- 在 `../edumind-backend` 下执行：
   - `cp .env.example .env`（若无 `.env`）
-  - 配置 `.env`：`DATABASE_URL`、可选 `UPLOAD_FOLDER`（不设则用 `backend_fastapi/uploads/`）。
+  - 配置 `.env`：`DATABASE_URL`、可选 `UPLOAD_FOLDER`（不设则用 `../edumind-backend/uploads/`）。
 - 启动服务：
   - `conda activate edumind`（或项目约定环境）
   - `python run.py` 或 `uvicorn app.main:app --reload --port 2004`
@@ -107,7 +107,7 @@ UPLOAD_FOLDER=/your/custom/uploads
 
 ## 五、小结
 
-- **已经上传的视频放在哪里**：**`backend_fastapi/uploads/`**（或你在 `.env` 里配置的 `UPLOAD_FOLDER`）。原始视频文件直接在该目录下，字幕、缓存等在其子目录。
+- **已经上传的视频放在哪里**：**`../edumind-backend/uploads/`**（或你在 `.env` 里配置的 `UPLOAD_FOLDER`）。原始视频文件直接在该目录下，字幕、缓存等在其子目录。
 - **要实现上传功能**：后端已就绪；把移动端切到「非 UI_ONLY」并配置正确的 `VITE_MOBILE_API_BASE_URL`，即可在 H5/iOS WebView 中完成真实上传；无需改后端上传接口或前端表单字段名。
 - **固定域名**：若后端使用固定域名（如 `https://api.yourdomain.com`），在 `mobile-frontend` 构建前设置 `VITE_MOBILE_API_BASE_URL` 为该域名（可建 `.env.production` 或 `.env.ios`），再执行 `npm run build` / `npm run build:ios`，换 Wi‑Fi/换地点后请求仍发往该域名。详见主提示词 `docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md` 第三节「后端固定域名」。
 

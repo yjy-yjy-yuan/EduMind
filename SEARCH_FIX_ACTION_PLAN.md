@@ -51,7 +51,7 @@ mysql -h 127.0.0.1 -u root -ppassword edumind -e \
 
 **方式 A：自动修复**（推荐）
 ```bash
-python backend_fastapi/scripts/fix_chromadb_persistence.py
+python ../edumind-backend/scripts/fix_chromadb_persistence.py
 ```
 
 **方式 B：手动修复**
@@ -63,7 +63,7 @@ python backend_fastapi/scripts/fix_chromadb_persistence.py
 
 **命令**：
 ```bash
-python -m compileall backend_fastapi/app/services/search/
+python -m compileall ../edumind-backend/app/services/search/
 ```
 
 **预期**：
@@ -99,7 +99,7 @@ mysql -h 127.0.0.1 -u root -ppassword edumind -e \
 **命令**：
 ```bash
 cd /Users/yuan/final-work/EduMind
-python backend_fastapi/run.py
+python ../edumind-backend/run.py
 ```
 
 **预期**：
@@ -114,7 +114,7 @@ python backend_fastapi/run.py
 **在另一个终端**：
 ```bash
 cd /Users/yuan/final-work/EduMind
-python backend_fastapi/scripts/verify_chromadb_integrity.py
+python ../edumind-backend/scripts/verify_chromadb_integrity.py
 ```
 
 **预期输出**：
@@ -167,14 +167,14 @@ curl -X POST http://localhost:8000/api/search/semantic/search \
 **检查**：
 ```bash
 # 查看错误
-python -m compileall backend_fastapi/app/services/search/ -v
+python -m compileall ../edumind-backend/app/services/search/ -v
 
 # 检查代码
-git diff backend_fastapi/app/services/search/
+git diff ../edumind-backend/app/services/search/
 
 # 回滚修改（如需要）
-git checkout backend_fastapi/app/services/search/store.py
-git checkout backend_fastapi/app/services/search/search.py
+git checkout ../edumind-backend/app/services/search/store.py
+git checkout ../edumind-backend/app/services/search/search.py
 ```
 
 ### 症状：验证仍然失败（ChromaDB 仍为 0）
@@ -221,7 +221,7 @@ curl -X POST http://localhost:8000/api/search/semantic/search \
 
 ```bash
 # 1. 停止后端
-pkill -f "python backend_fastapi/run.py"
+pkill -f "python ../edumind-backend/run.py"
 
 # 2. 恢复备份
 if [ -d data/chroma.backup ]; then
@@ -230,11 +230,11 @@ if [ -d data/chroma.backup ]; then
 fi
 
 # 3. 恢复代码（如修改有问题）
-git checkout backend_fastapi/app/services/search/store.py
-git checkout backend_fastapi/app/services/search/search.py
+git checkout ../edumind-backend/app/services/search/store.py
+git checkout ../edumind-backend/app/services/search/search.py
 
 # 4. 重新启动
-python backend_fastapi/run.py
+python ../edumind-backend/run.py
 ```
 
 ---
@@ -242,8 +242,8 @@ python backend_fastapi/run.py
 ## 关键文件
 
 ### 需要修改的源文件
-- `backend_fastapi/app/services/search/store.py` - 添加验证逻辑
-- `backend_fastapi/app/services/search/search.py` - 添加错误处理
+- `../edumind-backend/app/services/search/store.py` - 添加验证逻辑
+- `../edumind-backend/app/services/search/search.py` - 添加错误处理
 
 ### 需要查阅的文档
 - [`SEARCH_DIAGNOSTIC_SUMMARY.md`](SEARCH_DIAGNOSTIC_SUMMARY.md) - 诊断摘要
@@ -251,8 +251,8 @@ python backend_fastapi/run.py
 - [`logs/DEBUG_FINAL_REPORT.log`](logs/DEBUG_FINAL_REPORT.log) - 完整诊断日志
 
 ### 辅助工具
-- `backend_fastapi/scripts/fix_chromadb_persistence.py` - 自动修复脚本
-- `backend_fastapi/scripts/verify_chromadb_integrity.py` - 验证脚本
+- `../edumind-backend/scripts/fix_chromadb_persistence.py` - 自动修复脚本
+- `../edumind-backend/scripts/verify_chromadb_integrity.py` - 验证脚本
 
 ---
 
@@ -274,7 +274,7 @@ python backend_fastapi/run.py
 
 ```bash
 # 快速检查状态
-python backend_fastapi/scripts/verify_chromadb_integrity.py
+python ../edumind-backend/scripts/verify_chromadb_integrity.py
 
 # 查看完整诊断日志
 cat logs/DEBUG_FINAL_REPORT.log

@@ -25,7 +25,7 @@
 
 **代码证据**:
 ```python
-# backend_fastapi/app/services/search/search.py:47
+# ../edumind-backend/app/services/search/search.py:47
 preview_text = merged_text[:240]  # 仅取前 240 字
 ```
 

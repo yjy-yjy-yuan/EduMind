@@ -4,7 +4,7 @@
 
 EduMind 当前是 iOS-only 项目，唯一有效链路如下：
 
-1. `backend_fastapi/`
+1. `../edumind-backend/`
    真实后端能力层。上传、音频提取、Whisper 转录、摘要、问答、数据库写入、视频分析等都必须放在这里。
 2. `mobile-frontend/`
    唯一前端 H5。负责 UI、状态、API 调用、`WKWebView` 页面展示，不允许写数据库逻辑或伪后端逻辑。
@@ -33,7 +33,7 @@ bash scripts/blitz_build_ios.sh
 1. `blitz_prepare_edumind.sh`
    检查或创建 `.venv`，安装后端依赖，必要时安装前端依赖，并执行 `bash ios-app/sync_ios_web_assets.sh`
 2. `blitz_start_backend.sh`
-   激活 `.venv` 并从仓库根目录启动 `backend_fastapi/run.py`
+   激活 `.venv` 并从仓库根目录启动 `../edumind-backend/run.py`
 3. `blitz_backend_healthcheck.sh`
    默认检查 `http://127.0.0.1:2004/health`
 4. `blitz_build_ios.sh`
@@ -63,7 +63,7 @@ bash ios-app/sync_ios_web_assets.sh
 
 同步脚本当前会做这些事：
 
-1. 读取 `backend_fastapi/.env` 中的 `PORT`
+1. 读取 `../edumind-backend/.env` 中的 `PORT`
 2. 读取当前机器的 `LocalHostName`
 3. 刷新 iOS 原生 `EDUMIND_API_BASE_URL`
 4. 构建 `mobile-frontend`
@@ -143,7 +143,7 @@ bash scripts/blitz_backend_healthcheck.sh
 curl http://127.0.0.1:2004/health
 ```
 
-4. 检查 `backend_fastapi/.env` 中的 `HOST`、`PORT`
+4. 检查 `../edumind-backend/.env` 中的 `HOST`、`PORT`
 5. 检查 iOS 原生注入的 `apiBaseUrl` 是否已经被同步脚本刷新
 6. 检查前端日志中的 API base 来源是 `query`、`storage`、`native`、`env` 还是 `empty`
 7. 如果前端来源是 `storage`

@@ -2,20 +2,20 @@
 
 > 用途：给 Codex、Claude、Blitz 等编码助手直接使用，用于在当前 EduMind 仓库中推进视频推荐能力建设。
 > 适用仓库：`/Users/yuan/final-work/EduMind`
-> 当前产品边界：iOS-only，唯一有效链路为 `mobile-frontend/` + `backend_fastapi/` + `ios-app/`
+> 当前产品边界：iOS-only，唯一有效链路为 `mobile-frontend/` + `../edumind-backend/` + `ios-app/`
 
 ## 一、当前项目现状
 
 你面对的不是一个空白项目，而是一个已经收敛为 iOS-only 的移动学习系统：
 
 1. `mobile-frontend/` 是唯一前端，负责 `WKWebView` 中的 H5 UI。
-2. `backend_fastapi/` 是唯一真实后端，负责 MySQL、业务逻辑、视频处理、字幕、摘要、标签、问答和推荐能力。
+2. `../edumind-backend/` 是唯一真实后端，负责 MySQL、业务逻辑、视频处理、字幕、摘要、标签、问答和推荐能力。
 3. `ios-app/` 是唯一 iOS 容器，负责 `WKWebView`、原生桥接、本地资源加载与真机验证。
 
 必须严格遵守以下边界：
 
 1. 前端只能做 UI、状态和 API 调用，不能把标签提取、聚类、排序、爬取、数据库逻辑或“假装真实推荐”的逻辑写在页面里。
-2. 推荐系统的真实逻辑必须继续落在 `backend_fastapi/`。
+2. 推荐系统的真实逻辑必须继续落在 `../edumind-backend/`。
 3. 数据库必须继续使用 MySQL，并优先复用现有 `videos`、`users`、`subtitles` 等表，不要轻易新增平行表。
 4. 产品目标是 iOS App，不是桌面网站；任何前端交互改动最终都要在 `WKWebView` 中验证。
 
@@ -25,18 +25,18 @@
 
 ### 后端现状
 
-- `backend_fastapi/app/models/video.py`
+- `../edumind-backend/app/models/video.py`
   - `Video` 已有 `title`、`summary`、`tags`、`url`、`status`、`processing_origin` 等字段。
   - `tags` 当前以 JSON 字符串形式保存在 `videos.tags`。
-- `backend_fastapi/app/services/video_recommendation_service.py`
+- `../edumind-backend/app/services/video_recommendation_service.py`
   - 已实现基于标题、摘要、标签、状态和用户画像的轻量推荐。
   - 当前已按 `RECOMMENDATION_MAX_CANDIDATES_SCAN` 对站内候选做有上限扫描，不再默认全表加载。
   - 当前支持 `home / continue / review / related` 四个场景。
-- `backend_fastapi/app/routers/recommendation.py`
+- `../edumind-backend/app/routers/recommendation.py`
   - 已提供 `/api/recommendations/scenes` 和 `/api/recommendations/videos`。
-- `backend_fastapi/tests/api/test_recommendation_api.py`
+- `../edumind-backend/tests/api/test_recommendation_api.py`
   - 已覆盖推荐场景、首页推荐排序和相关推荐基础约束。
-- `backend_fastapi/app/routers/video.py`
+- `../edumind-backend/app/routers/video.py`
   - 已支持视频链接导入，并明确接受 B 站、YouTube、中国大学慕课链接。
 
 ### 前端现状
@@ -120,21 +120,21 @@
 
 必须严格遵守以下项目事实：
 
-1. 本项目已经收敛为 iOS-only，唯一有效链路是 `mobile-frontend/` + `backend_fastapi/` + `ios-app/`。
+1. 本项目已经收敛为 iOS-only，唯一有效链路是 `mobile-frontend/` + `../edumind-backend/` + `ios-app/`。
 2. `mobile-frontend/` 只负责 UI、路由、状态和 API 调用，不能在页面里实现标签提取、聚类、爬虫、RSS 解析、排序、数据库逻辑或伪造“真实推荐”。
-3. `backend_fastapi/` 是唯一真实业务层；视频标签标准化、聚类、外部候选源采集、标签处理、排序和推荐接口必须继续落在后端。
+3. `../edumind-backend/` 是唯一真实业务层；视频标签标准化、聚类、外部候选源采集、标签处理、排序和推荐接口必须继续落在后端。
 4. 数据库必须继续使用 MySQL，并优先复用现有 `videos`、`users`、`subtitles` 等表。不要轻易新增平行表。
 5. 任何前端交互改动完成后，都要考虑 iOS `WKWebView` 的可点击、可滚动、可跳转和安全区适配；不能只按桌面浏览器验证。
 
 先理解当前现状：
 
 - 后端当前已有推荐骨架：
-  - `backend_fastapi/app/services/video_recommendation_service.py`
-  - `backend_fastapi/app/routers/recommendation.py`
-  - `backend_fastapi/app/schemas/recommendation.py`
-  - `backend_fastapi/tests/api/test_recommendation_api.py`
+  - `../edumind-backend/app/services/video_recommendation_service.py`
+  - `../edumind-backend/app/routers/recommendation.py`
+  - `../edumind-backend/app/schemas/recommendation.py`
+  - `../edumind-backend/tests/api/test_recommendation_api.py`
 - 当前 `Video` 模型已有推荐相关数据：
-  - `backend_fastapi/app/models/video.py`
+  - `../edumind-backend/app/models/video.py`
   - 其中已包含 `title`、`summary`、`tags`、`url`、`status`
 - 当前前端已有推荐入口：
   - `mobile-frontend/src/api/recommendation.js`
@@ -143,7 +143,7 @@
   - B 站
   - YouTube
   - 中国大学慕课
-  - 参考 `backend_fastapi/app/routers/video.py` 与 `mobile-frontend/src/views/Upload.vue`
+  - 参考 `../edumind-backend/app/routers/video.py` 与 `mobile-frontend/src/views/Upload.vue`
 
 当前问题不是“没有推荐模块”，而是“推荐模块还停留在站内轻量排序，尚未形成基于标签聚类和外部候选源的真实推荐闭环”。
 

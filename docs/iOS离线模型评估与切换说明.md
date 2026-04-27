@@ -46,9 +46,9 @@
 
 当前仓库里，本地 LLM 回退链路在后端：
 
-- [`backend_fastapi/app/services/video_content_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/video_content_service.py)：摘要、标签生成可回退到 Ollama
-- [`backend_fastapi/app/utils/semantic_utils.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/utils/semantic_utils.py)：字幕语义分段、标题生成可走 Ollama
-- [`backend_fastapi/app/services/llm_similarity_service.py`](/Users/yuan/final-work/EduMind/backend_fastapi/app/services/llm_similarity_service.py)：标签相似度可走 Ollama
+- [`../edumind-backend/app/services/video_content_service.py`](/Users/yuan/final-work/edumind-backend/app/services/video_content_service.py)：摘要、标签生成可回退到 Ollama
+- [`../edumind-backend/app/utils/semantic_utils.py`](/Users/yuan/final-work/edumind-backend/app/utils/semantic_utils.py)：字幕语义分段、标题生成可走 Ollama
+- [`../edumind-backend/app/services/llm_similarity_service.py`](/Users/yuan/final-work/edumind-backend/app/services/llm_similarity_service.py)：标签相似度可走 Ollama
 
 另外，当前 iOS 离线转录在同步回后端时，仍然写入原有数据库主链路：
 
@@ -117,8 +117,8 @@
 
 当前仓库已经补了一个兼容脚本，二选一即可：
 
-1. 本地 GGUF 文件：`bash backend_fastapi/scripts/import_qwen35_gguf_to_ollama.sh /absolute/path/to/model.gguf`
-2. Hugging Face 直接拉取：`bash backend_fastapi/scripts/import_qwen35_gguf_to_ollama.sh hf.co/Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-GGUF:Q4_K_M`
+1. 本地 GGUF 文件：`bash ../edumind-backend/scripts/import_qwen35_gguf_to_ollama.sh /absolute/path/to/model.gguf`
+2. Hugging Face 直接拉取：`bash ../edumind-backend/scripts/import_qwen35_gguf_to_ollama.sh hf.co/Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-GGUF:Q4_K_M`
 
 如果你真正想提升“离线视频处理总体效果”，下一步更值得做的是：
 

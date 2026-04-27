@@ -2,7 +2,7 @@
 
 > 用途：给 Codex、Claude、Blitz 等编码助手直接使用，用于在当前 EduMind 仓库中优先推进“视频推荐 UI 页面”建设。
 > 适用仓库：`/Users/yuan/final-work/EduMind`
-> 当前产品边界：iOS-only，唯一有效链路为 `mobile-frontend/` + `backend_fastapi/` + `ios-app/`
+> 当前产品边界：iOS-only，唯一有效链路为 `mobile-frontend/` + `../edumind-backend/` + `ios-app/`
 
 ## 一、当前任务定位
 
@@ -12,7 +12,7 @@
 你必须遵守以下事实：
 
 1. `mobile-frontend/` 是唯一前端代码库，负责推荐页面、首页推荐卡片、上传跳转、来源标识、空态与交互状态。
-2. `backend_fastapi/` 是唯一真实后端，但本轮默认不优先做新的推荐算法改造；如需调用推荐接口，只能复用已有接口或兼容现有字段。
+2. `../edumind-backend/` 是唯一真实后端，但本轮默认不优先做新的推荐算法改造；如需调用推荐接口，只能复用已有接口或兼容现有字段。
 3. `ios-app/` 是唯一 iOS 容器，所有前端交互改动最终都要考虑 `WKWebView` 的点击、滚动、路由跳转和安全区适配。
 4. 本轮是 **UI-first**，不是 recommendation-engine-first。
 
@@ -198,9 +198,9 @@ bash ios-app/validate_ios_build.sh
 
 必须严格遵守以下项目事实：
 
-1. 本项目是 iOS-only，唯一有效链路是 `mobile-frontend/` + `backend_fastapi/` + `ios-app/`。
+1. 本项目是 iOS-only，唯一有效链路是 `mobile-frontend/` + `../edumind-backend/` + `ios-app/`。
 2. `mobile-frontend/` 是唯一前端，负责推荐页、首页入口、上传跳转和 iOS `WKWebView` 中的 H5 UI。
-3. `backend_fastapi/` 是唯一真实后端，但这一轮默认不优先扩展推荐算法，只在前端 UI 需要时复用现有接口与现有字段。
+3. `../edumind-backend/` 是唯一真实后端，但这一轮默认不优先扩展推荐算法，只在前端 UI 需要时复用现有接口与现有字段。
 4. `ios-app/` 是唯一 iOS 容器；任何前端交互改动最终都要考虑 `WKWebView` 真实点击、滚动、跳转和安全区表现。
 
 先理解当前现状：

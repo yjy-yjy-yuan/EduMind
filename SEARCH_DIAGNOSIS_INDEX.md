@@ -21,7 +21,7 @@
 #### "快速修复问题"
 ```bash
 cd /Users/yuan/final-work/EduMind
-python backend_fastapi/scripts/fix_chromadb_persistence.py
+python ../edumind-backend/scripts/fix_chromadb_persistence.py
 ```
 然后按照屏幕提示清理数据并重启后端。
 
@@ -32,15 +32,15 @@ python backend_fastapi/scripts/fix_chromadb_persistence.py
 #### "手动修改代码"
 1️⃣ 阅读修复指南 → [`SEARCH_FIX_GUIDE.md`](SEARCH_FIX_GUIDE.md) § 修复步骤
 2️⃣ 手动编辑：
-   - `backend_fastapi/app/services/search/store.py` 第116-143行
-   - `backend_fastapi/app/services/search/search.py` 第245行
+   - `../edumind-backend/app/services/search/store.py` 第116-143行
+   - `../edumind-backend/app/services/search/search.py` 第245行
 3️⃣ 测试修改 → 运行验证脚本（见修复指南）
 
 ---
 
 #### "验证修复是否成功"
 ```bash
-python backend_fastapi/scripts/verify_chromadb_integrity.py
+python ../edumind-backend/scripts/verify_chromadb_integrity.py
 ```
 
 📖 详情 → [`SEARCH_FIX_GUIDE.md`](SEARCH_FIX_GUIDE.md) § 验证清单
@@ -87,8 +87,8 @@ python backend_fastapi/scripts/verify_chromadb_integrity.py
 
 | 文件 | 用途 |
 |------|------|
-| [`backend_fastapi/scripts/fix_chromadb_persistence.py`](backend_fastapi/scripts/fix_chromadb_persistence.py) | ⚡ 自动应用代码修复 |
-| [`backend_fastapi/scripts/verify_chromadb_integrity.py`](backend_fastapi/scripts/verify_chromadb_integrity.py) | ✓ 验证修复是否成功（代码在 SEARCH_FIX_GUIDE.md） |
+| [`../edumind-backend/scripts/fix_chromadb_persistence.py`](../edumind-backend/scripts/fix_chromadb_persistence.py) | ⚡ 自动应用代码修复 |
+| [`../edumind-backend/scripts/verify_chromadb_integrity.py`](../edumind-backend/scripts/verify_chromadb_integrity.py) | ✓ 验证修复是否成功（代码在 SEARCH_FIX_GUIDE.md） |
 
 ---
 
@@ -105,7 +105,7 @@ python backend_fastapi/scripts/verify_chromadb_integrity.py
 
 ### 根本原因
 
-**文件**：`backend_fastapi/app/services/search/store.py`
+**文件**：`../edumind-backend/app/services/search/store.py`
 **函数**：`add_chunks_batch()` 第116-143行
 **问题**：调用 `self._collection.upsert()` 后没有验证数据是否被保存
 **结果**：虽然代码执行，但数据从未真正写入ChromaDB
@@ -124,7 +124,7 @@ python backend_fastapi/scripts/verify_chromadb_integrity.py
 ### 方式1：自动修复（推荐）⚡
 
 ```bash
-python backend_fastapi/scripts/fix_chromadb_persistence.py
+python ../edumind-backend/scripts/fix_chromadb_persistence.py
 ```
 
 ### 方式2：手动修复 📝
@@ -149,13 +149,13 @@ python backend_fastapi/scripts/fix_chromadb_persistence.py
 
 ### 步骤1️⃣：应用代码修复
 ```bash
-python backend_fastapi/scripts/fix_chromadb_persistence.py
+python ../edumind-backend/scripts/fix_chromadb_persistence.py
 # 或参考 SEARCH_FIX_GUIDE.md 手动修改
 ```
 
 ### 步骤2️⃣：编译检查
 ```bash
-python -m compileall backend_fastapi/app/services/search/
+python -m compileall ../edumind-backend/app/services/search/
 ```
 
 ### 步骤3️⃣：清理旧数据
@@ -167,13 +167,13 @@ mysql -h 127.0.0.1 -u root -ppassword edumind -e "UPDATE videos SET has_semantic
 
 ### 步骤4️⃣：启动后端
 ```bash
-python backend_fastapi/run.py
+python ../edumind-backend/run.py
 # 等待自动重新索引（~15 min）
 ```
 
 ### 步骤5️⃣：验证修复
 ```bash
-python backend_fastapi/scripts/verify_chromadb_integrity.py
+python ../edumind-backend/scripts/verify_chromadb_integrity.py
 ```
 
 **期望输出**：
@@ -318,11 +318,11 @@ def add_chunks_batch(self, chunks) -> bool:  # ← 返回值改为bool
 | 我想... | 链接 |
 |--------|------|
 | 了解问题 | [SEARCH_DIAGNOSTIC_SUMMARY.md](SEARCH_DIAGNOSTIC_SUMMARY.md) |
-| 快速修复 | `python backend_fastapi/scripts/fix_chromadb_persistence.py` |
+| 快速修复 | `python ../edumind-backend/scripts/fix_chromadb_persistence.py` |
 | 详细指南 | [SEARCH_FIX_GUIDE.md](SEARCH_FIX_GUIDE.md) |
 | 快速参考 | [SEARCH_SYSTEM_QUICK_REFERENCE.md](SEARCH_SYSTEM_QUICK_REFERENCE.md) |
 | 完整日志 | [logs/DEBUG_FINAL_REPORT.log](logs/DEBUG_FINAL_REPORT.log) |
-| 验证状态 | `python backend_fastapi/scripts/verify_chromadb_integrity.py` |
+| 验证状态 | `python ../edumind-backend/scripts/verify_chromadb_integrity.py` |
 
 ---
 

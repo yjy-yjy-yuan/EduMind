@@ -46,7 +46,7 @@
 
 - **先跑通、再聪明**：先保证规则路径与写库正确，再打开 LLM 意图或润色。
 - **每个版本只引入一个「新风险面」**（例如本版只加意图分类，不改表结构），便于回滚与对比。
-- **与 EduMind 架构对齐**：能力放在 `backend_fastapi`，前端薄；**不要**为 Agent 单独引入第二套运行时（如 Node/Bun CLI）。
+- **与 EduMind 架构对齐**：能力放在 `../edumind-backend`，前端薄；**不要**为 Agent 单独引入第二套运行时（如 Node/Bun CLI）。
 
 ### 7. 协作哲学：提示词与代码一样要可读
 
@@ -70,22 +70,22 @@
 
 1. **保持产品形态**：仍是 FastAPI 暴露的 `POST /api/agent/execute`，移动端 H5 经同一后端；**不**引入外部 TS/CLI 项目作为运行时依赖。
 2. **借鉴架构思想（非拷贝外部代码）**：拆成「上下文组装 → 意图路由 → 分步工具（纯函数/小类）→ 持久化 → 结构化 `action_records`」，便于测试与迭代。
-3. **遵守仓库约束**：以根目录 **`AGENTS.md`** 为准——仅 `backend_fastapi` + `mobile-frontend` + `ios-app`；**数据库保持 MySQL**；不随意改表；新能力优先适配现有表（`Note`、`NoteTimestamp`、`Video` 等）。
-4. **测试约束**：仓库 **AGENTS.md** 规定「禁止使用 pytest 测试修改的程序」——本次任务以**手工验收清单** + **`/docs` 手工调用**为主，不要用 `backend_fastapi/tests/` 里的 pytest 作为本次改动的自动化验证手段。
+3. **遵守仓库约束**：以根目录 **`AGENTS.md`** 为准——仅 `../edumind-backend` + `mobile-frontend` + `ios-app`；**数据库保持 MySQL**；不随意改表；新能力优先适配现有表（`Note`、`NoteTimestamp`、`Video` 等）。
+4. **测试约束**：仓库 **AGENTS.md** 规定「禁止使用 pytest 测试修改的程序」——本次任务以**手工验收清单** + **`/docs` 手工调用**为主，不要用 `../edumind-backend/tests/` 里的 pytest 作为本次改动的自动化验证手段。
 
 ### 现状基线（实现前必读）
 
 | 项目 | 路径 |
 |------|------|
-| 路由 | `backend_fastapi/app/routers/agent.py` |
-| 核心逻辑 | `backend_fastapi/app/services/learning_flow_agent.py` |
-| 契约 | `backend_fastapi/app/schemas/agent.py` |
+| 路由 | `../edumind-backend/app/routers/agent.py` |
+| 核心逻辑 | `../edumind-backend/app/services/learning_flow_agent.py` |
+| 契约 | `../edumind-backend/app/schemas/agent.py` |
 | 前端封装 | `mobile-frontend/src/api/agent.js` |
-| 配置 | `backend_fastapi/app/core/config.py` |
+| 配置 | `../edumind-backend/app/core/config.py` |
 
 ### 目标目录结构（建议）
 
-在 **`backend_fastapi/app/services/learning_flow_agent/`** 下建包：
+在 **`../edumind-backend/app/services/learning_flow_agent/`** 下建包：
 
 | 模块 | 职责 |
 |------|------|

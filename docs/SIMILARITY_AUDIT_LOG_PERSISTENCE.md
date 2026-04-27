@@ -90,10 +90,10 @@ INDEX idx_created_at (created_at)      -- 时间范围查询
 
 ```bash
 # 方式一：使用 MySQL CLI
-mysql -h 127.0.0.1 -u root -p edumind < backend_fastapi/migrations/add_similarity_audit_logs.sql
+mysql -h 127.0.0.1 -u root -p edumind < ../edumind-backend/migrations/add_similarity_audit_logs.sql
 
 # 方式二：使用脚本（若有 ORM 自动创建功能）
-python backend_fastapi/scripts/init_db.py --create
+python ../edumind-backend/scripts/init_db.py --create
 ```
 
 ### 2. 应用初始化
@@ -131,7 +131,7 @@ finally:
 
 ### 单元测试（17 个）
 
-所有测试位于 `backend_fastapi/tests/unit/test_similarity_audit_log_persistence.py`
+所有测试位于 `../edumind-backend/tests/unit/test_similarity_audit_log_persistence.py`
 
 #### Repository 层（6 个测试）
 - ✅ 单条日志保存
@@ -349,7 +349,7 @@ SIMILARITY_AUDIT_LOG_CLEANUP_HOUR: int = 2  # 凌晨 2 点
 
 - [x] **应用启动**：`app/main.py` 的 `lifespan` 中已调用 `init_persistence_service()`
 - [x] **审计写入路径**：`LLMSimilarityService` → `_record_similarity_audit_log` → `SessionLocal` + `SimilarityAuditLogPersistenceService.record_log`
-- [x] **自动化测试**：持久化专项 **17** 项 + 相似度域 **64** 项，合计 **81/81**（维护发布前在 `backend_fastapi` 下跑通即视为满足）
+- [x] **自动化测试**：持久化专项 **17** 项 + 相似度域 **64** 项，合计 **81/81**（维护发布前在 `../edumind-backend` 下跑通即视为满足）
 - [x] **烟雾脚本**：`python scripts/validate_backend_smoke.py`（仓库级回归已覆盖）
 
 ### 目标环境侧（部署到具体库/集群时自验）

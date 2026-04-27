@@ -25,12 +25,12 @@ ChromaDB 实际存储的 chunks:   0 ✗
 ### 问题位置
 
 **主要问题点**：
-- **文件**：`backend_fastapi/app/services/search/store.py`
+- **文件**：`../edumind-backend/app/services/search/store.py`
 - **函数**：`add_chunks_batch()` 方法（第116-143行）
 - **原因**：调用 `self._collection.upsert()` 后没有验证数据是否真正被保存
 
 **从属问题点**：
-- **文件**：`backend_fastapi/app/services/search/search.py`
+- **文件**：`../edumind-backend/app/services/search/search.py`
 - **函数**：`build_video_index_internal()` 方法（第245行）
 - **原因**：调用 `store.add_chunks_batch()` 后没有检查返回值或错误
 
@@ -109,8 +109,8 @@ ChromaDB 实际存储的 chunks:   0 ✗
 
 已生成的修复文件：
 - `SEARCH_FIX_GUIDE.md` - 详细修复指南
-- `backend_fastapi/scripts/fix_chromadb_persistence.py` - 自动修复脚本
-- `backend_fastapi/scripts/verify_chromadb_integrity.py` - 验证脚本（在指南中）
+- `../edumind-backend/scripts/fix_chromadb_persistence.py` - 自动修复脚本
+- `../edumind-backend/scripts/verify_chromadb_integrity.py` - 验证脚本（在指南中）
 
 ### 执行修复
 
@@ -121,14 +121,14 @@ ChromaDB 实际存储的 chunks:   0 ✗
 **方式2：自动修复**（推荐）
 ```bash
 cd /Users/yuan/final-work/EduMind
-python backend_fastapi/scripts/fix_chromadb_persistence.py
+python ../edumind-backend/scripts/fix_chromadb_persistence.py
 ```
 
 ### 修复后验证
 
 ```bash
 # 1. 编译检查
-python -m compileall backend_fastapi/app/services/search/
+python -m compileall ../edumind-backend/app/services/search/
 
 # 2. 清理旧数据
 rm -rf data/chroma
@@ -136,10 +136,10 @@ mysql -h 127.0.0.1 -u root -ppassword edumind -e "DELETE FROM vector_indexes;"
 mysql -h 127.0.0.1 -u root -ppassword edumind -e "UPDATE videos SET has_semantic_index=0, vector_index_id=NULL;"
 
 # 3. 启动后端
-python backend_fastapi/run.py
+python ../edumind-backend/run.py
 
 # 4. 验证修复
-python backend_fastapi/scripts/verify_chromadb_integrity.py
+python ../edumind-backend/scripts/verify_chromadb_integrity.py
 
 # 5. 测试搜索
 curl -X POST http://localhost:8000/api/search/semantic/search \
@@ -265,7 +265,7 @@ if not success:
 - ✅ `logs/debug_video_search_deep.log` - 深度诊断输出
 - ✅ `SEARCH_DEBUG_SUMMARY.md` - 诊断摘要
 - ✅ `SEARCH_FIX_GUIDE.md` - 详细修复指南（包含验证脚本）
-- ✅ `backend_fastapi/scripts/fix_chromadb_persistence.py` - 自动修复脚本
+- ✅ `../edumind-backend/scripts/fix_chromadb_persistence.py` - 自动修复脚本
 
 ### 访问路径
 ```
@@ -276,7 +276,7 @@ if not success:
 │   └── debug_video_search_deep.log
 ├── SEARCH_FIX_GUIDE.md
 ├── SEARCH_DEBUG_SUMMARY.md
-└── backend_fastapi/scripts/
+└── ../edumind-backend/scripts/
     ├── fix_chromadb_persistence.py
     └── verify_chromadb_integrity.py (已包含在SEARCH_FIX_GUIDE.md中)
 ```

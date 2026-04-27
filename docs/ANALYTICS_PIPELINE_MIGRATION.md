@@ -79,7 +79,7 @@ Logger 名：**`app.analytics.telemetry`**。级别由配置 **`ANALYTICS_LOG_LE
 以下命令**仅统计** `test_analytics_*.py` 四文件（不含 `test_similarity_analytics.py` 等回归）：
 
 ```bash
-cd backend_fastapi
+cd ../edumind-backend
 pytest tests/unit/test_analytics_schema.py tests/unit/test_analytics_pipeline.py \
   tests/unit/test_analytics_alerting.py tests/unit/test_analytics_adapters.py -q
 ```
@@ -104,7 +104,7 @@ pytest tests/unit/test_analytics_schema.py tests/unit/test_analytics_pipeline.py
 ## 测试命令（开发自验）
 
 ```bash
-cd backend_fastapi
+cd ../edumind-backend
 pytest tests/unit/test_analytics_schema.py tests/unit/test_analytics_pipeline.py \
   tests/unit/test_analytics_alerting.py tests/unit/test_analytics_adapters.py \
   tests/unit/test_similarity_analytics.py -q

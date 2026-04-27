@@ -15,7 +15,7 @@
 | 脱敏 | `user_id` → **SHA256 截断哈希**（盐可配）；`query_text` / `tag` / `error_message` **裁剪** |
 | 质检 | 缺字段、`schema` 不一致、`trace_id` 字段存在性、`meta.date_key` 一致性、**重复键**、**异常耗时/分值** |
 | 质量报告 | 同目录 **`report_{date}_{batch_id}.json`**：样本量、**combined_error_rate**、相似度 batch **均值/标准差**、**drift_summary** 文本摘要（非生产级漂移模型） |
-| 调度入口 | `backend_fastapi/scripts/export_compounding_trajectories.py`：**重试**（指数退避）、**幂等**（报告已存在则跳过，除非 `--force`） |
+| 调度入口 | `../edumind-backend/scripts/export_compounding_trajectories.py`：**重试**（指数退避）、**幂等**（报告已存在则跳过，除非 `--force`） |
 | 在线性能 | 导出仅在 **离线脚本/手动任务** 中执行，**不挂载** 到请求热路径 |
 
 ---
@@ -45,7 +45,7 @@
 
 ## 使用方式
 
-在 **`backend_fastapi`** 目录下（已配置 `DATABASE_URL`）：
+在 **`../edumind-backend`** 目录下（已配置 `DATABASE_URL`）：
 
 ```bash
 python scripts/export_compounding_trajectories.py --date 2026-04-10 --batch-id nightly
@@ -83,7 +83,7 @@ python scripts/export_compounding_trajectories.py --date 2026-04-10 --batch-id n
 ## 测试
 
 ```bash
-cd backend_fastapi
+cd ../edumind-backend
 pytest tests/unit/test_compounding_export.py -q
 ```
 

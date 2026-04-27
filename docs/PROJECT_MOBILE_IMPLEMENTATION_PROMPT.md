@@ -2,7 +2,7 @@
 
 > 用途：作为本仓库后续研发、联调、编码、验收的统一实现方向文档。
 > 当前结论：本项目已收敛为 iOS-only 架构。
-> 唯一有效链路：`mobile-frontend/` + `backend_fastapi/` + `ios-app/`。
+> 唯一有效链路：`mobile-frontend/` + `../edumind-backend/` + `ios-app/`。
 > 开发设备：MacBook Pro。
 > 目标终端：iOS App（`WKWebView` 加载 `mobile-frontend` 构建产物）。
 
@@ -19,7 +19,7 @@
 
 本项目后续实现必须围绕以下三个目录展开：
 
-1. `backend_fastapi/`
+1. `../edumind-backend/`
 2. `mobile-frontend/`
 3. `ios-app/`
 
@@ -49,7 +49,7 @@
 
 ### 2. 后端 = 实际功能层
 
-`backend_fastapi/` 是唯一真实后端，负责：
+`../edumind-backend/` 是唯一真实后端，负责：
 
 1. MySQL 数据读写
 2. 视频上传保存
@@ -59,7 +59,7 @@
 6. 摘要生成与标签提取
 7. 笔记、问答、推荐等后续能力
 
-所有“真实功能”都必须落在 `backend_fastapi/`，不能写在前端页面里伪装成功能已实现。
+所有“真实功能”都必须落在 `../edumind-backend/`，不能写在前端页面里伪装成功能已实现。
 
 ### 3. iOS = 容器层
 
@@ -78,17 +78,17 @@
 
 - 本机开发默认：
   - 前端调试地址：Vite dev server
-  - 后端地址：`http://127.0.0.1:<backend_fastapi/.env 的 PORT>`
+  - 后端地址：`http://127.0.0.1:<../edumind-backend/.env 的 PORT>`
 - 真机调试默认：
-  - 后端地址：`http://<Mac LocalHostName>.local:<backend_fastapi/.env 的 PORT>`
+  - 后端地址：`http://<Mac LocalHostName>.local:<../edumind-backend/.env 的 PORT>`
 
 ### 2. 后端端口是唯一真实能力入口
 
-所有上传、处理、状态查询、字幕查询、视频详情、问答等请求，都必须走 `backend_fastapi` 端口。
+所有上传、处理、状态查询、字幕查询、视频详情、问答等请求，都必须走 `../edumind-backend` 端口。
 
 ### 2.1 真机默认地址必须跟随后端端口
 
-- 修改 `backend_fastapi/.env` 中的 `PORT` 后，执行 `bash ios-app/sync_ios_web_assets.sh`
+- 修改 `../edumind-backend/.env` 中的 `PORT` 后，执行 `bash ios-app/sync_ios_web_assets.sh`
 - 同步脚本必须将 iOS 原生默认后端地址刷新为 `http://<Mac LocalHostName>.local:<PORT>`
 - 不允许继续手工在多个页面、多个文档、多个原生配置里散落改端口
 
@@ -114,7 +114,7 @@
 必须优先保证以下闭环：
 
 1. iOS 端选择视频或输入视频链接
-2. 前端调用 `backend_fastapi` 上传接口
+2. 前端调用 `../edumind-backend` 上传接口
 3. 后端保存视频并写入 MySQL
 4. 后端执行音频提取、转录与字幕生成
 5. 后端把处理状态、字幕路径、字幕数据写回现有表
@@ -145,7 +145,7 @@
 
 ## 五点二、视频问答实现边界
 
-视频问答必须走 `backend_fastapi` 的真实后端链路，不能在 `mobile-frontend/` 中返回 mock 逻辑冒充已完成。
+视频问答必须走 `../edumind-backend` 的真实后端链路，不能在 `mobile-frontend/` 中返回 mock 逻辑冒充已完成。
 
 视频问答实现要求：
 
@@ -177,7 +177,7 @@
 实现要求：
 
 1. 笔记系统默认基于现有 `notes`、`note_timestamps`、`videos`、`subtitles` 表与接口，不要轻易新增平行表。
-2. 前端只负责笔记列表、详情、编辑、筛选、入口跳转和时间戳展示；关键词提取、相似笔记、导出、时间戳写入等真实逻辑必须继续放在 `backend_fastapi/`。
+2. 前端只负责笔记列表、详情、编辑、筛选、入口跳转和时间戳展示；关键词提取、相似笔记、导出、时间戳写入等真实逻辑必须继续放在 `../edumind-backend/`。
 3. 笔记必须支持普通笔记与视频关联笔记两类主路径；视频关联笔记至少要能带上 `video_id`，并允许挂接一个或多个时间点。
 4. 如果在视频详情、播放器、问答等学习流页面新增“记笔记”入口，必须把视频上下文通过接口参数、路由参数或真实后端数据传递，不能只在前端内存里伪造关联。
 5. 在不修改现有表结构的前提下优先完成第一版真实可用版本；如确需扩展字段，优先扩展现有 `notes` 或 `note_timestamps`，并同步更新 SQL、测试和文档。
@@ -186,7 +186,7 @@
 
 ## 五点五、视频推荐实现边界
 
-视频推荐必须继续走 `backend_fastapi` 的真实后端链路，不能在 `mobile-frontend/` 中拼接假推荐结果冒充已完成。
+视频推荐必须继续走 `../edumind-backend` 的真实后端链路，不能在 `mobile-frontend/` 中拼接假推荐结果冒充已完成。
 
 实现要求：
 
@@ -203,7 +203,7 @@
 
 ## 六、目录职责
 
-### `backend_fastapi/`
+### `../edumind-backend/`
 
 负责：
 
@@ -222,7 +222,7 @@
 1. 移动端页面
 2. 上传、列表、详情、播放器、问答、笔记等 UI
 3. 状态管理
-4. 调用 `backend_fastapi` 接口
+4. 调用 `../edumind-backend` 接口
 5. iOS `WKWebView` 适配
 
 ### `ios-app/`
@@ -252,8 +252,8 @@ python3 -m venv .venv
 
 ```bash
 . .venv/bin/activate
-pip install -r backend_fastapi/requirements.txt
-python backend_fastapi/run.py
+pip install -r ../edumind-backend/requirements.txt
+python ../edumind-backend/run.py
 ```
 
 ### 3. 移动端启动
