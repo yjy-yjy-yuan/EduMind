@@ -96,7 +96,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getVideoList, processVideo } from '@/api/video'
+import { filterDeletedVideosLocally, getVideoList, processVideo } from '@/api/video'
 import { OFFLINE_QUEUE_EVENT_NAME, getPendingOfflineTasks } from '@/services/offlineQueue'
 import { buildProcessPayload, getProcessingSettings, whisperModelLabel } from '@/services/processingSettings'
 import { isActiveVideoStatus, normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
@@ -104,8 +104,19 @@ import { isActiveVideoStatus, normalizeVideoStatus, videoStatusText, videoStatus
 const route = useRoute()
 const router = useRouter()
 const go = (path) => router.push(path)
+
+const resolveVideoId = (video) => {
+  const n = Number(video?.id ?? video?.video_id ?? video?.server_id ?? video?.local_id ?? 0)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+}
+
 const openVideo = (video) => {
-  go(`/videos/${video.id}`)
+  const videoId = resolveVideoId(video)
+  if (!videoId) {
+    error.value = '视频ID无效，请先刷新列表后重试'
+    return
+  }
+  go(`/videos/${videoId}`)
 }
 
 const loading = ref(false)
@@ -144,7 +155,15 @@ const scopeTitle = computed(() => {
 
 const normalizeList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
-  return Array.isArray(list) ? list : []
+  if (!Array.isArray(list)) return []
+  const filtered = filterDeletedVideosLocally(list)
+  return filtered.map((item) => {
+    const resolvedId = resolveVideoId(item)
+    return {
+      ...item,
+      id: resolvedId || item?.id || item?.video_id || item?.server_id || item?.local_id || ''
+    }
+  })
 }
 
 const filteredVideos = computed(() => {

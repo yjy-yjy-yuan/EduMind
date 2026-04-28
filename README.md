@@ -6,8 +6,6 @@ EduMind 是一个 iOS-only 移动学习项目，工程链路如下：
 2. `mobile-frontend/`：移动端 H5 UI（由 iOS `WKWebView` 加载）
 3. `ios-app/`：iOS `WKWebView` 容器与原生桥接层
 
-不再维护桌面网页版、旧 Flask 后端或 Android 工程。
-
 ## 项目结构
 
 ```text

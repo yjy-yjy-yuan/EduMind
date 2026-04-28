@@ -207,8 +207,9 @@ block_match = block_pattern.search(content)
 if block_match:
     block = block_match.group(1)
     # 只替换目标块中的 INFOPLIST_KEY_EDUMIND_API_BASE_URL
+    # Support both quoted values and legacy placeholders like __DEBUG_DYNAMIC__ (unquoted).
     new_block = re.sub(
-        r'(INFOPLIST_KEY_EDUMIND_API_BASE_URL = )"[^"]*"',
+        r'(INFOPLIST_KEY_EDUMIND_API_BASE_URL = )(?:"[^"]*"|[^;]+)',
         r'\1"' + new_url + '"',
         block
     )

@@ -44,6 +44,7 @@ const parseStreamErrorBody = async (response) => {
  * @param {Object} [options]
  * @param {Function} [options.onEvent]
  * @param {AbortSignal} [options.signal]
+ * @param {number} [options.timeoutMs]
  */
 export async function describeFrameStream(params, options) {
   const {
@@ -56,7 +57,7 @@ export async function describeFrameStream(params, options) {
     context_history,
     allow_degrade,
   } = params || {}
-  const { onEvent, signal } = options || {}
+  const { onEvent, signal, timeoutMs } = options || {}
 
   if (shouldUseMockApi()) {
     return dispatchMockStream({ video_id, frames, timestamp, video_title, detail_level, session_id }, onEvent)
@@ -77,13 +78,37 @@ export async function describeFrameStream(params, options) {
   const token = storageGet('m_token')
   if (token) headers.Authorization = 'Bearer ' + token
 
-  const response = await fetch(withBase('/api/frame_description/describe'), {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-    credentials: 'include',
-    signal,
-  })
+  const timeout = Number(timeoutMs || 0)
+  const shouldTimeout = Number.isFinite(timeout) && timeout > 0
+  const timeoutController = shouldTimeout ? new AbortController() : null
+  const requestSignal = timeoutController ? timeoutController.signal : signal
+  let timeoutTimer = null
+
+  if (timeoutController) {
+    timeoutTimer = setTimeout(() => timeoutController.abort(), timeout)
+    if (signal) {
+      if (signal.aborted) timeoutController.abort()
+      else signal.addEventListener('abort', () => timeoutController.abort(), { once: true })
+    }
+  }
+
+  let response
+  try {
+    response = await fetch(withBase('/api/frame_description/describe'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      credentials: 'include',
+      signal: requestSignal,
+    })
+  } catch (error) {
+    if (error?.name === 'AbortError' && shouldTimeout && !(signal && signal.aborted)) {
+      throw toStreamError('连接超时，已切换到降级描述', 408)
+    }
+    throw error
+  } finally {
+    if (timeoutTimer) clearTimeout(timeoutTimer)
+  }
 
   if (!response.ok) {
     throw toStreamError(await parseStreamErrorBody(response), response.status)

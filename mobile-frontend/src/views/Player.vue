@@ -376,6 +376,7 @@ const fdStreamController = ref(null)
 const fdLastSampleTime = ref(-99)
 const fdRetryCount = ref(0)
 const FD_MAX_RETRIES = 3
+const FD_STREAM_TIMEOUT_MS = 4500
 const fdFeedbackSent = ref(false)
 const fdNoteWriteBusy = ref(false)
 const fdNoteWriteResult = ref(null)
@@ -566,6 +567,7 @@ const startFdStream = async () => {
         {
           onEvent: handleFdEvent,
           signal: controller.signal,
+          timeoutMs: FD_STREAM_TIMEOUT_MS,
         }
       )
       // Success — reset retry counter and schedule next tick
@@ -577,6 +579,10 @@ const startFdStream = async () => {
       if (controller.signal.aborted) return
       fdRetryCount.value += 1
       const detail = err?.message || err?.response?.data?.detail || '描述失败'
+      const isTimeout = String(detail).includes('超时') || Number(err?.response?.status || 0) === 408
+      if (isTimeout) {
+        fdRetryCount.value = FD_MAX_RETRIES
+      }
       if (fdRetryCount.value >= FD_MAX_RETRIES) {
         // Max retries reached — show degraded notice and keep polling slowly
         fdStage.value = 'degraded'

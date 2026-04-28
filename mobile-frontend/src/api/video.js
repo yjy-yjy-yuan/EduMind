@@ -13,10 +13,51 @@ import {
   mockUploadVideoUrl
 } from '@/api/mockGateway'
 
+const LOCAL_DELETED_VIDEO_IDS_KEY = 'm_deleted_video_ids'
+
 export const hasLiveVideoBackend = () => hasReachableBackendConfig()
 export const isVideoUploadQueueableError = (error) => isBackendUnavailableError(error)
 export const getVideoUploadQueueableMessage = (error, fallback = '后端暂时不可达') =>
   getBackendUnavailableMessage(error, fallback)
+
+const parseDeletedVideoIds = () => {
+  try {
+    const raw = localStorage.getItem(LOCAL_DELETED_VIDEO_IDS_KEY)
+    const list = JSON.parse(raw || '[]')
+    if (!Array.isArray(list)) return new Set()
+    return new Set(list.map((item) => Number(item)).filter((item) => Number.isFinite(item) && item > 0))
+  } catch {
+    return new Set()
+  }
+}
+
+const writeDeletedVideoIds = (idsSet) => {
+  try {
+    localStorage.setItem(LOCAL_DELETED_VIDEO_IDS_KEY, JSON.stringify([...idsSet]))
+  } catch {
+    // ignore storage failures
+  }
+}
+
+const resolveVideoId = (video) => {
+  const n = Number(video?.id ?? video?.video_id ?? video?.server_id ?? video?.local_id ?? 0)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+}
+
+export const markVideoDeletedLocally = (videoId) => {
+  const id = Number(videoId)
+  if (!Number.isFinite(id) || id <= 0) return
+  const ids = parseDeletedVideoIds()
+  ids.add(Math.floor(id))
+  writeDeletedVideoIds(ids)
+}
+
+export const filterDeletedVideosLocally = (videos = []) => {
+  const ids = parseDeletedVideoIds()
+  if (ids.size === 0) return Array.isArray(videos) ? videos : []
+  const list = Array.isArray(videos) ? videos : []
+  return list.filter((video) => !ids.has(resolveVideoId(video)))
+}
 
 export function getVideoList(page = 1, pageSize = 10) {
   if (shouldUseMockApi()) return mockGetVideoList(page, pageSize)
@@ -51,9 +92,24 @@ export function processVideo(videoId, options = {}) {
   return request({ url: `/api/videos/${videoId}/process`, method: 'post', data: options })
 }
 
-export function deleteVideo(videoId) {
+export async function deleteVideo(videoId) {
   if (shouldUseMockApi()) return mockDeleteVideo(videoId)
-  return request({ url: `/api/videos/${videoId}/delete`, method: 'delete' })
+
+  try {
+    return await request({ url: `/api/videos/${videoId}/delete`, method: 'delete' })
+  } catch (error) {
+    const status = Number(error?.response?.status || 0)
+    if (status !== 404) throw error
+  }
+
+  try {
+    return await request({ url: `/api/videos/${videoId}`, method: 'delete' })
+  } catch (error) {
+    const status = Number(error?.response?.status || 0)
+    if (status !== 404) throw error
+  }
+
+  return request({ url: `/api/video/${videoId}/delete`, method: 'delete' })
 }
 
 export function uploadLocalVideo(formData, { onUploadProgress } = {}) {

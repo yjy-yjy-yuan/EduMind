@@ -44,8 +44,8 @@
 
 ```
 Debug 配置（UUID: 1C23BC312F62C3DC00D572F8）:
-  INFOPLIST_KEY_EDUMIND_API_BASE_URL = "__DEBUG_DYNAMIC__"
-  （由 sync_ios_web_assets.sh 动态注入当前机器 LocalHostName）
+  INFOPLIST_KEY_EDUMIND_API_BASE_URL = "http://<LocalHostName>.local:<PORT>"
+  （由 sync_ios_web_assets.sh 在 Debug 配置块内直接写入真实值）
 
 Release 配置（UUID: 1C23BC322F62C3DC00D572F8）:
   INFOPLIST_KEY_EDUMIND_API_BASE_URL = "https://api.xxx.com"
@@ -233,7 +233,7 @@ FIXED_DOMAIN=https://api.xxx.com bash ios-app/validate_ios_build.sh --release
 ```bash
 # 回滚到 Debug 本地开发模式
 bash ios-app/sync_ios_web_assets.sh
-# project.pbxproj Debug 配置恢复为 __DEBUG_DYNAMIC__，脚本下次运行注入本机 LocalHostName
+# project.pbxproj Debug 配置将被直接刷新为本机 .local 地址（含端口）
 
 # 回滚前端到本地开发版本
 cd mobile-frontend

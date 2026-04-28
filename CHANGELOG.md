@@ -1,5 +1,24 @@
 # 变更日志
 
+## 2026-04-28
+
+### 实时画面描述连接超时降级 + 删除链路前端即时反馈修复
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/api/frameDescription.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/frameDescription.js)：为 `describeFrameStream` 增加 `timeoutMs`，连接超时直接抛出 `408` 风格错误，避免长时间停留在 connecting。
+  - 更新 [`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)：引入 `FD_STREAM_TIMEOUT_MS=4500` 并传入流请求；超时后立即进入降级重试分支。
+  - 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：删除视频改为“先本地标记 + 立即跳首页 + 后台执行删除请求”，避免用户等待接口返回。
+  - 更新 [`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)：新增本地删除 ID 集（`m_deleted_video_ids`）及过滤函数，保证删除后首页/列表即时隐藏。
+  - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：接入本地删除过滤，防止“已删视频仍显示”。
+
+- **ios-app**：
+  - 修复 [`ios-app/sync_ios_web_assets.sh`](/Users/yuan/final-work/EduMind/ios-app/sync_ios_web_assets.sh) 中 pbxproj 替换规则：兼容 `__DEBUG_DYNAMIC__` 这类无引号占位符，确保 Debug API Base 能被真实写入。
+  - 更新 [`ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS.xcodeproj/project.pbxproj)：Debug 配置写入 `http://yuandeMacBook-Pro.local:2004`，Release 保持 `https://47.84.228.226`。
+  - 同步 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)。
+
+- **docs**：
+  - 更新 [`docs/BACKEND_FIXED_DOMAIN.md`](/Users/yuan/final-work/EduMind/docs/BACKEND_FIXED_DOMAIN.md)：修正文档中“Debug 永久占位 `__DEBUG_DYNAMIC__`”的过时描述，改为脚本直接写入真实 `.local` 地址。
+
 ## 2026-04-27
 
 ### VideoDetail.vue 删除按钮交互修复

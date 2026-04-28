@@ -248,7 +248,7 @@ import {
   resolveRecommendationUrl,
   shouldOpenRecommendationExternalSource
 } from '@/services/recommendationActions'
-import { getVideoList } from '@/api/video'
+import { filterDeletedVideosLocally, getVideoList } from '@/api/video'
 import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
 const router = useRouter()
@@ -275,7 +275,7 @@ const recommendationMeta = ref({
 
 const normalizeList = (payload) => {
   const list = payload?.videos || payload?.items || payload?.data || payload || []
-  return Array.isArray(list) ? list : []
+  return filterDeletedVideosLocally(Array.isArray(list) ? list : [])
 }
 
 const RECOMMENDATION_TITLE_BLOCKLIST = ['排列组合插空法详解']
@@ -466,10 +466,16 @@ const goStat = (scope) => {
   router.push({ path: '/videos', query: { scope } })
 }
 
+const resolveVideoId = (video) => {
+  const n = Number(video?.id ?? video?.video_id ?? video?.server_id ?? video?.local_id ?? 0)
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+}
+
 const openVideo = (video) => {
   const current = video || {}
-  if (!current.id) return
-  router.push(`/videos/${current.id}`)
+  const videoId = resolveVideoId(current)
+  if (!videoId) return
+  router.push(`/videos/${videoId}`)
 }
 
 const hasAuthToken = computed(() => Boolean(String(storageGet('m_token') || '').trim()))

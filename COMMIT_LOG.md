@@ -177,3 +177,10 @@
 
 ### 2026-04-23（待提交）
 - `TBD` `feat(m4): align backend/frontend contracts, stream normalization and integration docs`
+# 2026-04-28
+
+- `PENDING` `fix(mobile+ios+docs): frame description timeout degrade, instant delete UX, debug api base sync script fix`
+  - 移动端实时画面描述新增连接超时快速降级，避免长时间停留 connecting。
+  - 删除视频改为前端即时跳转首页并本地过滤已删视频，消除“删除后仍显示”的卡顿感。
+  - 修复 `ios-app/sync_ios_web_assets.sh` 对 `__DEBUG_DYNAMIC__` 无引号占位符无法替换的问题，确保 Debug API Base 真实写入。
+  - 修正文档中关于 Debug API Base 占位符的过时说明并同步 CHANGELOG。

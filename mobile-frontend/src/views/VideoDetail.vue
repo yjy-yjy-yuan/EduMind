@@ -159,7 +159,16 @@
           {{ retrying ? '重试中…' : '失败后一键重试' }}
         </button>
 
-        <button class="danger video-detail__section video-detail__section--delete" @click="remove" :disabled="deleteDisabled">删除视频</button>
+        <button class="danger video-detail__section video-detail__section--delete" @click="armDelete" :disabled="deleteDisabled">
+          {{ deleteButtonText }}
+        </button>
+        <div v-if="deleteConfirmVisible" class="delete-confirm video-detail__section">
+          <span class="delete-confirm__text">确认删除当前视频？删除后视频将从列表隐藏，相关索引也会一并清理。</span>
+          <div class="delete-confirm__actions">
+            <button class="mini mini--warn" @click="remove" :disabled="deleteInFlight">确认删除</button>
+            <button class="mini" @click="cancelDelete" :disabled="deleteInFlight">取消</button>
+          </div>
+        </div>
             </div>
           </div>
         </div>
@@ -182,7 +191,16 @@ import { useRoute, useRouter } from 'vue-router'
 import { shouldUseMockApi } from '@/config'
 import { createNote, getNotes, updateNote } from '@/api/note'
 import { getSubtitleContext } from '@/api/subtitle'
-import { deleteVideo, generateVideoSummary, generateVideoTags, getVideo, getVideoProcessingOptions, getVideoStatus, processVideo } from '@/api/video'
+import {
+  deleteVideo,
+  generateVideoSummary,
+  generateVideoTags,
+  getVideo,
+  getVideoProcessingOptions,
+  getVideoStatus,
+  markVideoDeletedLocally,
+  processVideo
+} from '@/api/video'
 import VideoDetailRecommendPanel from '@/components/videoDetail/VideoDetailRecommendPanel.vue'
 import WhisperModelPicker from '@/components/WhisperModelPicker.vue'
 import { emitVideoDetailTelemetry } from '@/services/videoDetailTelemetry'
@@ -221,6 +239,7 @@ const numericVideoId = computed(() => {
   const n = Number(video.value?.id ?? id.value ?? 0)
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
 })
+const hasValidVideoId = computed(() => numericVideoId.value > 0)
 
 const PANEL_STORAGE_PREFIX = 'videoDetailSubPage:'
 const activePanelIndex = ref(0)
@@ -336,7 +355,12 @@ const processDisabled = computed(
   () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(normalizeVideoStatus(statusValue.value))
 )
 const deleteInFlight = ref(false)
+const deleteConfirmVisible = ref(false)
 const deleteDisabled = computed(() => autoStarting.value || retrying.value || deleteInFlight.value)
+const deleteButtonText = computed(() => {
+  if (deleteInFlight.value) return '删除中…'
+  return '删除视频'
+})
 
 const extractErrorMessage = (err, fallback) => {
   const detail = err?.response?.data?.detail
@@ -379,7 +403,9 @@ const heroClass = computed(() => {
 
 const fetchStatus = async () => {
   const previousStatus = normalizeVideoStatus(statusValue.value)
-  const res = await getVideoStatus(id.value)
+  const currentVideoId = numericVideoId.value
+  if (!currentVideoId) throw new Error('视频ID无效，请返回列表重新进入')
+  const res = await getVideoStatus(currentVideoId)
   const p = res.data || {}
   statusInfo.value = {
     status: p.status || p.data?.status || '',
@@ -391,7 +417,7 @@ const fetchStatus = async () => {
   }
   const nextStatus = normalizeVideoStatus(statusInfo.value.status)
   if (previousStatus && isActiveVideoStatus(previousStatus) && !isActiveVideoStatus(nextStatus)) {
-    const detailRes = await getVideo(id.value)
+    const detailRes = await getVideo(currentVideoId)
     video.value = normalizeVideo(detailRes.data)
   }
 }
@@ -429,7 +455,9 @@ const tryAutoStartProcessing = async () => {
   try {
     attempted = true
     processingSettings.value = getProcessingSettings()
-    await processVideo(id.value, buildProcessPayload(processingSettings.value))
+    const currentVideoId = numericVideoId.value
+    if (!currentVideoId) throw new Error('视频ID无效，请返回列表重试')
+    await processVideo(currentVideoId, buildProcessPayload(processingSettings.value))
     await fetchStatus()
     startPollingIfNeeded()
   } catch (e) {
@@ -562,13 +590,18 @@ const refreshOfflineMemoryContext = async (currentVideo) => {
 const loadVideoNotes = async () => {
   notesLoading.value = true
   try {
-    const response = await getNotes({ video_id: Number(id.value) })
+    const currentVideoId = numericVideoId.value
+    if (!currentVideoId) {
+      videoNotes.value = []
+      return
+    }
+    const response = await getNotes({ video_id: currentVideoId })
     const list = normalizeNoteList(response?.data)
     await cacheNotes(list)
     videoNotes.value = list.slice(0, 3)
   } catch (e) {
     if (shouldUseOfflineMemoryMode(e)) {
-      videoNotes.value = (await getOfflineNotes({ videoId: Number(id.value) })).slice(0, 3)
+      videoNotes.value = (await getOfflineNotes({ videoId: currentVideoId })).slice(0, 3)
     } else {
       videoNotes.value = []
     }
@@ -581,14 +614,16 @@ const reload = async () => {
   loading.value = true
   error.value = ''
   try {
+    if (!hasValidVideoId.value) throw new Error('视频ID无效，请返回列表重新进入')
     await refreshWhisperModelOptions()
     processingSettings.value = getProcessingSettings()
-    const res = await getVideo(id.value)
+    const currentVideoId = numericVideoId.value
+    const res = await getVideo(currentVideoId)
     video.value = normalizeVideo(res.data)
     await refreshOfflineMemoryContext(video.value)
     await loadVideoNotes()
     try {
-      const subtitleResponse = await getSubtitleContext(Number(id.value), { preferMerged: true })
+      const subtitleResponse = await getSubtitleContext(currentVideoId, { preferMerged: true })
       subtitleFragments.value = normalizeSubtitleContext(subtitleResponse).slice(0, 8)
     } catch {
       subtitleFragments.value = []
@@ -603,7 +638,7 @@ const reload = async () => {
   } catch (e) {
     if (shouldUseOfflineMemoryMode(e)) {
       try {
-        await hydrateOfflineVideoContext(id.value, '当前后端不可达，已切换到本地离线缓存')
+        await hydrateOfflineVideoContext(numericVideoId.value || id.value, '当前后端不可达，已切换到本地离线缓存')
       } catch {
         error.value = e?.message || '加载失败'
       }
@@ -625,8 +660,10 @@ const selectProcessingModel = (model) => {
 
 const startProcess = async () => {
   try {
+    const currentVideoId = numericVideoId.value
+    if (!currentVideoId) throw new Error('视频ID无效，请返回列表重试')
     processingSettings.value = getProcessingSettings()
-    await processVideo(id.value, buildProcessPayload(processingSettings.value))
+    await processVideo(currentVideoId, buildProcessPayload(processingSettings.value))
     await reload()
   } catch (e) {
     error.value = extractErrorMessage(e, '提交失败')
@@ -638,8 +675,10 @@ const retryProcess = async () => {
   retrying.value = true
   error.value = ''
   try {
+    const currentVideoId = numericVideoId.value
+    if (!currentVideoId) throw new Error('视频ID无效，请返回列表重试')
     processingSettings.value = getProcessingSettings()
-    await processVideo(id.value, buildProcessPayload(processingSettings.value))
+    await processVideo(currentVideoId, buildProcessPayload(processingSettings.value))
     await reload()
   } catch (e) {
     error.value = extractErrorMessage(e, '重试失败')
@@ -650,7 +689,11 @@ const retryProcess = async () => {
 
 const play = () => {
   if (!canOpenPlayerWhileProcessing.value) return
-  router.push(`/player/${id.value}`)
+  if (!hasValidVideoId.value) {
+    error.value = '视频ID无效，请返回列表重新进入'
+    return
+  }
+  router.push(`/player/${numericVideoId.value}`)
 }
 
 const createSummary = async () => {
@@ -658,8 +701,10 @@ const createSummary = async () => {
   summaryGenerating.value = true
   error.value = ''
   try {
+    const currentVideoId = numericVideoId.value
+    if (!currentVideoId) throw new Error('视频ID无效，请返回列表重试')
     processingSettings.value = getProcessingSettings()
-    await generateVideoSummary(id.value, { style: processingSettings.value.summaryStyle })
+    await generateVideoSummary(currentVideoId, { style: processingSettings.value.summaryStyle })
     await reload()
   } catch (e) {
     error.value = extractErrorMessage(e, '生成摘要失败')
@@ -673,7 +718,9 @@ const createTags = async () => {
   tagGenerating.value = true
   error.value = ''
   try {
-    await generateVideoTags(id.value, { max_tags: 6 })
+    const currentVideoId = numericVideoId.value
+    if (!currentVideoId) throw new Error('视频ID无效，请返回列表重试')
+    await generateVideoTags(currentVideoId, { max_tags: 6 })
     await reload()
   } catch (e) {
     error.value = extractErrorMessage(e, '提取标签失败')
@@ -686,15 +733,17 @@ const buildSummaryNotePayload = () => ({
   title: normalizeText(video.value?.title) || '未命名视频',
   content: normalizeText(video.value?.summary),
   note_type: 'summary',
-  video_id: Number(id.value),
+  video_id: numericVideoId.value,
   tags: tagList.value.join(',')
 })
 
 const findSummaryNote = async () => {
-  const response = await getNotes({ video_id: Number(id.value), per_page: 100 })
+  const currentVideoId = numericVideoId.value
+  if (!currentVideoId) return null
+  const response = await getNotes({ video_id: currentVideoId, per_page: 100 })
   const currentTitle = normalizeText(video.value?.title) || '未命名视频'
   const summaryNotes = normalizeNoteList(response?.data).filter(
-    (item) => String(item?.note_type || 'text') === 'summary' && Number(item?.video_id || 0) === Number(id.value)
+    (item) => String(item?.note_type || 'text') === 'summary' && Number(item?.video_id || 0) === currentVideoId
   )
   return summaryNotes.find((item) => normalizeText(item?.title) === currentTitle) || summaryNotes[0] || null
 }
@@ -728,7 +777,7 @@ const importSummaryToNote = async () => {
 
     const query = {
       noteAction,
-      videoId: String(id.value)
+      videoId: String(numericVideoId.value)
     }
     if (noteId) query.noteId = noteId
 
@@ -741,30 +790,48 @@ const importSummaryToNote = async () => {
 }
 
 const qa = () => {
+  if (!hasValidVideoId.value) {
+    error.value = '视频ID无效，请返回列表重新进入'
+    return
+  }
   const title = String(video.value?.title || '').trim()
   router.push({
     path: '/qa',
-    query: { videoId: String(id.value), ...(title ? { videoTitle: title } : {}) }
+    query: { videoId: String(numericVideoId.value), ...(title ? { videoTitle: title } : {}) }
   })
 }
 
 const openSearch = () => {
+  if (!hasValidVideoId.value) {
+    error.value = '视频ID无效，请返回列表重新进入'
+    return
+  }
   const title = String(video.value?.title || '').trim()
   router.push({
     path: '/search',
-    query: { videoId: String(id.value), ...(title ? { videoTitle: title } : {}) }
+    query: { videoId: String(numericVideoId.value), ...(title ? { videoTitle: title } : {}) }
   })
 }
 
 const openNewVideoNote = () => {
+  if (!hasValidVideoId.value) {
+    error.value = '视频ID无效，请返回列表重新进入'
+    return
+  }
   const title = String(video.value?.title || '').trim()
   router.push({
     path: '/notes/new',
-    query: { videoId: String(id.value), ...(title ? { videoTitle: title } : {}) }
+    query: { videoId: String(numericVideoId.value), ...(title ? { videoTitle: title } : {}) }
   })
 }
 
-const openVideoNotes = () => router.push({ path: '/notes', query: { videoId: String(id.value) } })
+const openVideoNotes = () => {
+  if (!hasValidVideoId.value) {
+    error.value = '视频ID无效，请返回列表重新进入'
+    return
+  }
+  router.push({ path: '/notes', query: { videoId: String(numericVideoId.value) } })
+}
 
 const openNote = (noteId) => router.push(`/notes/${noteId}`)
 const buildNoteExcerpt = (content) => {
@@ -788,15 +855,37 @@ const formatMetaTime = (value) => {
   if (Number.isNaN(date.getTime())) return String(value)
   return date.toLocaleDateString()
 }
+const armDelete = () => {
+  if (!hasValidVideoId.value) {
+    error.value = '视频ID无效，请返回列表重新进入'
+    return
+  }
+  deleteConfirmVisible.value = true
+}
+
+const cancelDelete = () => {
+  if (deleteInFlight.value) return
+  deleteConfirmVisible.value = false
+}
+
 const remove = async () => {
-  const ok = window.confirm('确认删除该视频？')
-  if (!ok || deleteInFlight.value) return
+  if (deleteInFlight.value) return
+  const currentVideoId = numericVideoId.value
+  if (!currentVideoId) {
+    error.value = '视频ID无效，请返回列表重新进入'
+    return
+  }
   deleteInFlight.value = true
+  deleteConfirmVisible.value = false
+
+  // Keep UX responsive: leave detail page immediately, let delete continue in background.
+  markVideoDeletedLocally(currentVideoId)
+  router.replace('/')
+
   try {
-    await deleteVideo(id.value)
-    router.replace('/videos')
+    await deleteVideo(currentVideoId)
   } catch (e) {
-    error.value = extractErrorMessage(e, '删除失败')
+    console.warn('[VideoDetail] delete request failed:', extractErrorMessage(e, '删除失败'))
   } finally {
     deleteInFlight.value = false
   }
@@ -1388,6 +1477,27 @@ onUnmounted(() => {
   border-radius: 14px;
   padding: 12px;
   font-weight: 900;
+}
+
+.delete-confirm {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(180, 24, 93, 0.2);
+  background: rgba(251, 242, 246, 0.96);
+}
+
+.delete-confirm__text {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6b1d44;
+}
+
+.delete-confirm__actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
 }
 
 @media (max-width: 420px) {
