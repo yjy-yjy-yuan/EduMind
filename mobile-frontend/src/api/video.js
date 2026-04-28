@@ -14,6 +14,7 @@ import {
 } from '@/api/mockGateway'
 
 const LOCAL_DELETED_VIDEO_IDS_KEY = 'm_deleted_video_ids'
+export const VIDEO_DELETED_EVENT_NAME = 'edumind_video_deleted'
 
 export const hasLiveVideoBackend = () => hasReachableBackendConfig()
 export const isVideoUploadQueueableError = (error) => isBackendUnavailableError(error)
@@ -47,9 +48,13 @@ const resolveVideoId = (video) => {
 export const markVideoDeletedLocally = (videoId) => {
   const id = Number(videoId)
   if (!Number.isFinite(id) || id <= 0) return
+  const normalizedId = Math.floor(id)
   const ids = parseDeletedVideoIds()
-  ids.add(Math.floor(id))
+  ids.add(normalizedId)
   writeDeletedVideoIds(ids)
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent(VIDEO_DELETED_EVENT_NAME, { detail: { videoId: normalizedId } }))
+  }
 }
 
 export const filterDeletedVideosLocally = (videos = []) => {

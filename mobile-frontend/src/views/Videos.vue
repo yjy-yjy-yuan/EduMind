@@ -96,7 +96,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { filterDeletedVideosLocally, getVideoList, processVideo } from '@/api/video'
+import { VIDEO_DELETED_EVENT_NAME, filterDeletedVideosLocally, getVideoList, processVideo } from '@/api/video'
 import { OFFLINE_QUEUE_EVENT_NAME, getPendingOfflineTasks } from '@/services/offlineQueue'
 import { buildProcessPayload, getProcessingSettings, whisperModelLabel } from '@/services/processingSettings'
 import { isActiveVideoStatus, normalizeVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
@@ -117,6 +117,16 @@ const openVideo = (video) => {
     return
   }
   go(`/videos/${videoId}`)
+}
+
+const removeVideoFromLocalState = (videoId) => {
+  const id = Number(videoId)
+  if (!Number.isFinite(id) || id <= 0) return
+  videos.value = videos.value.filter((item) => Number(item?.id || 0) !== id)
+}
+
+const handleVideoDeleted = (event) => {
+  removeVideoFromLocalState(event?.detail?.videoId)
 }
 
 const loading = ref(false)
@@ -414,6 +424,7 @@ watch(
 
 onMounted(async () => {
   window.addEventListener(OFFLINE_QUEUE_EVENT_NAME, reloadOfflineTaskCount)
+  window.addEventListener(VIDEO_DELETED_EVENT_NAME, handleVideoDeleted)
   await reloadOfflineTaskCount()
   await reload(true)
   startPollingIfNeeded()
@@ -422,6 +433,7 @@ onMounted(async () => {
 onUnmounted(() => {
   stopPolling()
   window.removeEventListener(OFFLINE_QUEUE_EVENT_NAME, reloadOfflineTaskCount)
+  window.removeEventListener(VIDEO_DELETED_EVENT_NAME, handleVideoDeleted)
 })
 </script>
 

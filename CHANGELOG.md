@@ -2,6 +2,16 @@
 
 ## 2026-04-28
 
+### 删除视频链路二次修正：单击即删 + 跨页面即时隐藏
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：移除删除二次确认弹层，改为“单击删除按钮即执行删除流程”，并保持立即跳转首页。
+  - 更新 [`mobile-frontend/src/api/video.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/video.js)：新增 `VIDEO_DELETED_EVENT_NAME` 事件；`markVideoDeletedLocally` 在写入 `m_deleted_video_ids` 后立即广播删除事件。
+  - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)、[`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：监听删除事件并实时从当前内存列表剔除对应视频，确保“删除后首页/视频库立即不显示”。
+
+- **ios-app**：
+  - 同步 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css) 以确保真机加载最新删除链路行为。
+
 ### 实时画面描述连接超时降级 + 删除链路前端即时反馈修复
 
 - **mobile-frontend**：

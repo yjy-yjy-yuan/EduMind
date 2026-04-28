@@ -179,6 +179,11 @@
 - `TBD` `feat(m4): align backend/frontend contracts, stream normalization and integration docs`
 # 2026-04-28
 
+- `PENDING` `fix(mobile): one-click delete and cross-page immediate removal sync`
+  - 删除按钮改为单击即执行，不再展示二次确认弹层。
+  - 删除时广播 `VIDEO_DELETED_EVENT_NAME`，首页与视频库实时剔除已删项。
+  - 同步 iOS WebAssets，确保真机加载到本次删除链路修正。
+
 - `b7734a1d` `fix(mobile+ios+docs): frame description timeout degrade, instant delete UX, debug api base sync script fix`
   - 移动端实时画面描述新增连接超时快速降级，避免长时间停留 connecting。
   - 删除视频改为前端即时跳转首页并本地过滤已删视频，消除“删除后仍显示”的卡顿感。

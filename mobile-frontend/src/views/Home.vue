@@ -226,7 +226,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BrandLogo from '@/components/BrandLogo.vue'
 import { getVideoRecommendations } from '@/api/recommendation'
@@ -248,7 +248,7 @@ import {
   resolveRecommendationUrl,
   shouldOpenRecommendationExternalSource
 } from '@/services/recommendationActions'
-import { filterDeletedVideosLocally, getVideoList } from '@/api/video'
+import { VIDEO_DELETED_EVENT_NAME, filterDeletedVideosLocally, getVideoList } from '@/api/video'
 import { isActiveVideoStatus, isCompletedVideoStatus, videoStatusText, videoStatusTone } from '@/services/videoStatus'
 
 const router = useRouter()
@@ -605,7 +605,26 @@ const reloadDashboard = async () => {
   await reloadRecommendations()
 }
 
-onMounted(reloadDashboard)
+const removeVideoFromLocalState = (videoId) => {
+  const id = Number(videoId)
+  if (!Number.isFinite(id) || id <= 0) return
+  allVideos.value = allVideos.value.filter((item) => Number(item?.id || 0) !== id)
+  recommendations.value = recommendations.value.filter((item) => Number(item?.id || 0) !== id)
+}
+
+const handleVideoDeleted = (event) => {
+  const deletedId = Number(event?.detail?.videoId || 0)
+  removeVideoFromLocalState(deletedId)
+}
+
+onMounted(() => {
+  window.addEventListener(VIDEO_DELETED_EVENT_NAME, handleVideoDeleted)
+  void reloadDashboard()
+})
+
+onUnmounted(() => {
+  window.removeEventListener(VIDEO_DELETED_EVENT_NAME, handleVideoDeleted)
+})
 </script>
 
 <style scoped>

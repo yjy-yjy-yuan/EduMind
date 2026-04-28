@@ -159,16 +159,9 @@
           {{ retrying ? '重试中…' : '失败后一键重试' }}
         </button>
 
-        <button class="danger video-detail__section video-detail__section--delete" @click="armDelete" :disabled="deleteDisabled">
+        <button class="danger video-detail__section video-detail__section--delete" @click="remove" :disabled="deleteDisabled">
           {{ deleteButtonText }}
         </button>
-        <div v-if="deleteConfirmVisible" class="delete-confirm video-detail__section">
-          <span class="delete-confirm__text">确认删除当前视频？删除后视频将从列表隐藏，相关索引也会一并清理。</span>
-          <div class="delete-confirm__actions">
-            <button class="mini mini--warn" @click="remove" :disabled="deleteInFlight">确认删除</button>
-            <button class="mini" @click="cancelDelete" :disabled="deleteInFlight">取消</button>
-          </div>
-        </div>
             </div>
           </div>
         </div>
@@ -355,7 +348,6 @@ const processDisabled = computed(
   () => autoStarting.value || retrying.value || ['processing', 'downloading'].includes(normalizeVideoStatus(statusValue.value))
 )
 const deleteInFlight = ref(false)
-const deleteConfirmVisible = ref(false)
 const deleteDisabled = computed(() => autoStarting.value || retrying.value || deleteInFlight.value)
 const deleteButtonText = computed(() => {
   if (deleteInFlight.value) return '删除中…'
@@ -855,19 +847,6 @@ const formatMetaTime = (value) => {
   if (Number.isNaN(date.getTime())) return String(value)
   return date.toLocaleDateString()
 }
-const armDelete = () => {
-  if (!hasValidVideoId.value) {
-    error.value = '视频ID无效，请返回列表重新进入'
-    return
-  }
-  deleteConfirmVisible.value = true
-}
-
-const cancelDelete = () => {
-  if (deleteInFlight.value) return
-  deleteConfirmVisible.value = false
-}
-
 const remove = async () => {
   if (deleteInFlight.value) return
   const currentVideoId = numericVideoId.value
@@ -876,7 +855,6 @@ const remove = async () => {
     return
   }
   deleteInFlight.value = true
-  deleteConfirmVisible.value = false
 
   // Keep UX responsive: leave detail page immediately, let delete continue in background.
   markVideoDeletedLocally(currentVideoId)
