@@ -179,6 +179,11 @@
 - `TBD` `feat(m4): align backend/frontend contracts, stream normalization and integration docs`
 # 2026-04-28
 
+- `PENDING` `fix(mobile): harden realtime frame description critical path`
+  - 实时描述增加会话启动超时与流空闲超时，消除长时间 connecting/inferring 卡顿。
+  - 短视频切换高频采样策略，提高实时描述命中率。
+  - 同步 iOS WebAssets，确保真机加载到最新前端逻辑。
+
 - `7d65bfa2` `fix(mobile): one-click delete and cross-page immediate removal sync`
   - 删除按钮改为单击即执行，不再展示二次确认弹层。
   - 删除时广播 `VIDEO_DELETED_EVENT_NAME`，首页与视频库实时剔除已删项。

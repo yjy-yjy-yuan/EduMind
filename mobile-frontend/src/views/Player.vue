@@ -376,7 +376,9 @@ const fdStreamController = ref(null)
 const fdLastSampleTime = ref(-99)
 const fdRetryCount = ref(0)
 const FD_MAX_RETRIES = 3
-const FD_STREAM_TIMEOUT_MS = 4500
+const FD_STREAM_TIMEOUT_MS = 6500
+const FD_STREAM_IDLE_TIMEOUT_MS = 3000
+const FD_SESSION_START_TIMEOUT_MS = 2200
 const fdFeedbackSent = ref(false)
 const fdNoteWriteBusy = ref(false)
 const fdNoteWriteResult = ref(null)
@@ -426,6 +428,14 @@ const formatSeconds = (seconds) => {
   const ss = total % 60
   return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
 }
+
+const isShortVideo = () => {
+  const seconds = Number(durationSeconds.value || videoMeta.value?.duration || 0)
+  return Number.isFinite(seconds) && seconds > 0 && seconds <= 45
+}
+
+const getFdIntervalMs = () => (isShortVideo() ? 2500 : 8000)
+const getFdMinSampleGapSeconds = () => (isShortVideo() ? 1.5 : 6)
 
 // -----------------------------------------------------------------------
 // Frame description lifecycle
@@ -513,7 +523,7 @@ const startFdStream = async () => {
         action: 'start',
         detail_level: fdDetailLevel.value,
         session_id: '',
-      })
+      }, { timeoutMs: FD_SESSION_START_TIMEOUT_MS })
       sessionId = sess?.session_id || ''
       fdSessionId.value = sessionId
     } catch {
@@ -522,15 +532,15 @@ const startFdStream = async () => {
     }
   }
 
-  const INTERVAL_MS = 8000
-
   const tick = async () => {
     if (controller.signal.aborted || !fdEnabled.value) return
+    const intervalMs = getFdIntervalMs()
+    const minSampleGapSeconds = getFdMinSampleGapSeconds()
 
     const currentTime = currentTimeSeconds.value
-    if (Math.abs(currentTime - fdLastSampleTime.value) < 6) {
+    if (Math.abs(currentTime - fdLastSampleTime.value) < minSampleGapSeconds) {
       if (!controller.signal.aborted && fdEnabled.value) {
-        setTimeout(tick, INTERVAL_MS)
+        setTimeout(tick, intervalMs)
       }
       return
     }
@@ -543,7 +553,7 @@ const startFdStream = async () => {
     if (!frameData) {
       fdStage.value = 'connecting'
       if (!controller.signal.aborted && fdEnabled.value) {
-        setTimeout(tick, INTERVAL_MS)
+        setTimeout(tick, intervalMs)
       }
       return
     }
@@ -568,12 +578,13 @@ const startFdStream = async () => {
           onEvent: handleFdEvent,
           signal: controller.signal,
           timeoutMs: FD_STREAM_TIMEOUT_MS,
+          idleTimeoutMs: FD_STREAM_IDLE_TIMEOUT_MS,
         }
       )
       // Success — reset retry counter and schedule next tick
       fdRetryCount.value = 0
       if (!controller.signal.aborted && fdEnabled.value) {
-        setTimeout(tick, INTERVAL_MS)
+        setTimeout(tick, intervalMs)
       }
     } catch (err) {
       if (controller.signal.aborted) return
@@ -589,11 +600,11 @@ const startFdStream = async () => {
         fdDegraded.value = true
         fdDescriptionText.value = '（画面描述服务暂时不可用）'
         if (!controller.signal.aborted && fdEnabled.value) {
-          setTimeout(tick, Math.min(INTERVAL_MS * 3, 30000))
+          setTimeout(tick, Math.min(intervalMs * 3, 30000))
         }
       } else {
         // Retry with exponential backoff
-        const backoffMs = Math.min(INTERVAL_MS * fdRetryCount.value, 30000)
+        const backoffMs = Math.min(intervalMs * fdRetryCount.value, 30000)
         fdStage.value = 'recovering'
         if (!controller.signal.aborted && fdEnabled.value) {
           setTimeout(tick, backoffMs)

@@ -2,6 +2,19 @@
 
 ## 2026-04-28
 
+### 实时描述主链路修复：会话启动超时、流空闲超时、短视频高频采样
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/api/frameDescription.js`](/Users/yuan/final-work/EduMind/mobile-frontend/src/api/frameDescription.js)：
+    - 为 `describeFrameStream` 增加双超时机制：连接超时（`timeoutMs`）与流空闲超时（`idleTimeoutMs`），避免 `connecting` / `inferring` 长时间无响应。
+    - 为 `manageFrameDescSession` 增加 `timeoutMs`，会话启动请求超时时快速失败并交给上层回退处理。
+  - 更新 [`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)：
+    - 新增 `FD_SESSION_START_TIMEOUT_MS`、`FD_STREAM_IDLE_TIMEOUT_MS` 参数并接入调用链。
+    - 短视频（<=45s）启用高频采样：采样间隔降至 2.5s、最小采样时间差降至 1.5s，提升短视频实时描述触发概率。
+
+- **ios-app**：
+  - 同步 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css) 以确保容器加载最新实时描述逻辑。
+
 ### 删除视频链路二次修正：单击即删 + 跨页面即时隐藏
 
 - **mobile-frontend**：

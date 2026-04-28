@@ -45,6 +45,7 @@ const parseStreamErrorBody = async (response) => {
  * @param {Function} [options.onEvent]
  * @param {AbortSignal} [options.signal]
  * @param {number} [options.timeoutMs]
+ * @param {number} [options.idleTimeoutMs]
  */
 export async function describeFrameStream(params, options) {
   const {
@@ -57,7 +58,7 @@ export async function describeFrameStream(params, options) {
     context_history,
     allow_degrade,
   } = params || {}
-  const { onEvent, signal, timeoutMs } = options || {}
+  const { onEvent, signal, timeoutMs, idleTimeoutMs } = options || {}
 
   if (shouldUseMockApi()) {
     return dispatchMockStream({ video_id, frames, timestamp, video_title, detail_level, session_id }, onEvent)
@@ -78,14 +79,41 @@ export async function describeFrameStream(params, options) {
   const token = storageGet('m_token')
   if (token) headers.Authorization = 'Bearer ' + token
 
-  const timeout = Number(timeoutMs || 0)
-  const shouldTimeout = Number.isFinite(timeout) && timeout > 0
-  const timeoutController = shouldTimeout ? new AbortController() : null
+  const connectTimeout = Number(timeoutMs || 0)
+  const hasConnectTimeout = Number.isFinite(connectTimeout) && connectTimeout > 0
+  const streamIdleTimeout = Number(idleTimeoutMs || 0)
+  const hasIdleTimeout = Number.isFinite(streamIdleTimeout) && streamIdleTimeout > 0
+  const timeoutController = hasConnectTimeout || hasIdleTimeout ? new AbortController() : null
   const requestSignal = timeoutController ? timeoutController.signal : signal
-  let timeoutTimer = null
+  let connectTimer = null
+  let idleTimer = null
+  let timeoutReason = ''
+
+  const abortByTimeout = (reason) => {
+    if (!timeoutController) return
+    timeoutReason = reason
+    timeoutController.abort()
+  }
+  const clearConnectTimer = () => {
+    if (connectTimer) {
+      clearTimeout(connectTimer)
+      connectTimer = null
+    }
+  }
+  const clearIdleTimer = () => {
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+      idleTimer = null
+    }
+  }
+  const resetIdleTimer = () => {
+    if (!hasIdleTimeout || !timeoutController) return
+    clearIdleTimer()
+    idleTimer = setTimeout(() => abortByTimeout('idle'), streamIdleTimeout)
+  }
 
   if (timeoutController) {
-    timeoutTimer = setTimeout(() => timeoutController.abort(), timeout)
+    if (hasConnectTimeout) connectTimer = setTimeout(() => abortByTimeout('connect'), connectTimeout)
     if (signal) {
       if (signal.aborted) timeoutController.abort()
       else signal.addEventListener('abort', () => timeoutController.abort(), { once: true })
@@ -102,13 +130,13 @@ export async function describeFrameStream(params, options) {
       signal: requestSignal,
     })
   } catch (error) {
-    if (error?.name === 'AbortError' && shouldTimeout && !(signal && signal.aborted)) {
-      throw toStreamError('连接超时，已切换到降级描述', 408)
+    if (error?.name === 'AbortError' && !(signal && signal.aborted)) {
+      if (timeoutReason === 'connect') throw toStreamError('连接超时，已切换到降级描述', 408)
+      if (timeoutReason === 'idle') throw toStreamError('流式响应超时，已切换到降级描述', 408)
     }
     throw error
-  } finally {
-    if (timeoutTimer) clearTimeout(timeoutTimer)
   }
+  clearConnectTimer()
 
   if (!response.ok) {
     throw toStreamError(await parseStreamErrorBody(response), response.status)
@@ -142,21 +170,38 @@ export async function describeFrameStream(params, options) {
     }
   }
 
-  while (true) {
-    const { done, value } = await reader.read()
-    buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
-    let newlineIndex = buffer.indexOf('\n')
-    while (newlineIndex >= 0) {
-      const line = buffer.slice(0, newlineIndex).trim()
-      buffer = buffer.slice(newlineIndex + 1)
-      handleLine(line)
-      newlineIndex = buffer.indexOf('\n')
+  try {
+    while (true) {
+      resetIdleTimer()
+      let readResult
+      try {
+        readResult = await reader.read()
+      } catch (error) {
+        clearIdleTimer()
+        if (error?.name === 'AbortError' && timeoutReason === 'idle' && !(signal && signal.aborted)) {
+          throw toStreamError('流式响应超时，已切换到降级描述', 408)
+        }
+        throw error
+      }
+      clearIdleTimer()
+      const { done, value } = readResult
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+      let newlineIndex = buffer.indexOf('\n')
+      while (newlineIndex >= 0) {
+        const line = buffer.slice(0, newlineIndex).trim()
+        buffer = buffer.slice(newlineIndex + 1)
+        handleLine(line)
+        newlineIndex = buffer.indexOf('\n')
+      }
+      if (done) break
     }
-    if (done) break
-  }
 
-  const rest = (buffer + decoder.decode()).trim()
-  if (rest) handleLine(rest)
+    const rest = (buffer + decoder.decode()).trim()
+    if (rest) handleLine(rest)
+  } finally {
+    clearConnectTimer()
+    clearIdleTimer()
+  }
 
   return finalEvent
 }
@@ -164,8 +209,9 @@ export async function describeFrameStream(params, options) {
 /**
  * 管理描述会话（开启/关闭）
  */
-export async function manageFrameDescSession(params) {
+export async function manageFrameDescSession(params, options = {}) {
   const { video_id, action, detail_level, session_id } = params || {}
+  const timeoutMs = Number(options?.timeoutMs || 0)
 
   if (shouldUseMockApi()) {
     return {
@@ -180,12 +226,27 @@ export async function manageFrameDescSession(params) {
   const token = storageGet('m_token')
   if (token) headers.Authorization = 'Bearer ' + token
 
-  const response = await fetch(withBase('/api/frame_description/session'), {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ video_id, action, detail_level: detail_level || 'standard', session_id: session_id || '' }),
-    credentials: 'include',
-  })
+  const timeoutController = Number.isFinite(timeoutMs) && timeoutMs > 0 ? new AbortController() : null
+  let timer = null
+  if (timeoutController) timer = setTimeout(() => timeoutController.abort(), timeoutMs)
+
+  let response
+  try {
+    response = await fetch(withBase('/api/frame_description/session'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ video_id, action, detail_level: detail_level || 'standard', session_id: session_id || '' }),
+      credentials: 'include',
+      signal: timeoutController?.signal,
+    })
+  } catch (error) {
+    if (error?.name === 'AbortError' && timeoutController) {
+      throw new Error('会话初始化超时')
+    }
+    throw error
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 
   if (!response.ok) {
     const text = await response.text()
