@@ -179,7 +179,7 @@
 - `TBD` `feat(m4): align backend/frontend contracts, stream normalization and integration docs`
 # 2026-04-28
 
-- `PENDING` `fix(mobile): harden realtime frame description critical path`
+- `a9a7b660` `fix(mobile): harden realtime frame description critical path`
   - 实时描述增加会话启动超时与流空闲超时，消除长时间 connecting/inferring 卡顿。
   - 短视频切换高频采样策略，提高实时描述命中率。
   - 同步 iOS WebAssets，确保真机加载到最新前端逻辑。
