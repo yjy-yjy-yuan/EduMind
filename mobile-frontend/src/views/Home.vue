@@ -103,7 +103,7 @@
         <div v-for="i in 3" :key="i" class="skeleton-item"></div>
       </div>
 
-      <div v-else class="overview__body">
+      <div v-else class="overview__body overview__body--tight">
         <button v-if="featuredVideo" class="focus-card" @click="openVideo(featuredVideo)">
           <span class="focus-card__eyebrow">{{ featuredVideoEyebrow }}</span>
           <h3 class="focus-card__title">{{ featuredVideo.title || '未命名视频' }}</h3>
@@ -875,7 +875,6 @@ onUnmounted(() => {
 }
 
 .hero-actions,
-.summary-grid,
 .video-list,
 .recommend-list,
 .skeleton-list {
@@ -992,8 +991,7 @@ onUnmounted(() => {
   background: rgba(235, 226, 246, 0.94);
 }
 
-.stats,
-.summary-grid {
+.stats {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -1003,6 +1001,12 @@ onUnmounted(() => {
   gap: 8px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-items: stretch;
+}
+
+.summary-grid {
+  display: block;
+  margin-top: 0;
+  padding: 0;
 }
 
 .stat-pill {
@@ -1058,6 +1062,15 @@ onUnmounted(() => {
   gap: 16px;
   padding: 20px;
   border-radius: 28px;
+}
+
+.overview__body {
+  display: grid;
+  gap: 10px;
+}
+
+.overview__body--tight {
+  gap: 3px;
 }
 
 .recommend-card__next {
@@ -1122,9 +1135,11 @@ onUnmounted(() => {
 
 .focus-card {
   display: grid;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  padding: 18px;
+  min-height: 144px;
+  margin: 0;
+  padding: 14px;
   text-align: left;
   border-radius: 22px;
   background: linear-gradient(180deg, rgba(247, 241, 251, 0.98), rgba(228, 217, 241, 0.92));
@@ -1148,9 +1163,11 @@ onUnmounted(() => {
 
 .summary-card {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
-  padding: 16px;
+  min-height: 112px;
+  margin: 0;
+  padding: 12px 16px;
   text-align: left;
   border-radius: 20px;
   border: 1px solid rgba(17, 24, 39, 0.08);
@@ -1337,13 +1354,16 @@ onUnmounted(() => {
 }
 
 @media (max-width: 640px) {
+  .overview__body {
+    gap: 12px;
+  }
+
   .welcome {
     padding: 20px;
   }
 
   .welcome__hero,
   .hero-actions,
-  .summary-grid,
   .recommend-list {
     grid-template-columns: 1fr;
   }

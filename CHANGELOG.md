@@ -1855,3 +1855,10 @@
   - 新增 Vinci Ops 指标接口、M1~M4 监控指标与 runbook。
   - 新增告警规则模板并对齐运行手册阈值。
   - 补充告警验收准备工具、M3 验收证据与预发 dry-run 记录，形成可追溯验收链路。
+
+## 2026-04-29 16:35 (Asia/Shanghai) 首页学习概览卡片间距修复与真机对齐
+
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：修复“学习概览”中主卡片与“可复盘内容”卡片之间出现大片空白的问题。将该区域间距改为单点控制并固定为 `12px`，同时去除会叠加撑大空白的冲突规则，确保不出现卡片粘连，也不出现中间大面积留白。
+- 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：为两张目标卡片增加稳定尺寸约束（`focus-card` / `summary-card` 的最小高度），使真机与桌面预览下的视觉比例更接近目标参考图。
+- 同步前端构建产物到 iOS 容器资源：[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)。
+- 对 2026-04-29 当天前序调整记录的更正说明：此前多轮调参中曾误引入额外 `margin-top` 导致间距异常；本次提交已统一清理并以固定间距方案收敛为最终行为。
