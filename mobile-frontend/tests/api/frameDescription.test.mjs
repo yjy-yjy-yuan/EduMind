@@ -92,7 +92,7 @@ test('source includes required NDJSON Accept header', () => {
 // -----------------------------------------------------------------------
 test('source calls /api/frame_description/describe', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
-    assert.match(source, /withBase\s*\(\s*['"]\/api\/frame_description\/describe['"]\s*\)/)
+    assert.match(source, /withFrameDescBase\s*\(\s*['"]\/api\/frame_description\/describe['"]\s*\)/)
 })
 
 // -----------------------------------------------------------------------
@@ -100,7 +100,7 @@ test('source calls /api/frame_description/describe', () => {
 // -----------------------------------------------------------------------
 test('source calls /api/frame_description/session', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
-    assert.match(source, /withBase\s*\(\s*['"]\/api\/frame_description\/session['"]\s*\)/)
+    assert.match(source, /withFrameDescBase\s*\(\s*['"]\/api\/frame_description\/session['"]\s*\)/)
 })
 
 // -----------------------------------------------------------------------
@@ -108,7 +108,7 @@ test('source calls /api/frame_description/session', () => {
 // -----------------------------------------------------------------------
 test('source calls /api/frame_description/health', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
-    assert.match(source, /withBase\s*\(\s*['"]\/api\/frame_description\/health['"]\s*\)/)
+    assert.match(source, /withFrameDescBase\s*\(\s*['"]\/api\/frame_description\/health['"]\s*\)/)
 })
 
 // -----------------------------------------------------------------------
@@ -173,7 +173,38 @@ test('source supports allow_degrade parameter', () => {
 })
 
 // -----------------------------------------------------------------------
-// 测试 19：Player.vue 集成正确导入 API
+// 测试 19：支持 iOS WebView 跨域采帧失败后的服务端抽帧兜底
+// -----------------------------------------------------------------------
+test('source supports frame_source_url fallback for iOS WebView capture failures', () => {
+    const frameApiSource = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const playerSource = readFileSync(resolve(process.cwd(), 'src/views/Player.vue'), 'utf8')
+    assert.ok(frameApiSource.includes('frame_source_url'), 'payload should include frame_source_url')
+    assert.ok(playerSource.includes('FD_SERVER_FRAME_STREAM_TIMEOUT_MS'), 'Player should allow longer server extraction timeout')
+    assert.ok(playerSource.includes('using server frame source fallback'), 'Player should log server-frame fallback')
+})
+
+// -----------------------------------------------------------------------
+// 测试 20：前端忙碌状态 9 秒后降级
+// -----------------------------------------------------------------------
+test('Player.vue aligns realtime description timeouts to 9 seconds', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/views/Player.vue'), 'utf8')
+    assert.match(source, /FD_STREAM_TIMEOUT_MS\s*=\s*9000/)
+    assert.match(source, /FD_STREAM_IDLE_TIMEOUT_MS\s*=\s*9000/)
+    assert.match(source, /FD_BUSY_STAGE_MAX_MS\s*=\s*9000/)
+    assert.match(source, /FD_SERVER_FRAME_STREAM_TIMEOUT_MS\s*=\s*75000/)
+    assert.match(source, /FD_SERVER_FRAME_IDLE_TIMEOUT_MS\s*=\s*75000/)
+    assert.match(source, /FD_SERVER_FRAME_BUSY_STAGE_MAX_MS\s*=\s*75000/)
+})
+
+test('Player.vue supports Xcode realtime description auto-start query', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/views/Player.vue'), 'utf8')
+    assert.ok(source.includes('shouldAutoStartFrameDescription'), 'should expose query-gated auto start')
+    assert.ok(source.includes('route.query.fd'), 'should support /player/:id?fd=1 for Simulator verification')
+    assert.ok(source.includes('auto start requested by route query'), 'should log auto-start for Xcode debug trace')
+})
+
+// -----------------------------------------------------------------------
+// 测试 21：Player.vue 集成正确导入 API
 // -----------------------------------------------------------------------
 test('Player.vue imports frameDescription API', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/views/Player.vue'), 'utf8')
@@ -181,7 +212,7 @@ test('Player.vue imports frameDescription API', () => {
 })
 
 // -----------------------------------------------------------------------
-// 测试 20：Player.vue 包含 fd-panel 样式
+// 测试 22：Player.vue 包含 fd-panel 样式
 // -----------------------------------------------------------------------
 test('Player.vue includes fd-panel styles', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/views/Player.vue'), 'utf8')

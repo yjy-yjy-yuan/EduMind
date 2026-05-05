@@ -14,6 +14,9 @@ export default defineConfig(({ command, mode }) => {
     'http://127.0.0.1:2004'
   const injectedRuntimeConfig = {
     'globalThis.__EDUMIND_ENV_API_BASE_URL__': JSON.stringify(env.VITE_MOBILE_API_BASE_URL || ''),
+    'globalThis.__EDUMIND_ENV_FRAME_DESC_API_BASE_URL__': JSON.stringify(
+      env.VITE_FRAME_DESC_API_BASE_URL || ''
+    ),
     'globalThis.__EDUMIND_ENV_UI_ONLY__': JSON.stringify(env.VITE_MOBILE_UI_ONLY || ''),
     'globalThis.__EDUMIND_ENV_ALLOW_UI_ONLY_IN_PROD__': JSON.stringify(env.VITE_ALLOW_UI_ONLY_IN_PROD || ''),
     'globalThis.__EDUMIND_ENV_RECOMMENDATION_INCLUDE_EXTERNAL__': JSON.stringify(

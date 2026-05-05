@@ -922,7 +922,7 @@ onUnmounted(() => {
 }
 
 .video-detail__tab--active {
-  background: linear-gradient(135deg, #a792bc, #7f698f);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
   color: #fff;
   border-color: transparent;
 }
@@ -1101,15 +1101,15 @@ onUnmounted(() => {
 }
 
 .hero-shell--idle {
-  background: linear-gradient(145deg, #8b799d, #665775);
+  background: linear-gradient(145deg, #1a56a8, #5b8fd9);
 }
 
 .hero-shell--warn {
-  background: linear-gradient(145deg, #8f73ba, #5f477e);
+  background: linear-gradient(145deg, #5b8fd9, #1a56a8);
 }
 
 .hero-shell--ok {
-  background: linear-gradient(145deg, #b79dd5, #6b5b84);
+  background: linear-gradient(145deg, #5b8fd9, #1a56a8);
 }
 
 .hero-shell--bad {
@@ -1182,7 +1182,7 @@ onUnmounted(() => {
 .badge.ok { background: var(--ok-bg); color: var(--ok-text); }
 .badge.warn { background: var(--lilac-bg); color: var(--lilac-text); }
 .badge.bad { background: var(--lilac-bg); color: var(--lilac-text); }
-.badge.info { background: rgba(139, 121, 157, 0.14); color: #665775; }
+.badge.info { background: rgba(91, 143, 217, 0.14); color: #1a56a8; }
 
 .progress {
   margin-top: 10px;
@@ -1194,7 +1194,7 @@ onUnmounted(() => {
 
 .bar {
   height: 100%;
-  background: linear-gradient(90deg, #a792bc, #7f698f);
+  background: linear-gradient(90deg, #1a56a8, #5b8fd9);
 }
 
 .inline-tip {
@@ -1284,7 +1284,7 @@ onUnmounted(() => {
   gap: 8px;
   padding: 12px;
   border-radius: 16px;
-  background: rgba(242, 235, 248, 0.98);
+  background: rgba(235, 245, 255, 0.98);
   border: 1px solid rgba(32, 42, 55, 0.08);
 }
 
@@ -1369,7 +1369,7 @@ onUnmounted(() => {
 }
 
 .mini--primary {
-  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
   color: #fff;
 }
 
@@ -1423,7 +1423,7 @@ onUnmounted(() => {
 .btn--primary {
   border: 0;
   color: #fff;
-  background: linear-gradient(135deg, #a792bc, #7f698f);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
 }
 
 .btn:disabled,
@@ -1462,14 +1462,14 @@ onUnmounted(() => {
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid rgba(180, 24, 93, 0.2);
-  background: rgba(251, 242, 246, 0.96);
+  background: rgba(235, 245, 255, 0.96);
 }
 
 .delete-confirm__text {
   display: block;
   font-size: 12px;
   line-height: 1.5;
-  color: #6b1d44;
+  color: #4a6a8a;
 }
 
 .delete-confirm__actions {
@@ -1504,8 +1504,8 @@ onUnmounted(() => {
   padding: 10px 12px;
   border-radius: 16px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(242, 235, 248, 0.92);
-  box-shadow: 0 10px 20px rgba(101, 87, 117, 0.08);
+  background: rgba(235, 245, 255, 0.92);
+  box-shadow: 0 10px 20px rgba(30, 90, 168, 0.08);
 }
 
 .card {
@@ -1513,7 +1513,7 @@ onUnmounted(() => {
   border-radius: 24px;
   border: 1px solid rgba(32, 42, 55, 0.09);
   background: linear-gradient(180deg, #ffffff, #f0e8f7);
-  box-shadow: 0 16px 30px rgba(101, 87, 117, 0.1);
+  box-shadow: 0 16px 30px rgba(30, 90, 168, 0.1);
   padding: 16px;
 }
 
@@ -1537,6 +1537,6 @@ onUnmounted(() => {
 }
 
 .btn--primary {
-  background: linear-gradient(135deg, #8b799d, #a48eb5);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
 }
 </style>

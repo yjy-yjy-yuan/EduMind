@@ -42,9 +42,9 @@ const onCardClick = () => {
 .vd-rec-card {
   border-radius: 16px;
   padding: 14px 14px 12px;
-  background: linear-gradient(180deg, #ffffff 0%, #f7f2fc 100%);
+  background: linear-gradient(180deg, #ffffff 0%, rgba(235, 245, 255, 0.5) 100%);
   border: 1px solid rgba(32, 42, 55, 0.08);
-  box-shadow: 0 8px 20px rgba(101, 87, 117, 0.08);
+  box-shadow: 0 8px 20px rgba(30, 90, 168, 0.08);
   display: grid;
   gap: 8px;
   text-align: left;
@@ -63,8 +63,8 @@ const onCardClick = () => {
   font-weight: 800;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(95, 71, 126, 0.12);
-  color: #5f477e;
+  background: rgba(91, 143, 217, 0.12);
+  color: #1a56a8;
 }
 
 .vd-rec-card__badge {
@@ -85,8 +85,8 @@ const onCardClick = () => {
 }
 
 .vd-rec-card__badge.badge--soft {
-  background: rgba(107, 91, 132, 0.12);
-  color: #5f477e;
+  background: rgba(91, 143, 217, 0.12);
+  color: #1a56a8;
 }
 
 .vd-rec-card__title {
@@ -122,7 +122,7 @@ const onCardClick = () => {
   font-weight: 900;
   font-size: 13px;
   color: #fff;
-  background: linear-gradient(135deg, #8b799d, #6b5b84);
+  background: linear-gradient(135deg, #5b8fd9, #1a56a8);
 }
 
 .vd-rec-card__action:disabled {

@@ -111,6 +111,13 @@ const waitForMountTarget = () =>
     onReady()
   })
 
+const getNativeInitialRoute = () => {
+  if (window.location.protocol !== 'file:') return ''
+  const route = String(window.__edumindNativeConfig?.initialRoute || '').trim()
+  if (!route || !route.startsWith('/') || route.startsWith('//')) return ''
+  return route
+}
+
 window.addEventListener('error', (event) => {
   const msg = event?.error?.stack || event?.message || 'Unknown runtime error'
   pushBootTrace('window:error', msg)
@@ -135,9 +142,15 @@ try {
   const app = createApp(App)
   pushBootTrace('app:use-router')
   app.use(router)
+  const nativeInitialRoute = getNativeInitialRoute()
+  const prepareRouter = nativeInitialRoute
+    ? router.replace(nativeInitialRoute).then(() => {
+        pushBootTrace('router:native-initial-route', nativeInitialRoute)
+      })
+    : Promise.resolve()
   pushBootTrace('router:isReady:wait')
-  router
-    .isReady()
+  prepareRouter
+    .then(() => router.isReady())
     .then(async () => {
       pushBootTrace('router:isReady:resolved', `path=${router.currentRoute.value.fullPath}`)
       const root = await waitForMountTarget()

@@ -147,10 +147,12 @@ if [ "$IS_RELEASE" = true ]; then
   fi
 
   IOS_API_BASE_URL="$FIXED_DOMAIN"
+  FRAME_DESC_API_BASE_URL=""
   BUILD_MODE="Release"
   PBXPROJ_TARGET_UUID="1C23BC322F62C3DC00D572F8"
   PBXPROJ_TARGET_NAME="Release"
   log "【Release 模式】iOS native API base URL: $IOS_API_BASE_URL (source: FIXED_DOMAIN env)"
+  log "【Release 模式】实时描述 API base URL: <fallback to main API>"
 else
   # ---- Debug 本地联调通道 ----
   LOCAL_HOSTNAME="$(scutil --get LocalHostName 2>/dev/null || true)"
@@ -162,11 +164,13 @@ else
   fi
   log "LocalHostName: $LOCAL_HOSTNAME"
 
-  IOS_API_BASE_URL="http://${LOCAL_HOSTNAME}.local:${BACKEND_PORT}"
+  IOS_API_BASE_URL="${EDUMIND_DEBUG_API_BASE_URL:-https://47.84.228.226}"
+  FRAME_DESC_API_BASE_URL="http://${LOCAL_HOSTNAME}.local:${BACKEND_PORT}"
   BUILD_MODE="Debug"
   PBXPROJ_TARGET_UUID="1C23BC312F62C3DC00D572F8"
   PBXPROJ_TARGET_NAME="Debug"
-  log "【Debug 模式】iOS native API base URL: $IOS_API_BASE_URL (source: scutil LocalHostName)"
+  log "【Debug 模式】iOS native API base URL: $IOS_API_BASE_URL (source: EDUMIND_DEBUG_API_BASE_URL or cloud default)"
+  log "【Debug 模式】实时描述 API base URL: $FRAME_DESC_API_BASE_URL (feature-specific local backend)"
 fi
 
 # ============================================================
@@ -249,6 +253,10 @@ if [ -f "node_modules/vite/bin/vite.js" ] && [ ! -x "node_modules/vite/bin/vite.
 fi
 
 log "执行 mobile-frontend iOS 构建（mode=ios）"
+VITE_MOBILE_API_BASE_URL="$IOS_API_BASE_URL" \
+VITE_FRAME_DESC_API_BASE_URL="$FRAME_DESC_API_BASE_URL" \
+VITE_MOBILE_PROXY_TARGET="$IOS_API_BASE_URL" \
+VITE_MOBILE_UI_ONLY=false \
 npm run build:ios
 
 # ============================================================
@@ -268,6 +276,7 @@ log "=============================================="
 log "同步完成"
 log "  模式:        $BUILD_MODE"
 log "  API Base:   $IOS_API_BASE_URL"
+log "  Frame Desc: ${FRAME_DESC_API_BASE_URL:-<fallback to API Base>}"
 log "  WebAssets:  $WEB_ASSETS_DIR"
 log "=============================================="
 if [ "$IS_RELEASE" = true ]; then

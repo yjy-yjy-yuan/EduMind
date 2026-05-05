@@ -295,8 +295,8 @@ onBeforeUnmount(() => {
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(242, 235, 248, 0.92);
-  box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
+  background: rgba(235, 245, 255, 0.92);
+  box-shadow: 0 10px 22px rgba(30, 90, 168, 0.09);
 }
 
 .topbar h2 {
@@ -317,7 +317,7 @@ onBeforeUnmount(() => {
   gap: 10px;
   border-radius: 24px;
   padding: 16px;
-  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.95));
+  background: linear-gradient(180deg, rgba(235, 245, 255, 0.98), rgba(235, 245, 255, 0.95));
   box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
 }
@@ -399,7 +399,7 @@ onBeforeUnmount(() => {
   width: 72px;
   border-radius: 22px;
   overflow: hidden;
-  background: rgba(139, 121, 157, 0.08);
+  background: rgba(91, 143, 217, 0.08);
   flex: 0 0 auto;
   padding: 0;
   border: 0;
@@ -420,7 +420,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   border-radius: 22px;
-  background: linear-gradient(145deg, #8b799d, #a48eb5);
+  background: linear-gradient(145deg, #5b8fd9, #5b8fd9);
   color: #fff;
   font-size: 26px;
   font-weight: 900;
@@ -507,12 +507,12 @@ onBeforeUnmount(() => {
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  border: 1px solid rgba(139, 121, 157, 0.18);
-  background: rgba(139, 121, 157, 0.08);
+  border: 1px solid rgba(91, 143, 217, 0.18);
+  background: rgba(91, 143, 217, 0.08);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #8b799d;
+  color: #5b8fd9;
   flex: 0 0 auto;
 }
 

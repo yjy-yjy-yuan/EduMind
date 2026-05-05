@@ -1,5 +1,30 @@
 # 变更日志
 
+## 2026-05-05
+
+### 主题颜色迁移：紫色 → 蓝色（冷静学习配色）
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/styles.css`](/Users/yuan/final-work/EduMind/mobile-frontend/src/styles.css)：
+    - 核心 CSS 变量全面重映射：`--bg` / `--primary` / `--primary-deep` / `--accent` / `--card` / `--text` / `--muted` / `--tap` / `--primary-soft` / `--primary-soft-strong` / `--accent-soft` / `--surface-lilac` / `--surface-lilac-deep` / `--surface-rose` 等。
+    - 全局渐变色（`body` 背景、`gradient-text` 等）和 focus outline 同步更新为蓝色系。
+  - 更新 [`mobile-frontend/src/App.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/App.vue)：背景装饰渐变（`.app-shell`、`.bg-decor--center`、`.bg-decor--right`）从青紫改为蓝色调。
+  - 更新 [`mobile-frontend/src/views/Home.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Home.vue)：欢迎卡片 box-shadow、Hero 按钮渐变、中性灰文字等改为蓝色。
+  - 更新 [`mobile-frontend/src/views/Login.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Login.vue)、[`mobile-frontend/src/views/Register.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Register.vue)：认证页 Hero 和按钮渐变从紫改为蓝色。
+  - 更新 [`mobile-frontend/src/views/Guide.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Guide.vue)：引导页徽章、面板背景、按钮渐变改为蓝色。
+  - 更新 [`mobile-frontend/src/views/Player.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Player.vue)：播放器背景、进度条、帧描述面板滚动条等改为蓝色。
+  - 更新 [`mobile-frontend/src/views/Upload.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Upload.vue)：上传页卡片阴影、按钮渐变、文字颜色全面蓝色化。
+  - 更新 [`mobile-frontend/src/views/QA.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/QA.vue)：问答页模式标签、发送按钮、进度条等改为蓝色。
+  - 更新 [`mobile-frontend/src/views/Notes.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Notes.vue)：笔记页标签激活态、筛选卡片、笔记卡片阴影等改为蓝色。
+  - 更新 [`mobile-frontend/src/views/VideoDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/VideoDetail.vue)：详情页徽章、按钮渐变等改为蓝色。
+  - 更新 [`mobile-frontend/src/views/Videos.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Videos.vue)：中性灰文字改为更蓝的蓝灰色。
+  - 更新 [`mobile-frontend/src/views/Recommendations.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Recommendations.vue)、[`mobile-frontend/src/views/LocalTranscripts.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscripts.vue)、[`mobile-frontend/src/views/LocalTranscriptDetail.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LocalTranscriptDetail.vue)、[`mobile-frontend/src/views/Profile.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/Profile.vue)、[`mobile-frontend/src/views/WhisperModelPicker.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/WhisperModelPicker.vue)、[`mobile-frontend/src/components/videoDetail/VideoDetailRecommendCard.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/videoDetail/VideoDetailRecommendCard.vue)、[`mobile-frontend/src/components/videoDetail/VideoDetailRecommendPanel.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/videoDetail/VideoDetailRecommendPanel.vue)、[`mobile-frontend/src/views/NoteEdit.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/NoteEdit.vue)、[`mobile-frontend/src/views/LearningPath.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/LearningPath.vue)、[`mobile-frontend/src/views/DesignAssistant.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/views/DesignAssistant.vue)：卡片阴影、渐变 shim、按钮激活态等紫色改为蓝色。
+  - 更新 [`mobile-frontend/src/components/TabBar.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/TabBar.vue)：底部导航栏背景、边框、阴影、上传按钮渐变改为蓝色。
+  - 更新 [`mobile-frontend/src/components/BrandLogo.vue`](/Users/yuan/final-work/EduMind/mobile-frontend/src/components/BrandLogo.vue)：品牌 Logo 框架背景和阴影改为蓝色。
+
+- **ios-app**：
+  - 同步 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css) 以确保 iOS 容器加载最新蓝色主题。
+
 ## 2026-04-28
 
 ### 实时描述主链路修复：会话启动超时、流空闲超时、短视频高频采样

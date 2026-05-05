@@ -263,6 +263,20 @@ private struct H5WebView: UIViewRepresentable {
         )?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let apiBase = configuredAPIBase.isEmpty ? "" : configuredAPIBase
+        let configuredFrameDescAPIBase = (
+            Bundle.main.object(forInfoDictionaryKey: "EDUMIND_FRAME_DESC_API_BASE_URL") as? String
+        )?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let configuredInitialRoute = (
+            Bundle.main.object(forInfoDictionaryKey: "EDUMIND_INITIAL_ROUTE") as? String
+        )?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let argumentInitialRoute = launchArgumentValue(named: "--edumind-initial-route")
+        let environmentInitialRoute = ProcessInfo.processInfo.environment["EDUMIND_INITIAL_ROUTE"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let initialRoute = !argumentInitialRoute.isEmpty
+            ? argumentInitialRoute
+            : (!environmentInitialRoute.isEmpty ? environmentInitialRoute : configuredInitialRoute)
         if apiBase.isEmpty {
             EduMindLog.error("WebView", "EDUMIND_API_BASE_URL 未配置！H5 将无法请求后端 API。请在 Xcode Build Settings 中设置 INFOPLIST_KEY_EDUMIND_API_BASE_URL。")
         } else {
@@ -271,9 +285,20 @@ private struct H5WebView: UIViewRepresentable {
                 "native api base=\(apiBase) | source=info-plist"
             )
         }
+        if !configuredFrameDescAPIBase.isEmpty {
+            EduMindLog.info(
+                "WebView",
+                "native frame desc api base=\(configuredFrameDescAPIBase) | source=info-plist"
+            )
+        }
+        if !initialRoute.isEmpty {
+            EduMindLog.info("WebView", "native initial route=\(initialRoute)")
+        }
 
         let payload: [String: String] = [
-            "apiBaseUrl": apiBase
+            "apiBaseUrl": apiBase,
+            "frameDescApiBaseUrl": configuredFrameDescAPIBase,
+            "initialRoute": initialRoute
         ]
 
         guard
@@ -283,6 +308,20 @@ private struct H5WebView: UIViewRepresentable {
             return #"{"apiBaseUrl":""}"#
         }
         return text
+    }
+
+    private static func launchArgumentValue(named name: String) -> String {
+        let args = ProcessInfo.processInfo.arguments
+        let prefix = "\(name)="
+        for (index, argument) in args.enumerated() {
+            if argument.hasPrefix(prefix) {
+                return String(argument.dropFirst(prefix.count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            if argument == name, index + 1 < args.count {
+                return args[index + 1].trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        return ""
     }
 
     private func usesLegacyAbsoluteAssetPaths(in html: String) -> Bool {
@@ -771,18 +810,51 @@ private struct H5WebView: UIViewRepresentable {
             EduMindLog.info("Lifecycle", "start load timeout watchdog")
             EduMindLog.debug("Lifecycle", "watchdog target=\(String(describing: webView.url?.absoluteString ?? "<pending>"))")
             let work = DispatchWorkItem { [weak self, weak webView] in
-                guard let webView else { return }
-                EduMindLog.error("Lifecycle", "load timeout watchdog fired")
-                self?.showErrorPage(
-                    in: webView,
-                    code: .navigationTimeout,
-                    title: "页面加载超时",
-                    details: "页面在预期时间内未完成加载，请检查前端资源是否已经同步到 App 包内。",
-                    recovery: "请执行：bash ios-app/sync_ios_web_assets.sh；若仍失败，再检查 WebAssets/index.html、index.js、index.css 是否在 App 包内。"
-                )
+                guard let self, let webView else { return }
+                let js = """
+                (function() {
+                  return JSON.stringify({
+                    bootMounted: !!window.__edumindBootMounted,
+                    appChildCount: document.getElementById('app') ? document.getElementById('app').childElementCount : 0,
+                    href: location.href,
+                    title: document.title || ''
+                  });
+                })();
+                """
+                webView.evaluateJavaScript(js) { [weak self, weak webView] result, _ in
+                    guard let self, let webView else { return }
+                    if self.hasMountedPage(result) {
+                        EduMindLog.info("Lifecycle", "load timeout suppressed because web app is already mounted: \(String(describing: result))")
+                        self.finishLoad()
+                        return
+                    }
+                    EduMindLog.error("Lifecycle", "load timeout watchdog fired")
+                    self.showErrorPage(
+                        in: webView,
+                        code: .navigationTimeout,
+                        title: "页面加载超时",
+                        details: "页面在预期时间内未完成加载，请检查前端资源是否已经同步到 App 包内。",
+                        recovery: "请执行：bash ios-app/sync_ios_web_assets.sh；若仍失败，再检查 WebAssets/index.html、index.js、index.css 是否在 App 包内。"
+                    )
+                }
             }
             loadTimeoutWorkItem = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: work)
+        }
+
+        private func hasMountedPage(_ result: Any?) -> Bool {
+            guard
+                let text = result as? String,
+                let data = text.data(using: .utf8),
+                let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else {
+                return false
+            }
+            if payload["bootMounted"] as? Bool == true {
+                return true
+            }
+            let childCount = (payload["appChildCount"] as? NSNumber)?.intValue ?? 0
+            return childCount > 0
         }
 
         private func finishLoad() {

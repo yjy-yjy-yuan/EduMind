@@ -4,5 +4,9 @@
 <dict>
 	<key>EDUMIND_API_BASE_URL</key>
 	<string>https://47.84.228.226</string>
+	<key>EDUMIND_FRAME_DESC_API_BASE_URL</key>
+	<string></string>
+	<key>EDUMIND_INITIAL_ROUTE</key>
+	<string></string>
 </dict>
 </plist>

@@ -174,9 +174,9 @@ const onPrimary = (item) => {
 
 .vd-rec-panel__refresh {
   justify-self: start;
-  border: 1px solid rgba(95, 71, 126, 0.25);
+  border: 1px solid rgba(91, 143, 217, 0.25);
   background: rgba(255, 255, 255, 0.9);
-  color: #5f477e;
+  color: #1a56a8;
   border-radius: 12px;
   padding: 8px 14px;
   font-weight: 800;
@@ -247,7 +247,7 @@ const onPrimary = (item) => {
 
 .vd-rec-panel__retry {
   border: 0;
-  background: linear-gradient(135deg, #8b799d, #6b5b84);
+  background: linear-gradient(135deg, #5b8fd9, #1a56a8);
   color: #fff;
   border-radius: 12px;
   padding: 8px 16px;

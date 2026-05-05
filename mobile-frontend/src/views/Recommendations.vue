@@ -273,17 +273,17 @@ onMounted(reloadAll)
   padding: 20px;
   border-radius: 28px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(242, 235, 248, 0.93);
-  box-shadow: 0 18px 38px rgba(73, 51, 104, 0.12);
+  background: rgba(235, 245, 255, 0.93);
+  box-shadow: 0 18px 38px rgba(30, 90, 168, 0.12);
 }
 
 .hero {
   position: relative;
   overflow: hidden;
   background:
-    linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.95)),
-    radial-gradient(circle at top right, rgba(143, 115, 186, 0.18), transparent 34%),
-    radial-gradient(circle at 16% 100%, rgba(183, 157, 213, 0.14), transparent 28%);
+    linear-gradient(180deg, rgba(235, 245, 255, 0.98), rgba(235, 245, 255, 0.95)),
+    radial-gradient(circle at top right, rgba(91, 143, 217, 0.18), transparent 34%),
+    radial-gradient(circle at 16% 100%, rgba(91, 143, 217, 0.14), transparent 28%);
 }
 
 .hero::after {
@@ -294,7 +294,7 @@ onMounted(reloadAll)
   top: -130px;
   right: -100px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(95, 71, 126, 0.08) 0%, rgba(95, 71, 126, 0.01) 64%, transparent 72%);
+  background: radial-gradient(circle, rgba(91, 143, 217, 0.08) 0%, rgba(91, 143, 217, 0.01) 64%, transparent 72%);
   pointer-events: none;
 }
 
@@ -328,8 +328,8 @@ onMounted(reloadAll)
 
 .badge--reason {
   padding: 5px 10px;
-  background: rgba(95, 71, 126, 0.1);
-  color: #5f477e;
+  background: rgba(91, 143, 217, 0.1);
+  color: #1a56a8;
 }
 
 .badge--external {
@@ -340,7 +340,7 @@ onMounted(reloadAll)
 
 .badge--mint {
   padding: 5px 10px;
-  background: rgba(229, 217, 241, 0.94);
+  background: rgba(229, 240, 252, 0.94);
   color: var(--ok-text);
 }
 
@@ -349,14 +349,14 @@ onMounted(reloadAll)
   font-size: 34px;
   line-height: 1.03;
   letter-spacing: -0.04em;
-  color: #221a30;
+  color: #1a2e4a;
 }
 
 .hero__desc,
 .section-head p,
 .recommend-card__meta,
 .message {
-  color: #706781;
+  color: #4a6a8a;
 }
 
 .hero__desc {
@@ -371,7 +371,7 @@ onMounted(reloadAll)
   padding-left: 1.25rem;
   font-size: 13px;
   line-height: 1.55;
-  color: #5b5268;
+  color: #4a6a8a;
   max-width: 36rem;
 }
 
@@ -394,7 +394,7 @@ onMounted(reloadAll)
 .recommend-card,
 .action-btn {
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(247, 241, 251, 0.96);
+  background: rgba(247, 244, 252, 0.96);
 }
 
 .hero-btn,
@@ -409,8 +409,8 @@ onMounted(reloadAll)
 .action-btn--primary {
   border: 0;
   color: #f9fafb;
-  background: linear-gradient(135deg, #5f477e, #8f73ba);
-  box-shadow: 0 16px 24px rgba(95, 71, 126, 0.24);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
+  box-shadow: 0 16px 24px rgba(91, 143, 217, 0.24);
 }
 
 .hero-btn--ghost,
@@ -419,7 +419,7 @@ onMounted(reloadAll)
 }
 
 .hero-btn--ghost {
-  background: rgba(242, 235, 248, 0.94);
+  background: rgba(235, 245, 255, 0.94);
 }
 
 .section-head,
@@ -467,7 +467,7 @@ onMounted(reloadAll)
   font-size: 16px;
   font-weight: 800;
   line-height: 1.35;
-  color: #221a30;
+  color: #1a2e4a;
 }
 
 .recommend-card__meta {
@@ -478,8 +478,8 @@ onMounted(reloadAll)
   font-size: 12px;
   line-height: 1.6;
   color: var(--primary-deep);
-  background: rgba(232, 221, 244, 0.76);
-  border: 1px solid rgba(143, 115, 186, 0.18);
+  background: rgba(229, 242, 255, 0.76);
+  border: 1px solid rgba(91, 143, 217, 0.18);
   border-radius: 16px;
   padding: 10px 12px;
 }
@@ -491,7 +491,7 @@ onMounted(reloadAll)
   gap: 10px;
   padding: 14px 15px;
   border-radius: 18px;
-  background: rgba(238, 230, 246, 0.92);
+  background: rgba(229, 242, 255, 0.92);
   border: 1px dashed rgba(17, 24, 39, 0.12);
   font-size: 13px;
   line-height: 1.6;
@@ -501,7 +501,7 @@ onMounted(reloadAll)
   color: var(--lilac-text);
   background: var(--lilac-bg);
   border-style: solid;
-  border-color: rgba(139, 121, 157, 0.14);
+  border-color: rgba(91, 143, 217, 0.14);
 }
 
 .message--hint {
@@ -523,7 +523,7 @@ onMounted(reloadAll)
 .skeleton-card {
   height: 132px;
   border-radius: 20px;
-  background: linear-gradient(90deg, #f2ecf9, #e5daf2, #f2ecf9);
+  background: linear-gradient(90deg, #e8f0fc, #dce8f8, #e8f0fc);
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }

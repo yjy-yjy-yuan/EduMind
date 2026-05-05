@@ -35,6 +35,25 @@ const fromNative = (() => {
   }
 })()
 
+const fromFrameDescQuery = (() => {
+  try {
+    const url = new URL(window.location.href)
+    const value = url.searchParams.get('frameDescApiBase')
+    return value ? String(value) : ''
+  } catch {
+    return ''
+  }
+})()
+
+const fromNativeFrameDesc = (() => {
+  try {
+    const value = window.__edumindNativeConfig?.frameDescApiBaseUrl
+    return value ? String(value).trim() : ''
+  } catch {
+    return ''
+  }
+})()
+
 const fromUiOnlyQuery = (() => {
   try {
     const url = new URL(window.location.href)
@@ -62,6 +81,10 @@ const pickBuildEnvValue = (buildValue, viteValue = '') => {
 const ENV_API_BASE_URL = pickBuildEnvValue(
   globalThis.__EDUMIND_ENV_API_BASE_URL__,
   import.meta.env.VITE_MOBILE_API_BASE_URL || ''
+)
+const ENV_FRAME_DESC_API_BASE_URL = pickBuildEnvValue(
+  globalThis.__EDUMIND_ENV_FRAME_DESC_API_BASE_URL__,
+  import.meta.env.VITE_FRAME_DESC_API_BASE_URL || ''
 )
 const ENV_UI_ONLY = pickBuildEnvValue(
   globalThis.__EDUMIND_ENV_UI_ONLY__,
@@ -97,11 +120,31 @@ const normalizeApiBaseUrl = (value) => {
   return parsed ? parsed.href.replace(/\/+$/, '') : ''
 }
 
+const isLoopbackHost = (host) => {
+  const text = String(host || '').trim().toLowerCase()
+  return text === 'localhost' || text === '127.0.0.1' || text === '::1' || text === '[::1]'
+}
+
+const shouldRejectRuntimeApiBaseForCurrentOrigin = (value, source) => {
+  if (!['query', 'override', 'storage'].includes(source)) return false
+  const parsed = parseAbsoluteApiBaseUrl(value)
+  if (!parsed || !isLoopbackHost(parsed.hostname)) return false
+  try {
+    const page = window.location
+    const pageHost = String(page?.hostname || '').trim()
+    const isHttpPage = ['http:', 'https:'].includes(String(page?.protocol || ''))
+    return Boolean(isHttpPage && pageHost && !isLoopbackHost(pageHost))
+  } catch {
+    return false
+  }
+}
+
 const LOCK_RUNTIME_API_BASE_IN_PROD = import.meta.env.PROD || Boolean(fromNative)
 
 const TRUSTED_API_BASE_ORIGINS = (() => {
   const origins = new Set()
-  for (const candidate of [fromNative, ENV_API_BASE_URL]) {
+  const candidates = fromNative ? [fromNative] : [ENV_API_BASE_URL]
+  for (const candidate of candidates) {
     const parsed = parseAbsoluteApiBaseUrl(candidate)
     if (parsed) origins.add(parsed.origin)
   }
@@ -111,6 +154,7 @@ const TRUSTED_API_BASE_ORIGINS = (() => {
 const canUseRuntimeApiBase = (value, source) => {
   const normalized = normalizeApiBaseUrl(value)
   if (!normalized) return ''
+  if (shouldRejectRuntimeApiBaseForCurrentOrigin(normalized, source)) return ''
   if (!LOCK_RUNTIME_API_BASE_IN_PROD) return normalized
   if (source === 'native' || source === 'env') return normalized
   if (TRUSTED_API_BASE_ORIGINS.size === 0) return ''
@@ -142,7 +186,7 @@ const resolveApiBaseConfig = ({
     }
   }
 
-  const normalizedNative = canUseRuntimeApiBase(nativeValue, 'native')
+  const normalizedNative = normalizeApiBaseUrl(nativeValue)
   if (normalizedNative) {
     return {
       apiBaseUrl: normalizedNative,
@@ -158,7 +202,7 @@ const resolveApiBaseConfig = ({
     }
   }
 
-  const normalizedEnv = canUseRuntimeApiBase(envValue, 'env')
+  const normalizedEnv = normalizeApiBaseUrl(envValue)
   if (normalizedEnv) {
     return {
       apiBaseUrl: normalizedEnv,
@@ -206,8 +250,57 @@ const initialApiBaseConfig = resolveApiBaseConfig({
 
 export const API_BASE_URL = initialApiBaseConfig.apiBaseUrl
 
+const resolveFrameDescApiBaseConfig = ({
+  queryValue = '',
+  nativeValue = '',
+  envValue = '',
+  fallbackValue = ''
+} = {}) => {
+  const normalizedQuery = canUseRuntimeApiBase(queryValue, 'query')
+  if (normalizedQuery) {
+    return {
+      apiBaseUrl: normalizedQuery,
+      source: 'query'
+    }
+  }
+
+  const normalizedNative = canUseRuntimeApiBase(nativeValue, 'native')
+  if (normalizedNative) {
+    return {
+      apiBaseUrl: normalizedNative,
+      source: 'native'
+    }
+  }
+
+  const normalizedEnv = canUseRuntimeApiBase(envValue, 'env')
+  if (normalizedEnv) {
+    return {
+      apiBaseUrl: normalizedEnv,
+      source: 'env'
+    }
+  }
+
+  const normalizedFallback = normalizeApiBaseUrl(fallbackValue)
+  return {
+    apiBaseUrl: normalizedFallback,
+    source: normalizedFallback ? 'api' : 'empty'
+  }
+}
+
+const initialFrameDescApiBaseConfig = resolveFrameDescApiBaseConfig({
+  queryValue: fromFrameDescQuery,
+  nativeValue: fromNativeFrameDesc,
+  envValue: ENV_FRAME_DESC_API_BASE_URL,
+  fallbackValue: initialApiBaseConfig.apiBaseUrl
+})
+
+export const FRAME_DESC_API_BASE_URL = initialFrameDescApiBaseConfig.apiBaseUrl
+
 console.info(
   `[INFO][Config] api base=${API_BASE_URL || '<empty>'} source=${initialApiBaseConfig.source}`
+)
+console.info(
+  `[INFO][Config] frame desc api base=${FRAME_DESC_API_BASE_URL || '<empty>'} source=${initialFrameDescApiBaseConfig.source}`
 )
 
 if (fromNative && fromNative !== fromStorage && !fromOverrideStorage) {
@@ -258,6 +351,21 @@ export function getApiBaseUrl() {
   }
 }
 
+export function getFrameDescApiBaseUrl() {
+  try {
+    return resolveFrameDescApiBaseConfig({
+      queryValue: typeof window !== 'undefined' && window.location?.search
+        ? new URLSearchParams(window.location.search).get('frameDescApiBase') || ''
+        : '',
+      nativeValue: window.__edumindNativeConfig?.frameDescApiBaseUrl || '',
+      envValue: ENV_FRAME_DESC_API_BASE_URL,
+      fallbackValue: getApiBaseUrl()
+    }).apiBaseUrl
+  } catch {
+    return FRAME_DESC_API_BASE_URL || getApiBaseUrl()
+  }
+}
+
 export function getApiBaseSource() {
   return getRuntimeApiBaseConfig().source
 }
@@ -290,6 +398,14 @@ export const shouldIncludeExternalRecommendationsOnHome = () =>
 export const withBase = (path) => {
   const p = String(path || '')
   const base = getApiBaseUrl()
+  if (!p) return base || ''
+  if (!base) return p.startsWith('/') ? p : `/${p}`
+  return p.startsWith('/') ? `${base}${p}` : `${base}/${p}`
+}
+
+export const withFrameDescBase = (path) => {
+  const p = String(path || '')
+  const base = getFrameDescApiBaseUrl()
   if (!p) return base || ''
   if (!base) return p.startsWith('/') ? p : `/${p}`
   return p.startsWith('/') ? `${base}${p}` : `${base}/${p}`

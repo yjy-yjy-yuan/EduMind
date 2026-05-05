@@ -735,7 +735,7 @@ cleanupLegacyOfflineMemoryCache()
 .mode-chip--active {
   color: #fff;
   border-color: transparent;
-  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
 }
 
 .mode-panel__hint {
@@ -757,7 +757,7 @@ cleanupLegacyOfflineMemoryCache()
 .progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(135deg, #8b799d, #a48eb5);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
 }
 
 .chat {
@@ -931,7 +931,7 @@ cleanupLegacyOfflineMemoryCache()
   padding: 12px 14px;
   font-weight: 900;
   color: #fff;
-  background: linear-gradient(135deg, #a792bc, #7f698f);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
 }
 
 .send:disabled {
@@ -948,12 +948,12 @@ cleanupLegacyOfflineMemoryCache()
   padding: 10px 12px;
   border-radius: 16px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(242, 235, 248, 0.92);
-  box-shadow: 0 10px 20px rgba(101, 87, 117, 0.08);
+  background: rgba(235, 245, 255, 0.92);
+  box-shadow: 0 10px 20px rgba(30, 90, 168, 0.08);
 }
 
 .msg.user .bubble {
-  background: linear-gradient(135deg, rgba(139, 121, 157, 0.14), rgba(139, 121, 157, 0.08));
+  background: linear-gradient(135deg, rgba(91, 143, 217, 0.14), rgba(91, 143, 217, 0.08));
 }
 
 .msg.ai .bubble {
@@ -967,7 +967,7 @@ cleanupLegacyOfflineMemoryCache()
 
 .send {
   border-radius: 16px;
-  background: linear-gradient(135deg, #8b799d, #a48eb5);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
 }
 
 .note-entry {
@@ -976,8 +976,8 @@ cleanupLegacyOfflineMemoryCache()
   margin: 10px 0 4px;
   padding: 12px 14px;
   border-radius: 16px;
-  border: 1px solid rgba(95, 71, 126, 0.16);
-  background: rgba(242, 235, 248, 0.65);
+  border: 1px solid rgba(91, 143, 217, 0.16);
+  background: rgba(235, 245, 255, 0.65);
 }
 
 .note-entry__btn {
@@ -987,7 +987,7 @@ cleanupLegacyOfflineMemoryCache()
   padding: 10px 14px;
   font-weight: 800;
   color: #fff;
-  background: linear-gradient(135deg, #6b5a7d, #8b799d);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
 }
 
 .note-entry__tip {

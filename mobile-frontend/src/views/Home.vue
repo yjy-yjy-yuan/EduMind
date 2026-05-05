@@ -641,17 +641,17 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(242, 235, 248, 0.92);
-  box-shadow: 0 18px 38px rgba(73, 51, 104, 0.12);
+  background: rgba(242, 245, 255, 0.92);
+  box-shadow: 0 18px 38px rgba(50, 90, 160, 0.12);
 }
 
 .welcome {
   padding: 24px;
   border-radius: 30px;
   background:
-    linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.95)),
-    radial-gradient(circle at top right, rgba(143, 115, 186, 0.18), transparent 34%),
-    radial-gradient(circle at 18% 100%, rgba(183, 157, 213, 0.14), transparent 28%);
+    linear-gradient(180deg, rgba(242, 245, 255, 0.98), rgba(242, 245, 255, 0.95)),
+    radial-gradient(circle at top right, rgba(91, 143, 217, 0.18), transparent 34%),
+    radial-gradient(circle at 18% 100%, rgba(147, 197, 253, 0.14), transparent 28%);
 }
 
 .welcome::before {
@@ -659,7 +659,7 @@ onUnmounted(() => {
   position: absolute;
   inset: 0 0 auto;
   height: 1px;
-  background: linear-gradient(90deg, rgba(95, 71, 126, 0), rgba(95, 71, 126, 0.14), rgba(95, 71, 126, 0));
+  background: linear-gradient(90deg, rgba(90, 143, 217, 0), rgba(90, 143, 217, 0.14), rgba(90, 143, 217, 0));
 }
 
 .welcome::after {
@@ -670,7 +670,7 @@ onUnmounted(() => {
   right: -90px;
   top: -120px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(95, 71, 126, 0.08) 0%, rgba(95, 71, 126, 0.01) 64%, transparent 72%);
+  background: radial-gradient(circle, rgba(90, 143, 217, 0.08) 0%, rgba(90, 143, 217, 0.01) 64%, transparent 72%);
   pointer-events: none;
 }
 
@@ -747,7 +747,7 @@ onUnmounted(() => {
 }
 
 .welcome__brand-title {
-  color: #221a30;
+  color: #1a2e4a;
   font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.025em;
@@ -767,12 +767,12 @@ onUnmounted(() => {
 .guide-btn {
   border: 1px solid rgba(17, 24, 39, 0.09);
   border-radius: 999px;
-  background: rgba(244, 238, 249, 0.84);
+  background: rgba(235, 245, 255, 0.84);
   padding: 7px 11px;
   font-size: 11px;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.68),
-    0 6px 14px rgba(106, 75, 155, 0.06);
+    0 6px 14px rgba(30, 90, 168, 0.06);
 }
 
 .welcome__hero {
@@ -830,14 +830,14 @@ onUnmounted(() => {
   padding: 16px;
   border-radius: 22px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.94));
+  background: linear-gradient(180deg, rgba(242, 245, 255, 0.98), rgba(242, 245, 255, 0.94));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .welcome__spotlight-label {
   font-size: 11px;
   font-weight: 700;
-  color: #6b7280;
+  color: #4a6a8a;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -847,14 +847,14 @@ onUnmounted(() => {
   line-height: 1.1;
   font-weight: 800;
   letter-spacing: -0.03em;
-  color: #221a30;
+  color: #1a2e4a;
 }
 
 .welcome__spotlight-note {
   margin: 0;
   font-size: 13px;
   line-height: 1.55;
-  color: #706781;
+  color: #4a6a8a;
 }
 
 .welcome__spotlight-link {
@@ -871,7 +871,7 @@ onUnmounted(() => {
   margin-top: 14px;
   font-size: 12px;
   line-height: 1.5;
-  color: #6b7280;
+  color: #4a6a8a;
 }
 
 .hero-actions,
@@ -894,10 +894,10 @@ onUnmounted(() => {
   padding: 16px;
   border-radius: 20px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(239, 231, 247, 0.75));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(235, 245, 255, 0.75));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.75),
-    0 10px 22px rgba(95, 71, 126, 0.08);
+    0 10px 22px rgba(30, 90, 168, 0.08);
 }
 
 .home-semantic-search__label {
@@ -905,14 +905,14 @@ onUnmounted(() => {
   font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: #221a30;
+  color: #1a2e4a;
 }
 
 .home-semantic-search__scope {
   margin: 0;
   font-size: 12px;
   line-height: 1.45;
-  color: #6b7280;
+  color: #4a6a8a;
 }
 
 .home-semantic-search__row {
@@ -939,8 +939,8 @@ onUnmounted(() => {
 
 .home-semantic-search__input:focus {
   outline: none;
-  border-color: rgba(95, 71, 126, 0.35);
-  box-shadow: 0 0 0 3px rgba(143, 115, 186, 0.18);
+  border-color: rgba(30, 90, 168, 0.35);
+  box-shadow: 0 0 0 3px rgba(91, 143, 217, 0.18);
 }
 
 .home-semantic-search__btn {
@@ -952,8 +952,8 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 800;
   color: #f9fafb;
-  background: linear-gradient(135deg, #5f477e, #8f73ba);
-  box-shadow: 0 8px 18px rgba(95, 71, 126, 0.22);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
+  box-shadow: 0 8px 18px rgba(30, 90, 168, 0.22);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -969,7 +969,7 @@ onUnmounted(() => {
 .recommend-card,
 .video-item {
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(247, 241, 251, 0.96);
+  background: rgba(235, 245, 255, 0.96);
 }
 
 .hero-btn {
@@ -982,13 +982,13 @@ onUnmounted(() => {
 .hero-btn--primary {
   border: 0;
   color: #f9fafb;
-  background: linear-gradient(135deg, #5f477e, #8f73ba);
-  box-shadow: 0 16px 24px rgba(95, 71, 126, 0.24);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
+  box-shadow: 0 16px 24px rgba(30, 90, 168, 0.24);
 }
 
 .hero-btn--secondary {
   color: var(--primary-deep);
-  background: rgba(235, 226, 246, 0.94);
+  background: rgba(229, 242, 255, 0.94);
 }
 
 .stats {
@@ -1025,7 +1025,7 @@ onUnmounted(() => {
 }
 
 .stat-pill--ok {
-  background: rgba(234, 225, 246, 0.9);
+  background: rgba(219, 236, 255, 0.9);
 }
 
 .stat-pill--warn {
@@ -1033,7 +1033,7 @@ onUnmounted(() => {
 }
 
 .stat-pill--feature {
-  background: linear-gradient(180deg, rgba(232, 221, 244, 0.98), rgba(243, 237, 249, 0.96));
+  background: linear-gradient(180deg, rgba(232, 240, 252, 0.98), rgba(243, 246, 252, 0.96));
 }
 
 .stat-pill__label,
@@ -1042,7 +1042,7 @@ onUnmounted(() => {
   font-size: 10px;
   line-height: 1.3;
   font-weight: 700;
-  color: #6b7280;
+  color: #4a6a8a;
 }
 
 .stat-pill__value,
@@ -1076,7 +1076,7 @@ onUnmounted(() => {
 .recommend-card__next {
   font-size: 12px;
   line-height: 1.5;
-  color: #6b7280;
+  color: #4a6a8a;
 }
 
 .recommend-provider-list {
@@ -1090,16 +1090,16 @@ onUnmounted(() => {
   border-radius: 18px;
   padding: 14px 15px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(239, 231, 247, 0.92);
+  background: rgba(235, 245, 255, 0.92);
 }
 
 .recommend-provider-card--failed {
-  border-color: rgba(139, 121, 157, 0.18);
+  border-color: rgba(91, 143, 217, 0.18);
   background: var(--lilac-bg);
 }
 
 .recommend-provider-card--empty {
-  background: rgba(237, 228, 245, 0.88);
+  background: rgba(237, 244, 252, 0.88);
 }
 
 .recommend-provider-card__top {
@@ -1108,14 +1108,14 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 8px;
   flex-wrap: wrap;
-  color: #221a30;
+  color: #1a2e4a;
 }
 
 .recommend-provider-card__top span,
 .recommend-provider-card p {
   font-size: 12px;
   line-height: 1.55;
-  color: #6b7280;
+  color: #4a6a8a;
 }
 
 .section-head h2,
@@ -1142,7 +1142,7 @@ onUnmounted(() => {
   padding: 14px;
   text-align: left;
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(247, 241, 251, 0.98), rgba(228, 217, 241, 0.92));
+  background: linear-gradient(180deg, rgba(247, 246, 252, 0.98), rgba(228, 240, 252, 0.92));
   border: 1px solid rgba(17, 24, 39, 0.08);
 }
 
@@ -1171,7 +1171,7 @@ onUnmounted(() => {
   text-align: left;
   border-radius: 20px;
   border: 1px solid rgba(17, 24, 39, 0.08);
-  background: rgba(238, 230, 246, 0.92);
+  background: rgba(238, 244, 252, 0.92);
 }
 
 .summary-card--soft {
@@ -1248,7 +1248,7 @@ onUnmounted(() => {
 }
 
 .video-item__arrow {
-  color: #8b7da3;
+  color: #5b8fd9;
   font-size: 20px;
   line-height: 1;
 }
@@ -1260,7 +1260,7 @@ onUnmounted(() => {
 .recommend-card {
   display: grid;
   gap: 10px;
-  background: rgba(238, 230, 246, 0.92);
+  background: rgba(238, 244, 252, 0.92);
   border-radius: 20px;
   padding: 16px;
 }
@@ -1282,8 +1282,8 @@ onUnmounted(() => {
   color: var(--primary-deep);
   border-radius: 16px;
   padding: 10px 12px;
-  background: rgba(240, 232, 245, 0.72);
-  border: 1px solid rgba(139, 121, 157, 0.14);
+  background: rgba(240, 244, 252, 0.72);
+  border: 1px solid rgba(91, 143, 217, 0.14);
 }
 
 .recommend-card__next {
@@ -1300,7 +1300,7 @@ onUnmounted(() => {
   border-radius: 18px;
   padding: 14px;
   font-size: 13px;
-  background: rgba(238, 230, 246, 0.92);
+  background: rgba(238, 244, 252, 0.92);
   border: 1px dashed rgba(17, 24, 39, 0.12);
 }
 
@@ -1308,7 +1308,7 @@ onUnmounted(() => {
   background: var(--lilac-bg);
   color: var(--lilac-text);
   border-style: solid;
-  border-color: rgba(139, 121, 157, 0.14);
+  border-color: rgba(91, 143, 217, 0.14);
 }
 
 .message--empty {
@@ -1334,7 +1334,7 @@ onUnmounted(() => {
 .skeleton-item {
   height: 64px;
   border-radius: 18px;
-  background: linear-gradient(90deg, #f2ecf9, #e5daf2, #f2ecf9);
+  background: linear-gradient(90deg, #f0e8f7, #e5daf2, #f0e8f7);
   background-size: 220% 100%;
   animation: shimmer 1.2s linear infinite;
 }

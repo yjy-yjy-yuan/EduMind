@@ -345,18 +345,26 @@ const normalizeSourceCode = (note) => {
   if (source) return source
 
   const noteType = String(note?.note_type || '').trim().toLowerCase()
-  if (noteType === 'vinci_enhanced') return 'vinci_enhanced'
+  if (['vision_description', 'vinci_enhanced'].includes(noteType)) {
+    return 'vision_description'
+  }
 
   const tags = Array.isArray(note?.tags) ? note.tags : []
-  if (tags.some((tag) => String(tag).trim().toLowerCase() === 'vinci_enhanced')) {
-    return 'vinci_enhanced'
+  if (
+    tags.some((tag) =>
+      ['vision_description', 'vinci_enhanced'].includes(
+        String(tag).trim().toLowerCase(),
+      ),
+    )
+  ) {
+    return 'vision_description'
   }
   return ''
 }
 
 const resolveSourceLabel = (note) => {
   const sourceCode = normalizeSourceCode(note)
-  if (sourceCode === 'vinci_enhanced') return 'Vinci增强'
+  if (sourceCode === 'vision_description') return '实时描述'
   return ''
 }
 
@@ -397,8 +405,8 @@ onMounted(reload)
   padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(242, 235, 248, 0.94);
-  box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
+  background: rgba(235, 245, 255, 0.94);
+  box-shadow: 0 10px 22px rgba(30, 90, 168, 0.09);
 }
 
 .topbar h2 {
@@ -441,8 +449,8 @@ onMounted(reload)
 .card {
   border-radius: 22px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.96));
-  box-shadow: 0 16px 30px rgba(101, 87, 117, 0.08);
+  background: linear-gradient(180deg, rgba(235, 245, 255, 0.98), rgba(235, 245, 255, 0.96));
+  box-shadow: 0 16px 30px rgba(30, 90, 168, 0.08);
 }
 
 .filter-card {
@@ -479,7 +487,7 @@ onMounted(reload)
   border-radius: 14px;
   padding: 11px 12px;
   font-size: 14px;
-  background: rgba(242, 235, 248, 0.98);
+  background: rgba(235, 245, 255, 0.98);
 }
 
 .assistant-hint {
@@ -509,7 +517,7 @@ onMounted(reload)
 
 .ghost {
   border: 1px solid rgba(32, 42, 55, 0.12);
-  background: rgba(242, 235, 248, 0.98);
+  background: rgba(235, 245, 255, 0.98);
   color: #334155;
   border-radius: 12px;
   padding: 8px 12px;
@@ -539,7 +547,7 @@ onMounted(reload)
   border-radius: 14px;
   padding: 11px 12px;
   font-size: 14px;
-  background: rgba(242, 235, 248, 0.98);
+  background: rgba(235, 245, 255, 0.98);
 }
 
 .tag-filter {
@@ -564,7 +572,7 @@ onMounted(reload)
 }
 
 .tag-chip--active {
-  background: linear-gradient(135deg, #665775, #8b799d);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
   color: #f9fafb;
   border-color: transparent;
 }
@@ -606,7 +614,7 @@ onMounted(reload)
 
 .btn--primary {
   color: #f9fafb;
-  background: linear-gradient(135deg, #665775, #8b799d);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
 }
 
 .skeleton,
@@ -637,7 +645,7 @@ onMounted(reload)
   margin-top: 16px;
   border-radius: 20px;
   padding: 18px;
-  background: rgba(242, 235, 248, 0.92);
+  background: rgba(235, 245, 255, 0.92);
   color: #0f172a;
 }
 
@@ -659,12 +667,12 @@ onMounted(reload)
   padding: 16px;
   display: grid;
   gap: 10px;
-  background: rgba(242, 235, 248, 0.98);
+  background: rgba(235, 245, 255, 0.98);
 }
 
 .card--focus {
   border: 1px solid var(--primary-soft-strong);
-  box-shadow: 0 0 0 2px var(--primary-soft), 0 16px 30px rgba(101, 87, 117, 0.1);
+  box-shadow: 0 0 0 2px var(--primary-soft), 0 16px 30px rgba(30, 90, 168, 0.1);
 }
 
 .title {

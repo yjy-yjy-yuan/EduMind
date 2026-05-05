@@ -340,7 +340,7 @@ const go = (path) => router.push(path)
   padding: 14px;
   border-radius: var(--radius);
   color: #fff;
-  background: linear-gradient(135deg, #a792bc, #7f698f);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
   box-shadow: var(--shadow-sm);
   border: 1px solid rgba(255, 255, 255, 0.18);
   margin-bottom: 18px;
@@ -380,15 +380,15 @@ const go = (path) => router.push(path)
 .pref-explain__block {
   padding: 12px 12px 12px 14px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(139, 121, 157, 0.2);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 232, 249, 0.85));
+  border: 1px solid rgba(91, 143, 217, 0.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(235, 245, 255, 0.85));
 }
 
 .pref-explain__title {
   margin: 0 0 8px;
   font-size: 13px;
   font-weight: 900;
-  color: var(--primary-deep, #4b3f63);
+  color: var(--primary-deep, #1a56a8);
   letter-spacing: 0.01em;
 }
 
@@ -464,7 +464,7 @@ const go = (path) => router.push(path)
 }
 
 .acc[open] {
-  box-shadow: inset 0 0 0 1px rgba(139, 121, 157, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(91, 143, 217, 0.12);
 }
 
 .acc-summary {
@@ -489,7 +489,7 @@ const go = (path) => router.push(path)
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: rgba(79, 70, 229, 0.10);
+  background: rgba(91, 143, 217, 0.10);
   color: var(--primary);
   font-size: 12px;
 }
@@ -529,11 +529,11 @@ const go = (path) => router.push(path)
   margin-bottom: 18px;
   background:
     radial-gradient(circle at right top, rgba(255, 255, 255, 0.24), transparent 44%),
-    linear-gradient(145deg, #8b799d, #665775);
+    linear-gradient(145deg, #1a56a8, #5b8fd9);
 }
 
 .btn--primary {
-  background: linear-gradient(145deg, #8b799d, #a48eb5);
+  background: linear-gradient(145deg, #1a56a8, #5b8fd9);
 }
 
 .workflow {
@@ -548,12 +548,12 @@ const go = (path) => router.push(path)
 }
 
 .acc-badge {
-  background: rgba(139, 121, 157, 0.14);
+  background: rgba(91, 143, 217, 0.14);
   color: var(--primary-deep);
 }
 
 .acc-note {
-  background: rgba(139, 121, 157, 0.08);
+  background: rgba(91, 143, 217, 0.08);
   color: var(--primary-deep);
 }
 </style>

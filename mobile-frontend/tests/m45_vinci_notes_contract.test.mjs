@@ -20,13 +20,13 @@ test('each realtime description item supports one-click note write action', () =
   assert.match(source, /@click="saveFdDescriptionToNote\(item\)"|@click="writeFdNote\(item\)"/)
 })
 
-test('note payload for frame description includes video_id timestamp content source=vinci_enhanced', () => {
+test('note payload for frame description includes video_id timestamp content source=vision_description', () => {
   const source = readSource('src/views/Player.vue')
   assert.match(source, /createNote\s*\(\s*\{/)
   assert.match(source, /video_id\s*:\s*Number\(id\.value\)/)
   assert.match(source, /timestamp\s*:/)
   assert.match(source, /content\s*:/)
-  assert.match(source, /source\s*:\s*['"]vinci_enhanced['"]/)
+  assert.match(source, /source\s*:\s*['"]vision_description['"]/)
 })
 
 test('write failure provides retryable user-facing message for description note write', () => {
@@ -36,10 +36,10 @@ test('write failure provides retryable user-facing message for description note 
   assert.match(source, /retryFdNote|retryWriteNote|retrySaveDescriptionNote/)
 })
 
-test('Notes list renders Vinci enhanced source label', () => {
+test('Notes list renders realtime description source label', () => {
   const source = readSource('src/views/Notes.vue')
-  assert.match(source, /vinci_enhanced/)
-  assert.match(source, /Vinci增强/)
+  assert.match(source, /vision_description/)
+  assert.match(source, /实时描述/)
   assert.match(source, /meta-pill--source|note-source-label|source-badge/)
 })
 
@@ -50,6 +50,6 @@ test('frontend keeps backend-only integration and does not directly call Vinci h
 
   const joined = `${playerSource}\n${frameApiSource}\n${noteApiSource}`
   assert.ok(!/https?:\/\/[^\s'"`]*vinci/i.test(joined), 'must not directly call Vinci host in frontend')
-  assert.match(frameApiSource, /withBase\s*\(\s*['"]\/api\/frame_description\//)
+  assert.match(frameApiSource, /withFrameDescBase\s*\(\s*['"]\/api\/frame_description\//)
   assert.match(noteApiSource, /url:\s*['"]\/api\/notes/)
 })

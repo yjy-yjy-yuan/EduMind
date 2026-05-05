@@ -468,7 +468,7 @@ onUnmounted(() => {
 .polling-tip {
   margin: -2px 0 10px;
   font-size: 12px;
-  color: #6b7280;
+  color: #4a6a8a;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -502,7 +502,7 @@ onUnmounted(() => {
 
 .scope-pill {
   border: 1px solid var(--border);
-  background: rgba(248, 242, 250, 0.98);
+  background: rgba(235, 245, 255, 0.98);
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 12px;
@@ -557,7 +557,7 @@ onUnmounted(() => {
 .sk-card {
   height: 92px;
   border-radius: var(--radius);
-  background: linear-gradient(90deg, #ebe3f4, #e2d8f0, #ebe3f4);
+  background: linear-gradient(90deg, #e8f0fc, #dce8f8, #e8f0fc);
   background-size: 200% 100%;
   animation: shimmer 1.2s infinite;
 }
@@ -650,7 +650,7 @@ onUnmounted(() => {
 .badge.ok { background: var(--ok-bg); color: var(--ok-text); }
 .badge.warn { background: var(--lilac-bg); color: var(--lilac-text); }
 .badge.bad { background: var(--lilac-bg); color: var(--lilac-text); }
-.badge.info { background: rgba(139, 121, 157, 0.14); color: #665775; }
+.badge.info { background: rgba(91, 143, 217, 0.14); color: #1a56a8; }
 
 .progress {
   height: 8px;
@@ -661,12 +661,12 @@ onUnmounted(() => {
 
 .bar {
   height: 100%;
-  background: linear-gradient(90deg, #665775, #8b799d);
+  background: linear-gradient(90deg, #1a56a8, #5b8fd9);
 }
 
 .mini {
   border: 1px solid var(--border);
-  background: rgba(248, 242, 250, 0.98);
+  background: rgba(235, 245, 255, 0.98);
   border-radius: 999px;
   padding: 6px 10px;
   font-size: 12px;
@@ -693,7 +693,7 @@ onUnmounted(() => {
 
 .load-more {
   border: 1px solid rgba(0, 0, 0, 0.08);
-  background: rgba(248, 242, 250, 0.98);
+  background: rgba(235, 245, 255, 0.98);
   border-radius: 999px;
   padding: 10px 14px;
   font-weight: 900;
@@ -727,9 +727,9 @@ onUnmounted(() => {
   z-index: 5;
   padding: 12px 14px;
   border-radius: 18px;
-  background: rgba(248, 242, 250, 0.94);
+  background: rgba(235, 245, 255, 0.94);
   border: 1px solid rgba(32, 42, 55, 0.08);
-  box-shadow: 0 10px 22px rgba(101, 87, 117, 0.09);
+  box-shadow: 0 10px 22px rgba(30, 90, 168, 0.09);
 }
 
 .topbar h2 {
@@ -752,8 +752,8 @@ onUnmounted(() => {
 .card {
   border-radius: 20px;
   border: 1px solid rgba(32, 42, 55, 0.09);
-  background: linear-gradient(180deg, rgba(248, 242, 250, 0.98), rgba(242, 235, 248, 0.96));
-  box-shadow: 0 12px 24px rgba(101, 87, 117, 0.08);
+  background: linear-gradient(180deg, rgba(235, 245, 255, 0.98), rgba(235, 245, 255, 0.96));
+  box-shadow: 0 12px 24px rgba(30, 90, 168, 0.08);
 }
 
 .card-main {
@@ -786,7 +786,7 @@ onUnmounted(() => {
 }
 
 .bar {
-  background: linear-gradient(90deg, #665775, #8b799d);
+  background: linear-gradient(90deg, #1a56a8, #5b8fd9);
 }
 
 .load-more {

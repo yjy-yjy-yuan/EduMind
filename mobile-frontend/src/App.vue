@@ -28,8 +28,8 @@ onMounted(async () => {
   min-height: 100dvh;
   overflow-x: hidden;
   background:
-    radial-gradient(circle at 18% 56%, rgba(91, 228, 255, 0.16), transparent 24%),
-    radial-gradient(circle at 72% 38%, rgba(6, 128, 170, 0.16), transparent 28%);
+    radial-gradient(circle at 18% 56%, rgba(91, 180, 255, 0.18), transparent 24%),
+    radial-gradient(circle at 72% 38%, rgba(30, 100, 200, 0.16), transparent 28%);
 }
 
 .content {
@@ -66,7 +66,7 @@ onMounted(async () => {
   top: 12%;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 44% 46%, rgba(12, 136, 177, 0.98), rgba(15, 141, 183, 0.82) 44%, rgba(20, 152, 192, 0.26) 70%, transparent 82%);
+    radial-gradient(circle at 44% 46%, rgba(30, 110, 200, 0.98), rgba(30, 120, 210, 0.82) 44%, rgba(40, 140, 220, 0.26) 70%, transparent 82%);
   transform: translateX(-50%);
 }
 
@@ -77,7 +77,7 @@ onMounted(async () => {
   top: -180px;
   border-radius: 48%;
   background:
-    radial-gradient(circle at 34% 40%, rgba(152, 233, 251, 0.78), rgba(152, 233, 251, 0.18) 62%, transparent 78%);
+    radial-gradient(circle at 34% 40%, rgba(147, 197, 253, 0.78), rgba(147, 197, 253, 0.18) 62%, transparent 78%);
 }
 
 @media (max-width: 390px) {

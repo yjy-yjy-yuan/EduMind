@@ -83,10 +83,10 @@ const isActive = (prefix) => {
   display: flex;
   align-items: stretch;
   gap: 6px;
-  background: linear-gradient(180deg, rgba(245, 238, 250, 0.98), rgba(237, 227, 246, 0.98));
-  border: 1px solid rgba(95, 71, 126, 0.12);
+  background: linear-gradient(180deg, rgba(235, 245, 255, 0.98), rgba(228, 240, 255, 0.98));
+  border: 1px solid rgba(30, 90, 168, 0.12);
   box-shadow:
-    0 16px 28px rgba(95, 71, 126, 0.16),
+    0 16px 28px rgba(30, 90, 168, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.72);
   border-radius: 28px;
   overflow: hidden;
@@ -96,7 +96,7 @@ const isActive = (prefix) => {
 .tab {
   flex: 1;
   text-decoration: none;
-  color: #6f6185;
+  color: #4a6a8a;
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -121,12 +121,12 @@ const isActive = (prefix) => {
 
 .tab.active {
   color: var(--primary-deep);
-  background: linear-gradient(180deg, rgba(236, 227, 246, 0.98), rgba(247, 241, 251, 0.98));
+  background: linear-gradient(180deg, rgba(219, 236, 255, 0.98), rgba(235, 245, 255, 0.98));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 .tab--upload {
-  color: #6d5a86;
+  color: #4a6a8a;
 }
 
 .upload-dot {
@@ -135,8 +135,8 @@ const isActive = (prefix) => {
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #6a4b9b, #9b82c7);
-  box-shadow: 0 12px 18px rgba(106, 75, 155, 0.26);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
+  box-shadow: 0 12px 18px rgba(30, 90, 168, 0.26);
 }
 
 .icon--upload {

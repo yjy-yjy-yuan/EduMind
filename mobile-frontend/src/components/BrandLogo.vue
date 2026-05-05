@@ -68,11 +68,11 @@ const resolvedLogoSrc = computed(() => (props.logoType === 'mark' ? logoMarkSrc 
   padding: 8px;
   border-radius: 26px;
   background:
-    linear-gradient(180deg, rgba(246, 240, 251, 0.96), rgba(233, 223, 245, 0.92)),
+    linear-gradient(180deg, rgba(235, 245, 255, 0.96), rgba(228, 240, 255, 0.92)),
     rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(255, 255, 255, 0.62);
   box-shadow:
-    0 16px 28px rgba(102, 87, 117, 0.12),
+    0 16px 28px rgba(30, 90, 168, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.78);
   overflow: hidden;
 }
@@ -81,7 +81,7 @@ const resolvedLogoSrc = computed(() => (props.logoType === 'mark' ? logoMarkSrc 
   padding: 6px;
   border-radius: 22px;
   box-shadow:
-    0 12px 22px rgba(102, 87, 117, 0.1),
+    0 12px 22px rgba(30, 90, 168, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
@@ -93,7 +93,7 @@ const resolvedLogoSrc = computed(() => (props.logoType === 'mark' ? logoMarkSrc 
   object-position: center;
   border-radius: 18px;
   flex-shrink: 0;
-  box-shadow: 0 8px 18px rgba(139, 121, 157, 0.08);
+  box-shadow: 0 8px 18px rgba(91, 143, 217, 0.08);
 }
 
 .brand-logo--compact .brand-logo__image {

@@ -651,15 +651,15 @@ onUnmounted(() => {
 }
 
 .hero-shell--idle {
-  background: linear-gradient(145deg, #8b799d, #665775);
+  background: linear-gradient(145deg, #5b8fd9, #1a56a8);
 }
 
 .hero-shell--warn {
-  background: linear-gradient(145deg, #8f73ba, #5f477e);
+  background: linear-gradient(145deg, #5b8fd9, #1a56a8);
 }
 
 .hero-shell--ok {
-  background: linear-gradient(145deg, #b79dd5, #6b5b84);
+  background: linear-gradient(145deg, #93c5fd, #1a56a8);
 }
 
 .hero-shell--bad {
@@ -732,7 +732,7 @@ onUnmounted(() => {
 .badge.ok { background: var(--ok-bg); color: var(--ok-text); }
 .badge.warn { background: var(--lilac-bg); color: var(--lilac-text); }
 .badge.bad { background: var(--lilac-bg); color: var(--lilac-text); }
-.badge.info { background: rgba(139, 121, 157, 0.14); color: #665775; }
+.badge.info { background: rgba(91, 143, 217, 0.14); color: #1a56a8; }
 
 .setting-hint {
   margin-top: 8px;
@@ -750,7 +750,7 @@ onUnmounted(() => {
 
 .bar {
   height: 100%;
-  background: linear-gradient(90deg, #a792bc, #7f698f);
+  background: linear-gradient(90deg, #1a56a8, #5b8fd9);
 }
 
 .inline-tip {
@@ -781,7 +781,7 @@ onUnmounted(() => {
 }
 
 .btn--primary {
-  background: linear-gradient(135deg, #5f477e, #8f73ba);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
   color: #fff;
 }
 

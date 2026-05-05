@@ -738,8 +738,8 @@ onMounted(load)
   padding: 10px 12px;
   border-radius: 16px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(242, 235, 248, 0.92);
-  box-shadow: 0 10px 20px rgba(101, 87, 117, 0.08);
+  background: rgba(235, 245, 255, 0.92);
+  box-shadow: 0 10px 20px rgba(30, 90, 168, 0.08);
 }
 
 .topbar-title {
@@ -806,9 +806,9 @@ onMounted(load)
   margin-top: 12px;
   border-radius: 24px;
   padding: 16px;
-  background: linear-gradient(180deg, #ffffff, #f0e8f7);
+  background: linear-gradient(180deg, #ffffff, rgba(235, 245, 255, 0.5));
   border: 1px solid rgba(32, 42, 55, 0.09);
-  box-shadow: 0 16px 30px rgba(101, 87, 117, 0.1);
+  box-shadow: 0 16px 30px rgba(30, 90, 168, 0.1);
 }
 
 .card--compact {
@@ -816,7 +816,7 @@ onMounted(load)
 }
 
 .context-card {
-  background: linear-gradient(180deg, rgba(139, 121, 157, 0.12), rgba(183, 157, 213, 0.12));
+  background: linear-gradient(180deg, rgba(91, 143, 217, 0.12), rgba(147, 197, 253, 0.12));
 }
 
 .context-line,
@@ -964,7 +964,7 @@ onMounted(load)
 .segment-card__time {
   font-size: 11px;
   font-weight: 800;
-  color: #7a667f;
+  color: #4a6a8a;
 }
 
 .segment-card__title {
@@ -986,7 +986,7 @@ onMounted(load)
 }
 
 .tag-chip {
-  border: 1px solid rgba(139, 121, 157, 0.2);
+  border: 1px solid rgba(91, 143, 217, 0.2);
   background: var(--ok-bg);
   color: var(--ok-text);
   border-radius: 999px;
@@ -1035,7 +1035,7 @@ onMounted(load)
 
 .time-preview {
   font-size: 12px;
-  color: #7a667f;
+  color: #4a6a8a;
   font-weight: 800;
 }
 

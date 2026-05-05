@@ -49,6 +49,7 @@
           @playing="handlePlaying"
           @timeupdate="handleTimeUpdate"
           @waiting="handleWaiting"
+          @ended="handleEnded"
           @error="handleVideoError"
         >
           <track v-if="subtitleUrl" kind="subtitles" srclang="zh" label="中文" :src="subtitleUrl" default />
@@ -270,6 +271,10 @@ import { describeFrameStream, manageFrameDescSession } from '@/api/frameDescript
 
 const route = useRoute()
 const router = useRouter()
+const shouldAutoStartFrameDescription = () => {
+  const raw = route.query.fd ?? route.query.frame_description
+  return ['1', 'true', 'yes', 'on'].includes(String(raw ?? '').trim().toLowerCase())
+}
 
 // -----------------------------------------------------------------------
 // Video state
@@ -375,14 +380,21 @@ const fdSessionActive = ref(false)
 const fdStreamController = ref(null)
 const fdLastSampleTime = ref(-99)
 const fdRetryCount = ref(0)
+const fdBusyStageSinceMs = ref(0)
+const fdWatchdogTimer = ref(null)
 const FD_MAX_RETRIES = 3
-const FD_STREAM_TIMEOUT_MS = 6500
-const FD_STREAM_IDLE_TIMEOUT_MS = 3000
+const FD_STREAM_TIMEOUT_MS = 9000
+const FD_STREAM_IDLE_TIMEOUT_MS = 9000
 const FD_SESSION_START_TIMEOUT_MS = 2200
+const FD_BUSY_STAGE_MAX_MS = 9000
+const FD_SERVER_FRAME_STREAM_TIMEOUT_MS = 75000
+const FD_SERVER_FRAME_IDLE_TIMEOUT_MS = 75000
+const FD_SERVER_FRAME_BUSY_STAGE_MAX_MS = 75000
 const fdFeedbackSent = ref(false)
 const fdNoteWriteBusy = ref(false)
 const fdNoteWriteResult = ref(null)
 const fdLastFailedNoteItem = ref(null)
+const fdServerFrameFetchActive = ref(false)
 
 const FD_STAGE_LABELS = {
   idle: '就绪',
@@ -437,12 +449,89 @@ const isShortVideo = () => {
 const getFdIntervalMs = () => (isShortVideo() ? 2500 : 8000)
 const getFdMinSampleGapSeconds = () => (isShortVideo() ? 1.5 : 6)
 
+const summarizeSubtitleExcerpt = (rawText) => {
+  const lines = String(rawText || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  if (lines.length === 0) return ''
+  const merged = lines.slice(0, 2).join('；')
+  return merged.length > 140 ? merged.slice(0, 140).trim() + '…' : merged
+}
+
+const buildFdFallbackDescription = (reasonText = '') => {
+  const timeText = currentTimeText.value || '00:00'
+  const subtitleSummary = summarizeSubtitleExcerpt(buildSubtitleExcerpt())
+  if (subtitleSummary) {
+    return `（降级）当前约 ${timeText}，结合附近字幕：${subtitleSummary}`
+  }
+  const latestHistory = String(fdRecentHistory.value?.[0]?.text || '').trim()
+  if (latestHistory) {
+    return `（降级）当前约 ${timeText}，描述服务暂不可用，先参考上一条：${latestHistory}`
+  }
+  const reason = String(reasonText || '').trim()
+  if (reason) {
+    return `（降级）当前约 ${timeText}，描述服务暂不可用（${reason}），正在自动重试。`
+  }
+  return `（降级）当前约 ${timeText}，描述服务暂不可用，正在自动重试。`
+}
+
+const applyFdDegradedOutput = (reasonText = '') => {
+  const fallbackText = buildFdFallbackDescription(reasonText)
+  fdStage.value = 'degraded'
+  fdDegraded.value = true
+  fdProgress.value = 100
+  fdDescriptionText.value = fallbackText
+
+  const currentTs = Number(currentTimeSeconds.value || 0)
+  const latest = fdRecentHistory.value?.[0]
+  if (!latest || latest.text !== fallbackText) {
+    fdRecentHistory.value = [{ timestamp: currentTs, text: fallbackText }, ...fdRecentHistory.value].slice(0, 5)
+  }
+}
+
+const abortFdStreamController = () => {
+  const ctrl = fdStreamController.value
+  if (ctrl) {
+    try { ctrl.abort() } catch {}
+  }
+  fdStreamController.value = null
+  fdSessionActive.value = false
+}
+
+const startFdWatchdog = () => {
+  if (fdWatchdogTimer.value) clearInterval(fdWatchdogTimer.value)
+  fdWatchdogTimer.value = setInterval(() => {
+    if (!fdEnabled.value) return
+    const stage = String(fdStage.value || '')
+    const isBusyStage = ['connecting', 'sampling', 'inferring', 'recovering'].includes(stage)
+    if (!isBusyStage) return
+    const since = Number(fdBusyStageSinceMs.value || 0)
+    if (!since) return
+    const maxBusyMs = fdServerFrameFetchActive.value ? FD_SERVER_FRAME_BUSY_STAGE_MAX_MS : FD_BUSY_STAGE_MAX_MS
+    if (Date.now() - since < maxBusyMs) return
+
+    abortFdStreamController()
+    applyFdDegradedOutput('连接实时描述服务超时，已自动降级')
+  }, 1000)
+}
+
+const stopFdWatchdog = () => {
+  if (fdWatchdogTimer.value) {
+    clearInterval(fdWatchdogTimer.value)
+    fdWatchdogTimer.value = null
+  }
+}
+
 // -----------------------------------------------------------------------
 // Frame description lifecycle
 // -----------------------------------------------------------------------
 const captureVideoFrame = () => {
   const video = videoRef.value
-  if (!video || video.readyState < 2) return null
+  if (!video || video.readyState < 2) {
+    console.info('[FrameDesc] capture skipped: video not ready', { readyState: video?.readyState ?? null })
+    return null
+  }
   try {
     const canvas = document.createElement('canvas')
     canvas.width = video.videoWidth || 640
@@ -450,10 +539,13 @@ const captureVideoFrame = () => {
     const ctx = canvas.getContext('2d')
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
     return canvas.toDataURL('image/jpeg', 0.6).split(',')[1] || null
-  } catch {
+  } catch (error) {
+    console.warn('[FrameDesc] capture failed, will try server frame source:', error?.name || error?.message || error)
     return null
   }
 }
+
+const canUseServerFrameSource = (url) => /^https?:\/\//i.test(String(url || '').trim())
 
 const handleFdEvent = (event) => {
   switch (event.type) {
@@ -483,8 +575,7 @@ const handleFdEvent = (event) => {
       scrollFdToBottom()
       break
     case 'error':
-      fdStage.value = 'error'
-      fdProgress.value = 0
+      applyFdDegradedOutput(event.message || event.detail || '')
       console.warn('[FrameDesc] error event:', event.message || event.detail)
       break
   }
@@ -550,23 +641,34 @@ const startFdStream = async () => {
     fdProgress.value = 15
 
     const frameData = captureVideoFrame()
-    if (!frameData) {
+    const frameSourceUrl = !frameData && canUseServerFrameSource(streamUrl.value) ? streamUrl.value : ''
+    if (!frameData && !frameSourceUrl) {
       fdStage.value = 'connecting'
       if (!controller.signal.aborted && fdEnabled.value) {
         setTimeout(tick, intervalMs)
       }
       return
     }
+    if (!frameData && frameSourceUrl) {
+      console.info('[FrameDesc] using server frame source fallback', {
+        video_id: Number(id.value),
+        timestamp: currentTime,
+        source: frameSourceUrl,
+      })
+    }
 
     const contextHistory = fdRecentHistory.value.slice(0, 3).map((h) => h.text)
     fdStage.value = 'inferring'
     fdProgress.value = 35
 
+    const useServerFrameSource = !frameData && Boolean(frameSourceUrl)
+    fdServerFrameFetchActive.value = useServerFrameSource
     try {
       await describeFrameStream(
         {
           video_id: Number(id.value),
-          frames: [frameData],
+          frames: frameData ? [frameData] : [],
+          frame_source_url: frameSourceUrl,
           timestamp: currentTime,
           video_title: videoTitle.value,
           detail_level: fdDetailLevel.value,
@@ -577,28 +679,28 @@ const startFdStream = async () => {
         {
           onEvent: handleFdEvent,
           signal: controller.signal,
-          timeoutMs: FD_STREAM_TIMEOUT_MS,
-          idleTimeoutMs: FD_STREAM_IDLE_TIMEOUT_MS,
+          timeoutMs: useServerFrameSource ? FD_SERVER_FRAME_STREAM_TIMEOUT_MS : FD_STREAM_TIMEOUT_MS,
+          idleTimeoutMs: useServerFrameSource ? FD_SERVER_FRAME_IDLE_TIMEOUT_MS : FD_STREAM_IDLE_TIMEOUT_MS,
         }
       )
+      fdServerFrameFetchActive.value = false
       // Success — reset retry counter and schedule next tick
       fdRetryCount.value = 0
       if (!controller.signal.aborted && fdEnabled.value) {
         setTimeout(tick, intervalMs)
       }
     } catch (err) {
+      fdServerFrameFetchActive.value = false
       if (controller.signal.aborted) return
       fdRetryCount.value += 1
       const detail = err?.message || err?.response?.data?.detail || '描述失败'
       const isTimeout = String(detail).includes('超时') || Number(err?.response?.status || 0) === 408
+      applyFdDegradedOutput(detail)
       if (isTimeout) {
         fdRetryCount.value = FD_MAX_RETRIES
       }
       if (fdRetryCount.value >= FD_MAX_RETRIES) {
-        // Max retries reached — show degraded notice and keep polling slowly
-        fdStage.value = 'degraded'
-        fdDegraded.value = true
-        fdDescriptionText.value = '（画面描述服务暂时不可用）'
+        // Max retries reached — keep degraded output and poll slowly
         if (!controller.signal.aborted && fdEnabled.value) {
           setTimeout(tick, Math.min(intervalMs * 3, 30000))
         }
@@ -640,6 +742,7 @@ const stopFdStream = async () => {
   fdDescriptionText.value = ''
   fdDegraded.value = false
   fdRetryCount.value = 0
+  fdBusyStageSinceMs.value = 0
 }
 
 const toggleFd = async () => {
@@ -683,9 +786,9 @@ const saveFdDescriptionToNote = async (item) => {
       video_id: Number(id.value),
       timestamp: noteTimestamp,
       content: description,
-      source: 'vinci_enhanced',
+      source: 'vision_description',
       note_type: 'text',
-      tags: 'vinci_enhanced,实时描述',
+      tags: 'vision_description,实时描述',
       timestamps: [{ time_seconds: noteTimestamp, subtitle_text: description }],
     })
     const created = response?.data?.data || response?.data?.note || response?.data || null
@@ -727,11 +830,31 @@ watch(playerState, (state) => {
   if (state === '播放中' && fdEnabled.value && !fdStreamController.value) {
     startFdStream()
   }
-  if (state !== '播放中' && fdStreamController.value) {
-    // Pause streaming while buffering
-    const ctrl = fdStreamController.value
-    if (ctrl) ctrl.abort()
-    fdStreamController.value = null
+  if (state === '播放结束' && fdEnabled.value && !fdHasContent.value) {
+    abortFdStreamController()
+    applyFdDegradedOutput('视频已播放结束，但实时描述服务仍未完成连接')
+    return
+  }
+  if (state === '缓冲中' && fdStreamController.value) {
+    console.info('[FrameDesc] video buffering, keep realtime description stream alive', {
+      serverFrameSource: fdServerFrameFetchActive.value,
+    })
+    return
+  }
+  if (state === '播放失败' && fdStreamController.value) {
+    abortFdStreamController()
+    if (!fdHasContent.value) {
+      applyFdDegradedOutput(`${state}，实时描述连接已中断`)
+    }
+  }
+})
+
+watch(fdStage, (stage) => {
+  const busy = ['connecting', 'sampling', 'inferring', 'recovering'].includes(String(stage || ''))
+  if (busy) {
+    if (!fdBusyStageSinceMs.value) fdBusyStageSinceMs.value = Date.now()
+  } else {
+    fdBusyStageSinceMs.value = 0
   }
 })
 
@@ -813,6 +936,15 @@ const handleTimeUpdate = (event) => {
 }
 
 const handleWaiting = () => { playerState.value = '缓冲中' }
+
+const handleEnded = () => {
+  playerState.value = '播放结束'
+  if (!fdEnabled.value) return
+  if (!fdHasContent.value) {
+    abortFdStreamController()
+    applyFdDegradedOutput('视频已播放结束，但实时描述服务仍未完成连接')
+  }
+}
 
 const probeStreamAvailability = async () => {
   if (useMockPlayer.value) return ''
@@ -955,9 +1087,19 @@ const saveTimestampNote = async () => {
   }
 }
 
-onMounted(loadVideoMeta)
+onMounted(async () => {
+  startFdWatchdog()
+  await loadVideoMeta()
+  if (shouldAutoStartFrameDescription() && !fdEnabled.value) {
+    console.info('[FrameDesc] auto start requested by route query')
+    fdEnabled.value = true
+    await nextTick()
+    startFdStream()
+  }
+})
 
 onUnmounted(() => {
+  stopFdWatchdog()
   if (fdEnabled.value) stopFdStream()
 })
 </script>
@@ -1027,7 +1169,7 @@ onUnmounted(() => {
   min-height: 28px;
   padding: 0 10px;
   border-radius: 999px;
-  background: rgba(139, 121, 157, 0.12);
+  background: rgba(91, 143, 217, 0.12);
   color: var(--primary-deep);
   font-size: 12px;
   font-weight: 900;
@@ -1055,12 +1197,12 @@ onUnmounted(() => {
 .player-shell {
   background:
     radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 35%),
-    linear-gradient(180deg, #261f2d, #000);
+    linear-gradient(180deg, #0f1c2e, #000);
 }
 
 .mock-player {
   padding: 16px;
-  background: linear-gradient(180deg, #261f2d, #3a3042);
+  background: linear-gradient(180deg, #0f1c2e, #1a2840);
   color: #fff;
 }
 
@@ -1074,8 +1216,8 @@ onUnmounted(() => {
   text-align: center;
   gap: 10px;
   background:
-    radial-gradient(circle at top right, rgba(183, 157, 213, 0.28), transparent 34%),
-    linear-gradient(145deg, rgba(139, 121, 157, 0.94), rgba(73, 60, 82, 0.98));
+    radial-gradient(circle at top right, rgba(91, 143, 217, 0.28), transparent 34%),
+    linear-gradient(145deg, rgba(91, 143, 217, 0.94), rgba(40, 100, 180, 0.98));
 }
 
 .mock-player__chip {
@@ -1130,7 +1272,7 @@ onUnmounted(() => {
 .mock-player__bar {
   width: 34%;
   height: 100%;
-  background: linear-gradient(90deg, #d8bd83, #fbbf24);
+  background: linear-gradient(90deg, #1a56a8, #5b8fd9);
 }
 
 .video {
@@ -1155,14 +1297,14 @@ onUnmounted(() => {
   margin-top: 12px;
   border-radius: 18px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(242, 235, 248, 0.6);
+  background: rgba(235, 245, 255, 0.6);
   overflow: hidden;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .fd-panel--active {
-  border-color: rgba(139, 121, 157, 0.32);
-  box-shadow: 0 4px 16px rgba(139, 121, 157, 0.1);
+  border-color: rgba(91, 143, 217, 0.32);
+  box-shadow: 0 4px 16px rgba(91, 143, 217, 0.1);
 }
 
 .fd-panel__header {
@@ -1201,7 +1343,7 @@ onUnmounted(() => {
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.03em;
-  background: rgba(139, 121, 157, 0.12);
+  background: rgba(91, 143, 217, 0.12);
   color: var(--primary-deep);
 }
 
@@ -1226,7 +1368,7 @@ onUnmounted(() => {
 }
 
 .fd-badge--idle {
-  background: rgba(139, 121, 157, 0.08);
+  background: rgba(91, 143, 217, 0.08);
   color: var(--muted);
 }
 
@@ -1256,7 +1398,7 @@ onUnmounted(() => {
 }
 
 .fd-level-pill--active {
-  background: linear-gradient(135deg, #8b799d, #6f5d7d);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
   color: #fff;
   border-color: transparent;
 }
@@ -1267,14 +1409,14 @@ onUnmounted(() => {
   height: 26px;
   border-radius: 999px;
   border: 1.5px solid rgba(32, 42, 55, 0.15);
-  background: rgba(139, 121, 157, 0.15);
+  background: rgba(91, 143, 217, 0.15);
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
   flex-shrink: 0;
 }
 
 .fd-toggle--on {
-  background: linear-gradient(135deg, #8b799d, #6f5d7d);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
   border-color: transparent;
 }
 
@@ -1348,14 +1490,14 @@ onUnmounted(() => {
   flex: 1;
   height: 4px;
   border-radius: 999px;
-  background: rgba(139, 121, 157, 0.15);
+  background: rgba(91, 143, 217, 0.15);
   overflow: hidden;
 }
 
 .fd-progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #8b799d, #a78bfa);
+  background: linear-gradient(90deg, #1a56a8, #5b8fd9);
   transition: width 0.4s ease;
 }
 
@@ -1375,7 +1517,7 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(32, 42, 55, 0.06);
   scrollbar-width: thin;
-  scrollbar-color: rgba(139, 121, 157, 0.3) transparent;
+  scrollbar-color: rgba(91, 143, 217, 0.3) transparent;
 }
 
 .fd-description-area::-webkit-scrollbar {
@@ -1384,7 +1526,7 @@ onUnmounted(() => {
 
 .fd-description-area::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(139, 121, 157, 0.3);
+  background: rgba(91, 143, 217, 0.3);
 }
 
 .fd-placeholder {
@@ -1560,7 +1702,7 @@ onUnmounted(() => {
   padding: 14px;
   border-radius: 18px;
   border: 1px solid rgba(32, 42, 55, 0.08);
-  background: linear-gradient(180deg, rgba(242, 235, 248, 0.98), rgba(242, 235, 248, 0.96));
+  background: linear-gradient(180deg, rgba(235, 245, 255, 0.98), rgba(235, 245, 255, 0.96));
   display: grid;
   gap: 10px;
 }
@@ -1604,7 +1746,7 @@ onUnmounted(() => {
   min-height: 28px;
   padding: 0 10px;
   border-radius: 999px;
-  background: rgba(139, 121, 157, 0.12);
+  background: rgba(91, 143, 217, 0.12);
   color: var(--primary-deep);
   font-size: 12px;
   font-weight: 900;
@@ -1661,7 +1803,7 @@ onUnmounted(() => {
 }
 
 .tag-chip--active {
-  background: linear-gradient(135deg, #8b799d, #6f5d7d);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
   color: #fff;
   border-color: transparent;
 }
@@ -1724,7 +1866,7 @@ onUnmounted(() => {
 }
 
 .btn--primary {
-  background: linear-gradient(135deg, #8b799d, #6f5d7d);
+  background: linear-gradient(135deg, #1a56a8, #5b8fd9);
   color: #fff;
 }
 

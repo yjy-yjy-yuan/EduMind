@@ -8,7 +8,7 @@
  *   - error: 错误
  */
 
-import { withBase, shouldUseMockApi } from '@/config'
+import { withFrameDescBase, shouldUseMockApi } from '@/config'
 import { storageGet } from '@/utils/storage'
 
 const toStreamError = (detail, status) => {
@@ -35,6 +35,7 @@ const parseStreamErrorBody = async (response) => {
  * @param {Object} params
  * @param {number} params.video_id
  * @param {string[]} params.frames
+ * @param {string} [params.frame_source_url]
  * @param {number} params.timestamp
  * @param {string} [params.video_title]
  * @param {'brief'|'standard'|'detailed'} [params.detail_level='standard']
@@ -51,6 +52,7 @@ export async function describeFrameStream(params, options) {
   const {
     video_id,
     frames,
+    frame_source_url,
     timestamp,
     video_title,
     detail_level,
@@ -66,7 +68,8 @@ export async function describeFrameStream(params, options) {
 
   const payload = {
     video_id,
-    frames,
+    frames: Array.isArray(frames) ? frames : [],
+    frame_source_url: frame_source_url || '',
     timestamp,
     video_title: video_title || '',
     detail_level: detail_level || 'standard',
@@ -122,7 +125,7 @@ export async function describeFrameStream(params, options) {
 
   let response
   try {
-    response = await fetch(withBase('/api/frame_description/describe'), {
+    response = await fetch(withFrameDescBase('/api/frame_description/describe'), {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
@@ -232,7 +235,7 @@ export async function manageFrameDescSession(params, options = {}) {
 
   let response
   try {
-    response = await fetch(withBase('/api/frame_description/session'), {
+    response = await fetch(withFrameDescBase('/api/frame_description/session'), {
       method: 'POST',
       headers,
       body: JSON.stringify({ video_id, action, detail_level: detail_level || 'standard', session_id: session_id || '' }),
@@ -271,7 +274,7 @@ export async function getFrameDescHealth() {
     return { enabled: false, service: 'mock', description: 'UI 模拟模式' }
   }
 
-  const response = await fetch(withBase('/api/frame_description/health'), {
+  const response = await fetch(withFrameDescBase('/api/frame_description/health'), {
     method: 'GET',
     credentials: 'include',
   })
