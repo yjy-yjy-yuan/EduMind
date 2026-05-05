@@ -5,7 +5,7 @@
 ### 品牌 Logo 全面替换为新设计
 
 - **mobile-frontend**：
-  - 替换 [`mobile-frontend/src/assets/edumind-logo.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo.png) 与 [`mobile-frontend/src/assets/edumind-logo-icon.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo-icon.png) 为用户提供的新 Logo 图片。
+  - 替换 [`mobile-frontend/src/assets/edumind-logo.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo.png) 与 [`mobile-frontend/src/assets/edumind-logo-icon.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo-icon.png) 为用户提供的新 Logo 图片（第二轮，完整替换所有版本）。
   - 重新构建 iOS 前端并同步至 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/)。
 
 - **ios-app**：
