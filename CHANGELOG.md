@@ -2,6 +2,15 @@
 
 ## 2026-05-05
 
+### 品牌 Logo 全面替换为新设计
+
+- **mobile-frontend**：
+  - 替换 [`mobile-frontend/src/assets/edumind-logo.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo.png) 与 [`mobile-frontend/src/assets/edumind-logo-icon.png`](/Users/yuan/final-work/EduMind/mobile-frontend/src/assets/edumind-logo-icon.png) 为用户提供的新 Logo 图片。
+  - 重新构建 iOS 前端并同步至 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/WebAssets/)。
+
+- **ios-app**：
+  - 替换 [`ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`](/Users/yuan/final-work/EduMind/ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png) 为用户提供的新 Logo 图片，更新 iOS App 主屏幕图标。
+
 ### 主题颜色迁移：紫色 → 蓝色（冷静学习配色）
 
 - **mobile-frontend**：
