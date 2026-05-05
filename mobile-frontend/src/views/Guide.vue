@@ -544,7 +544,7 @@ const go = (path) => router.push(path)
 
 .acc {
   border-color: rgba(32, 42, 55, 0.1);
-  background: linear-gradient(180deg, #ffffff, #f0e8f7);
+  background: linear-gradient(180deg, #ffffff, #dbeafe);
 }
 
 .acc-badge {

@@ -1512,7 +1512,7 @@ onUnmounted(() => {
   margin-top: 12px;
   border-radius: 24px;
   border: 1px solid rgba(32, 42, 55, 0.09);
-  background: linear-gradient(180deg, #ffffff, #f0e8f7);
+  background: linear-gradient(180deg, #ffffff, #dbeafe);
   box-shadow: 0 16px 30px rgba(30, 90, 168, 0.1);
   padding: 16px;
 }

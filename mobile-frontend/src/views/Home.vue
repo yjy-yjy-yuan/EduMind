@@ -1334,7 +1334,7 @@ onUnmounted(() => {
 .skeleton-item {
   height: 64px;
   border-radius: 18px;
-  background: linear-gradient(90deg, #f0e8f7, #e5daf2, #f0e8f7);
+  background: linear-gradient(90deg, #dbeafe, #bfdbfe, #dbeafe);
   background-size: 220% 100%;
   animation: shimmer 1.2s linear infinite;
 }
