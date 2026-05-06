@@ -90,7 +90,7 @@ const resolvedLogoSrc = computed(() => (props.logoType === 'mark' ? logoMarkSrc 
   height: 100%;
   display: block;
   object-fit: contain;
-  object-position: center;
+  object-position: top;
   border-radius: 18px;
   flex-shrink: 0;
   box-shadow: 0 8px 18px rgba(91, 143, 217, 0.08);

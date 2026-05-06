@@ -1,5 +1,18 @@
 # 变更日志
 
+## 2026-05-06
+
+### Logo 图片尺寸修复：AppIcon 重命名 + BrandLogo 图片对齐优化
+
+- **ios-app**：
+  - 修复 [`ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/`](ios-app/EduMindIOS/EduMindIOS/Assets.xcassets/AppIcon.appiconset/)：删除损坏的中文文件名图片，将新 Logo 重命名为 `AppIcon-1024.png`，更新 `Contents.json` 的 `filename` 引用为 `AppIcon-1024.png`，解决 Xcode "did not have any applicable content" 构建错误。
+  - 同步 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/edumind-logo.png`](ios-app/EduMindIOS/EduMindIOS/WebAssets/edumind-logo.png) 与 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js)、[`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css`](ios-app/EduMindIOS/EduMindIOS/WebAssets/index.css)。
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/assets/edumind-logo.png`](mobile-frontend/src/assets/edumind-logo.png) 与 [`mobile-frontend/src/assets/edumind-logo-icon.png`](mobile-frontend/src/assets/edumind-logo-icon.png) 为用户提供的新 Logo。
+  - 更新 [`mobile-frontend/src/components/BrandLogo.vue`](mobile-frontend/src/components/BrandLogo.vue)：`object-position: center` → `object-position: top`，确保竖长 Logo 图片在顶部对齐时图案部分完整显示在容器内。
+  - 骨架屏动画（[`Home.vue`](mobile-frontend/src/views/Home.vue)）、引导页卡片（[`Guide.vue`](mobile-frontend/src/views/Guide.vue)）、视频详情卡片（[`VideoDetail.vue`](mobile-frontend/src/views/VideoDetail.vue)）渐变色从残留紫色 `#f0e8f7` 修正为蓝色 `#dbeafe`，与主题一致。
+
 ## 2026-05-05
 
 ### 品牌 Logo 全面替换为新设计
