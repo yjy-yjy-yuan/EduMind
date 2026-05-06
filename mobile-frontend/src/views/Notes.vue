@@ -4,7 +4,6 @@
       <h2>笔记</h2>
       <div class="actions">
         <button class="link" @click="reload" :disabled="loading">{{ loading ? '…' : '刷新' }}</button>
-        <button class="link" @click="goToQa">问答</button>
         <button class="link" @click="goNewNote">新建</button>
       </div>
     </header>
@@ -23,7 +22,6 @@
       <div class="filter-head">
         <div>
           <div class="section-title">筛选与搜索</div>
-          <div class="section-tip">按关键词、视频和标签快速定位学习笔记。</div>
         </div>
         <button class="ghost" @click="clearFilters" :disabled="loading || !hasActiveFilters">清空</button>
       </div>
@@ -65,10 +63,17 @@
       <div class="filter-actions">
         <button class="btn btn--primary" @click="applyFilters" :disabled="loading">应用筛选</button>
       </div>
+    </section>
 
-      <div class="qa-row">
-        <span class="qa-row__text">{{ filters.videoId ? '已选视频，可带着上下文去追问。' : '打开 AI 问答；在上方选择「关联视频」后可带着该视频追问。' }}</span>
-        <button type="button" class="link" @click="goToQa">去问答</button>
+    <section class="filter-card qa-card" role="button" tabindex="0" @click="goToQa" @keydown.enter="goToQa" @keydown.space.prevent="goToQa">
+      <div class="filter-head">
+        <div class="qa-card__label">
+          <svg class="qa-card__icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm0 3a1 1 0 011 1v4a1 1 0 01-2 0V6a1 1 0 011-1zm0 8a1 1 0 100-2 1 1 0 000 2z" fill="currentColor"/>
+          </svg>
+          <span class="qa-card__title">关联问答</span>
+        </div>
+        <span class="qa-card__arrow" aria-hidden="true">›</span>
       </div>
     </section>
 
@@ -457,6 +462,53 @@ onMounted(reload)
   padding: 16px;
   display: grid;
   gap: 14px;
+}
+
+.filter-card + .qa-card,
+.qa-card + .filter-card {
+  margin-top: 12px;
+}
+
+.qa-card {
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  width: 50%;
+}
+
+.qa-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 20px 36px rgba(30, 90, 168, 0.12);
+}
+
+.qa-card:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.qa-card__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qa-card__icon {
+  width: 18px;
+  height: 18px;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.qa-card__title {
+  font-size: 14px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.qa-card__arrow {
+  font-size: 22px;
+  color: #9ca3af;
+  font-weight: 400;
+  line-height: 1;
 }
 
 .filter-head,

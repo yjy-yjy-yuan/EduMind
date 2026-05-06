@@ -24,7 +24,7 @@
       <div v-else-if="items.length === 0" class="vd-rec-panel__state">
         <p class="vd-rec-panel__empty-title">暂无可延伸推荐</p>
         <p class="vd-rec-panel__empty-desc">
-          可先完成本视频的转写与摘要，或稍后在网络稳定时重试。推荐仅展示真实可跳转的学习条目，不会用占位内容凑数。
+          可先完成本视频的转写与摘要，或稍后在网络稳定时重试。
         </p>
       </div>
 

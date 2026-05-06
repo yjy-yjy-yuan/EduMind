@@ -46,9 +46,6 @@
         <div v-else class="hero-shell" :class="heroClass">
           <div class="hero-shell__badge">LOCAL</div>
           <div class="hero-shell__initial">{{ heroInitial }}</div>
-          <div class="hero-shell__caption">
-            本地离线结果已保存在当前设备。若需要视频预览，请在 iOS 原生容器中打开该页面。
-          </div>
         </div>
       </div>
 
@@ -64,17 +61,11 @@
         <span v-if="durationText" class="muted">{{ durationText }}</span>
       </div>
 
-      <div class="setting-hint">{{ updatedText }}</div>
-      <div v-if="segmentCount > 0" class="setting-hint">分段数量：{{ segmentCount }}</div>
-      <div v-if="syncHintText" class="setting-hint">{{ syncHintText }}</div>
-
       <div v-if="showProgress" class="progress">
         <div class="bar" :style="{ width: `${transcript.progress}%` }"></div>
       </div>
 
       <div v-if="playerError" class="inline-tip inline-tip--bad">{{ playerError }}</div>
-      <div v-else class="inline-tip">{{ tipText }}</div>
-
       <div v-if="transcript.errorMessage" class="alert alert--bad">{{ transcript.errorMessage }}</div>
 
       <div class="block">
@@ -85,10 +76,6 @@
               {{ summaryGenerating ? '生成中…' : (transcript.summary ? '重生成摘要' : '生成摘要') }}
             </button>
           </div>
-        </div>
-        <div class="setting-hint">
-          当前摘要设置：{{ summaryStyleText }}
-          <span v-if="!summaryBackendConfigured"> · 当前未配置可用后端</span>
         </div>
         <div v-if="transcript.summary" class="block-body block-body--prewrap">{{ transcript.summary }}</div>
         <div v-else-if="transcript.summaryStatus === 'generating'" class="block-placeholder">正在提取课程摘要…</div>
@@ -182,7 +169,7 @@ const updatedText = computed(() => {
 const syncHintText = computed(() => {
   const status = String(transcript.value?.syncStatus || '').trim().toLowerCase()
   if (status === 'completed' && Number(transcript.value?.syncedVideoId || 0) > 0) {
-    return `已写入视频库：videoId=${transcript.value.syncedVideoId} · 来源标记=iOS 离线处理`
+    return '已同步到视频库（iOS 离线处理）'
   }
   if (status === 'syncing') return '正在将本地离线结果写入视频库…'
   if (status === 'failed' && transcript.value?.syncErrorMessage) return `写入视频库失败：${transcript.value.syncErrorMessage}`

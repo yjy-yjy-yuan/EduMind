@@ -2,6 +2,25 @@
 
 ## 2026-05-06
 
+### UI 说明文字清理：去除开发者提示，简化用户界面
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/views/VideoDetail.vue`](mobile-frontend/src/views/VideoDetail.vue)：删除 hero 区域封面描述文字（"预览"/"视频预览与播放资源由后端接口提供"）、离线任务队列提示、"本次任务模型"提示、"后台处理中仍可进入播放器"提示、摘要设置风格提示、笔记引导说明文字；精简加载中/无笔记占位文案。
+  - 更新 [`mobile-frontend/src/views/QA.vue`](mobile-frontend/src/views/QA.vue)：删除问答模式说明文字（深度思考/直接回答模式提示）、记笔记按钮辅助提示。
+  - 更新 [`mobile-frontend/src/views/Player.vue`](mobile-frontend/src/views/Player.vue)：修复 CSS 解析错误（`@media` 指令断裂、重复 `.fd-description-text` 规则、缺失 `.fd-panel` 类）、删除 mock 播放器描述文字、播放器 tip 提示条、视觉增强来源说明区域、实时描述连接中提示、记笔记引导说明；精简 `tipText` 计算属性文案。
+  - 更新 [`mobile-frontend/src/views/LocalTranscriptDetail.vue`](mobile-frontend/src/views/LocalTranscriptDetail.vue)：删除本地离线结果说明文字、更新时间/分段数量提示、播放器 tip 提示、摘要设置风格提示。
+  - 更新 [`mobile-frontend/src/views/Recommendations.vue`](mobile-frontend/src/views/Recommendations.vue)：删除 hero 描述文字、推荐使用步骤列表、列表说明文字；修复被误删的 CSS 样式（`.hero__actions`、`.recommend-card` 等组件样式）。
+  - 更新 [`mobile-frontend/src/views/Home.vue`](mobile-frontend/src/views/Home.vue)：删除欢迎卡片站外导入说明文字。
+  - 更新 [`mobile-frontend/src/views/LearningPath.vue`](mobile-frontend/src/views/LearningPath.vue)：删除"推荐路径布局"占位说明卡片。
+  - 更新 [`mobile-frontend/src/components/videoDetail/VideoDetailRecommendPanel.vue`](mobile-frontend/src/components/videoDetail/VideoDetailRecommendPanel.vue)：精简无可延伸推荐时的空状态说明文字。
+  - 重新构建 iOS 前端并同步至 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/`](ios-app/EduMindIOS/EduMindIOS/WebAssets/)。
+
+### 笔记页面增加"关联问答"入口
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/views/Notes.vue`](mobile-frontend/src/views/Notes.vue)：在"筛选与搜索"卡片下方新增可点击的"关联问答"卡片（宽度 50%），点击跳转至问答页面并自动带上当前关联视频上下文；删除 topbar 中的"问答"按钮和底部 `.qa-row` 问答入口；卡片具备 hover 上浮、active 按压反馈效果，支持键盘无障碍操作。
+  - 重新构建 iOS 前端并同步至 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/`](ios-app/EduMindIOS/EduMindIOS/WebAssets/)。
+
 ### VideoDetail 顶部卡片改为视频播放器入口
 
 - **mobile-frontend**：

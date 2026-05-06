@@ -7,12 +7,10 @@
     </header>
 
     <div class="hint">
-      {{ videoId ? `当前为视频上下文问答 · videoId=${videoId}` : '当前为通用问答' }}
     </div>
 
     <div v-if="normalizedVideoId" class="note-entry">
       <button type="button" class="note-entry__btn" @click="openVideoNoteEditor">记笔记（带当前视频）</button>
-      <span class="note-entry__tip">会把 videoId 传入笔记编辑页，便于与问答同一上下文整理结论。</span>
     </div>
 
     <div class="mode-panel">
@@ -27,9 +25,6 @@
         >
           {{ item.label }}
         </button>
-      </div>
-      <div class="mode-panel__hint">
-        {{ chatMode === 'deep_think' ? '已开启深度思考，会先进行推理再组织回答，质量更稳但通常更慢。' : '优先直接回答，响应更快速；通义千问不可用时自动切换 DeepSeek 兜底。' }}
       </div>
     </div>
 

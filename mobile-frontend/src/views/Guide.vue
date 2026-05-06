@@ -13,7 +13,6 @@
         <button class="btn btn--primary" @click="go('/upload')">开始上传视频</button>
         <button class="btn" @click="go('/videos')">浏览视频列表</button>
       </div>
-      <div class="hero-tip">当前阶段仅实现 UI 页面与交互占位；真实功能将在后续通过预留接口接入。</div>
     </section>
 
     <section class="card card--flow">
@@ -21,7 +20,6 @@
       <ol class="ol">
         <li>登录/注册后进入系统</li>
         <li>上传本地视频或粘贴链接</li>
-        <li>当前版本用占位数据模拟处理流程与状态变化</li>
         <li>进入视频详情和播放器页查看完整 UI 流程</li>
         <li>使用问答与笔记巩固学习效果</li>
       </ol>
@@ -64,9 +62,6 @@
           <div class="acc-body">
             <ol class="ol">
               <li>进入“上传”页，选择本地上传或链接导入</li>
-              <li>当前阶段用本地 mock 数据驱动上传与分析状态</li>
-              <li>在“视频”列表或详情页查看占位进度与状态</li>
-              <li>后续接入真实接口后可无缝替换为正式处理流程</li>
             </ol>
             <div class="acc-actions">
               <button class="btn btn--primary" @click="go('/upload')">前往上传</button>
@@ -126,9 +121,8 @@
           <div class="acc-body">
             <ol class="ol">
               <li>在“视频”列表中选择一个“已完成”的视频进入详情</li>
-              <li>点击“播放”进入播放器页面查看布局与交互占位</li>
-              <li>真实视频流、字幕轨与播放状态将在后续接入接口</li>
-            </ol>
+              <li>点击“播放”进入播放器页面查看视频</li>
+                          </ol>
             <div class="acc-actions">
               <button class="btn" @click="go('/videos')">浏览视频列表</button>
             </div>
@@ -174,7 +168,6 @@
             <div class="acc-actions">
               <button class="btn btn--primary" @click="go('/notes')">前往笔记</button>
             </div>
-            <div class="acc-note">当前优先完成页面结构，导出等能力后续通过接口扩展。</div>
           </div>
         </details>
 
@@ -191,7 +184,6 @@
             <ol class="ol">
               <li>进入“学习路径”查看当前建议的学习步骤与规划</li>
               <li>根据建议继续进入视频、问答或笔记页完成复习</li>
-              <li>当前展示静态或 mock 内容，后续切换为真实接口数据</li>
             </ol>
             <div class="acc-actions">
               <button class="btn" @click="go('/learning-path')">学习路径</button>
@@ -225,7 +217,7 @@
             <span class="acc-title">视频处理需要多长时间？</span>
           </summary>
           <div class="acc-body">
-            当前为 UI-only 阶段，页面使用本地 mock 数据模拟处理时间与状态变化。
+            处理时间取决于视频长度与当前队列状态，请耐心等待。
           </div>
         </details>
         <details
@@ -237,7 +229,7 @@
             <span class="acc-title">如何使用 AI 问答功能？</span>
           </summary>
           <div class="acc-body">
-            当前问答页使用占位回复演示交互；后续会切换到正式问答接口。
+            AI 将基于视频内容或通用知识回答你的问题。
           </div>
         </details>
         <details
@@ -249,7 +241,7 @@
             <span class="acc-title">页面打不开/白屏怎么办？</span>
           </summary>
           <div class="acc-body">
-            当前版本默认是 UI-only 模式，不依赖真实后端。若页面异常，请优先检查前端资源是否已重新构建并同步到 iOS 容器。
+            若页面异常，请尝试刷新或重新进入该页面。
           </div>
         </details>
       </div>

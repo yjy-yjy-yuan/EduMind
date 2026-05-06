@@ -5,11 +5,6 @@
       <button class="link" @click="refresh">刷新</button>
     </header>
 
-    <div class="card">
-      <div class="card-title">推荐路径（布局）</div>
-      <div class="muted">当前仅实现页面布局与步骤卡片；推荐结果后续通过预留接口接入。</div>
-    </div>
-
     <div class="list">
       <div class="step" v-for="(s, i) in steps" :key="i">
         <div class="badge">{{ i + 1 }}</div>
@@ -61,21 +56,6 @@ const refresh = () => {
   background: transparent;
   color: var(--primary);
   font-weight: 900;
-}
-
-.card {
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 14px;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
-  display: grid;
-  gap: 8px;
-}
-
-.card-title {
-  font-weight: 900;
-  font-size: 13px;
 }
 
 .muted {
@@ -134,7 +114,6 @@ const refresh = () => {
   font-size: 18px;
 }
 
-.card,
 .step {
   border-radius: 20px;
   border: 1px solid rgba(32, 42, 55, 0.08);

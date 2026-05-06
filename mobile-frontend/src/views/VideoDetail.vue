@@ -33,11 +33,8 @@
           @keydown.space.prevent="play"
         >
           <div class="hero-shell" :class="heroClass">
-            <div class="hero-shell__badge">{{ usingMockGateway ? 'UI ONLY' : 'LIVE' }}</div>
+            <div class="hero-shell__badge">{{ usingMockGateway ? '预览' : 'LIVE' }}</div>
             <div class="hero-shell__initial">{{ heroInitial }}</div>
-            <div class="hero-shell__caption">
-              {{ usingMockGateway ? '当前阶段仅构建界面，封面与播放器资源后续通过预留接口接入。' : '视频预览与播放资源由后端接口提供。' }}
-            </div>
             <div v-if="canOpenPlayerWhileProcessing" class="hero-shell__play-icon" aria-hidden="true">
               <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="28" cy="28" r="26" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.6)" stroke-width="2"/>
@@ -55,19 +52,12 @@
           <span v-if="isInProgress(statusValue)" class="muted">{{ progressValue }}% · {{ stepValue || '处理中' }}</span>
         </div>
 
-        <div v-if="offlineTaskCount > 0" class="inline-tip inline-tip--queue">
-          上传页还有 {{ offlineTaskCount }} 个离线任务等待自动补跑；本页只展示已经拿到视频 ID 的在线处理状态。
-        </div>
 
-        <div v-if="activeModelText" class="setting-hint">本次任务模型：{{ activeModelText }}</div>
 
         <div v-if="isInProgress(statusValue)" class="progress">
           <div class="bar" :style="{ width: `${progressValue}%` }"></div>
         </div>
 
-        <div v-if="canOpenPlayerWhileProcessing" class="inline-tip">
-          后台处理中仍可进入播放器，当前播放原始视频文件。
-        </div>
       </div>
 
       <div class="video-detail__segment" role="tablist" aria-label="详情分页">
@@ -122,7 +112,6 @@
               </button>
             </div>
           </div>
-          <div class="setting-hint">当前摘要设置：{{ summaryStyleText }}</div>
           <div v-if="video.summary" class="block-body block-body--prewrap">{{ video.summary }}</div>
           <div v-else class="block-placeholder">处理完成后可在此生成课程摘要。</div>
           <div v-if="tagList.length > 0" class="tag-list">
@@ -132,18 +121,15 @@
 
         <div class="block video-detail__section video-detail__section--notes">
           <div class="block-head">
-            <div>
-              <div class="block-title">本视频笔记</div>
-              <div class="setting-hint">把视频里的关键结论沉淀到笔记页，形成稳定回看入口。</div>
-            </div>
+            <div class="block-title">本视频笔记</div>
             <div class="block-actions">
               <button class="mini" @click="openNewVideoNote">新建笔记</button>
               <button class="mini" @click="openVideoNotes">查看全部</button>
             </div>
           </div>
 
-          <div v-if="notesLoading" class="setting-hint">正在加载本视频笔记…</div>
-          <div v-else-if="videoNotes.length === 0" class="block-placeholder">当前视频还没有笔记，建议从关键知识点开始记录。</div>
+          <div v-if="notesLoading">正在加载本视频笔记…</div>
+          <div v-else-if="videoNotes.length === 0" class="block-placeholder">当前视频还没有笔记。</div>
           <div v-else class="note-preview-list">
             <button
               v-for="note in videoNotes"
@@ -758,7 +744,7 @@ const findSummaryNote = async () => {
 const importSummaryToNote = async () => {
   if (!canImportSummary.value) return
   if (usingMockGateway.value) {
-    error.value = '当前未连接真实后端，摘要导入不会写入数据库；请先配置 API Base 并关闭 UI-only。'
+    error.value = '未连接后端，摘要导入不会写入数据库；请先配置后端地址。'
     return
   }
 

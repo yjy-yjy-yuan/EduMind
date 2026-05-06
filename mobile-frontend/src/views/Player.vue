@@ -12,7 +12,7 @@
     </div>
 
     <div class="status-row">
-      <span class="badge">{{ useMockPlayer ? 'UI ONLY' : 'LIVE' }}</span>
+      <span class="badge">{{ useMockPlayer ? '预览' : 'LIVE' }}</span>
       <span v-if="videoStatusText" class="badge badge--status">{{ videoStatusText }}</span>
       <span class="muted">{{ playerStateText }}</span>
       <span v-if="durationText" class="muted">{{ durationText }}</span>
@@ -21,10 +21,9 @@
     <div class="wrap">
       <div v-if="useMockPlayer" class="mock-player">
         <div class="mock-player__stage">
-          <div class="mock-player__chip">UI ONLY</div>
+          <div class="mock-player__chip">预览</div>
           <div class="mock-player__play">▶</div>
           <div class="mock-player__title">{{ videoTitle }}</div>
-          <div class="mock-player__desc">未配置后端地址，当前只展示播放器界面。到“我的”页面填写 FastAPI 地址后即可切换到真实播放。</div>
         </div>
         <div class="mock-player__controls">
           <span>00:00</span>
@@ -55,10 +54,6 @@
           <track v-if="subtitleUrl" kind="subtitles" srclang="zh" label="中文" :src="subtitleUrl" default />
         </video>
       </div>
-    </div>
-
-    <div class="tip">
-      {{ tipText }}
     </div>
 
     <!-- ================================================================
@@ -108,28 +103,11 @@
           </span>
         </div>
 
-        <div class="fd-source-section">
-          <button class="fd-source-toggle" @click="fdSourceExpanded = !fdSourceExpanded">
-            <span>视觉增强来源（可折叠）</span>
-            <span class="fd-source-arrow" :class="{ 'fd-source-arrow--up': fdSourceExpanded }">▾</span>
-          </button>
-          <div v-if="fdSourceExpanded" class="fd-source-body">
-            当前描述由 EduMind 后端视觉增强链路生成，并统一通过后端接口返回。
-          </div>
-        </div>
-
         <div class="fd-description-area" ref="fdDescriptionRef">
-          <div v-if="!fdHasContent && fdStage === 'idle'" class="fd-placeholder">
-            开启后将持续描述当前画面内容…
-          </div>
-          <div v-else-if="!fdHasContent && fdStage" class="fd-placeholder">
-            {{ fdConnectingLabel }}
+          <div v-if="!fdHasContent" class="fd-placeholder">
           </div>
           <div v-else>
             <div class="fd-description-text">{{ fdDescriptionText }}</div>
-            <div v-if="fdDegraded" class="fd-degraded-notice">
-              实时描述暂时不可用，将自动恢复。
-            </div>
           </div>
         </div>
 
@@ -186,7 +164,6 @@
       <div class="assistant-head">
         <div class="assistant-head__copy">
           <div class="assistant-title">这一段记笔记</div>
-          <div class="assistant-tip">系统已按当前时间点整理成学习卡片，标题会自动按「分类 · 时间点」生成。</div>
         </div>
         <button class="btn btn--primary" @click="saveTimestampNote" :disabled="noteBusy || !canSaveTimestampNote">
           {{ noteBusy ? '保存中…' : '记下这一段' }}
@@ -204,7 +181,6 @@
       <label class="assistant-field assistant-field--compact">
         <span class="assistant-label">短标题（可选）</span>
         <input v-model.trim="noteTitle" class="assistant-input" type="text" placeholder="可留空，系统会自动生成" />
-        <div class="assistant-hint">留空时使用自动标题；填写后会覆盖自动标题。</div>
       </label>
       <label class="assistant-field">
         <span class="assistant-label">这一段的笔记</span>
@@ -344,15 +320,15 @@ const currentTimeText = computed(() => {
 const canSaveTimestampNote = computed(() => !noteBusy.value)
 const tipText = computed(() => {
   if (useMockPlayer.value) {
-    return '当前未连接后端。到「我的」页面填写 FastAPI 地址，或使用 iOS 原生注入的固定地址后，播放器会立即切到真实视频流。'
+    return '播放器预览中，配置后端地址后可切换到真实播放。'
   }
   if (pageError.value) {
-    return '播放器已切到真实接口。若仍失败，优先检查后端地址、同一 Wi‑Fi、MySQL 是否可连、以及该视频是否已处理完成。'
+    return '播放器已连接到后端。若仍失败，请检查网络与后端地址，以及该视频是否已处理完成。'
   }
   if (['pending', 'processing'].includes(videoStatus.value)) {
     return '当前播放原始视频文件，后台仍在处理字幕与分析结果；处理完成后无需重新上传。'
   }
-  return '真机播放依赖 FastAPI 视频流接口和 iOS WebView 媒体配置，当前页面已启用原生 controls、inline 播放和字幕轨。'
+  return '视频正在播放中。'
 })
 
 // -----------------------------------------------------------------------
@@ -1283,16 +1259,6 @@ onUnmounted(() => {
   background: #000;
 }
 
-.tip {
-  margin-top: 12px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-/* ================================================================
-   Frame Description Panel
-   ================================================================ */
 .fd-panel {
   margin-top: 12px;
   border-radius: 18px;
@@ -1448,44 +1414,6 @@ onUnmounted(() => {
   gap: 10px;
 }
 
-.fd-source-section {
-  border-radius: 12px;
-  border: 1px solid rgba(32, 42, 55, 0.08);
-  background: rgba(255, 255, 255, 0.55);
-  padding: 6px 8px;
-}
-
-.fd-source-toggle {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 800;
-  padding: 2px 0;
-  cursor: pointer;
-}
-
-.fd-source-arrow {
-  font-size: 10px;
-  transition: transform 0.2s;
-}
-
-.fd-source-arrow--up {
-  transform: rotate(180deg);
-}
-
-.fd-source-body {
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #64748b;
-}
-
 .fd-progress-track {
   flex: 1;
   height: 4px;
@@ -1542,13 +1470,6 @@ onUnmounted(() => {
   color: #334155;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.fd-degraded-notice {
-  margin-top: 6px;
-  font-size: 11px;
-  color: #ea580c;
-  line-height: 1.5;
 }
 
 .fd-context-section {
@@ -1694,9 +1615,6 @@ onUnmounted(() => {
   font-style: italic;
 }
 
-/* ================================================================
-   Assistant Card (unchanged)
-   ================================================================ */
 .assistant-card {
   margin-top: 12px;
   padding: 14px;
@@ -1726,7 +1644,6 @@ onUnmounted(() => {
   font-weight: 900;
 }
 
-.assistant-tip,
 .note-summary__time {
   font-size: 12px;
   color: var(--muted);
@@ -1769,12 +1686,6 @@ onUnmounted(() => {
   font-size: 12px;
   font-weight: 900;
   color: var(--primary-deep);
-}
-
-.assistant-hint {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.5;
 }
 
 .assistant-input {

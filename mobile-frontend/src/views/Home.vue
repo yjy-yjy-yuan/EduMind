@@ -59,10 +59,6 @@
         </div>
       </div>
 
-      <div class="welcome__subnote">
-        <span>登录后，站外可导入推荐会先写入你的视频库，再出现在下方卡片里，点进去即可走下载与处理全流程。</span>
-      </div>
-
       <div class="stats">
         <button type="button" class="stat-pill" @click="goStat('recent')">
           <span class="stat-pill__label">最近视频</span>
@@ -865,13 +861,6 @@ onUnmounted(() => {
   color: var(--primary-deep);
   font-size: 13px;
   font-weight: 700;
-}
-
-.welcome__subnote {
-  margin-top: 14px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #4a6a8a;
 }
 
 .hero-actions,

@@ -4,13 +4,7 @@
       <div class="hero__copy">
         <p class="hero__eyebrow">Recommendation Hub</p>
         <h1 class="hero__title">推荐学习中枢</h1>
-        <p class="hero__desc">打开即可看到可学习的视频推荐。登录后，站外链接会先写入你的视频库再展示，确保能继续完整视频处理链路。</p>
       </div>
-      <ol class="hero__flow" aria-label="推荐使用步骤">
-        <li>看推荐列表</li>
-        <li>点卡片直接进入详情或导入学习</li>
-        <li>在详情页继续完整处理链路</li>
-      </ol>
       <div class="hero__actions">
         <button type="button" class="hero-btn hero-btn--ghost" @click="go('/upload')">去上传</button>
         <button type="button" class="hero-btn hero-btn--primary" @click="reloadAll" :disabled="pageLoading">
@@ -23,7 +17,6 @@
       <div class="section-head">
         <div>
           <h2>推荐视频</h2>
-          <p>仅展示可直接打开或继续导入处理的视频卡片。</p>
         </div>
         <button type="button" class="panel-link" @click="reloadAll" :disabled="pageLoading">
           {{ pageLoading ? '刷新中…' : '刷新列表' }}
@@ -299,7 +292,6 @@ onMounted(reloadAll)
 }
 
 .hero__copy,
-.hero__flow,
 .hero__actions {
   position: relative;
   z-index: 1;
@@ -352,31 +344,57 @@ onMounted(reloadAll)
   color: #1a2e4a;
 }
 
-.hero__desc,
-.section-head p,
-.recommend-card__meta,
-.message {
-  color: #4a6a8a;
+.hero__eyebrow,
+.badge,
+.pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.hero__desc {
+.hero__eyebrow,
+.badge--soft,
+.pill {
+  padding: 5px 10px;
+  background: var(--primary-soft);
+  color: var(--primary-deep);
+}
+
+.badge--reason {
+  padding: 5px 10px;
+  background: rgba(91, 143, 217, 0.1);
+  color: #1a56a8;
+}
+
+.badge--external {
+  padding: 5px 10px;
+  background: var(--surface-lilac-deep);
+  color: var(--lilac-text);
+}
+
+.badge--mint {
+  padding: 5px 10px;
+  background: rgba(229, 240, 252, 0.94);
+  color: var(--ok-text);
+}
+
+.hero__title {
   margin-top: 10px;
-  font-size: 14px;
-  line-height: 1.65;
-  max-width: 32rem;
+  font-size: 34px;
+  line-height: 1.03;
+  letter-spacing: -0.04em;
+  color: #1a2e4a;
 }
 
-.hero__flow {
-  margin: 12px 0 0;
-  padding-left: 1.25rem;
-  font-size: 13px;
-  line-height: 1.55;
-  color: #4a6a8a;
-  max-width: 36rem;
-}
-
-.hero__flow li {
-  margin-bottom: 4px;
+.hero__copy,
+.hero__actions {
+  position: relative;
+  z-index: 1;
 }
 
 .hero__actions,
@@ -422,31 +440,6 @@ onMounted(reloadAll)
   background: rgba(235, 245, 255, 0.94);
 }
 
-.section-head,
-.recommend-card__top,
-.recommend-card__meta,
-.recommend-card__actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.section-head h2 {
-  margin: 0;
-  font-size: 18px;
-  letter-spacing: -0.02em;
-  color: #111827;
-}
-
-.section-head p {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.6;
-  max-width: 31rem;
-}
-
 .panel-link {
   border: 0;
   background: transparent;
@@ -472,6 +465,7 @@ onMounted(reloadAll)
 
 .recommend-card__meta {
   font-size: 12px;
+  color: #4a6a8a;
 }
 
 .recommend-card__hint {
@@ -482,6 +476,16 @@ onMounted(reloadAll)
   border: 1px solid rgba(91, 143, 217, 0.18);
   border-radius: 16px;
   padding: 10px 12px;
+}
+
+.recommend-card__top,
+.recommend-card__meta,
+.recommend-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .message {
@@ -495,6 +499,7 @@ onMounted(reloadAll)
   border: 1px dashed rgba(17, 24, 39, 0.12);
   font-size: 13px;
   line-height: 1.6;
+  color: #4a6a8a;
 }
 
 .message--error {
@@ -529,13 +534,8 @@ onMounted(reloadAll)
 }
 
 @keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-
-  100% {
-    background-position: -200% 0;
-  }
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 @media (max-width: 720px) {
