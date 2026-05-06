@@ -20,7 +20,7 @@ function parseNdjson(text) {
 // 测试 1：API 文件存在且可读
 // -----------------------------------------------------------------------
 test('frameDescription.js source file exists', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.ok(source.length > 100, 'source file should not be empty')
 })
 
@@ -28,7 +28,7 @@ test('frameDescription.js source file exists', () => {
 // 测试 2：describeFrameStream 是 async 函数
 // -----------------------------------------------------------------------
 test('describeFrameStream is exported as function', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.match(source, /export\s+async\s+function\s+describeFrameStream/)
 })
 
@@ -36,7 +36,7 @@ test('describeFrameStream is exported as function', () => {
 // 测试 3：manageFrameDescSession 是 async 函数
 // -----------------------------------------------------------------------
 test('manageFrameDescSession is exported as function', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.match(source, /export\s+async\s+function\s+manageFrameDescSession/)
 })
 
@@ -44,7 +44,7 @@ test('manageFrameDescSession is exported as function', () => {
 // 测试 4：getFrameDescHealth 是 async 函数
 // -----------------------------------------------------------------------
 test('getFrameDescHealth is exported as function', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.match(source, /export\s+async\s+function\s+getFrameDescHealth/)
 })
 
@@ -83,7 +83,7 @@ test('parseNdjson filters empty lines', () => {
 // 测试 8：流式描述请求体格式正确
 // -----------------------------------------------------------------------
 test('source includes required NDJSON Accept header', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.match(source, /Accept:\s*['"]application\/x-ndjson['"]/)
 })
 
@@ -91,7 +91,7 @@ test('source includes required NDJSON Accept header', () => {
 // 测试 9：流式描述端点路径正确
 // -----------------------------------------------------------------------
 test('source calls /api/frame_description/describe', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.match(source, /withFrameDescBase\s*\(\s*['"]\/api\/frame_description\/describe['"]\s*\)/)
 })
 
@@ -99,7 +99,7 @@ test('source calls /api/frame_description/describe', () => {
 // 测试 10：会话端点路径正确
 // -----------------------------------------------------------------------
 test('source calls /api/frame_description/session', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.match(source, /withFrameDescBase\s*\(\s*['"]\/api\/frame_description\/session['"]\s*\)/)
 })
 
@@ -107,7 +107,7 @@ test('source calls /api/frame_description/session', () => {
 // 测试 11：健康检查端点路径正确
 // -----------------------------------------------------------------------
 test('source calls /api/frame_description/health', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.match(source, /withFrameDescBase\s*\(\s*['"]\/api\/frame_description\/health['"]\s*\)/)
 })
 
@@ -115,7 +115,7 @@ test('source calls /api/frame_description/health', () => {
 // 测试 12：Mock 流模拟函数存在
 // -----------------------------------------------------------------------
 test('source includes mock stream dispatcher', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.match(source, /async\s+function\s+dispatchMockStream/)
 })
 
@@ -123,7 +123,7 @@ test('source includes mock stream dispatcher', () => {
 // 测试 13：describeFrameStream 包含 onEvent 回调逻辑
 // -----------------------------------------------------------------------
 test('describeFrameStream handles onEvent callback', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.ok(source.includes('onEvent'), 'should call onEvent for each NDJSON event')
 })
 
@@ -131,7 +131,7 @@ test('describeFrameStream handles onEvent callback', () => {
 // 测试 14：detail_level 参数存在
 // -----------------------------------------------------------------------
 test('source supports detail_level parameter', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.ok(source.includes('detail_level'), 'should support detail_level param')
     assert.ok(source.includes('brief') && source.includes('standard') && source.includes('detailed'),
         'should support three detail levels')
@@ -141,7 +141,7 @@ test('source supports detail_level parameter', () => {
 // 测试 15：Mock 模式条件判断
 // -----------------------------------------------------------------------
 test('source checks shouldUseMockApi() for mock mode', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.match(source, /shouldUseMockApi\s*\(\s*\)/)
     assert.ok(source.includes('dispatchMockStream'), 'mock mode should call dispatchMockStream')
 })
@@ -150,7 +150,7 @@ test('source checks shouldUseMockApi() for mock mode', () => {
 // 测试 16：fetch 错误解析逻辑存在
 // -----------------------------------------------------------------------
 test('source parses error responses from backend', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.ok(source.includes('parseStreamErrorBody'), 'should have error body parser')
     assert.ok(source.includes('toStreamError'), 'should have error wrapper')
 })
@@ -159,7 +159,7 @@ test('source parses error responses from backend', () => {
 // 测试 17：session 管理支持 start/stop action
 // -----------------------------------------------------------------------
 test('source supports start and stop session actions', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.ok(source.includes('"start"') || source.includes("'start'"), 'should support start action')
     assert.ok(source.includes('action ===') && source.includes("'start'"), 'should distinguish start vs stop in manageFrameDescSession')
 })
@@ -168,7 +168,7 @@ test('source supports start and stop session actions', () => {
 // 测试 18：allow_degrade 参数存在
 // -----------------------------------------------------------------------
 test('source supports allow_degrade parameter', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
     assert.ok(source.includes('allow_degrade'), 'should support allow_degrade')
 })
 
@@ -176,8 +176,8 @@ test('source supports allow_degrade parameter', () => {
 // 测试 19：支持 iOS WebView 跨域采帧失败后的服务端抽帧兜底
 // -----------------------------------------------------------------------
 test('source supports frame_source_url fallback for iOS WebView capture failures', () => {
-    const frameApiSource = readFileSync(resolve(process.cwd(), 'src/api/frameDescription.js'), 'utf8')
-    const playerSource = readFileSync(resolve(process.cwd(), 'src/views/Player.vue'), 'utf8')
+    const frameApiSource = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/api/frameDescription.js'), 'utf8')
+    const playerSource = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/views/Player.vue'), 'utf8')
     assert.ok(frameApiSource.includes('frame_source_url'), 'payload should include frame_source_url')
     assert.ok(playerSource.includes('FD_SERVER_FRAME_STREAM_TIMEOUT_MS'), 'Player should allow longer server extraction timeout')
     assert.ok(playerSource.includes('using server frame source fallback'), 'Player should log server-frame fallback')
@@ -187,7 +187,7 @@ test('source supports frame_source_url fallback for iOS WebView capture failures
 // 测试 20：前端忙碌状态 9 秒后降级
 // -----------------------------------------------------------------------
 test('Player.vue aligns realtime description timeouts to 9 seconds', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/views/Player.vue'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/views/Player.vue'), 'utf8')
     assert.match(source, /FD_STREAM_TIMEOUT_MS\s*=\s*9000/)
     assert.match(source, /FD_STREAM_IDLE_TIMEOUT_MS\s*=\s*9000/)
     assert.match(source, /FD_BUSY_STAGE_MAX_MS\s*=\s*9000/)
@@ -197,7 +197,7 @@ test('Player.vue aligns realtime description timeouts to 9 seconds', () => {
 })
 
 test('Player.vue supports Xcode realtime description auto-start query', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/views/Player.vue'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/views/Player.vue'), 'utf8')
     assert.ok(source.includes('shouldAutoStartFrameDescription'), 'should expose query-gated auto start')
     assert.ok(source.includes('route.query.fd'), 'should support /player/:id?fd=1 for Simulator verification')
     assert.ok(source.includes('auto start requested by route query'), 'should log auto-start for Xcode debug trace')
@@ -207,7 +207,7 @@ test('Player.vue supports Xcode realtime description auto-start query', () => {
 // 测试 21：Player.vue 集成正确导入 API
 // -----------------------------------------------------------------------
 test('Player.vue imports frameDescription API', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/views/Player.vue'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/views/Player.vue'), 'utf8')
     assert.match(source, /from\s+['"]@\/api\/frameDescription['"]/)
 })
 
@@ -215,7 +215,7 @@ test('Player.vue imports frameDescription API', () => {
 // 测试 22：Player.vue 包含 fd-panel 样式
 // -----------------------------------------------------------------------
 test('Player.vue includes fd-panel styles', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/views/Player.vue'), 'utf8')
+    const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/views/Player.vue'), 'utf8')
     assert.ok(source.includes('fd-panel'), 'should include fd-panel CSS class')
     assert.ok(source.includes('fd-toggle'), 'should include fd-toggle control')
     assert.ok(source.includes('fd-level-pill'), 'should include detail level pills')

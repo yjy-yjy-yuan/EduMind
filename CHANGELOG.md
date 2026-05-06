@@ -13,6 +13,9 @@
   - 更新 [`mobile-frontend/src/components/BrandLogo.vue`](mobile-frontend/src/components/BrandLogo.vue)：`object-position: center` → `object-position: top`，确保竖长 Logo 图片在顶部对齐时图案部分完整显示在容器内。
   - 骨架屏动画（[`Home.vue`](mobile-frontend/src/views/Home.vue)）、引导页卡片（[`Guide.vue`](mobile-frontend/src/views/Guide.vue)）、视频详情卡片（[`VideoDetail.vue`](mobile-frontend/src/views/VideoDetail.vue)）渐变色从残留紫色 `#f0e8f7` 修正为蓝色 `#dbeafe`，与主题一致。
 
+- **测试**：
+  - 修复 [`tests/api/config.test.mjs`](mobile-frontend/tests/api/config.test.mjs) 与 [`tests/api/frameDescription.test.mjs`](mobile-frontend/tests/api/frameDescription.test.mjs) 中的 `readFileSync` 路径前缀，从 `'src/'` 更正为 `'mobile-frontend/src/'`，解决 `node --test` 从 repo root 运行时文件找不到的问题。
+
 ## 2026-05-05
 
 ### 品牌 Logo 全面替换为新设计
