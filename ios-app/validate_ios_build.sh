@@ -106,7 +106,7 @@ xcodebuild \
   CODE_SIGNING_REQUIRED=NO \
   CODE_SIGN_IDENTITY="" \
   build 2>&1 | tee "$BUILD_LOG_PATH"
-BUILD_EXIT_CODE=${PIPESTATUS[0]}
+BUILD_EXIT_CODE=${PIPESTATUS[0]:-1}
 set -e
 
 if [ "$BUILD_EXIT_CODE" -eq 0 ]; then

@@ -2,6 +2,15 @@
 
 ## 2026-05-06
 
+### VideoDetail 顶部卡片改为视频播放器入口
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/views/VideoDetail.vue`](mobile-frontend/src/views/VideoDetail.vue)：将视频详情页顶部 hero 卡片改为可点击的视频播放器入口（点击跳转到 `/player/:id`），点击行为与页面下方"播放"按钮一致，保留页面中原有的播放按钮不受影响。
+  - hero 区域增加播放图标 SVG（带呼吸缩放动画），仅在可播放状态（`canOpenPlayerWhileProcessing`）下显示。
+  - hero 区域增加 hover/active 视觉反馈（卡片上浮、阴影加深、轻微缩小）。
+  - 同步 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/`](ios-app/EduMindIOS/EduMindIOS/WebAssets/) 最新构建产物。
+  - 修复 [`ios-app/validate_ios_build.sh`](ios-app/validate_ios_build.sh)：`BUILD_EXIT_CODE=${PIPESTATUS[0]}` 改为 `${PIPESTATUS[0]:-1}`，避免沙箱环境中 `PIPESTATUS` 不可用时脚本报 unbound variable 错误。
+
 ### Logo 图片尺寸修复：AppIcon 重命名 + BrandLogo 图片对齐优化
 
 - **ios-app**：

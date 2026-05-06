@@ -22,12 +22,27 @@
     <div v-else class="video-detail-body">
       <!-- 封面与基础信息固定在上方；横向分页仅在下方区域生效（符合「在卡片下」滑动） -->
       <div class="card video-detail__shared">
-        <div class="hero">
+        <div
+          class="hero"
+          :class="{ 'hero--clickable': canOpenPlayerWhileProcessing }"
+          role="button"
+          tabindex="0"
+          :aria-label="canOpenPlayerWhileProcessing ? '点击播放视频' : undefined"
+          @click="play"
+          @keydown.enter="play"
+          @keydown.space.prevent="play"
+        >
           <div class="hero-shell" :class="heroClass">
             <div class="hero-shell__badge">{{ usingMockGateway ? 'UI ONLY' : 'LIVE' }}</div>
             <div class="hero-shell__initial">{{ heroInitial }}</div>
             <div class="hero-shell__caption">
               {{ usingMockGateway ? '当前阶段仅构建界面，封面与播放器资源后续通过预留接口接入。' : '视频预览与播放资源由后端接口提供。' }}
+            </div>
+            <div v-if="canOpenPlayerWhileProcessing" class="hero-shell__play-icon" aria-hidden="true">
+              <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="28" cy="28" r="26" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.6)" stroke-width="2"/>
+                <path d="M22 19L38 28L22 37V19Z" fill="white"/>
+              </svg>
             </div>
           </div>
         </div>
@@ -1098,6 +1113,37 @@ onUnmounted(() => {
   left: -24px;
   bottom: -26px;
   background: rgba(255, 255, 255, 0.14);
+}
+
+.hero-shell__play-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: 56px;
+  height: 56px;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+  animation: hero-play-pulse 2s ease-in-out infinite;
+}
+
+@keyframes hero-play-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.92; }
+  50% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+}
+
+.hero--clickable {
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.hero--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(30, 90, 168, 0.22);
+}
+
+.hero--clickable:active {
+  transform: translateY(0) scale(0.98);
 }
 
 .hero-shell--idle {
