@@ -1,9 +1,6 @@
 <template>
   <div class="vd-rec-panel">
     <div class="vd-rec-panel__head">
-      <p class="vd-rec-panel__intro">
-        基于当前视频，从学习库与可信来源为你延伸相关内容。以下为实时推荐结果，不含自动生成的长摘要片段。
-      </p>
       <button type="button" class="vd-rec-panel__refresh" :disabled="loading" @click="load(true)">
         {{ loading ? '加载中…' : '刷新推荐' }}
       </button>
@@ -24,7 +21,6 @@
       <div v-else-if="items.length === 0" class="vd-rec-panel__state">
         <p class="vd-rec-panel__empty-title">暂无可延伸推荐</p>
         <p class="vd-rec-panel__empty-desc">
-          可先完成本视频的转写与摘要，或稍后在网络稳定时重试。
         </p>
       </div>
 
@@ -162,14 +158,6 @@ const onPrimary = (item) => {
 .vd-rec-panel__head {
   display: grid;
   gap: 10px;
-}
-
-.vd-rec-panel__intro {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.55;
-  color: #64748b;
-  font-weight: 600;
 }
 
 .vd-rec-panel__refresh {

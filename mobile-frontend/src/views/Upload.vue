@@ -183,7 +183,6 @@
           <button class="link link--small" @click="clearUploadRecommendations" :disabled="busy">收起</button>
         </div>
       </div>
-      <div class="muted">{{ uploadRecommendationIntro }}</div>
       <div class="upload-followup__list">
         <article v-for="item in uploadRecommendationItems" :key="item.key" class="upload-followup__item">
           <div class="upload-followup__top">
@@ -512,13 +511,6 @@ const decorateUploadRecommendationItem = (item, index = 0) => {
 const uploadRecommendationItems = computed(() =>
   normalizeRecommendationItems(uploadRecommendationPayload.value).map((item, index) => decorateUploadRecommendationItem(item, index))
 )
-const uploadRecommendationIntro = computed(() => {
-  const scene = String(uploadRecommendationPayload.value?.scene || '').trim().toLowerCase()
-  const label = UPLOAD_RECOMMENDATION_SCENE_LABELS[scene] || '下一步推荐'
-  const title = latestUploadedTitle.value ? `《${latestUploadedTitle.value}》` : '当前上传内容'
-  return `${title} 上传后，后端已自动返回 ${label}，你可以直接从这里决定下一步学什么。`
-})
-
 const clearUploadRecommendations = () => {
   uploadRecommendationPayload.value = null
 }

@@ -20,7 +20,6 @@
         <div class="welcome__copy">
           <p class="welcome__eyebrow">Learning Dashboard</p>
           <h1 class="welcome__title">智能伴学中心</h1>
-          <p class="welcome__subtitle">把上传、跟进、复盘和推荐收进同一条学习动线里，页面保持简洁，下一步一眼就能决定。</p>
         </div>
         <aside class="welcome__spotlight">
           <span class="welcome__spotlight-label">当前重心</span>
@@ -83,7 +82,6 @@
       <div class="section-head">
         <div>
           <h2>学习概览</h2>
-          <p>把最近任务和回看入口压缩成一屏里的稳定节奏。</p>
         </div>
         <button class="overview-link" @click="reloadDashboard" :disabled="loading || recommendationLoading">
           {{ loading ? '刷新中…' : '刷新' }}

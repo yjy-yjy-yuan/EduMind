@@ -33,7 +33,6 @@
       <div class="card-head">
         <div>
           <div class="card-title">设计项目</div>
-          <p class="muted">先选择一个 Sleek 项目，再把你希望生成的页面描述发给后端。</p>
         </div>
       </div>
 

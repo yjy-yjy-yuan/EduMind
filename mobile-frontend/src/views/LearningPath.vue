@@ -10,7 +10,6 @@
         <div class="badge">{{ i + 1 }}</div>
         <div class="content">
           <div class="title">{{ s.title }}</div>
-          <div class="muted">{{ s.desc }}</div>
         </div>
       </div>
     </div>
@@ -20,12 +19,6 @@
 <script setup>
 import { ref } from 'vue'
 
-const steps = ref([
-  { title: '上传学习视频', desc: '导入课程视频，等待字幕/摘要/标签生成。' },
-  { title: '观看与提问', desc: '边看边问，快速澄清知识点与疑惑。' },
-  { title: '记录笔记', desc: '把关键结论整理成笔记，便于复习。' },
-  { title: '复盘学习结果', desc: '结合摘要、标签和笔记确认下一步学习重点。' }
-])
 
 const refresh = () => {
   // 占位：后续接入学习路径推荐接口
@@ -56,12 +49,6 @@ const refresh = () => {
   background: transparent;
   color: var(--primary);
   font-weight: 900;
-}
-
-.muted {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.6;
 }
 
 .list {

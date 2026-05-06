@@ -79,7 +79,7 @@
         </div>
         <div v-if="transcript.summary" class="block-body block-body--prewrap">{{ transcript.summary }}</div>
         <div v-else-if="transcript.summaryStatus === 'generating'" class="block-placeholder">正在提取课程摘要…</div>
-        <div v-else class="block-placeholder">转录完成后可在此生成课程摘要。</div>
+        <div v-else class="block-placeholder">暂无摘要。</div>
         <div v-if="transcript.summaryErrorMessage" class="inline-tip inline-tip--bad">{{ transcript.summaryErrorMessage }}</div>
       </div>
 
@@ -96,7 +96,7 @@
           <div class="block-title">转录文本</div>
         </div>
         <pre v-if="transcript.transcriptText" class="block-body block-body--prewrap transcript-text">{{ transcript.transcriptText }}</pre>
-        <div v-else class="block-placeholder">当前还没有可用文本。</div>
+        <div v-else class="block-placeholder">暂无转录文本。</div>
       </div>
 
       <button class="danger" @click="removeTranscript" :disabled="deleting">

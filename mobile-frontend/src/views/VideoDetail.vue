@@ -113,7 +113,7 @@
             </div>
           </div>
           <div v-if="video.summary" class="block-body block-body--prewrap">{{ video.summary }}</div>
-          <div v-else class="block-placeholder">处理完成后可在此生成课程摘要。</div>
+          <div v-else class="block-placeholder">暂无摘要。</div>
           <div v-if="tagList.length > 0" class="tag-list">
             <span v-for="tag in tagList" :key="tag" class="tag-pill">{{ tag }}</span>
           </div>

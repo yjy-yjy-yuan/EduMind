@@ -82,7 +82,6 @@
     </div>
     <div v-else-if="notes.length === 0" class="empty">
       <div class="empty__title">当前没有符合条件的笔记。</div>
-      <div class="empty__tip">可以直接新建普通笔记，也可以通过筛选找到已有内容继续编辑。</div>
     </div>
 
     <div v-else class="content">
@@ -704,13 +703,6 @@ onMounted(reload)
 .empty__title {
   font-size: 14px;
   font-weight: 900;
-}
-
-.empty__tip {
-  margin-top: 6px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #475569;
 }
 
 .card {
