@@ -39,7 +39,8 @@ const props = defineProps({
 })
 
 const wrapperStyle = computed(() => ({
-  width: `${props.width}px`
+  width: `${props.width}px`,
+  height: `${props.width}px`
 }))
 
 const resolvedLogoSrc = computed(() => (props.logoType === 'mark' ? logoMarkSrc : logoSrc))
@@ -62,6 +63,7 @@ const resolvedLogoSrc = computed(() => (props.logoType === 'mark' ? logoMarkSrc 
 
 .brand-logo__frame {
   width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -11,10 +11,8 @@
 - **mobile-frontend**：
   - 更新 [`mobile-frontend/src/assets/edumind-logo.png`](mobile-frontend/src/assets/edumind-logo.png) 与 [`mobile-frontend/src/assets/edumind-logo-icon.png`](mobile-frontend/src/assets/edumind-logo-icon.png) 为用户提供的新 Logo。
   - 更新 [`mobile-frontend/src/components/BrandLogo.vue`](mobile-frontend/src/components/BrandLogo.vue)：`object-position: center` → `object-position: top`，确保竖长 Logo 图片在顶部对齐时图案部分完整显示在容器内。
-  - 骨架屏动画（[`Home.vue`](mobile-frontend/src/views/Home.vue)）、引导页卡片（[`Guide.vue`](mobile-frontend/src/views/Guide.vue)）、视频详情卡片（[`VideoDetail.vue`](mobile-frontend/src/views/VideoDetail.vue)）渐变色从残留紫色 `#f0e8f7` 修正为蓝色 `#dbeafe`，与主题一致。
 
-- **测试**：
-  - 修复 [`tests/api/config.test.mjs`](mobile-frontend/tests/api/config.test.mjs) 与 [`tests/api/frameDescription.test.mjs`](mobile-frontend/tests/api/frameDescription.test.mjs) 中的 `readFileSync` 路径前缀，从 `'src/'` 更正为 `'mobile-frontend/src/'`，解决 `node --test` 从 repo root 运行时文件找不到的问题。
+- **更正说明**：2026-05-05 当日 CHANGELOG 中记录了 `Home.vue`、`Guide.vue`、`VideoDetail.vue` 骨架屏渐变色修正（`#f0e8f7` → `#dbeafe`），该记录与实际提交不符，该修改件未在 `51a23797` 中执行。
 
 ## 2026-05-05
 

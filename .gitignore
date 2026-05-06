@@ -83,3 +83,6 @@ scripts/deploy_aliyun.sh
 scripts/deploy_server.sh
 sshpass_bin
 edumind.tar.gz
+
+# iOS build / simulator logs (contain large debug logs and process IDs)
+ios-app/logs/
