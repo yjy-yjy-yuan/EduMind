@@ -255,7 +255,7 @@ onMounted(reloadAll)
 .recommendations-page {
   display: grid;
   gap: 16px;
-  padding-top: calc(16px + env(safe-area-inset-top));
+  padding-top: 16px;
   font-family: 'Avenir Next', 'SF Pro Display', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 

@@ -935,8 +935,8 @@ cleanupLegacyOfflineMemoryCache()
 </style>
 <style scoped>
 .page {
-  padding-top: calc(12px + env(safe-area-inset-top));
-  padding-bottom: calc(28px + env(safe-area-inset-bottom));
+  padding-top: 12px;
+  padding-bottom: 28px;
 }
 
 .topbar {

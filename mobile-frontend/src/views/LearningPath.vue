@@ -86,7 +86,7 @@ const refresh = () => {
 </style>
 <style scoped>
 .page {
-  padding-top: calc(14px + env(safe-area-inset-top));
+  padding-top: 14px;
 }
 
 .topbar {

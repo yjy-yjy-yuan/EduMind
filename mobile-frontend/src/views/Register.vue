@@ -189,7 +189,7 @@ const submit = async () => {
 </style>
 <style scoped>
 .page {
-  padding-top: calc(22px + env(safe-area-inset-top));
+  padding-top: 22px;
 }
 
 .hero {

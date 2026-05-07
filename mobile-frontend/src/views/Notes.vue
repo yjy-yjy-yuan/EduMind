@@ -395,7 +395,7 @@ onMounted(reload)
 .page {
   max-width: 520px;
   margin: 0 auto;
-  padding: calc(14px + env(safe-area-inset-top)) 16px 0;
+  padding: 14px 16px 0;
 }
 
 .topbar {
