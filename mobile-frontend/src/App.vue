@@ -3,7 +3,7 @@
     <div class="bg-decor bg-decor--left"></div>
     <div class="bg-decor bg-decor--center"></div>
     <div class="bg-decor bg-decor--right"></div>
-    <main class="content">
+    <main class="content" :class="{ 'content--with-tabbar': !route.meta.hideTabBar }">
       <RouterView />
     </main>
     <TabBar v-if="!route.meta.hideTabBar" />
@@ -25,6 +25,8 @@ onMounted(async () => {
 <style scoped>
 .app-shell {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-height: 100dvh;
   overflow-x: hidden;
   background:
@@ -35,9 +37,15 @@ onMounted(async () => {
 .content {
   position: relative;
   z-index: 2;
-  min-height: 100dvh;
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
   overflow-x: hidden;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+}
+
+.content--with-tabbar {
   padding-bottom: calc(var(--tabbar-space) + 14px);
 }
 

@@ -569,7 +569,8 @@ export default {
 .search-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100%;
+  height: 100%;
   background: #f5f5f5;
 }
 

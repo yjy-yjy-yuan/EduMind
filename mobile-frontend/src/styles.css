@@ -163,9 +163,9 @@ textarea {
   min-height: 100%;
   margin: 0 auto;
   padding:
-    calc(12px + env(safe-area-inset-top))
+    12px
     clamp(14px, 4vw, 22px)
-    calc(var(--tabbar-space) + 12px);
+    12px;
 }
 
 .ios-page > * {
@@ -294,8 +294,8 @@ textarea:focus-visible {
 
   .ios-page {
     padding:
-      calc(10px + env(safe-area-inset-top))
+      10px
       12px
-      calc(76px + env(safe-area-inset-bottom));
+      10px;
   }
 }
