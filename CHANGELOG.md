@@ -2,6 +2,28 @@
 
 ## 2026-05-06
 
+### 移动端全面屏安全区域适配（Safe Area）
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/App.vue`](mobile-frontend/src/App.vue)：将 `.app-shell` 改为 `display: flex; flex-direction: column;`，`.content` 改为 `flex: 1 1 auto; min-height: 0;`，统一添加 `padding-top: env(safe-area-inset-top)` 和动态 `padding-bottom`（有 TabBar 时使用 `--tabbar-space`，无 TabBar 时使用 `env(safe-area-inset-bottom)`）；通过 `route.meta.hideTabBar` 动态切换 `content--with-tabbar` 类，避免底部留白或遮挡。
+  - 更新 [`mobile-frontend/src/styles.css`](mobile-frontend/src/styles.css)：将 `.ios-page` 的顶部/底部 padding 中的 `env(safe-area-inset-*)` 去除，改为纯设计间距（`12px` / `10px`），避免与 App.vue 统一安全区域 padding 叠加导致间距过大。
+  - 批量更新以下视图，去除各自重复的 `env(safe-area-inset-top)` / `env(safe-area-inset-bottom)`，改由 App.vue 统一管控：
+    - [`mobile-frontend/src/views/Home.vue`](mobile-frontend/src/views/Home.vue)
+    - [`mobile-frontend/src/views/Login.vue`](mobile-frontend/src/views/Login.vue)
+    - [`mobile-frontend/src/views/Register.vue`](mobile-frontend/src/views/Register.vue)
+    - [`mobile-frontend/src/views/Notes.vue`](mobile-frontend/src/views/Notes.vue)
+    - [`mobile-frontend/src/views/NoteEdit.vue`](mobile-frontend/src/views/NoteEdit.vue)
+    - [`mobile-frontend/src/views/Videos.vue`](mobile-frontend/src/views/Videos.vue)
+    - [`mobile-frontend/src/views/LearningPath.vue`](mobile-frontend/src/views/LearningPath.vue)
+    - [`mobile-frontend/src/views/VideoDetail.vue`](mobile-frontend/src/views/VideoDetail.vue)
+    - [`mobile-frontend/src/views/Profile.vue`](mobile-frontend/src/views/Profile.vue)
+    - [`mobile-frontend/src/views/QA.vue`](mobile-frontend/src/views/QA.vue)
+    - [`mobile-frontend/src/views/Upload.vue`](mobile-frontend/src/views/Upload.vue)
+    - [`mobile-frontend/src/views/Recommendations.vue`](mobile-frontend/src/views/Recommendations.vue)
+  - 更新 [`mobile-frontend/src/views/Search.vue`](mobile-frontend/src/views/Search.vue)：将 `.search-page` 的 `height: 100vh` 改为 `min-height: 100%; height: 100%`，避免在 flex 容器中出现视口高度计算偏差；顶部安全区域由 App.vue 统一提供。
+  - 底部导航 [`mobile-frontend/src/components/TabBar.vue`](mobile-frontend/src/components/TabBar.vue) 保持原有 `env(safe-area-inset-bottom)` 适配，无需修改。
+  - iOS 原生端 [`ios-app/EduMindIOS/EduMindIOS/ContentView.swift`](ios-app/EduMindIOS/EduMindIOS/ContentView.swift) 已具备 `.ignoresSafeArea()`，配合 H5 的 `viewport-fit=cover` 可将安全区域 inset 正确暴露给 CSS `env()`。
+
 ### UI 说明文字清理：去除开发者提示，简化用户界面
 
 - **mobile-frontend**：
