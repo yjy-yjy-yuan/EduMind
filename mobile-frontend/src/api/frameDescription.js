@@ -134,8 +134,8 @@ export async function describeFrameStream(params, options) {
     })
   } catch (error) {
     if (error?.name === 'AbortError' && !(signal && signal.aborted)) {
-      if (timeoutReason === 'connect') throw toStreamError('连接超时，已切换到降级描述', 408)
-      if (timeoutReason === 'idle') throw toStreamError('流式响应超时，已切换到降级描述', 408)
+      if (timeoutReason === 'connect') throw toStreamError('连接超时，已切换到字幕描述', 408)
+      if (timeoutReason === 'idle') throw toStreamError('响应超时，已切换到字幕描述', 408)
     }
     throw error
   }
@@ -182,7 +182,7 @@ export async function describeFrameStream(params, options) {
       } catch (error) {
         clearIdleTimer()
         if (error?.name === 'AbortError' && timeoutReason === 'idle' && !(signal && signal.aborted)) {
-          throw toStreamError('流式响应超时，已切换到降级描述', 408)
+          throw toStreamError('响应超时，已切换到字幕描述', 408)
         }
         throw error
       }

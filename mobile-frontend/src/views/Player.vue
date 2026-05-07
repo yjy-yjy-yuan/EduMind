@@ -65,7 +65,6 @@
           <span class="fd-panel__title">实时画面描述</span>
           <div class="fd-panel__badges">
             <span v-if="fdStage" class="fd-badge" :class="fdBadgeClass">{{ fdStageLabel }}</span>
-            <span v-if="fdDegraded" class="fd-badge fd-badge--degraded">降级模式</span>
           </div>
         </div>
         <div class="fd-panel__controls">
@@ -378,7 +377,7 @@ const FD_STAGE_LABELS = {
   sampling: '采样中',
   inferring: '推理中',
   completed: '已完成',
-  degraded: '降级中',
+  subtitle: '字幕模式',
   recovering: '恢复中',
   error: '异常',
 }
@@ -439,17 +438,17 @@ const buildFdFallbackDescription = (reasonText = '') => {
   const timeText = currentTimeText.value || '00:00'
   const subtitleSummary = summarizeSubtitleExcerpt(buildSubtitleExcerpt())
   if (subtitleSummary) {
-    return `（降级）当前约 ${timeText}，结合附近字幕：${subtitleSummary}`
+    return `当前约 ${timeText}，结合附近字幕：${subtitleSummary}`
   }
   const latestHistory = String(fdRecentHistory.value?.[0]?.text || '').trim()
   if (latestHistory) {
-    return `（降级）当前约 ${timeText}，描述服务暂不可用，先参考上一条：${latestHistory}`
+    return `当前约 ${timeText}，参考上一条：${latestHistory}`
   }
   const reason = String(reasonText || '').trim()
   if (reason) {
-    return `（降级）当前约 ${timeText}，描述服务暂不可用（${reason}），正在自动重试。`
+    return `当前约 ${timeText}，描述服务暂不可用（${reason}），正在自动重试。`
   }
-  return `（降级）当前约 ${timeText}，描述服务暂不可用，正在自动重试。`
+  return `当前约 ${timeText}，描述服务暂不可用，正在自动重试。`
 }
 
 const applyFdDegradedOutput = (reasonText = '') => {
@@ -488,7 +487,7 @@ const startFdWatchdog = () => {
     if (Date.now() - since < maxBusyMs) return
 
     abortFdStreamController()
-    applyFdDegradedOutput('连接实时描述服务超时，已自动降级')
+    applyFdDegradedOutput('连接超时，已自动切换到字幕模式')
   }, 1000)
 }
 
