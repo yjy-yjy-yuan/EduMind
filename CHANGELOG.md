@@ -2,6 +2,19 @@
 
 ## 2026-05-13
 
+### 笔记页"关联问答"卡片高度缩减为原来的二分之一
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/views/Notes.vue`](mobile-frontend/src/views/Notes.vue)：
+    - `.qa-card` 纵向 padding 从 `14px` 减至 `7px`。
+    - `.qa-card__icon` 尺寸从 `18px` 减至 `14px`。
+    - `.qa-card__title` 字号从 `14px` 减至 `12px`。
+    - `.qa-card__arrow` 字号从 `22px` 减至 `16px`。
+    - `.qa-card__label` 间隙从 `8px` 减至 `4px`。
+- **ios-app**：
+  - 重新构建并同步 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/`](ios-app/EduMindIOS/EduMindIOS/WebAssets/) 目录。
+- **impact**：仅 UI 尺寸调整，无功能行为变化。
+
 ### 笔记页"关联问答"卡片宽度与"筛选与搜索"卡片一致
 
 - **mobile-frontend**：

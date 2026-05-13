@@ -469,7 +469,7 @@ onMounted(reload)
 }
 
 .qa-card {
-  padding: 14px 16px;
+  padding: 7px 16px;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
@@ -486,24 +486,24 @@ onMounted(reload)
 .qa-card__label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
 }
 
 .qa-card__icon {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   color: var(--primary);
   flex-shrink: 0;
 }
 
 .qa-card__title {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 900;
   color: #0f172a;
 }
 
 .qa-card__arrow {
-  font-size: 22px;
+  font-size: 16px;
   color: #9ca3af;
   font-weight: 400;
   line-height: 1;
