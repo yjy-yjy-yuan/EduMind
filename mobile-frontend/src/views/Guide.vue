@@ -226,7 +226,7 @@
           @toggle="onAccordionToggle(FAQ.AI_QA, $event)"
         >
           <summary class="acc-summary">
-            <span class="acc-title">如何使用 AI 问答功能？</span>
+            <span class="acc-title">如何使用智能问答功能？</span>
           </summary>
           <div class="acc-body">
             AI 将基于视频内容或通用知识回答你的问题。

@@ -2,6 +2,16 @@
 
 ## 2026-05-13
 
+### 统一页面中"AI问答"字样改为"智能问答"
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/views/QA.vue`](mobile-frontend/src/views/QA.vue)：问答页面标题 `AI 问答` → `智能问答`。
+  - 更新 [`mobile-frontend/src/views/Guide.vue`](mobile-frontend/src/views/Guide.vue)：新手教程中问答章节标题和 FAQ 标题中的 `AI 问答` → `智能问答`。
+  - 更新 [`mobile-frontend/src/router/index.js`](mobile-frontend/src/router/index.js)：路由 meta title `AI 问答` → `智能问答`。
+- **ios-app**：
+  - 同步更新 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js`](ios-app/EduMindIOS/EduMindIOS/WebAssets/index.js) 中的编译后文本，共 2 处。
+- **impact**：仅文本标签变更，无功能行为或接口契约变化。
+
 ### 视频链接上传入口收敛为仅支持 B站
 
 - **mobile-frontend**：

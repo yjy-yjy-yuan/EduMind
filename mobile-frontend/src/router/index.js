@@ -33,7 +33,7 @@ const router = createRouter({
     { path: '/notes', name: 'Notes', component: Notes, meta: { title: '笔记', requiresAuth: true } },
     { path: '/notes/new', name: 'NoteNew', component: NoteEdit, meta: { title: '新建笔记', hideTabBar: true, requiresAuth: true } },
     { path: '/notes/:id', name: 'NoteEdit', component: NoteEdit, meta: { title: '编辑笔记', hideTabBar: true, requiresAuth: true } },
-    { path: '/qa', name: 'QA', component: QA, meta: { title: 'AI 问答', hideTabBar: true } },
+    { path: '/qa', name: 'QA', component: QA, meta: { title: '智能问答', hideTabBar: true } },
     { path: '/search', name: 'Search', component: Search, meta: { title: '搜索' } },
     { path: '/learning-path', name: 'LearningPath', component: LearningPath, meta: { title: '学习路径' } },
     { path: '/guide', name: 'Guide', component: Guide, meta: { title: '使用指南', hideTabBar: true } },

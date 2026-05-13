@@ -2,7 +2,7 @@
   <div class="page">
     <header class="topbar">
       <button class="back" @click="goBack">‹</button>
-      <h2>AI 问答</h2>
+      <h2>智能问答</h2>
       <button class="link" @click="clear" :disabled="asking">清空</button>
     </header>
 
