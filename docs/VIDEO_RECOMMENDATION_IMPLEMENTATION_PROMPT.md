@@ -37,7 +37,7 @@
 - `../edumind-backend/tests/api/test_recommendation_api.py`
   - 已覆盖推荐场景、首页推荐排序和相关推荐基础约束。
 - `../edumind-backend/app/routers/video.py`
-  - 已支持视频链接导入，并明确接受 B 站、YouTube、中国大学慕课链接。
+  - 已支持视频链接导入；当前上传入库链路仅保留 B 站，YouTube 与中国大学慕课链接会被后端拒绝，需作为外部候选或跳转来源处理。
 
 ### 前端现状
 
@@ -49,7 +49,7 @@
   - 已有独立「推荐学习中枢」页（`/recommendations`）：当前为 **单列表 `scene=home`** + 刷新，与首页共用推荐接口；**不再**内嵌多场景切换、主列表「看同主题」或页内「同主题」区块。
   - **`scene=related` + `seed_video_id`** 仍用于 **视频详情**「相关推荐」等需要种子的入口；兜底与排除规则仍由后端收口，前端按契约展示。
 - `mobile-frontend/src/views/Upload.vue`
-  - 已支持链接导入，且链接校验已覆盖 B 站 / YouTube / 中国大学慕课。
+  - 已支持链接导入；当前 UI 与校验仅允许 B 站链接，避免把暂时关闭的 YouTube / 中国大学慕课链接送入上传处理。
 
 当前问题不是“完全没有推荐能力”，而是“只有站内轻量推荐，还没有围绕已上传视频标签聚类和外部候选源扩展的完整链路”。
 
@@ -139,10 +139,9 @@
 - 当前前端已有推荐入口：
   - `mobile-frontend/src/api/recommendation.js`
   - `mobile-frontend/src/views/Home.vue`
-- 当前链接导入链路已支持：
+- 当前链接上传入库链路已支持：
   - B 站
-  - YouTube
-  - 中国大学慕课
+  - YouTube / 中国大学慕课：暂时关闭上传入库；推荐系统可保留外部候选元数据与跳转能力，但不要把这两个来源作为可上传链接展示或提交。
   - 参考 `../edumind-backend/app/routers/video.py` 与 `mobile-frontend/src/views/Upload.vue`
 
 当前问题不是“没有推荐模块”，而是“推荐模块还停留在站内轻量排序，尚未形成基于标签聚类和外部候选源的真实推荐闭环”。

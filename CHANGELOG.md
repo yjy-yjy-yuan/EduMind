@@ -1,5 +1,16 @@
 # 变更日志
 
+## 2026-05-13
+
+### 视频链接上传入口收敛为仅支持 B站
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/views/Upload.vue`](mobile-frontend/src/views/Upload.vue)：视频链接上传输入框提示改为“请输入B站视频链接”，页面支持说明改为“支持：B站”。
+  - 更新 [`mobile-frontend/src/views/Upload.vue`](mobile-frontend/src/views/Upload.vue)：链接校验正则收敛为 `bilibili.com|b23.tv`，前端不再接受 YouTube 或中国大学慕课链接进入上传流程。
+- **docs**：
+  - 更新 [`docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md`](docs/VIDEO_RECOMMENDATION_IMPLEMENTATION_PROMPT.md)：修正旧前提，明确当前“链接上传入库”仅保留 B站；YouTube / 中国大学慕课仍可作为外部候选方向讨论，但暂不作为上传入库链路。
+- **impact**：上传页 UI 与后端 `/api/videos/upload-url` 当前策略保持一致，避免页面显示“中国大学慕课”但后端已拒绝的产品不一致。
+
 ## 2026-05-06
 
 ### 移动端全面屏安全区域适配（Safe Area）

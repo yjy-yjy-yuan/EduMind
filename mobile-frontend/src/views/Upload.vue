@@ -170,9 +170,9 @@
       <div v-if="hasRecommendationImport" class="import-tip">
         <span class="import-badge import-badge--inline">{{ importSourceLabel }}</span>
       </div>
-      <input class="input" v-model.trim="videoUrl" placeholder="请输入视频链接（B站/YouTube等）" :disabled="busy" />
+      <input class="input" v-model.trim="videoUrl" placeholder="请输入B站视频链接" :disabled="busy" />
       <button class="btn" @click="uploadUrl" :disabled="!videoUrl || busy">{{ busy ? '提交中…' : '提交链接' }}</button>
-      <div class="muted">支持：B站、YouTube、中国大学慕课</div>
+      <div class="muted">支持：B站</div>
     </div>
 
     <div v-if="uploadRecommendationItems.length > 0" class="card upload-followup">
@@ -1349,8 +1349,8 @@ const queueOfflineUrlImport = async (trimmedUrl) => {
 const validateVideoUrl = (url) => {
   const value = String(url || '').trim()
   if (!value) return '请输入视频链接'
-  const ok = /(bilibili\.com|b23\.tv|youtube\.com|youtu\.be|icourse163\.org)/i.test(value)
-  if (!ok) return '仅支持 B站 / YouTube / 中国大学慕课 链接'
+  const ok = /(bilibili\.com|b23\.tv)/i.test(value)
+  if (!ok) return '仅支持 B站 链接'
   return ''
 }
 
