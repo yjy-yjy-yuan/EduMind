@@ -472,7 +472,6 @@ onMounted(reload)
   padding: 14px 16px;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
-  width: 50%;
 }
 
 .qa-card:hover {

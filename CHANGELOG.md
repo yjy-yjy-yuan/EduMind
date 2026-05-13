@@ -2,6 +2,14 @@
 
 ## 2026-05-13
 
+### 笔记页"关联问答"卡片宽度与"筛选与搜索"卡片一致
+
+- **mobile-frontend**：
+  - 更新 [`mobile-frontend/src/views/Notes.vue`](mobile-frontend/src/views/Notes.vue)：移除 `.qa-card` 的 `width: 50%` 限制，使"关联问答"入口卡片的宽度与上方"筛选与搜索"卡片一致（满宽），消除视觉不协调。
+- **ios-app**：
+  - 重新构建并同步 [`ios-app/EduMindIOS/EduMindIOS/WebAssets/`](ios-app/EduMindIOS/EduMindIOS/WebAssets/) 目录。
+- **impact**：仅 UI 宽度调整，无功能行为变化。
+
 ### 统一页面中"AI问答"字样改为"智能问答"
 
 - **mobile-frontend**：
