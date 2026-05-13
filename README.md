@@ -97,10 +97,9 @@ bash ios-app/validate_ios_build.sh         # iOS 构建 + 屏幕方向配置校�
 
 ```bash
 bash scripts/install_git_hooks.sh
-pre-commit install
-pre-commit install --hook-type commit-msg
-pre-commit install --hook-type pre-push
 ```
+
+脚本会自动创建 `.venv`（若缺失）、安装 `pre-commit` 与 `mypy`、然后注册全部三类 hook（`pre-commit`、`commit-msg`、`pre-push`）。
 
 说明：
 
@@ -111,11 +110,9 @@ pre-commit install --hook-type pre-push
 
 ## GitHub Actions CI
 
-最小后端 CI 工作流历史文件为 [`.github/workflows/backend-ci.yml`](.github/workflows/backend-ci.yml)。
+后端 CI 已迁移至 `edumind-backend` 独立仓库（`ruff` + smoke regression），本仓库不再保留 GitHub Actions 工作流文件。
 
-后端目录拆分后，建议在 `edumind-backend` 独立仓库中维护 CI（`ruff` + smoke regression），本仓库仅保留 iOS 前端链路相关 CI。
-
-CI 为云端回归门禁，不替代本地 smoke / iOS build 验证链路。本地改动验证默认使用 `validate_backend_smoke.py`，不直接运行 `pytest`。
+本地改动验证默认使用 `validate_backend_smoke.py`，不直接运行 `pytest`。
 
 ## MySQL 数据库管理
 
