@@ -161,7 +161,7 @@ taskkill /F /IM python.exe
 **方法1: 使用预下载脚本(推荐)**
 ```bash
 # 在项目根目录运行
-python download_whisper.py
+python scripts/download_whisper.py
 
 # 选择要下载的模型
 # 默认保存到: /Users/yuan/302_works/whisper_models

@@ -30,8 +30,6 @@ build/
 dist/
 
 # Project specific
-backend/uploads/
-backend/instance/
 ../edumind-backend/uploads/
 ../edumind-backend/data/
 
@@ -61,8 +59,8 @@ Thumbs.db
 .xcode-derived*/
 DerivedData/
 
-# Accidental local directories
-~/
+# Temporary output directories
+output_docx/
 
 # Logs
 *.log

@@ -1,5 +1,29 @@
 # 变更日志
 
+## 2026-05-18
+
+### 项目结构重构：收敛根目录文件至规范子目录
+
+- **docs/**：将散落在根目录的文档文件收敛至 `docs/` 目录：
+  - `BACKEND_ARCHITECTURE.md` → `docs/BACKEND_ARCHITECTURE.md`
+  - `HTTPS_UPGRADE_ARCHITECTURE.md` → `docs/HTTPS_UPGRADE_ARCHITECTURE.md`
+  - `KEYWORD_SEARCH_DELIVERY_SUMMARY.md` → `docs/KEYWORD_SEARCH_DELIVERY_SUMMARY.md`
+  - `PROJECT_AGENT_ORCHESTRATION_PROMPT.md` → `docs/PROJECT_AGENT_ORCHESTRATION_PROMPT.md`
+  - `PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md` → `docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`
+  - `SENTRYSEARCH_INTEGRATION_PROMPT.md` → `docs/SENTRYSEARCH_INTEGRATION_PROMPT.md`
+  - `server_deployment_log.md` → `docs/server_deployment_log.md`
+- **deploy/**：将部署与工具链配置收敛至 `deploy/` 目录：
+  - `pyproject.toml` → `deploy/pyproject.toml`
+  - `pytest.ini` → `deploy/pytest.ini`
+  - `.flake8` → `deploy/.flake8`
+  - `docker-compose.yml` → `deploy/docker-compose.yml`
+  - `nginx.conf` → `deploy/nginx.conf`
+- **scripts/**：将工具脚本收敛至 `scripts/` 目录：
+  - `download_whisper.py` → `scripts/download_whisper.py`
+- **.gitignore**：清理已废弃的 `backend/` 路径引用，新增 `output_docx/` 忽略规则。
+- **AGENTS.md**：同步更新项目结构说明与 `deploy/pyproject.toml` 路径引用。
+- **impact**：纯内部结构调整，无功能行为变化。所有页面、卡片、交互逻辑保持不变。
+
 ## 2026-05-13
 
 ### 笔记页"关联问答"卡片高度缩减为原来的二分之一
