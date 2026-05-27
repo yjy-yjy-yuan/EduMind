@@ -18,7 +18,7 @@ repos:
     rev: v4.6.0
     hooks:
       - id: check-ast
-        files: ^(download_whisper\.py|scripts/.*\.py)$
+        files: ^scripts/.*\.py$
       - id: check-byte-order-marker
       - id: check-case-conflict
       - id: check-merge-conflict
@@ -39,21 +39,22 @@ repos:
     rev: 24.10.0
     hooks:
       - id: black
-        files: ^(download_whisper\.py|scripts/.*\.py)$
-        args: [--config=pyproject.toml]
+        files: ^scripts/.*\.py$
+        args: [--config=deploy/pyproject.toml]
 
   - repo: https://github.com/PyCQA/isort
     rev: 5.13.2
     hooks:
       - id: isort
-        files: ^(download_whisper\.py|scripts/.*\.py)$
-        args: [--settings-path=pyproject.toml]
+        files: ^scripts/.*\.py$
+        args: [--settings-path=deploy/pyproject.toml]
 
   - repo: https://github.com/PyCQA/flake8
     rev: 7.1.1
     hooks:
       - id: flake8
-        files: ^(download_whisper\.py|scripts/.*\.py)$
+        files: ^scripts/.*\.py$
+        args: [--config=deploy/.flake8]
 
   - repo: local
     hooks:

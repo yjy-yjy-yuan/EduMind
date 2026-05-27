@@ -353,15 +353,18 @@ const fdSourceExpanded = ref(false)
 const fdSessionId = ref('')
 const fdSessionActive = ref(false)
 const fdStreamController = ref(null)
+const fdStreamRunId = ref(0)
+const fdTickTimer = ref(null)
+const fdTickInFlight = ref(false)
 const fdLastSampleTime = ref(-99)
 const fdRetryCount = ref(0)
 const fdBusyStageSinceMs = ref(0)
 const fdWatchdogTimer = ref(null)
 const FD_MAX_RETRIES = 3
-const FD_STREAM_TIMEOUT_MS = 9000
-const FD_STREAM_IDLE_TIMEOUT_MS = 9000
+const FD_STREAM_TIMEOUT_MS = 7000
+const FD_STREAM_IDLE_TIMEOUT_MS = 7000
 const FD_SESSION_START_TIMEOUT_MS = 2200
-const FD_BUSY_STAGE_MAX_MS = 9000
+const FD_BUSY_STAGE_MAX_MS = 7000
 const FD_SERVER_FRAME_STREAM_TIMEOUT_MS = 75000
 const FD_SERVER_FRAME_IDLE_TIMEOUT_MS = 75000
 const FD_SERVER_FRAME_BUSY_STAGE_MAX_MS = 75000
@@ -421,8 +424,8 @@ const isShortVideo = () => {
   return Number.isFinite(seconds) && seconds > 0 && seconds <= 45
 }
 
-const getFdIntervalMs = () => (isShortVideo() ? 2500 : 8000)
-const getFdMinSampleGapSeconds = () => (isShortVideo() ? 1.5 : 6)
+const getFdIntervalMs = () => (isShortVideo() ? 2500 : 3000)
+const getFdMinSampleGapSeconds = () => (isShortVideo() ? 1.8 : 2.4)
 
 const summarizeSubtitleExcerpt = (rawText) => {
   const lines = String(rawText || '')
@@ -465,13 +468,49 @@ const applyFdDegradedOutput = (reasonText = '') => {
   }
 }
 
+const clearFdTickTimer = () => {
+  if (fdTickTimer.value) {
+    clearTimeout(fdTickTimer.value)
+    fdTickTimer.value = null
+  }
+}
+
+const isFdRunActive = (controller, runId) => {
+  return Boolean(
+    fdEnabled.value &&
+    controller &&
+    !controller.signal.aborted &&
+    fdStreamController.value === controller &&
+    fdStreamRunId.value === runId
+  )
+}
+
+const executeScheduledFdTick = (controller, runId) => {
+  fdTickTimer.value = null
+  runFdTick(controller, runId)
+}
+
+const scheduleFdTick = (controller, runId, delayMs) => {
+  if (!isFdRunActive(controller, runId)) return
+  clearFdTickTimer()
+  fdTickTimer.value = setTimeout(
+    executeScheduledFdTick,
+    Math.max(0, Number(delayMs || 0)),
+    controller,
+    runId
+  )
+}
+
 const abortFdStreamController = () => {
+  clearFdTickTimer()
   const ctrl = fdStreamController.value
   if (ctrl) {
     try { ctrl.abort() } catch {}
   }
   fdStreamController.value = null
   fdSessionActive.value = false
+  fdTickInFlight.value = false
+  fdStreamRunId.value += 1
 }
 
 const startFdWatchdog = () => {
@@ -522,6 +561,90 @@ const captureVideoFrame = () => {
 
 const canUseServerFrameSource = (url) => /^https?:\/\//i.test(String(url || '').trim())
 
+const runFdTick = async (controller, runId) => {
+  if (!isFdRunActive(controller, runId)) return
+  if (fdTickInFlight.value) return
+  fdTickInFlight.value = true
+
+  const intervalMs = getFdIntervalMs()
+  try {
+    const minSampleGapSeconds = getFdMinSampleGapSeconds()
+    const currentTime = currentTimeSeconds.value
+    if (Math.abs(currentTime - fdLastSampleTime.value) < minSampleGapSeconds) {
+      scheduleFdTick(controller, runId, intervalMs)
+      return
+    }
+
+    fdLastSampleTime.value = currentTime
+    fdStage.value = 'sampling'
+    fdProgress.value = 15
+
+    const frameData = captureVideoFrame()
+    const frameSourceUrl = !frameData && canUseServerFrameSource(streamUrl.value) ? streamUrl.value : ''
+    if (!frameData && !frameSourceUrl) {
+      fdStage.value = 'connecting'
+      scheduleFdTick(controller, runId, intervalMs)
+      return
+    }
+    if (!frameData && frameSourceUrl) {
+      console.info('[FrameDesc] using server frame source fallback', {
+        video_id: Number(id.value),
+        timestamp: currentTime,
+        source: frameSourceUrl,
+      })
+    }
+
+    const contextHistory = fdRecentHistory.value.slice(0, 3).map((h) => h.text)
+    fdStage.value = 'inferring'
+    fdProgress.value = 35
+
+    const useServerFrameSource = !frameData && Boolean(frameSourceUrl)
+    fdServerFrameFetchActive.value = useServerFrameSource
+    await describeFrameStream(
+      {
+        video_id: Number(id.value),
+        frames: frameData ? [frameData] : [],
+        frame_source_url: frameSourceUrl,
+        timestamp: currentTime,
+        video_title: videoTitle.value,
+        detail_level: fdDetailLevel.value,
+        session_id: fdSessionId.value,
+        context_history: contextHistory,
+        allow_degrade: true,
+      },
+      {
+        onEvent: handleFdEvent,
+        signal: controller.signal,
+        timeoutMs: useServerFrameSource ? FD_SERVER_FRAME_STREAM_TIMEOUT_MS : FD_STREAM_TIMEOUT_MS,
+        idleTimeoutMs: useServerFrameSource ? FD_SERVER_FRAME_IDLE_TIMEOUT_MS : FD_STREAM_IDLE_TIMEOUT_MS,
+      }
+    )
+    fdServerFrameFetchActive.value = false
+    fdRetryCount.value = 0
+    scheduleFdTick(controller, runId, intervalMs)
+  } catch (err) {
+    fdServerFrameFetchActive.value = false
+    if (!isFdRunActive(controller, runId)) return
+    fdRetryCount.value += 1
+    const detail = err?.message || err?.response?.data?.detail || '描述失败'
+    const isTimeout = String(detail).includes('超时') || Number(err?.response?.status || 0) === 408
+    applyFdDegradedOutput(detail)
+    if (isTimeout) {
+      fdRetryCount.value = FD_MAX_RETRIES
+    }
+    if (fdRetryCount.value >= FD_MAX_RETRIES) {
+      scheduleFdTick(controller, runId, Math.min(intervalMs * 2, 10000))
+    } else {
+      fdStage.value = 'recovering'
+      scheduleFdTick(controller, runId, Math.min(intervalMs * fdRetryCount.value, 10000))
+    }
+  } finally {
+    if (fdStreamController.value === controller && fdStreamRunId.value === runId) {
+      fdTickInFlight.value = false
+    }
+  }
+}
+
 const handleFdEvent = (event) => {
   switch (event.type) {
     case 'status':
@@ -539,6 +662,10 @@ const handleFdEvent = (event) => {
       fdProgress.value = 100
       fdLatencyMs.value = event.latency_ms ?? null
       fdDegraded.value = event.degraded ?? false
+      if (event.suppressed_duplicate) {
+        scrollFdToBottom()
+        break
+      }
       if (event.full_description) {
         fdDescriptionText.value = event.full_description
         fdRecentHistory.value = [
@@ -568,10 +695,14 @@ const startFdStream = async () => {
     fdStreamController.value.abort()
     fdStreamController.value = null
   }
+  clearFdTickTimer()
 
   const controller = new AbortController()
+  const runId = fdStreamRunId.value + 1
+  fdStreamRunId.value = runId
   fdStreamController.value = controller
   fdSessionActive.value = true
+  fdTickInFlight.value = false
   fdRetryCount.value = 0
 
   fdStage.value = 'connecting'
@@ -598,105 +729,16 @@ const startFdStream = async () => {
     }
   }
 
-  const tick = async () => {
-    if (controller.signal.aborted || !fdEnabled.value) return
-    const intervalMs = getFdIntervalMs()
-    const minSampleGapSeconds = getFdMinSampleGapSeconds()
-
-    const currentTime = currentTimeSeconds.value
-    if (Math.abs(currentTime - fdLastSampleTime.value) < minSampleGapSeconds) {
-      if (!controller.signal.aborted && fdEnabled.value) {
-        setTimeout(tick, intervalMs)
-      }
-      return
-    }
-
-    fdLastSampleTime.value = currentTime
-    fdStage.value = 'sampling'
-    fdProgress.value = 15
-
-    const frameData = captureVideoFrame()
-    const frameSourceUrl = !frameData && canUseServerFrameSource(streamUrl.value) ? streamUrl.value : ''
-    if (!frameData && !frameSourceUrl) {
-      fdStage.value = 'connecting'
-      if (!controller.signal.aborted && fdEnabled.value) {
-        setTimeout(tick, intervalMs)
-      }
-      return
-    }
-    if (!frameData && frameSourceUrl) {
-      console.info('[FrameDesc] using server frame source fallback', {
-        video_id: Number(id.value),
-        timestamp: currentTime,
-        source: frameSourceUrl,
-      })
-    }
-
-    const contextHistory = fdRecentHistory.value.slice(0, 3).map((h) => h.text)
-    fdStage.value = 'inferring'
-    fdProgress.value = 35
-
-    const useServerFrameSource = !frameData && Boolean(frameSourceUrl)
-    fdServerFrameFetchActive.value = useServerFrameSource
-    try {
-      await describeFrameStream(
-        {
-          video_id: Number(id.value),
-          frames: frameData ? [frameData] : [],
-          frame_source_url: frameSourceUrl,
-          timestamp: currentTime,
-          video_title: videoTitle.value,
-          detail_level: fdDetailLevel.value,
-          session_id: sessionId,
-          context_history: contextHistory,
-          allow_degrade: true,
-        },
-        {
-          onEvent: handleFdEvent,
-          signal: controller.signal,
-          timeoutMs: useServerFrameSource ? FD_SERVER_FRAME_STREAM_TIMEOUT_MS : FD_STREAM_TIMEOUT_MS,
-          idleTimeoutMs: useServerFrameSource ? FD_SERVER_FRAME_IDLE_TIMEOUT_MS : FD_STREAM_IDLE_TIMEOUT_MS,
-        }
-      )
-      fdServerFrameFetchActive.value = false
-      // Success — reset retry counter and schedule next tick
-      fdRetryCount.value = 0
-      if (!controller.signal.aborted && fdEnabled.value) {
-        setTimeout(tick, intervalMs)
-      }
-    } catch (err) {
-      fdServerFrameFetchActive.value = false
-      if (controller.signal.aborted) return
-      fdRetryCount.value += 1
-      const detail = err?.message || err?.response?.data?.detail || '描述失败'
-      const isTimeout = String(detail).includes('超时') || Number(err?.response?.status || 0) === 408
-      applyFdDegradedOutput(detail)
-      if (isTimeout) {
-        fdRetryCount.value = FD_MAX_RETRIES
-      }
-      if (fdRetryCount.value >= FD_MAX_RETRIES) {
-        // Max retries reached — keep degraded output and poll slowly
-        if (!controller.signal.aborted && fdEnabled.value) {
-          setTimeout(tick, Math.min(intervalMs * 3, 30000))
-        }
-      } else {
-        // Retry with exponential backoff
-        const backoffMs = Math.min(intervalMs * fdRetryCount.value, 30000)
-        fdStage.value = 'recovering'
-        if (!controller.signal.aborted && fdEnabled.value) {
-          setTimeout(tick, backoffMs)
-        }
-      }
-    }
-  }
-
-  await tick()
+  await runFdTick(controller, runId)
 }
 
 const stopFdStream = async () => {
+  clearFdTickTimer()
   const controller = fdStreamController.value
   fdStreamController.value = null
   fdSessionActive.value = false
+  fdTickInFlight.value = false
+  fdStreamRunId.value += 1
   if (controller) controller.abort()
 
   if (fdSessionId.value) {

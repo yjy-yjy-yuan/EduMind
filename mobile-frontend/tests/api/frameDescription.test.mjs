@@ -184,16 +184,19 @@ test('source supports frame_source_url fallback for iOS WebView capture failures
 })
 
 // -----------------------------------------------------------------------
-// 测试 20：前端忙碌状态 9 秒后降级
+// 测试 20：前端忙碌状态 7 秒后降级，避免用户看到接近 10 秒的等待
 // -----------------------------------------------------------------------
-test('Player.vue aligns realtime description timeouts to 9 seconds', () => {
+test('Player.vue aligns realtime description timeouts to low-latency defaults', () => {
     const source = readFileSync(resolve(process.cwd(), 'mobile-frontend/src/views/Player.vue'), 'utf8')
-    assert.match(source, /FD_STREAM_TIMEOUT_MS\s*=\s*9000/)
-    assert.match(source, /FD_STREAM_IDLE_TIMEOUT_MS\s*=\s*9000/)
-    assert.match(source, /FD_BUSY_STAGE_MAX_MS\s*=\s*9000/)
+    assert.match(source, /FD_STREAM_TIMEOUT_MS\s*=\s*7000/)
+    assert.match(source, /FD_STREAM_IDLE_TIMEOUT_MS\s*=\s*7000/)
+    assert.match(source, /FD_BUSY_STAGE_MAX_MS\s*=\s*7000/)
     assert.match(source, /FD_SERVER_FRAME_STREAM_TIMEOUT_MS\s*=\s*75000/)
     assert.match(source, /FD_SERVER_FRAME_IDLE_TIMEOUT_MS\s*=\s*75000/)
     assert.match(source, /FD_SERVER_FRAME_BUSY_STAGE_MAX_MS\s*=\s*75000/)
+    assert.match(source, /getFdIntervalMs\s*=\s*\(\)\s*=>\s*\(isShortVideo\(\)\s*\?\s*2500\s*:\s*3000\)/)
+    assert.ok(source.includes('fdTickInFlight'), 'should prevent overlapping realtime analysis requests')
+    assert.ok(source.includes('suppressed_duplicate'), 'should ignore duplicate backend descriptions')
 })
 
 test('Player.vue supports Xcode realtime description auto-start query', () => {

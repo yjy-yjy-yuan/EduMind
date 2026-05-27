@@ -14,7 +14,9 @@ Do not reintroduce `frontend/`, `backend/`, Android modules, or desktop-web-spec
 - `mobile-frontend/`: the only frontend codebase. It provides the H5 UI loaded by iOS `WKWebView`.
 - `ios-app/`: the iOS container project, native bridge layer, on-device media/file access, on-device audio extraction/transcription execution, and Web asset sync script.
 - `docs/`: only keep documents that directly support the iOS mobile chain, Mac development, backend deployment, database setup, or video-processing workflow.
-- `CHANGELOG.md`, `index.md`, `README.md`: root-level control documents.
+- `deploy/`: deployment and infrastructure configuration (Nginx configs, Docker Compose, Python tooling configs such as `pyproject.toml`, `pytest.ini`, `.flake8`).
+- `scripts/`: utility scripts for validation, Git hooks installation, backend smoke testing, and maintenance tasks.
+- `CHANGELOG.md`, `COMMIT_LOG.md`, `index.md`, `README.md`: root-level control documents.
 - `docs/PROJECT_MOBILE_IMPLEMENTATION_PROMPT.md`: master implementation prompt for the iOS mobile chain.
 
 ## Architecture Rules
@@ -67,7 +69,7 @@ bash ios-app/validate_ios_build.sh
 ```
 
 ## Coding Style & Naming Conventions
-- Python follows Black and isort settings from `pyproject.toml`: 4-space indentation, 120-character lines, explicit imports.
+- Python follows Black and isort settings from `deploy/pyproject.toml`: 4-space indentation, 120-character lines, explicit imports.
 - Vue files should remain focused on UI state and API calls. Do not move backend logic into views.
 - Use descriptive names such as `VideoDetail.vue`, `test_video_api.py`, `video_processing.py`.
 - Prefer small top-level helpers over nested functions unless there is a hard technical reason.

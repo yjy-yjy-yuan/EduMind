@@ -234,7 +234,7 @@ print('Whisper base 模型下载完成')
 
 ```bash
 cd /var/www/edumind
-python3 download_whisper.py
+python3 scripts/download_whisper.py
 ```
 
 ### 9. 初始化数据库表

@@ -15,8 +15,10 @@ final-work/
 │   ├── ios-app/           # iOS WKWebView 容器与原生桥接
 │   ├── docs/              # iOS 链路相关文档
 │   ├── scripts/           # 本地验证、数据库管理、运维脚本
+│   ├── deploy/            # 部署配置（Nginx、Docker Compose、Python 工具链）
 │   ├── AGENTS.md          # 研发规范（AI 与人均遵守）
-│   └── CHANGELOG.md
+│   ├── CHANGELOG.md       # 变更日志
+│   └── COMMIT_LOG.md      # 分支提交日志
 └── edumind-backend/       # 唯一后端（独立目录）
 ```
 
